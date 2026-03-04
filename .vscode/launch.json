@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-BusManagementApplication<BusManagement>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "giang.com.BusManagement.BusManagementApplication",
+            "projectName": "BusManagement",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
