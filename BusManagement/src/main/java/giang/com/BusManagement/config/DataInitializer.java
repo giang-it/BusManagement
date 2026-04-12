@@ -285,7 +285,7 @@ public class DataInitializer implements CommandLineRunner {
         b.setBrand(brand);
         b.setBusType(type);
         b.setStatus(status);
-        b.setTotalKm(km);
+        b.setOdometer(km);
         return busRepository.save(b);
     }
 

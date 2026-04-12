@@ -13,44 +13,71 @@ public class Trip {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 1. Thay vì String, ta liên kết trực tiếp với bảng Route
+    // Liên kết với Route
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
     private Route route;
 
-    // 2. Phải có Xe và Tài xế để kiểm tra ràng buộc (như yêu cầu I.2)
+    // Xe được gán
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bus_id")
     private Bus bus;
 
+    // Tài xế chính
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "driver_id")
     private Driver driver;
 
+    // === PHỤ XE (mới thêm) ===
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assistant_id")
+    private Driver assistant; // Phụ xe/Conductor (cũng là Driver nhưng vai trò khác)
+
+    @Column(name = "departure_time")
     private LocalDateTime departureTime;
 
-    // Cần thiết để AI tính toán giờ nghỉ cho tài xế
+    @Column(name = "arrival_time_expected")
     private LocalDateTime arrivalTimeExpected;
 
+    @Column(name = "total_seats")
     private int totalSeats;
-    private int ticketsSold;
-    private BigDecimal price; // Dùng BigDecimal cho tiền tệ
 
-    // 3. Sử dụng Enum thay cho String để tránh lỗi typo (ACTIVE vs active)
+    @Column(name = "tickets_sold", columnDefinition = "INT DEFAULT 0")
+    private int ticketsSold = 0;
+
+    @Column(name = "price", precision = 10, scale = 2)
+    private BigDecimal price;
+
     @Enumerated(EnumType.STRING)
-    private TripStatus status;
+    @Column(name = "status")
+    private TripStatus status = TripStatus.PENDING_APPROVAL;
 
-    // 4. Self-reference: Liên kết trực tiếp tới chính object Trip gốc
+    // Self-reference: Chuyến gốc (nếu đây là chuyến tăng cường)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "original_trip_id")
     private Trip originalTrip;
 
+    @Column(name = "is_extra_trip", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean isExtraTrip = false;
 
-    // Helper method để tính tỉ lệ lấp đầy
+    // === HELPER METHODS ===
+
+    // Tính tỉ lệ lấp đầy ghế
     public double getOccupancyRate() {
         if (totalSeats == 0)
             return 0;
         return (double) ticketsSold / totalSeats;
+    }
+
+    // Kiểm tra có cần tăng cường không (> 90% ghế)
+    public boolean needsReinforcement() {
+        return getOccupancyRate() > 0.90;
+    }
+
+    // Tính thời gian chuyến (giờ)
+    public double getTripDurationHours() {
+        if (departureTime == null || arrivalTimeExpected == null)
+            return 0;
+        return java.time.Duration.between(departureTime, arrivalTimeExpected).toHours();
     }
 }

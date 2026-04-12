@@ -1,15 +1,6 @@
 package giang.com.BusManagement.domain;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
@@ -20,15 +11,45 @@ public class Bus {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "license_plate", unique = true, nullable = false)
     private String licensePlate;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bus_type_id")
     private BusType busType;
 
-    private String brand;
-    private Double totalKm;
+    @Column(name = "brand")
+    private String brand; // Hãng xe (đã có từ trước)
+
+    // === MAINTENANCE TRACKING ===
+    @Column(name = "odometer", columnDefinition = "DOUBLE DEFAULT 0")
+    private Double odometer = 0.0; // Đổi tên từ totalKm sang odometer
+
+    @Column(name = "last_maintenance_odometer", columnDefinition = "DOUBLE DEFAULT 0")
+    private Double lastMaintenanceOdometer = 0.0; // Số km lúc bảo trì lần cuối
+
+    @Column(name = "maintenance_threshold", columnDefinition = "DOUBLE DEFAULT 5000")
+    private Double maintenanceThreshold = 5000.0; // Ngưỡng cần bảo trì
 
     @Enumerated(EnumType.STRING)
-    private BusStatus status; // READY, TRAVELING, REPAIRING
+    @Column(name = "status")
+    private BusStatus status = BusStatus.READY; // READY, TRAVELING, REPAIRING (đã có)
+
+    // === HELPER METHODS ===
+
+    // Tính km kể từ lần bảo trì cuối
+    public Double getKmSinceLastMaintenance() {
+        return odometer - lastMaintenanceOdometer;
+    }
+
+    // Kiểm tra xe có cần bảo trì không
+    public Boolean needsMaintenance() {
+        return getKmSinceLastMaintenance() >= maintenanceThreshold;
+    }
+
+    // Phương thức reset sau bảo trì
+    public void performMaintenance() {
+        this.lastMaintenanceOdometer = this.odometer;
+        this.status = BusStatus.READY;
+    }
 }
