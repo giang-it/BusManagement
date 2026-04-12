@@ -8,8 +8,6 @@ import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoCon
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-
-
 @SpringBootApplication
 @EnableScheduling
 public class BusManagementApplication {

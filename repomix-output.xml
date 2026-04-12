@@ -1,0 +1,2431 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+BusManagement/.gitattributes
+BusManagement/.gitignore
+BusManagement/.mvn/wrapper/maven-wrapper.properties
+BusManagement/mvnw
+BusManagement/mvnw.cmd
+BusManagement/pom.xml
+BusManagement/src/main/java/giang/com/BusManagement/BusManagementApplication.java
+BusManagement/src/main/java/giang/com/BusManagement/config/DataInitializer.java
+BusManagement/src/main/java/giang/com/BusManagement/config/SecurityConfig.java
+BusManagement/src/main/java/giang/com/BusManagement/controller/admin/AdminController.java
+BusManagement/src/main/java/giang/com/BusManagement/controller/admin/AdminTripController.java
+BusManagement/src/main/java/giang/com/BusManagement/controller/helloController.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/Bus.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/BusStatus.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/BusType.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/Driver.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/Role.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/Route.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/RouteStation.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/RouteStationId.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/Station.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/Trip.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/TripStatus.java
+BusManagement/src/main/java/giang/com/BusManagement/domain/User.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/BusRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/BusTypeRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/DriverRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/RouteRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/RouteStationRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/StationRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/TripRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/repository/UserRepository.java
+BusManagement/src/main/java/giang/com/BusManagement/service/AdminService.java
+BusManagement/src/main/java/giang/com/BusManagement/service/TripService.java
+BusManagement/src/main/resources/application.properties
+BusManagement/src/main/resources/templates/admin/approve-form.html
+BusManagement/src/main/resources/templates/admin/bus-form.html
+BusManagement/src/main/resources/templates/admin/dashboard.html
+BusManagement/src/main/resources/templates/admin/pending-trips.html
+BusManagement/src/main/resources/templates/admin/suggestions.html
+BusManagement/src/main/resources/templates/admin/user-form.html
+BusManagement/src/main/resources/templates/hello.html
+BusManagement/src/test/java/giang/com/BusManagement/BusManagementApplicationTests.java
+README.md
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/controller/admin/AdminTripController.java">
+package giang.com.BusManagement.controller.admin;
+
+import giang.com.BusManagement.domain.Trip;
+import giang.com.BusManagement.service.TripService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+@Controller
+@RequestMapping("/admin/trips")
+@RequiredArgsConstructor
+public class AdminTripController {
+
+    private final TripService tripService;
+
+    // 1. Trang danh sách các chuyến AI đề xuất (PENDING_APPROVAL)
+    @GetMapping("/pending")
+    public String viewPendingTrips(Model model) {
+        model.addAttribute("pendingTrips", tripService.getPendingTrips());
+
+        System.out.println("pending");
+
+        return "admin/pending-trips";
+    }
+
+    // 2. Trang form để chọn Xe và Tài xế cho chuyến tăng cường
+    @GetMapping("/approve/{id}")
+    public String showApproveForm(@PathVariable Long id, Model model) {
+        Trip trip = tripService.getTripById(id);
+        model.addAttribute("trip", trip);
+
+        // Chỉ lấy danh sách Xe và Tài xế RẢNH & HỢP LỆ
+        model.addAttribute("availableBuses", tripService.getAvailableBusesForTrip(id));
+        model.addAttribute("availableDrivers", tripService.getAvailableDriversForTrip(id));
+
+        System.out.println("approving");
+        System.out.println("bus: " + tripService.getAvailableBusesForTrip(id));
+        System.out.println("driver: " + tripService.getAvailableDriversForTrip(id));
+
+        return "admin/approve-form";
+    }
+
+    // 3. Xử lý lưu phê duyệt
+    @PostMapping("/approve")
+    public String processApproval(@RequestParam Long tripId,
+            @RequestParam Long busId,
+            @RequestParam Long driverId) {
+        tripService.approveTrip(tripId, busId, driverId);
+
+        System.out.println("approve sucess");
+
+        return "redirect:/admin/trips/pending?success";
+    }
+
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/BusRepository.java">
+package giang.com.BusManagement.repository;
+
+import giang.com.BusManagement.domain.Bus;
+import giang.com.BusManagement.domain.BusStatus;
+import giang.com.BusManagement.domain.BusType;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface BusRepository extends JpaRepository<Bus, Long> {
+    List<Bus> findByStatus(BusStatus status);
+
+    List<Bus> findByStatusAndBusType(BusStatus status, BusType busType);
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/BusTypeRepository.java">
+package giang.com.BusManagement.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import giang.com.BusManagement.domain.BusType;
+
+@Repository
+public interface BusTypeRepository extends JpaRepository<BusType, Integer> {
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/DriverRepository.java">
+package giang.com.BusManagement.repository;
+
+import giang.com.BusManagement.domain.Bus;
+import giang.com.BusManagement.domain.BusStatus;
+import giang.com.BusManagement.domain.Driver;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface DriverRepository extends JpaRepository<Driver, Long> {
+    // có sẵn trong jpaRepository
+    // List<Driver> findById(Long id);
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/RouteRepository.java">
+package giang.com.BusManagement.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import giang.com.BusManagement.domain.Route;
+
+@Repository
+public interface RouteRepository extends JpaRepository<Route, Long> {
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/RouteStationRepository.java">
+package giang.com.BusManagement.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import giang.com.BusManagement.domain.RouteStation;
+import giang.com.BusManagement.domain.RouteStationId;
+
+@Repository
+public interface RouteStationRepository extends JpaRepository<RouteStation, RouteStationId> {
+    // Tìm tất cả trạm của một tuyến, sắp xếp theo thứ tự dừng
+    List<RouteStation> findByRouteIdOrderByStopOrderAsc(Long routeId);
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/StationRepository.java">
+package giang.com.BusManagement.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import giang.com.BusManagement.domain.Station;
+
+@Repository
+public interface StationRepository extends JpaRepository<Station, Long> {
+    // Tìm kiếm trạm theo tên (phục vụ tính năng gợi ý khi khách đặt vé)
+    List<Station> findByStationNameContainingIgnoreCase(String name);
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/UserRepository.java">
+package giang.com.BusManagement.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import giang.com.BusManagement.domain.User;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByUsername(String username);
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/service/AdminService.java">
+package giang.com.BusManagement.service;
+
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import giang.com.BusManagement.domain.Bus;
+import giang.com.BusManagement.domain.BusType;
+import giang.com.BusManagement.domain.User;
+import giang.com.BusManagement.repository.BusRepository;
+import giang.com.BusManagement.repository.BusTypeRepository;
+import giang.com.BusManagement.repository.UserRepository;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+
+// UserRepository.java & BusRepository.java (Tương tự như code cũ bạn đã có)
+
+@Service
+@RequiredArgsConstructor
+public class AdminService {
+    private final UserRepository userRepository;
+    private final BusRepository busRepository;
+    private final BusTypeRepository busTypeRepository;
+
+    @Transactional
+    public void createNewUser(User user) {
+        // Thực tế nên mã hóa password tại đây:
+        // user.setPassword(passwordEncoder.encode(...));
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void createNewBus(Bus bus) {
+        busRepository.save(bus);
+    }
+
+    public List<BusType> getAllBusTypes() {
+        return busTypeRepository.findAll();
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/resources/templates/admin/approve-form.html">
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Approve Trip</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="container mt-5">
+    <h2>Phê duyệt chuyến tăng cường</h2>
+    <hr>
+    <div class="card mb-4">
+        <div class="card-body">
+            <p><strong>Tuyến:</strong> <span
+                    th:text="${trip.route.departurePoint + ' - ' + trip.route.destinationPoint}"></span></p>
+            <p><strong>Giờ chạy:</strong> <span
+                    th:text="${#temporals.format(trip.departureTime, 'HH:mm dd-MM-yyyy')}"></span></p>
+        </div>
+    </div>
+
+    <form th:action="@{/admin/trips/approve}" method="post">
+        <input type="hidden" name="tripId" th:value="${trip.id}">
+
+        <div class="mb-3">
+            <label class="form-label">Chọn Xe (Chỉ hiển thị xe READY & đúng loại):</label>
+            <select name="busId" class="form-select" required>
+                <option value="">-- Chọn xe --</option>
+                <option th:each="bus : ${availableBuses}" th:value="${bus.id}"
+                    th:text="${bus.licensePlate + ' (' + bus.brand + ')'}"></option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Chọn Tài xế (Chỉ hiển thị người rảnh & lái < 8h):</label>
+                    <select name="driverId" class="form-select" required>
+                        <option value="">-- Chọn tài xế --</option>
+                        <option th:each="driver : ${availableDrivers}" th:value="${driver.userId}"
+                            th:text="${driver.user.fullName + ' - Bằng: ' + driver.licenseNumber}"></option>
+                    </select>
+        </div>
+
+        <button type="submit" class="btn btn-success">Kích hoạt chuyến xe</button>
+        <a href="/admin/trips/pending" class="btn btn-secondary">Quay lại</a>
+    </form>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/src/main/resources/templates/admin/bus-form.html">
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Thêm Xe Mới</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">🚌 Thêm Xe Khách Mới</h3>
+            </div>
+            <div class="card-body">
+                <form th:action="@{/admin/buses/save}" th:object="${bus}" method="post">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Biển số xe</label>
+                            <input type="text" th:field="*{licensePlate}" class="form-control"
+                                placeholder="Ví dụ: 29A-123.45" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Hãng xe (Brand)</label>
+                            <input type="text" th:field="*{brand}" class="form-control"
+                                placeholder="Ví dụ: Thaco, Hyundai">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Loại xe</label>
+                            <select th:field="*{busType}" class="form-select">
+                                <option th:each="type : ${busTypes}" th:value="${type.id}"
+                                    th:text="${type.typeName} + ' (' + ${type.capacity} + ' ghế)'">
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Trạng thái vận hành</label>
+                            <select th:field="*{status}" class="form-select">
+                                <option th:each="st : ${statuses}" th:value="${st}" th:text="${st}"></option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Số KM hiện tại</label>
+                        <input type="number" step="0.1" th:field="*{totalKm}" class="form-control" value="0">
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-success px-4">Lưu thông tin</button>
+                        <a href="/admin/dashboard" class="btn btn-secondary px-4">Hủy</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/src/main/resources/templates/admin/dashboard.html">
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Bus Management - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">🚌 BusManager Admin</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div th:if="${param.success}" class="alert alert-success alert-dismissible fade show">
+            Thao tác thành công!
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white shadow">
+                    <div class="card-body">
+                        <h5><i class="bi bi-people"></i> Người dùng</h5>
+                        <h2 th:text="${totalUsers}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white shadow">
+                    <div class="card-body">
+                        <h5><i class="bi bi-bus-front"></i> Tổng số xe</h5>
+                        <h2 th:text="${totalBuses}">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-dark shadow">
+                    <div class="card-body">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Đề xuất AI</h5>
+                        <h2 th:text="${pendingTrips}">0</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 text-primary font-weight-bold">Bảng điều khiển chức năng</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4 mb-3">
+                        <a th:href="@{/admin/users/new}" class="btn btn-outline-primary btn-lg w-100 py-4">
+                            <i class="bi bi-person-plus fs-1"></i><br>Tạo Người Dùng
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a th:href="@{/admin/buses/new}" class="btn btn-outline-success btn-lg w-100 py-4">
+                            <i class="bi bi-truck fs-1"></i><br>Tạo Xe Mới
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="#" class="btn btn-outline-info btn-lg w-100 py-4">
+                            <i class="bi bi-calendar-event fs-1"></i><br>Quản lý Chuyến
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/src/main/resources/templates/admin/pending-trips.html">
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>AI Suggestions</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="container mt-5">
+    <h2 class="mb-4">AI Suggestions (High Demand)</h2>
+
+    <div th:if="${param.success}" class="alert alert-success">Phê duyệt chuyến xe thành công!</div>
+
+    <table class="table table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Tuyến đường</th>
+                <th>Khởi hành</th>
+                <th>Chuyến gốc (ID)</th>
+                <th>Thao tác</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="trip : ${pendingTrips}">
+                <td th:text="${trip.id}"></td>
+                <td th:text="${trip.route.departurePoint + ' - ' + trip.route.destinationPoint}"></td>
+                <td th:text="${#temporals.format(trip.departureTime, 'dd-MM-yyyy HH:mm')}"></td>
+                <td th:text="${trip.originalTrip.id}"></td>
+                <td>
+                    <a th:href="@{/admin/trips/approve/{id}(id=${trip.id})}" class="btn btn-primary btn-sm">Duyệt & Gán
+                        Xe</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/src/main/resources/templates/admin/user-form.html">
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Tạo Người Dùng</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="col-md-8 mx-auto">
+            <div class="card shadow border-0">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">👤 Thêm Tài Khoản Mới</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form th:action="@{/admin/users/save}" th:object="${user}" method="post">
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold">Tên đăng nhập</label>
+                            <input type="text" th:field="*{username}" class="form-control" placeholder="username..."
+                                required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Mật khẩu</label>
+                            <input type="password" th:field="*{password}" class="form-control" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Họ và tên</label>
+                            <input type="text" th:field="*{fullName}" class="form-control" placeholder="Nguyễn Văn A">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Số điện thoại</label>
+                                <input type="text" th:field="*{phone}" class="form-control">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vai trò (Role)</label>
+                                <select th:field="*{role}" class="form-select">
+                                    <option th:each="r : ${roles}" th:value="${r}" th:text="${r}"></option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 text-end">
+                            <a href="/admin/dashboard" class="btn btn-secondary">Quay lại</a>
+                            <button type="submit" class="btn btn-primary px-5">Tạo tài khoản</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/.gitattributes">
+/mvnw text eol=lf
+*.cmd text eol=crlf
+</file>
+
+<file path="BusManagement/.gitignore">
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+</file>
+
+<file path="BusManagement/.mvn/wrapper/maven-wrapper.properties">
+wrapperVersion=3.3.4
+distributionType=only-script
+distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.12/apache-maven-3.9.12-bin.zip
+</file>
+
+<file path="BusManagement/mvnw">
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Apache Maven Wrapper startup batch script, version 3.3.4
+#
+# Optional ENV vars
+# -----------------
+#   JAVA_HOME - location of a JDK home dir, required when download maven via java source
+#   MVNW_REPOURL - repo url base for downloading maven distribution
+#   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+#   MVNW_VERBOSE - true: enable verbose log; debug: trace the mvnw script; others: silence the output
+# ----------------------------------------------------------------------------
+
+set -euf
+[ "${MVNW_VERBOSE-}" != debug ] || set -x
+
+# OS specific support.
+native_path() { printf %s\\n "$1"; }
+case "$(uname)" in
+CYGWIN* | MINGW*)
+  [ -z "${JAVA_HOME-}" ] || JAVA_HOME="$(cygpath --unix "$JAVA_HOME")"
+  native_path() { cygpath --path --windows "$1"; }
+  ;;
+esac
+
+# set JAVACMD and JAVACCMD
+set_java_home() {
+  # For Cygwin and MinGW, ensure paths are in Unix format before anything is touched
+  if [ -n "${JAVA_HOME-}" ]; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ]; then
+      # IBM's JDK on AIX uses strange locations for the executables
+      JAVACMD="$JAVA_HOME/jre/sh/java"
+      JAVACCMD="$JAVA_HOME/jre/sh/javac"
+    else
+      JAVACMD="$JAVA_HOME/bin/java"
+      JAVACCMD="$JAVA_HOME/bin/javac"
+
+      if [ ! -x "$JAVACMD" ] || [ ! -x "$JAVACCMD" ]; then
+        echo "The JAVA_HOME environment variable is not defined correctly, so mvnw cannot run." >&2
+        echo "JAVA_HOME is set to \"$JAVA_HOME\", but \"\$JAVA_HOME/bin/java\" or \"\$JAVA_HOME/bin/javac\" does not exist." >&2
+        return 1
+      fi
+    fi
+  else
+    JAVACMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v java
+    )" || :
+    JAVACCMD="$(
+      'set' +e
+      'unset' -f command 2>/dev/null
+      'command' -v javac
+    )" || :
+
+    if [ ! -x "${JAVACMD-}" ] || [ ! -x "${JAVACCMD-}" ]; then
+      echo "The java/javac command does not exist in PATH nor is JAVA_HOME set, so mvnw cannot run." >&2
+      return 1
+    fi
+  fi
+}
+
+# hash string like Java String::hashCode
+hash_string() {
+  str="${1:-}" h=0
+  while [ -n "$str" ]; do
+    char="${str%"${str#?}"}"
+    h=$(((h * 31 + $(LC_CTYPE=C printf %d "'$char")) % 4294967296))
+    str="${str#?}"
+  done
+  printf %x\\n $h
+}
+
+verbose() { :; }
+[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\\n "${1-}"; }
+
+die() {
+  printf %s\\n "$1" >&2
+  exit 1
+}
+
+trim() {
+  # MWRAPPER-139:
+  #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
+  #   Needed for removing poorly interpreted newline sequences when running in more
+  #   exotic environments such as mingw bash on Windows.
+  printf "%s" "${1}" | tr -d '[:space:]'
+}
+
+scriptDir="$(dirname "$0")"
+scriptName="$(basename "$0")"
+
+# parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
+while IFS="=" read -r key value; do
+  case "${key-}" in
+  distributionUrl) distributionUrl=$(trim "${value-}") ;;
+  distributionSha256Sum) distributionSha256Sum=$(trim "${value-}") ;;
+  esac
+done <"$scriptDir/.mvn/wrapper/maven-wrapper.properties"
+[ -n "${distributionUrl-}" ] || die "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+
+case "${distributionUrl##*/}" in
+maven-mvnd-*bin.*)
+  MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/
+  case "${PROCESSOR_ARCHITECTURE-}${PROCESSOR_ARCHITEW6432-}:$(uname -a)" in
+  *AMD64:CYGWIN* | *AMD64:MINGW*) distributionPlatform=windows-amd64 ;;
+  :Darwin*x86_64) distributionPlatform=darwin-amd64 ;;
+  :Darwin*arm64) distributionPlatform=darwin-aarch64 ;;
+  :Linux*x86_64*) distributionPlatform=linux-amd64 ;;
+  *)
+    echo "Cannot detect native platform for mvnd on $(uname)-$(uname -m), use pure java version" >&2
+    distributionPlatform=linux-amd64
+    ;;
+  esac
+  distributionUrl="${distributionUrl%-bin.*}-$distributionPlatform.zip"
+  ;;
+maven-mvnd-*) MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/ ;;
+*) MVN_CMD="mvn${scriptName#mvnw}" _MVNW_REPO_PATTERN=/org/apache/maven/ ;;
+esac
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+[ -z "${MVNW_REPOURL-}" ] || distributionUrl="$MVNW_REPOURL$_MVNW_REPO_PATTERN${distributionUrl#*"$_MVNW_REPO_PATTERN"}"
+distributionUrlName="${distributionUrl##*/}"
+distributionUrlNameMain="${distributionUrlName%.*}"
+distributionUrlNameMain="${distributionUrlNameMain%-bin}"
+MAVEN_USER_HOME="${MAVEN_USER_HOME:-${HOME}/.m2}"
+MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_string "$distributionUrl")"
+
+exec_maven() {
+  unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
+  exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
+}
+
+if [ -d "$MAVEN_HOME" ]; then
+  verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  exec_maven "$@"
+fi
+
+case "${distributionUrl-}" in
+*?-bin.zip | *?maven-mvnd-?*-?*.zip) ;;
+*) die "distributionUrl is not valid, must match *-bin.zip or maven-mvnd-*.zip, but found '${distributionUrl-}'" ;;
+esac
+
+# prepare tmp dir
+if TMP_DOWNLOAD_DIR="$(mktemp -d)" && [ -d "$TMP_DOWNLOAD_DIR" ]; then
+  clean() { rm -rf -- "$TMP_DOWNLOAD_DIR"; }
+  trap clean HUP INT TERM EXIT
+else
+  die "cannot create temp dir"
+fi
+
+mkdir -p -- "${MAVEN_HOME%/*}"
+
+# Download and Install Apache Maven
+verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+verbose "Downloading from: $distributionUrl"
+verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+# select .zip or .tar.gz
+if ! command -v unzip >/dev/null; then
+  distributionUrl="${distributionUrl%.zip}.tar.gz"
+  distributionUrlName="${distributionUrl##*/}"
+fi
+
+# verbose opt
+__MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR=''
+[ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
+
+# normalize http auth
+case "${MVNW_PASSWORD:+has-password}" in
+'') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
+esac
+
+if [ -z "${MVNW_USERNAME-}" ] && command -v wget >/dev/null; then
+  verbose "Found wget ... using wget"
+  wget ${__MVNW_QUIET_WGET:+"$__MVNW_QUIET_WGET"} "$distributionUrl" -O "$TMP_DOWNLOAD_DIR/$distributionUrlName" || die "wget: Failed to fetch $distributionUrl"
+elif [ -z "${MVNW_USERNAME-}" ] && command -v curl >/dev/null; then
+  verbose "Found curl ... using curl"
+  curl ${__MVNW_QUIET_CURL:+"$__MVNW_QUIET_CURL"} -f -L -o "$TMP_DOWNLOAD_DIR/$distributionUrlName" "$distributionUrl" || die "curl: Failed to fetch $distributionUrl"
+elif set_java_home; then
+  verbose "Falling back to use Java to download"
+  javaSource="$TMP_DOWNLOAD_DIR/Downloader.java"
+  targetZip="$TMP_DOWNLOAD_DIR/$distributionUrlName"
+  cat >"$javaSource" <<-END
+	public class Downloader extends java.net.Authenticator
+	{
+	  protected java.net.PasswordAuthentication getPasswordAuthentication()
+	  {
+	    return new java.net.PasswordAuthentication( System.getenv( "MVNW_USERNAME" ), System.getenv( "MVNW_PASSWORD" ).toCharArray() );
+	  }
+	  public static void main( String[] args ) throws Exception
+	  {
+	    setDefault( new Downloader() );
+	    java.nio.file.Files.copy( java.net.URI.create( args[0] ).toURL().openStream(), java.nio.file.Paths.get( args[1] ).toAbsolutePath().normalize() );
+	  }
+	}
+	END
+  # For Cygwin/MinGW, switch paths to Windows format before running javac and java
+  verbose " - Compiling Downloader.java ..."
+  "$(native_path "$JAVACCMD")" "$(native_path "$javaSource")" || die "Failed to compile Downloader.java"
+  verbose " - Running Downloader.java ..."
+  "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")"
+fi
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+if [ -n "${distributionSha256Sum-}" ]; then
+  distributionSha256Result=false
+  if [ "$MVN_CMD" = mvnd.sh ]; then
+    echo "Checksum validation is not supported for maven-mvnd." >&2
+    echo "Please disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  elif command -v sha256sum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | sha256sum -c - >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  elif command -v shasum >/dev/null; then
+    if echo "$distributionSha256Sum  $TMP_DOWNLOAD_DIR/$distributionUrlName" | shasum -a 256 -c >/dev/null 2>&1; then
+      distributionSha256Result=true
+    fi
+  else
+    echo "Checksum validation was requested but neither 'sha256sum' or 'shasum' are available." >&2
+    echo "Please install either command, or disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties." >&2
+    exit 1
+  fi
+  if [ $distributionSha256Result = false ]; then
+    echo "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised." >&2
+    echo "If you updated your Maven version, you need to update the specified distributionSha256Sum property." >&2
+    exit 1
+  fi
+fi
+
+# unzip and move
+if command -v unzip >/dev/null; then
+  unzip ${__MVNW_QUIET_UNZIP:+"$__MVNW_QUIET_UNZIP"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -d "$TMP_DOWNLOAD_DIR" || die "failed to unzip"
+else
+  tar xzf${__MVNW_QUIET_TAR:+"$__MVNW_QUIET_TAR"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -C "$TMP_DOWNLOAD_DIR" || die "failed to untar"
+fi
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+actualDistributionDir=""
+
+# First try the expected directory name (for regular distributions)
+if [ -d "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain" ]; then
+  if [ -f "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain/bin/$MVN_CMD" ]; then
+    actualDistributionDir="$distributionUrlNameMain"
+  fi
+fi
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if [ -z "$actualDistributionDir" ]; then
+  # enable globbing to iterate over items
+  set +f
+  for dir in "$TMP_DOWNLOAD_DIR"/*; do
+    if [ -d "$dir" ]; then
+      if [ -f "$dir/bin/$MVN_CMD" ]; then
+        actualDistributionDir="$(basename "$dir")"
+        break
+      fi
+    fi
+  done
+  set -f
+fi
+
+if [ -z "$actualDistributionDir" ]; then
+  verbose "Contents of $TMP_DOWNLOAD_DIR:"
+  verbose "$(ls -la "$TMP_DOWNLOAD_DIR")"
+  die "Could not find Maven distribution directory in extracted archive"
+fi
+
+verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+printf %s\\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
+mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_HOME" ] || die "fail to move MAVEN_HOME"
+
+clean || :
+exec_maven "$@"
+</file>
+
+<file path="BusManagement/mvnw.cmd">
+<# : batch portion
+@REM ----------------------------------------------------------------------------
+@REM Licensed to the Apache Software Foundation (ASF) under one
+@REM or more contributor license agreements.  See the NOTICE file
+@REM distributed with this work for additional information
+@REM regarding copyright ownership.  The ASF licenses this file
+@REM to you under the Apache License, Version 2.0 (the
+@REM "License"); you may not use this file except in compliance
+@REM with the License.  You may obtain a copy of the License at
+@REM
+@REM    http://www.apache.org/licenses/LICENSE-2.0
+@REM
+@REM Unless required by applicable law or agreed to in writing,
+@REM software distributed under the License is distributed on an
+@REM "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+@REM KIND, either express or implied.  See the License for the
+@REM specific language governing permissions and limitations
+@REM under the License.
+@REM ----------------------------------------------------------------------------
+
+@REM ----------------------------------------------------------------------------
+@REM Apache Maven Wrapper startup batch script, version 3.3.4
+@REM
+@REM Optional ENV vars
+@REM   MVNW_REPOURL - repo url base for downloading maven distribution
+@REM   MVNW_USERNAME/MVNW_PASSWORD - user and password for downloading maven
+@REM   MVNW_VERBOSE - true: enable verbose log; others: silence the output
+@REM ----------------------------------------------------------------------------
+
+@IF "%__MVNW_ARG0_NAME__%"=="" (SET __MVNW_ARG0_NAME__=%~nx0)
+@SET __MVNW_CMD__=
+@SET __MVNW_ERROR__=
+@SET __MVNW_PSMODULEP_SAVE=%PSModulePath%
+@SET PSModulePath=
+@FOR /F "usebackq tokens=1* delims==" %%A IN (`powershell -noprofile "& {$scriptDir='%~dp0'; $script='%__MVNW_ARG0_NAME__%'; icm -ScriptBlock ([Scriptblock]::Create((Get-Content -Raw '%~f0'))) -NoNewScope}"`) DO @(
+  IF "%%A"=="MVN_CMD" (set __MVNW_CMD__=%%B) ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
+)
+@SET PSModulePath=%__MVNW_PSMODULEP_SAVE%
+@SET __MVNW_PSMODULEP_SAVE=
+@SET __MVNW_ARG0_NAME__=
+@SET MVNW_USERNAME=
+@SET MVNW_PASSWORD=
+@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@echo Cannot start maven from wrapper >&2 && exit /b 1
+@GOTO :EOF
+: end batch / begin powershell #>
+
+$ErrorActionPreference = "Stop"
+if ($env:MVNW_VERBOSE -eq "true") {
+  $VerbosePreference = "Continue"
+}
+
+# calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
+$distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
+if (!$distributionUrl) {
+  Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+}
+
+switch -wildcard -casesensitive ( $($distributionUrl -replace '^.*/','') ) {
+  "maven-mvnd-*" {
+    $USE_MVND = $true
+    $distributionUrl = $distributionUrl -replace '-bin\.[^.]*$',"-windows-amd64.zip"
+    $MVN_CMD = "mvnd.cmd"
+    break
+  }
+  default {
+    $USE_MVND = $false
+    $MVN_CMD = $script -replace '^mvnw','mvn'
+    break
+  }
+}
+
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
+if ($env:MVNW_REPOURL) {
+  $MVNW_REPO_PATTERN = if ($USE_MVND -eq $False) { "/org/apache/maven/" } else { "/maven/mvnd/" }
+  $distributionUrl = "$env:MVNW_REPOURL$MVNW_REPO_PATTERN$($distributionUrl -replace "^.*$MVNW_REPO_PATTERN",'')"
+}
+$distributionUrlName = $distributionUrl -replace '^.*/',''
+$distributionUrlNameMain = $distributionUrlName -replace '\.[^.]*$','' -replace '-bin$',''
+
+$MAVEN_M2_PATH = "$HOME/.m2"
+if ($env:MAVEN_USER_HOME) {
+  $MAVEN_M2_PATH = "$env:MAVEN_USER_HOME"
+}
+
+if (-not (Test-Path -Path $MAVEN_M2_PATH)) {
+    New-Item -Path $MAVEN_M2_PATH -ItemType Directory | Out-Null
+}
+
+$MAVEN_WRAPPER_DISTS = $null
+if ((Get-Item $MAVEN_M2_PATH).Target[0] -eq $null) {
+  $MAVEN_WRAPPER_DISTS = "$MAVEN_M2_PATH/wrapper/dists"
+} else {
+  $MAVEN_WRAPPER_DISTS = (Get-Item $MAVEN_M2_PATH).Target[0] + "/wrapper/dists"
+}
+
+$MAVEN_HOME_PARENT = "$MAVEN_WRAPPER_DISTS/$distributionUrlNameMain"
+$MAVEN_HOME_NAME = ([System.Security.Cryptography.SHA256]::Create().ComputeHash([byte[]][char[]]$distributionUrl) | ForEach-Object {$_.ToString("x2")}) -join ''
+$MAVEN_HOME = "$MAVEN_HOME_PARENT/$MAVEN_HOME_NAME"
+
+if (Test-Path -Path "$MAVEN_HOME" -PathType Container) {
+  Write-Verbose "found existing MAVEN_HOME at $MAVEN_HOME"
+  Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+  exit $?
+}
+
+if (! $distributionUrlNameMain -or ($distributionUrlName -eq $distributionUrlNameMain)) {
+  Write-Error "distributionUrl is not valid, must end with *-bin.zip, but found $distributionUrl"
+}
+
+# prepare tmp dir
+$TMP_DOWNLOAD_DIR_HOLDER = New-TemporaryFile
+$TMP_DOWNLOAD_DIR = New-Item -Itemtype Directory -Path "$TMP_DOWNLOAD_DIR_HOLDER.dir"
+$TMP_DOWNLOAD_DIR_HOLDER.Delete() | Out-Null
+trap {
+  if ($TMP_DOWNLOAD_DIR.Exists) {
+    try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+    catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+  }
+}
+
+New-Item -Itemtype Directory -Path "$MAVEN_HOME_PARENT" -Force | Out-Null
+
+# Download and Install Apache Maven
+Write-Verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
+Write-Verbose "Downloading from: $distributionUrl"
+Write-Verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
+
+$webclient = New-Object System.Net.WebClient
+if ($env:MVNW_USERNAME -and $env:MVNW_PASSWORD) {
+  $webclient.Credentials = New-Object System.Net.NetworkCredential($env:MVNW_USERNAME, $env:MVNW_PASSWORD)
+}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$webclient.DownloadFile($distributionUrl, "$TMP_DOWNLOAD_DIR/$distributionUrlName") | Out-Null
+
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
+$distributionSha256Sum = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionSha256Sum
+if ($distributionSha256Sum) {
+  if ($USE_MVND) {
+    Write-Error "Checksum validation is not supported for maven-mvnd. `nPlease disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties."
+  }
+  Import-Module $PSHOME\Modules\Microsoft.PowerShell.Utility -Function Get-FileHash
+  if ((Get-FileHash "$TMP_DOWNLOAD_DIR/$distributionUrlName" -Algorithm SHA256).Hash.ToLower() -ne $distributionSha256Sum) {
+    Write-Error "Error: Failed to validate Maven distribution SHA-256, your Maven distribution might be compromised. If you updated your Maven version, you need to update the specified distributionSha256Sum property."
+  }
+}
+
+# unzip and move
+Expand-Archive "$TMP_DOWNLOAD_DIR/$distributionUrlName" -DestinationPath "$TMP_DOWNLOAD_DIR" | Out-Null
+
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
+$actualDistributionDir = ""
+
+# First try the expected directory name (for regular distributions)
+$expectedPath = Join-Path "$TMP_DOWNLOAD_DIR" "$distributionUrlNameMain"
+$expectedMvnPath = Join-Path "$expectedPath" "bin/$MVN_CMD"
+if ((Test-Path -Path $expectedPath -PathType Container) -and (Test-Path -Path $expectedMvnPath -PathType Leaf)) {
+  $actualDistributionDir = $distributionUrlNameMain
+}
+
+# If not found, search for any directory with the Maven executable (for snapshots)
+if (!$actualDistributionDir) {
+  Get-ChildItem -Path "$TMP_DOWNLOAD_DIR" -Directory | ForEach-Object {
+    $testPath = Join-Path $_.FullName "bin/$MVN_CMD"
+    if (Test-Path -Path $testPath -PathType Leaf) {
+      $actualDistributionDir = $_.Name
+    }
+  }
+}
+
+if (!$actualDistributionDir) {
+  Write-Error "Could not find Maven distribution directory in extracted archive"
+}
+
+Write-Verbose "Found extracted Maven distribution directory: $actualDistributionDir"
+Rename-Item -Path "$TMP_DOWNLOAD_DIR/$actualDistributionDir" -NewName $MAVEN_HOME_NAME | Out-Null
+try {
+  Move-Item -Path "$TMP_DOWNLOAD_DIR/$MAVEN_HOME_NAME" -Destination $MAVEN_HOME_PARENT | Out-Null
+} catch {
+  if (! (Test-Path -Path "$MAVEN_HOME" -PathType Container)) {
+    Write-Error "fail to move MAVEN_HOME"
+  }
+} finally {
+  try { Remove-Item $TMP_DOWNLOAD_DIR -Recurse -Force | Out-Null }
+  catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
+}
+
+Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+</file>
+
+<file path="BusManagement/pom.xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.0.2</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>giang.com</groupId>
+	<artifactId>BusManagement</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>BusManagement</name>
+	<description>Bus Management System for Graduation Thesis</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>17</java.version>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.thymeleaf.extras</groupId>
+			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/BusManagementApplication.java">
+package giang.com.BusManagement;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@SpringBootApplication
+@EnableScheduling
+public class BusManagementApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(BusManagementApplication.class, args);
+	}
+
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/config/DataInitializer.java">
+package giang.com.BusManagement.config;
+
+import giang.com.BusManagement.domain.*;
+import giang.com.BusManagement.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Component
+@RequiredArgsConstructor
+public class DataInitializer implements CommandLineRunner {
+
+    private final BusTypeRepository busTypeRepository;
+    private final BusRepository busRepository;
+    private final StationRepository stationRepository;
+    private final RouteRepository routeRepository;
+    private final UserRepository userRepository;
+    private final DriverRepository driverRepository;
+    private final TripRepository tripRepository;
+    private final RouteStationRepository routeStationRepository;
+
+    @Override
+    @Transactional
+    public void run(String... args) throws Exception {
+
+        tripRepository.deleteAll();
+        driverRepository.deleteAll();
+        busRepository.deleteAll();
+        routeStationRepository.deleteAll();
+        stationRepository.deleteAll();
+        routeRepository.deleteAll();
+        userRepository.deleteAll();
+        busTypeRepository.deleteAll();
+
+        if (userRepository.count() > 0)
+            return; // Tránh tạo trùng dữ liệu khi restart
+
+        // // 1. Khởi tạo BusType
+        // BusType busTypeGiuongNam = new BusType();
+        // busTypeGiuongNam.setTypeName("Giường nằm");
+        // busTypeGiuongNam.setCapacity(40);
+        // busTypeRepository.save(busTypeGiuongNam);
+
+        // BusType busTypeGheNgoi = new BusType();
+        // busTypeGheNgoi.setTypeName("Ghế ngồi");
+        // busTypeGheNgoi.setCapacity(28);
+        // busTypeRepository.save(busTypeGheNgoi);
+
+        // // 2. Khởi tạo Users (Admin & Driver)
+        // User admin = new User();
+        // admin.setUsername("admin");
+        // admin.setPassword("123456"); // Trong thực tế nên dùng BCrypt
+        // admin.setFullName("Quản trị viên");
+        // admin.setRole(Role.ROLE_ADMIN);
+        // userRepository.save(admin);
+
+        // User userDriver1 = new User();
+        // userDriver1.setUsername("driver1");
+        // userDriver1.setFullName("Nguyễn Văn Tài");
+        // userDriver1.setRole(Role.ROLE_DRIVER);
+        // userRepository.save(userDriver1);
+
+        // User userDriver2 = new User();
+        // userDriver2.setUsername("driver2");
+        // userDriver2.setFullName("Lê Văn Lái");
+        // userDriver2.setRole(Role.ROLE_DRIVER);
+        // userRepository.save(userDriver2);
+
+        // User userDriver3 = new User();
+        // userDriver3.setUsername("driver3");
+        // userDriver3.setFullName("Nguyễn Văn Dự Phòng");
+        // userDriver3.setRole(Role.ROLE_DRIVER);
+        // userRepository.save(userDriver3);
+
+        // // 3. Khởi tạo Drivers
+        // Driver driver1 = new Driver();
+        // driver1.setUser(userDriver1);
+        // driver1.setLicenseNumber("B2-123456");
+        // driver1.setExperienceYears(5);
+        // driver1.setTotalDrivingHours24h(2.0); // Đã lái 2h, vẫn rảnh
+        // driverRepository.save(driver1);
+
+        // Driver driver2 = new Driver();
+        // driver2.setUser(userDriver2);
+        // driver2.setLicenseNumber("D-789012");
+        // driver2.setExperienceYears(10);
+        // driver2.setTotalDrivingHours24h(0.0);
+        // driverRepository.save(driver2);
+
+        // Driver driver3 = new Driver();
+        // driver3.setUser(userDriver3);
+        // driver3.setLicenseNumber("E-112233");
+        // driver3.setExperienceYears(3);
+        // driver3.setTotalDrivingHours24h(0.0); // Người này cực kỳ rảnh
+        // driverRepository.save(driver3);
+
+        // // 4. Khởi tạo Buses
+        // Bus bus1 = new Bus();
+        // bus1.setLicensePlate("29A-123.45");
+        // bus1.setBrand("Thaco");
+        // bus1.setBusType(busTypeGiuongNam);
+        // bus1.setStatus(BusStatus.READY);
+        // bus1.setTotalKm(1200.0);
+        // busRepository.save(bus1);
+
+        // Bus bus2 = new Bus();
+        // bus2.setLicensePlate("30B-678.90");
+        // bus2.setBrand("Mercedes");
+        // bus2.setBusType(busTypeGiuongNam);
+        // bus2.setStatus(BusStatus.READY);
+        // bus2.setTotalKm(500.0);
+        // busRepository.save(bus2);
+
+        // // 5. Khởi tạo Stations
+        // Station hanoi = new Station();
+        // hanoi.setStationName("Bến xe Mỹ Đình");
+        // hanoi.setAddress("Hà Nội");
+        // stationRepository.save(hanoi);
+
+        // Station haiphong = new Station();
+        // haiphong.setStationName("Bến xe Niệm Nghĩa");
+        // haiphong.setAddress("Hải Phòng");
+        // stationRepository.save(haiphong);
+
+        // Station a = new Station();
+        // a.setStationName("Bến xe a");
+        // a.setAddress("a address");
+        // stationRepository.save(a);
+
+        // Station b = new Station();
+        // b.setStationName("Bến xe b");
+        // b.setAddress("b address");
+        // stationRepository.save(b);
+
+        // // 6. Khởi tạo Route
+        // Route routeHnHp = new Route();
+        // routeHnHp.setDeparturePoint("Hà Nội");
+        // routeHnHp.setDestinationPoint("Hải Phòng");
+        // routeHnHp.setDistanceKm(120.0);
+        // routeHnHp.setEstimatedDuration(120); // 2 tiếng
+        // routeHnHp.setSuitableBusType(busTypeGiuongNam);
+        // routeRepository.save(routeHnHp);
+
+        // Route routeAB = new Route();
+        // routeAB.setDeparturePoint("A");
+        // routeAB.setDestinationPoint("B");
+        // routeAB.setDistanceKm(100.0);
+        // routeAB.setEstimatedDuration(60); // 1 tiếng
+        // routeAB.setSuitableBusType(busTypeGiuongNam);
+        // routeRepository.save(routeAB);
+
+        // // 7. Khởi tạo Chuyến xe (Trip) - CHUYẾN NÀY SẼ KÍCH HOẠT AI
+        // Trip hotTrip = new Trip();
+        // hotTrip.setRoute(routeHnHp);
+        // hotTrip.setBus(bus1);
+        // hotTrip.setDriver(driver1);
+        // hotTrip.setDepartureTime(LocalDateTime.now().plusHours(12)); // Chạy sau 12h
+        // nữa
+        // hotTrip.setTotalSeats(40);
+        // hotTrip.setTicketsSold(37); // Tỉ lệ lấp đầy: 37/40 = 92.5% (> 90%)
+        // hotTrip.setPrice(new BigDecimal("250000"));
+        // hotTrip.setStatus(TripStatus.ACTIVE);
+        // tripRepository.save(hotTrip);
+
+        // Trip trip2 = new Trip();
+        // trip2.setRoute(routeAB);
+        // trip2.setBus(bus2);
+        // trip2.setDriver(driver2);
+        // trip2.setDepartureTime(LocalDateTime.now().plusHours(12)); // Chạy sau 12h
+        // nữa
+        // trip2.setTotalSeats(50);
+        // trip2.setTicketsSold(49); // Tỉ lệ lấp đầy: 37/40 = 92.5% (> 90%)
+        // trip2.setPrice(new BigDecimal("2500000"));
+        // trip2.setStatus(TripStatus.ACTIVE);
+        // tripRepository.save(trip2);
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+        /// new data for testing
+        ///
+
+        // --- 1. BUS TYPES ---
+        BusType giuongNam = createBusType("Giường nằm", 40);
+        BusType gheNgoi = createBusType("Ghế ngồi", 28);
+        BusType limousine = createBusType("Limousine", 9);
+
+        // --- 2. USERS & DRIVERS ---
+        // Tài xế cực kỳ rảnh (0h lái)
+        Driver driverFresh = createDriver("driver_fresh", "Nguyễn Văn Mới", "A1-111", 2, 0.0);
+
+        // Tài xế đang làm việc nhưng vẫn trong khung giờ cho phép (5h lái)
+        Driver driverWorking = createDriver("driver_working", "Trần Văn Chăm", "B2-222", 8, 5.0);
+
+        // Tài xế VI PHẠM (Đã lái 9h/24h) -> AI KHÔNG ĐƯỢC đề xuất ông này
+        Driver driverExhausted = createDriver("driver_exhausted", "Võ Văn Đuối", "C3-333", 15, 9.0);
+
+        // Tài xế dự phòng chất lượng cao
+        Driver driverPro = createDriver("driver_pro", "Phạm Anh Tài", "D4-444", 12, 1.5);
+        // Tài dự phòng không ca làm
+        Driver driverFree = createDriver("driver_free", "Nguyễn Văn Rảnh", "A1-222", 6, 0.0);
+        Driver driverFree2 = createDriver("driver_free2", "Nguyễn Văn Rảnh2", "A1-333", 6, 0.0);
+
+        // --- 3. BUSES ---
+        // Xe sẵn sàng, odo thấp
+        Bus busNew = createBus("29A-888.88", "Thaco", giuongNam, BusStatus.READY, 1000.0);
+        Bus busNew2 = createBus("29A-999.99", "Vinfast", giuongNam, BusStatus.READY, 100.0);
+
+        // Xe ĐANG CHẠY (Busy) -> AI không được lấy xe này để tăng cường
+        Bus busOnRoad = createBus("30F-999.99", "Hyundai", giuongNam, BusStatus.TRAVELING, 5000.0);
+
+        // Xe QUÁ HẠN BẢO TRÌ (Giả sử ngưỡng là 10.000km) -> AI nên cân nhắc loại bỏ
+        // hoặc cảnh báo
+        Bus busOld = createBus("51G-777.77", "Mercedes", gheNgoi, BusStatus.READY, 15500.0);
+
+        // Xe ĐANG SỬA CHỮA
+        Bus busRepair = createBus("15A-111.22", "Samco", gheNgoi, BusStatus.REPAIRING, 8000.0);
+
+        // --- 4. STATIONS & ROUTES ---
+        Station hn = createStation("Bến xe Mỹ Đình", "Hà Nội");
+        Station hp = createStation("Bến xe Niệm Nghĩa", "Hải Phòng");
+        Station dn = createStation("Bến xe Đà Nẵng", "Đà Nẵng");
+
+        Route routeHnHp = createRoute("Hà Nội", "Hải Phòng", 120.0, 120, giuongNam);
+        Route routeHnDn = createRoute("Hà Nội", "Đà Nẵng", 750.0, 900, giuongNam);
+        Route routeHpDn = createRoute("Hải Phòng", "Đà Nẵng", 1050.0, 900, giuongNam);
+
+        // --- 5. TRIPS (TRƯỜNG HỢP TEST AI) ---
+
+        // CASE 1: Chuyến cực hot (>90% vé) -> AI PHẢI ĐỀ XUẤT TĂNG CƯỜNG
+        createTrip(routeHnHp, busNew, driverFresh, 40, 39, "300000", TripStatus.ACTIVE, 10);
+
+        // CASE 2: Chuyến bình thường (50% vé) -> AI KHÔNG ĐỀ XUẤT
+        createTrip(routeHnHp, busOld, driverPro, 40, 20, "250000", TripStatus.ACTIVE, 15);
+
+        // CASE 3: Chuyến sắp chạy nhưng tài xế đã lái quá giờ (Test logic an toàn)
+        // Dù khách đông nhưng tài xế driverExhausted đã lái 9h, AI nên cảnh báo thay
+        // người
+        // chưa làm tính năng này
+        createTrip(routeHnDn, busOnRoad, driverExhausted, 40, 38, "700000", TripStatus.ACTIVE, 5);
+
+        // CASE 4: Chuyến "Ế" (<20% vé) -> AI có thể đề xuất hủy chuyến hoặc gộp chuyến
+        createTrip(routeHpDn, busNew, driverWorking, 40, 5, "250000", TripStatus.ACTIVE, 20);
+        createTrip(routeHnDn, busNew, driverWorking, 40, 5, "250000", TripStatus.ACTIVE, 15);
+
+        System.out.println(">> Data prepared!");
+        System.out.println(
+                ">> data consist of: 1 driver over 8h (duoi), 1 bus over repair (mecsedes), 2 hot trips (hn-ph 10h, hn-dn 5h) và 2 chuyến ế (hn-dn 15h, hp-dn 20h) .");
+
+        // Sửa lại trong DataInitializer.java
+        System.out.println(">> DATA INITIALIZED");
+        System.out.println(">> AI se som de xuat chuyen tang cuong trong vong 10 giay toi...");
+    }
+
+    // --- HELPER METHODS ĐỂ CODE GỌN HƠN ---
+
+    private BusType createBusType(String name, int cap) {
+        BusType bt = new BusType();
+        bt.setTypeName(name);
+        bt.setCapacity(cap);
+        return busTypeRepository.save(bt);
+    }
+
+    private Driver createDriver(String user, String name, String license, int exp, double hours) {
+        User u = new User();
+        u.setUsername(user);
+        u.setPassword("password");
+        u.setFullName(name);
+        u.setRole(Role.ROLE_DRIVER);
+        userRepository.save(u);
+
+        Driver d = new Driver();
+        d.setUser(u);
+        d.setLicenseNumber(license);
+        d.setExperienceYears(exp);
+        d.setTotalDrivingHours24h(hours);
+        return driverRepository.save(d);
+    }
+
+    private Bus createBus(String plate, String brand, BusType type, BusStatus status, double km) {
+        Bus b = new Bus();
+        b.setLicensePlate(plate);
+        b.setBrand(brand);
+        b.setBusType(type);
+        b.setStatus(status);
+        b.setTotalKm(km);
+        return busRepository.save(b);
+    }
+
+    private Station createStation(String name, String addr) {
+        Station s = new Station();
+        s.setStationName(name);
+        s.setAddress(addr);
+        return stationRepository.save(s);
+    }
+
+    private Route createRoute(String start, String end, double dist, int duration, BusType type) {
+        Route r = new Route();
+        r.setDeparturePoint(start);
+        r.setDestinationPoint(end);
+        r.setDistanceKm(dist);
+        r.setEstimatedDuration(duration);
+        r.setSuitableBusType(type);
+        return routeRepository.save(r);
+    }
+
+    private void createTrip(Route r, Bus b, Driver d, int total, int sold, String price, TripStatus status,
+            int hoursFromNow) {
+        Trip t = new Trip();
+        t.setRoute(r);
+        t.setBus(b);
+        t.setDriver(d);
+        t.setTotalSeats(total);
+        t.setTicketsSold(sold);
+        t.setPrice(new BigDecimal(price));
+        t.setStatus(status);
+        t.setDepartureTime(LocalDateTime.now().plusHours(hoursFromNow));
+        tripRepository.save(t);
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/config/SecurityConfig.java">
+package giang.com.BusManagement.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .anyRequest().permitAll() // Cho phép tất cả truy cập không cần mật khẩu
+                )
+                .csrf(csrf -> csrf.disable()) // Tắt bảo vệ CSRF để không bị lỗi khi làm Form
+                .formLogin(form -> form.disable()) // Tắt trang login mặc định
+                .httpBasic(basic -> basic.disable()); // Tắt hộp thoại nhập user/pass của trình duyệt
+
+        return http.build();
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/controller/admin/AdminController.java">
+package giang.com.BusManagement.controller.admin;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+import giang.com.BusManagement.domain.Bus;
+import giang.com.BusManagement.domain.BusStatus;
+import giang.com.BusManagement.domain.Role;
+import giang.com.BusManagement.domain.TripStatus;
+import giang.com.BusManagement.domain.User;
+import giang.com.BusManagement.repository.BusRepository;
+import giang.com.BusManagement.repository.TripRepository;
+import giang.com.BusManagement.repository.UserRepository;
+import giang.com.BusManagement.service.AdminService;
+import lombok.RequiredArgsConstructor;
+
+@Controller
+@RequestMapping("/admin")
+@RequiredArgsConstructor
+public class AdminController {
+
+    private final AdminService adminService;
+    private final UserRepository userRepository;
+    private final BusRepository busRepository;
+    private final TripRepository tripRepository; // Giả định bạn đã có
+
+    // Hiển thị trang Dashboard chính
+    @GetMapping("/dashboard")
+    public String dashboard(Model model) {
+        // Lấy số liệu thống kê cho các thẻ (Cards)
+        model.addAttribute("totalUsers", userRepository.count());
+        model.addAttribute("totalBuses", busRepository.count());
+        model.addAttribute("pendingTrips", tripRepository.countByStatus(TripStatus.PENDING_APPROVAL));
+
+        return "admin/dashboard";
+    }
+
+    // FORM TẠO NGƯỜI DÙNG
+    @GetMapping("/users/new")
+    public String showUserForm(Model model) {
+        model.addAttribute("user", new User());
+        model.addAttribute("roles", Role.values());
+        return "admin/user-form";
+    }
+
+    @PostMapping("/users/save")
+    public String saveUser(@ModelAttribute("user") User user) {
+        adminService.createNewUser(user);
+        return "redirect:/admin/dashboard?success=user";
+    }
+
+    // FORM TẠO XE
+    @GetMapping("/buses/new")
+    public String showBusForm(Model model) {
+        model.addAttribute("bus", new Bus());
+        model.addAttribute("busTypes", adminService.getAllBusTypes());
+        model.addAttribute("statuses", BusStatus.values());
+        return "admin/bus-form";
+    }
+
+    @PostMapping("/buses/save")
+    public String saveBus(@ModelAttribute("bus") Bus bus) {
+        adminService.createNewBus(bus);
+        return "redirect:/admin/dashboard?success=bus";
+    }
+
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/controller/helloController.java">
+package giang.com.BusManagement.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+@Controller
+public class helloController {
+
+    @RequestMapping("/")
+    public String getHomePage() {
+        return "hello";
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/Bus.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.Data;
+
+@Entity
+@Table(name = "buses")
+@Data
+public class Bus {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String licensePlate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bus_type_id")
+    private BusType busType;
+
+    private String brand;
+    private Double totalKm;
+
+    @Enumerated(EnumType.STRING)
+    private BusStatus status; // READY, TRAVELING, REPAIRING
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/BusStatus.java">
+package giang.com.BusManagement.domain;
+
+public enum BusStatus {
+    READY, // Xe sẵn sàng hoạt động
+    TRAVELING, // Xe đang trên đường (đang chạy một chuyến nào đó)
+    REPAIRING // Xe đang bảo trì, không thể gán vào chuyến mới
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/BusType.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "bus_types")
+@Data
+@NoArgsConstructor
+public class BusType {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @Column(nullable = false, unique = true)
+    private String typeName; // Ví dụ: "Giường nằm", "Ghế ngồi"
+
+    @Column(nullable = false)
+    private int capacity; // Số lượng ghế thực tế
+
+    // Quy định loại xe phù hợp cho tuyến này (ví dụ: Tuyến Bắc-Nam -> Giường nằm)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "suitable_bus_type_id")
+    private BusType suitableBusType;
+
+    /**
+     * Hàm lấy loại xe phù hợp (Smart Logic)
+     * Nếu Admin chưa gán loại xe cụ thể, hệ thống tự gợi ý dựa trên quãng đường
+     */
+    public BusType getSuitableBusType() {
+        if (this.suitableBusType != null) {
+            return this.suitableBusType;
+        }
+
+        // Logic AI đơn giản: Nếu đi trên 300km thì ưu tiên xe giường nằm (giả định)
+        // Lưu ý: Logic này cần được xử lý ở tầng Service nếu cần truy vấn DB tìm
+        // BusType giường nằm
+        return null;
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/Driver.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.Data;
+
+@Entity
+@Table(name = "drivers")
+@Data
+public class Driver {
+    @Id
+    private Long userId;
+
+    @OneToOne
+    @MapsId
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    private String licenseNumber;
+    private Integer experienceYears;
+    private Double totalDrivingHours24h;
+    private Integer monthlyRestDays;
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/Role.java">
+package giang.com.BusManagement.domain;
+
+public enum Role {
+    ROLE_ADMIN,
+    ROLE_DRIVER,
+    ROLE_USER
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/Route.java">
+package giang.com.BusManagement.domain;
+
+import java.util.List;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.Data;
+
+@Entity
+@Table(name = "routes")
+@Data
+public class Route {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String departurePoint;
+    private String destinationPoint;
+    private Double distanceKm;
+    private Integer estimatedDuration;
+
+    @OneToMany(mappedBy = "route", cascade = CascadeType.ALL)
+    private List<RouteStation> routeStations;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "suitable_bus_type_id")
+    private BusType suitableBusType;
+
+    /**
+     * Hàm lấy loại xe phù hợp (Smart Logic)
+     * Nếu Admin chưa gán loại xe cụ thể, hệ thống tự gợi ý dựa trên quãng đường
+     */
+    public BusType getSuitableBusType() {
+        if (this.suitableBusType != null) {
+            return this.suitableBusType;
+        }
+
+        // Logic AI đơn giản: Nếu đi trên 300km thì ưu tiên xe giường nằm (giả định)
+        // Lưu ý: Logic này cần được xử lý ở tầng Service nếu cần truy vấn DB tìm
+        // BusType giường nằm
+        return null;
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/RouteStation.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "route_stations")
+@Data
+@NoArgsConstructor
+public class RouteStation {
+
+    @EmbeddedId
+    private RouteStationId id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("routeId") // Ánh xạ routeId trong RouteStationId vào trường này
+    @JoinColumn(name = "route_id")
+    private Route route;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("stationId") // Ánh xạ stationId trong RouteStationId vào trường này
+    @JoinColumn(name = "station_id")
+    private Station station;
+
+    @Column(name = "stop_order")
+    private Integer stopOrder; // Ví dụ: Trạm 1, Trạm 2, Trạm 3...
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/RouteStationId.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.Embeddable;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.io.Serializable;
+
+@Embeddable
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RouteStationId implements Serializable {
+    private Long routeId;
+    private Long stationId;
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/Station.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.List;
+
+@Entity
+@Table(name = "stations")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Station {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 100)
+    private String stationName;
+
+    @Column(columnDefinition = "TEXT")
+    private String address;
+
+    // Liên kết ngược lại với RouteStation (Tùy chọn)
+    // Giúp bạn biết trạm này nằm trên những lộ trình nào
+    @OneToMany(mappedBy = "station", cascade = CascadeType.ALL)
+    private List<RouteStation> routeStations;
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/Trip.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "trips")
+@Data
+public class Trip {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // 1. Thay vì String, ta liên kết trực tiếp với bảng Route
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "route_id")
+    private Route route;
+
+    // 2. Phải có Xe và Tài xế để kiểm tra ràng buộc (như yêu cầu I.2)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bus_id")
+    private Bus bus;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_id")
+    private Driver driver;
+
+    private LocalDateTime departureTime;
+
+    // Cần thiết để AI tính toán giờ nghỉ cho tài xế
+    private LocalDateTime arrivalTimeExpected;
+
+    private int totalSeats;
+    private int ticketsSold;
+    private BigDecimal price; // Dùng BigDecimal cho tiền tệ
+
+    // 3. Sử dụng Enum thay cho String để tránh lỗi typo (ACTIVE vs active)
+    @Enumerated(EnumType.STRING)
+    private TripStatus status;
+
+    // 4. Self-reference: Liên kết trực tiếp tới chính object Trip gốc
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "original_trip_id")
+    private Trip originalTrip;
+
+    private boolean isExtraTrip = false;
+
+    // Helper method để tính tỉ lệ lấp đầy
+    public double getOccupancyRate() {
+        if (totalSeats == 0)
+            return 0;
+        return (double) ticketsSold / totalSeats;
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/TripStatus.java">
+package giang.com.BusManagement.domain;
+
+public enum TripStatus {
+    ACTIVE, PENDING_APPROVAL, DEPARTED, COMPLETED, CANCELLED
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/domain/User.java">
+package giang.com.BusManagement.domain;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Data;
+
+
+@Entity
+@Table(name = "users")
+@Data
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true, nullable = false)
+    private String username;
+
+    private String password; // Nên được mã hóa BCrypt
+    private String fullName;
+
+    @Column(unique = true)
+    private String email;
+
+    private String phone;
+
+    @Enumerated(EnumType.STRING)
+    private Role role; // ADMIN, DRIVER, USER
+
+    private Boolean status = true;
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/repository/TripRepository.java">
+package giang.com.BusManagement.repository;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import giang.com.BusManagement.domain.Driver;
+import giang.com.BusManagement.domain.Trip;
+import giang.com.BusManagement.domain.TripStatus;
+
+@Repository
+public interface TripRepository extends JpaRepository<Trip, Long> {
+
+    // Tìm chuyến theo trạng thái (Dùng cho getPendingTrips)
+    List<Trip> findByStatus(TripStatus status);
+
+    // Tìm các chuyến trong khoảng thời gian (Dùng cho AI quét nhu cầu cao)
+    List<Trip> findByDepartureTimeBetweenAndStatus(LocalDateTime start, LocalDateTime end, TripStatus status);
+
+    // Kiểm tra xem chuyến gốc đã có bản ghi tăng cường nào đang chờ duyệt chưa
+    boolean existsByOriginalTripAndStatus(Trip originalTrip, TripStatus status);
+
+    // Kiểm tra tài xế có đang bận trong khung giờ cụ thể không
+    boolean existsByDriverAndStatusInAndDepartureTimeBetween(
+            Driver driver,
+            Collection<TripStatus> statuses,
+            LocalDateTime start,
+            LocalDateTime end);
+
+    long countByStatus(TripStatus status);
+}
+</file>
+
+<file path="BusManagement/src/main/java/giang/com/BusManagement/service/TripService.java">
+package giang.com.BusManagement.service;
+
+import giang.com.BusManagement.domain.*;
+import giang.com.BusManagement.repository.*;
+import lombok.RequiredArgsConstructor;
+
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class TripService {
+
+    private final TripRepository tripRepository;
+    private final BusRepository busRepository;
+    private final DriverRepository driverRepository;
+
+    /**
+     * AI Logic: Quét các chuyến xe có tỉ lệ lấp đầy > 90%
+     * Chạy tự động mỗi 10 giây để kiểm tra
+     */
+    @Scheduled(fixedRate = 10000) // 10.000ms = 10 giây
+    @Transactional
+    public void scanAndSuggestExtraTrips() {
+        // 1. Tìm các chuyến ACTIVE sắp khởi hành (trong vòng 24h tới)
+        List<Trip> activeTrips = tripRepository.findByStatus(TripStatus.ACTIVE);
+
+        for (Trip trip : activeTrips) {
+            // 2. Kiểm tra tỉ lệ lấp đầy (> 90%) và chưa có chuyến tăng cường nào được tạo
+            // cho nó
+            if (trip.getOccupancyRate() > 0.9 && !hasAlreadySuggested(trip)) {
+
+                System.out.println("🤖 AI Detection: Chuyến xe ID " + trip.getId() + " đạt " +
+                        (trip.getOccupancyRate() * 100) + "%. Đang tạo đề xuất...");
+
+                Trip extraTrip = new Trip();
+                extraTrip.setRoute(trip.getRoute());
+                extraTrip.setDepartureTime(trip.getDepartureTime().plusMinutes(30)); // Chạy sau 30p
+                extraTrip.setStatus(TripStatus.PENDING_APPROVAL); // Trạng thái chờ Admin duyệt
+                extraTrip.setOriginalTrip(trip); // Liên kết với chuyến gốc
+                extraTrip.setTotalSeats(trip.getTotalSeats());
+                extraTrip.setPrice(trip.getPrice());
+                extraTrip.setExtraTrip(true);
+
+                tripRepository.save(extraTrip);
+            }
+        }
+    }
+
+    private boolean hasAlreadySuggested(Trip originalTrip) {
+        // Kiểm tra xem đã có chuyến nào PENDING hoặc ACTIVE mà trỏ tới originalTrip này
+        // chưa
+
+        return tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.PENDING_APPROVAL) ||
+                tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE);
+    }
+
+    /**
+     * Lấy danh sách xe SẴN SÀNG cho một chuyến xe cụ thể
+     */
+    public List<Bus> getAvailableBusesForTrip(Long tripId) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new RuntimeException("Trip not found"));
+
+        // 1. Lấy loại xe yêu cầu từ Route
+        BusType requiredType = trip.getRoute().getSuitableBusType();
+
+        // 2. Truy vấn tìm xe: Sẵn sàng + Đúng loại
+        if (requiredType != null) {
+            return busRepository.findByStatusAndBusType(BusStatus.READY, requiredType);
+        } else {
+            // Nếu tuyến đường không quy định loại xe, lấy tất cả xe đang READY
+            return busRepository.findByStatus(BusStatus.READY);
+        }
+    }
+
+    /**
+     * Lấy danh sách tài xế HỢP LỆ (Không quá 8h lái/24h)
+     */
+    public List<Driver> getAvailableDriversForTrip(Long tripId) {
+        Trip trip = tripRepository.findById(tripId).orElseThrow();
+        LocalDateTime startTime = trip.getDepartureTime();
+
+        System.out.println("get available driver: " + driverRepository.findAll());
+
+        return driverRepository.findAll().stream()
+                .filter(driver -> isDriverEligible(driver, startTime))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Logic kiểm tra ràng buộc 8 tiếng lái xe
+     */
+    private boolean isDriverEligible(Driver driver, LocalDateTime newTripStart) {
+
+        System.out.println("Checking driver: " + driver.getUser().getFullName());
+
+        // 1. Kiểm tra tài xế có đang bận chuyến nào khác trùng giờ không
+        boolean isBusy = tripRepository.existsByDriverAndStatusInAndDepartureTimeBetween(
+                driver,
+                List.of(TripStatus.ACTIVE, TripStatus.DEPARTED),
+                newTripStart.minusHours(5), // Ước tính thời gian chuyến đi
+                newTripStart.plusHours(5));
+
+        System.out.println("isBusy: " + isBusy);
+
+        if (isBusy)
+            return false;
+
+        // 2. Kiểm tra tổng giờ lái trong 24h qua (Requirement I.2.b)
+        // Lưu ý: Trong thực tế bạn sẽ query DriverLog để SUM(duration)
+        return driver.getTotalDrivingHours24h() < 8.0;
+    }
+
+    /**
+     * Admin phê duyệt chuyến xe: Gán Xe + Tài xế và kích hoạt
+     */
+    @Transactional
+    public void approveTrip(Long tripId, Long busId, Long driverId) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe"));
+
+        Bus bus = busRepository.findById(busId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy xe"));
+
+        Driver driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế"));
+
+        // Cập nhật thông tin chuyến xe
+        trip.setBus(bus);
+        trip.setDriver(driver);
+        trip.setStatus(TripStatus.ACTIVE);
+
+        // Cập nhật trạng thái xe sang TRAVELING (hoặc giữ READY nếu chưa đến giờ chạy)
+        // bus.setStatus(BusStatus.TRAVELING);
+
+        tripRepository.save(trip);
+        System.out.println("Admin: Đã phê duyệt chuyến xe " + tripId + " với xe " + bus.getLicensePlate());
+    }
+
+    /**
+     * Lấy tất cả các chuyến xe đang chờ phê duyệt (do AI đề xuất)
+     * Thường dùng để hiển thị danh sách cho Admin.
+     */
+    public List<Trip> getPendingTrips() {
+        // Trả về danh sách các chuyến có status là PENDING_APPROVAL
+        return tripRepository.findByStatus(TripStatus.PENDING_APPROVAL);
+    }
+
+    /**
+     * Lấy thông tin chi tiết của một chuyến xe theo ID
+     * 
+     * @throws RuntimeException nếu không tìm thấy ID
+     */
+    public Trip getTripById(Long id) {
+        return tripRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
+    }
+}
+</file>
+
+<file path="BusManagement/src/main/resources/application.properties">
+spring.application.name=BusManagement
+
+spring.jpa.hibernate.ddl-auto=update 
+spring.datasource.url=jdbc:mysql://${MYSQL_HOST:localhost}:3306/busmanagement
+spring.datasource.username=root
+spring.datasource.password=giangmysql
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.jpa.show-sql: false
+
+
+#config spring security
+spring.security.user.name=a
+spring.security.user.password=a
+# Cách này sẽ vô hiệu hóa hoàn toàn security (tùy version Spring Boot)
+spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+</file>
+
+<file path="BusManagement/src/main/resources/templates/admin/suggestions.html">
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Đề xuất tăng cường xe</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+
+<body class="container mt-5">
+    <h2>Hệ thống dự báo nhu cầu (AI Rule-based)</h2>
+    <p class="text-muted">Các chuyến xe dưới đây được hệ thống tự động đề xuất dựa trên tỷ lệ đặt chỗ cao.</p>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Lộ trình</th>
+                <th>Giờ khởi hành</th>
+                <th>Giá vé</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="trip : ${suggestions}">
+                <td th:text="${trip.route}"></td>
+                <td th:text="${#temporals.format(trip.departureTime, 'dd-MM-yyyy HH:mm')}"></td>
+                <td th:text="${trip.price}"></td>
+                <td>
+                    <form th:action="@{/admin/trips/approve/{id}(id=${trip.id})}" method="post">
+                        <button class="btn btn-success btn-sm">Duyệt mở chuyến</button>
+                    </form>
+                </td>
+            </tr>
+            <tr th:if="${suggestions.empty}">
+                <td colspan="4" class="text-center">Hiện chưa có đề xuất nào từ hệ thống.</td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/src/main/resources/templates/hello.html">
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chào mừng</title>
+</head>
+
+<body>
+    <h1>Hệ thống quản lý xe khách đã sẵn sàng!</h1>
+</body>
+
+</html>
+</file>
+
+<file path="BusManagement/src/test/java/giang/com/BusManagement/BusManagementApplicationTests.java">
+package giang.com.BusManagement;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class BusManagementApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}
+</file>
+
+<file path="README.md">
+# BusManagement
+</file>
+
+</files>

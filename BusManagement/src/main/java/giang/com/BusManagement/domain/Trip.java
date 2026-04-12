@@ -19,13 +19,13 @@ public class Trip {
     private Route route;
 
     // 2. Phải có Xe và Tài xế để kiểm tra ràng buộc (như yêu cầu I.2)
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "bus_id")
-    // private Bus bus;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bus_id")
+    private Bus bus;
 
-    // @ManyToOne(fetch = FetchType.LAZY)
-    // @JoinColumn(name = "driver_id")
-    // private Driver driver;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_id")
+    private Driver driver;
 
     private LocalDateTime departureTime;
 
