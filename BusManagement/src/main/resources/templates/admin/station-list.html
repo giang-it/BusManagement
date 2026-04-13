@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Trạm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-map-marker-alt"></i> Quản lý Trạm
+            </span>
+            <a href="/admin/dashboard" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Alert Messages -->
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card border-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="text-muted mb-1">Tổng số trạm</h6>
+                                <h3 class="mb-0" th:text="${stations.size()}">0</h3>
+                            </div>
+                            <div style="font-size: 3rem; opacity: 0.7;" class="text-primary">
+                                <i class="fas fa-map-marked-alt"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh sách trạm -->
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Danh sách trạm
+                </h5>
+                <a href="/admin/master-data/stations/form" class="btn btn-light btn-sm">
+                    <i class="fas fa-plus"></i> Thêm trạm mới
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Tên trạm</th>
+                                <th>Địa chỉ</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="station : ${stations}">
+                                <td th:text="${station.id}"></td>
+                                <td>
+                                    <i class="fas fa-map-marker-alt text-danger"></i>
+                                    <strong th:text="${station.stationName}"></strong>
+                                </td>
+                                <td th:text="${station.address}"></td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a th:href="@{/admin/master-data/stations/form(id=${station.id})}"
+                                            class="btn btn-outline-primary" title="Sửa">
+                                            <i class="fas fa-edit"></i> Sửa
+                                        </a>
+                                        <form th:action="@{/admin/master-data/stations/delete/{id}(id=${station.id})}"
+                                            method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Xác nhận xóa trạm này?')" title="Xóa">
+                                                <i class="fas fa-trash"></i> Xóa
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${stations.isEmpty()}">
+                                <td colspan="4" class="text-center text-muted py-5">
+                                    <i class="fas fa-info-circle fs-3"></i><br>
+                                    Chưa có trạm nào trong hệ thống. Hãy thêm trạm mới!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info box -->
+        <div class="alert alert-info mt-4">
+            <i class="fas fa-info-circle"></i>
+            <strong>Lưu ý:</strong> Trạm là các điểm dừng trên tuyến đường.
+            Mỗi tuyến có thể có nhiều trạm dừng giữa điểm đi và điểm đến.
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

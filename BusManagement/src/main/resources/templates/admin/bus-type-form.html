@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Loại xe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-bus"></i>
+                <span th:text="${busType.id != null ? 'Sửa loại xe' : 'Thêm loại xe mới'}"></span>
+            </span>
+            <a href="/admin/master-data/bus-types" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit"></i> Thông tin loại xe
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form th:action="@{/admin/master-data/bus-types/save}" th:object="${busType}" method="post">
+                            <input type="hidden" th:field="*{id}">
+
+                            <!-- Tên loại xe -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-tag"></i> Tên loại xe <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" class="form-control" th:field="*{typeName}" required
+                                    placeholder="VD: Giường nằm, Ghế ngồi, Limousine">
+                                <div class="form-text">Tên phân loại xe (phải là duy nhất)</div>
+                            </div>
+
+                            <!-- Số ghế -->
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-chair"></i> Số ghế <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" class="form-control" th:field="*{capacity}" required min="1"
+                                    max="100" placeholder="40">
+                                <div class="form-text">Số lượng ghế/giường của loại xe này</div>
+                            </div>
+
+                            <!-- Ví dụ -->
+                            <div class="card bg-light mb-3">
+                                <div class="card-header">
+                                    <i class="fas fa-lightbulb"></i> Ví dụ các loại xe phổ biến
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <strong>Giường nằm:</strong>
+                                            <ul class="mb-0">
+                                                <li>40-46 giường (2 tầng)</li>
+                                                <li>Cho tuyến dài > 300km</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <strong>Ghế ngồi:</strong>
+                                            <ul class="mb-0">
+                                                <li>29-45 ghế</li>
+                                                <li>Cho tuyến ngắn < 300km</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-6">
+                                            <strong>Limousine:</strong>
+                                            <ul class="mb-0">
+                                                <li>9-24 ghế cao cấp</li>
+                                                <li>Có massage, giải trí</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="/admin/master-data/bus-types" class="btn btn-secondary">
+                                    <i class="fas fa-times"></i> Hủy
+                                </a>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save"></i> Lưu
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
