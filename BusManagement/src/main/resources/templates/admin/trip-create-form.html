@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tạo Chuyến xe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-plus-circle"></i> Tạo Chuyến xe thủ công
+            </span>
+            <a href="/admin/trip-management/trips" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-edit"></i> Thông tin chuyến xe
+                </h5>
+            </div>
+            <div class="card-body">
+                <form action="/admin/trip-management/trips/create" method="post">
+
+                    <!-- CHỌN TUYẾN -->
+                    <h6 class="border-bottom pb-2 mb-3">
+                        <i class="fas fa-route"></i> Thông tin tuyến đường
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">
+                                Tuyến đường <span class="text-danger">*</span>
+                            </label>
+                            <select name="routeId" class="form-select" required>
+                                <option value="">-- Chọn tuyến --</option>
+                                <option th:each="route : ${routes}" th:value="${route.id}"
+                                    th:text="${route.departurePoint} + ' → ' + ${route.destinationPoint}">
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- CHỌN XE VÀ TÀI XẾ -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">
+                        <i class="fas fa-bus"></i> Phân công xe & nhân sự
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-bus"></i> Xe <span class="text-danger">*</span>
+                            </label>
+                            <select name="busId" class="form-select" required>
+                                <option value="">-- Chọn xe --</option>
+                                <option th:each="bus : ${buses}" th:value="${bus.id}"
+                                    th:text="${bus.licensePlate} + ' (' + ${bus.busType?.typeName} + ')'">
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-user-tie"></i> Tài xế chính <span class="text-danger">*</span>
+                            </label>
+                            <select name="driverId" class="form-select" required>
+                                <option value="">-- Chọn tài xế --</option>
+                                <option th:each="driver : ${drivers}" th:value="${driver.userId}"
+                                    th:text="${driver.user?.fullName}">
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-user"></i> Phụ xe (tùy chọn)
+                            </label>
+                            <select name="assistantId" class="form-select">
+                                <option value="">-- Không có --</option>
+                                <option th:each="driver : ${drivers}" th:value="${driver.userId}"
+                                    th:text="${driver.user?.fullName}">
+                                </option>
+                            </select>
+                            <div class="form-text">Phụ xe hỗ trợ bán vé và chăm sóc khách</div>
+                        </div>
+                    </div>
+
+                    <!-- THỜI GIAN -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">
+                        <i class="fas fa-clock"></i> Thời gian
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-day"></i> Thời gian khởi hành <span
+                                    class="text-danger">*</span>
+                            </label>
+                            <input type="datetime-local" name="departureTime" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-check"></i> Thời gian đến dự kiến <span
+                                    class="text-danger">*</span>
+                            </label>
+                            <input type="datetime-local" name="arrivalTimeExpected" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <!-- GHẾ VÀ GIÁ -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-4">
+                        <i class="fas fa-tags"></i> Ghế ngồi & Giá vé
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-chair"></i> Tổng số ghế <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="totalSeats" class="form-control" required min="1" max="100"
+                                placeholder="40">
+                            <div class="form-text">Số ghế thực tế trên xe</div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-dollar-sign"></i> Giá vé (VNĐ) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="price" class="form-control" required min="0" step="1000"
+                                placeholder="150000">
+                            <div class="form-text">Giá vé một ghế</div>
+                        </div>
+                    </div>
+
+                    <!-- CẢNH BÁO -->
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Lưu ý khi tạo chuyến:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Xe:</strong> Đảm bảo xe đang ở trạng thái READY (không trong bảo trì)</li>
+                            <li><strong>Tài xế:</strong> Kiểm tra tài xế chưa lái quá 8h trong 24h qua</li>
+                            <li><strong>Tài xế:</strong> Đảm bảo tài xế đã nghỉ đủ 2 ngày/tháng</li>
+                            <li><strong>Thời gian:</strong> Thời gian đến phải sau thời gian khởi hành</li>
+                            <li><strong>Ghế:</strong> Số ghế phải khớp với xe được chọn</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="/admin/trip-management/trips" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Hủy
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Tạo chuyến
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Hướng dẫn -->
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="fas fa-question-circle"></i> Hướng dẫn</h6>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li><strong>Chọn tuyến:</strong> Chọn tuyến đường đã được cấu hình sẵn</li>
+                    <li><strong>Gán xe & tài xế:</strong> Hệ thống sẽ kiểm tra ràng buộc tự động</li>
+                    <li><strong>Phụ xe:</strong> Tùy chọn, giúp hỗ trợ bán vé và chăm sóc khách</li>
+                    <li><strong>Đặt thời gian:</strong> Thời gian khởi hành phải là tương lai</li>
+                    <li><strong>Giá vé:</strong> Có thể tham khảo bảng giá đã cấu hình cho tuyến</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

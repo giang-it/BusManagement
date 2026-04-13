@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Chuyến xe</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            font-size: 0.85rem;
+            padding: 0.35rem 0.65rem;
+        }
+
+        .trip-row:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="fas fa-route"></i> Quản lý Chuyến xe
+            </span>
+            <a href="/admin/dashboard" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <!-- Alert Messages -->
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Filter & Actions -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <form action="/admin/trip-management/trips/filter" method="get" class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Lọc theo trạng thái</label>
+                                <select name="status" class="form-select">
+                                    <option value="">-- Tất cả trạng thái --</option>
+                                    <option th:each="status : ${statuses}" th:value="${status.name()}"
+                                        th:text="${status.name()}" th:selected="${selectedStatus == status.name()}">
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-filter"></i> Lọc
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <a href="/admin/trip-management/trips/create" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Tạo chuyến mới
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card border-primary">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Tổng chuyến</h6>
+                        <h3 class="mb-0" th:text="${trips.size()}">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Đang hoạt động</h6>
+                        <h3 class="mb-0 text-success" th:text="${#lists.size(trips.?[status.name() == 'ACTIVE'])}">0
+                        </h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-warning">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Chờ duyệt</h6>
+                        <h3 class="mb-0 text-warning"
+                            th:text="${#lists.size(trips.?[status.name() == 'PENDING_APPROVAL'])}">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-info">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-1">Hoàn thành</h6>
+                        <h3 class="mb-0 text-info" th:text="${#lists.size(trips.?[status.name() == 'COMPLETED'])}">0
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh sách trips -->
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Danh sách chuyến xe
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Tuyến</th>
+                                <th>Xe</th>
+                                <th>Tài xế</th>
+                                <th>Phụ xe</th>
+                                <th>Khởi hành</th>
+                                <th>Ghế</th>
+                                <th>Giá</th>
+                                <th>Trạng thái</th>
+                                <th>Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="trip : ${trips}" class="trip-row">
+                                <td th:text="${trip.id}"></td>
+                                <td>
+                                    <strong
+                                        th:text="${trip.route?.departurePoint} + ' → ' + ${trip.route?.destinationPoint}"></strong>
+                                    <span th:if="${trip.isExtraTrip}" class="badge bg-warning ms-1">Tăng cường</span>
+                                </td>
+                                <td>
+                                    <small th:text="${trip.bus?.licensePlate}"></small>
+                                </td>
+                                <td>
+                                    <small th:text="${trip.driver?.user?.fullName}"></small>
+                                </td>
+                                <td>
+                                    <small th:text="${trip.assistant?.user?.fullName ?: 'Không có'}"></small>
+                                </td>
+                                <td th:text="${#temporals.format(trip.departureTime, 'dd/MM/yyyy HH:mm')}"></td>
+                                <td>
+                                    <span th:text="${trip.ticketsSold} + '/' + ${trip.totalSeats}"></span>
+                                    <small
+                                        th:text="'(' + ${#numbers.formatDecimal(trip.getOccupancyRate() * 100, 1, 0)} + '%)'"></small>
+                                </td>
+                                <td th:text="${#numbers.formatDecimal(trip.price, 1, 'COMMA', 0, 'POINT')} + 'đ'"></td>
+                                <td>
+                                    <span class="badge status-badge" th:classappend="${trip.status.name() == 'ACTIVE' ? 'bg-success' : 
+                                                          trip.status.name() == 'PENDING_APPROVAL' ? 'bg-warning' : 
+                                                          trip.status.name() == 'COMPLETED' ? 'bg-info' :
+                                                          trip.status.name() == 'CANCELLED' ? 'bg-danger' :
+                                                          'bg-secondary'}" th:text="${trip.status.name()}">
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a th:href="@{/admin/trip-management/trips/edit/{id}(id=${trip.id})}"
+                                            class="btn btn-outline-primary" title="Sửa">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <form th:action="@{/admin/trip-management/trips/cancel/{id}(id=${trip.id})}"
+                                            method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-outline-warning btn-sm"
+                                                onclick="return confirm('Hủy chuyến này?')" title="Hủy"
+                                                th:disabled="${trip.status.name() == 'COMPLETED' || trip.status.name() == 'CANCELLED'}">
+                                                <i class="fas fa-ban"></i>
+                                            </button>
+                                        </form>
+                                        <form th:action="@{/admin/trip-management/trips/delete/{id}(id=${trip.id})}"
+                                            method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('Xóa chuyến này? (Chỉ được xóa nếu chưa có vé bán)')"
+                                                title="Xóa">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr th:if="${trips.isEmpty()}">
+                                <td colspan="10" class="text-center text-muted py-5">
+                                    <i class="fas fa-info-circle fs-3"></i><br>
+                                    Chưa có chuyến xe nào. Hãy tạo chuyến mới hoặc chờ AI đề xuất!
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6>Chú thích trạng thái:</h6>
+                <span class="badge bg-warning me-2">PENDING_APPROVAL</span> Chờ phê duyệt (AI đề xuất)
+                <span class="badge bg-success me-2 ms-3">ACTIVE</span> Đang hoạt động
+                <span class="badge bg-primary me-2 ms-3">DEPARTED</span> Đã khởi hành
+                <span class="badge bg-info me-2 ms-3">COMPLETED</span> Hoàn thành
+                <span class="badge bg-danger me-2 ms-3">CANCELLED</span> Đã hủy
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
