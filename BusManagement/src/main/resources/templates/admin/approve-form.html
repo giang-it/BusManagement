@@ -2,46 +2,298 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
-    <title>Approve Trip</title>
+    <title>Phê duyệt chuyến tăng cường</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .ai-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .resource-card {
+            border-left: 4px solid #198754;
+            background: #f8fff9;
+        }
+
+        .resource-card.warning {
+            border-left-color: #ffc107;
+            background: #fffdf0;
+        }
+
+        .constraint-badge {
+            font-size: 0.75rem;
+        }
+
+        .manual-section {
+            border-left: 4px solid #fd7e14;
+            background: #fff9f5;
+        }
+    </style>
 </head>
 
-<body class="container mt-5">
-    <h2>Phê duyệt chuyến tăng cường</h2>
-    <hr>
-    <div class="card mb-4">
-        <div class="card-body">
-            <p><strong>Tuyến:</strong> <span
-                    th:text="${trip.route.departurePoint + ' - ' + trip.route.destinationPoint}"></span></p>
-            <p><strong>Giờ chạy:</strong> <span
-                    th:text="${#temporals.format(trip.departureTime, 'HH:mm dd-MM-yyyy')}"></span></p>
+<body class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-0">Phê duyệt chuyến tăng cường</h2>
+            <small class="text-muted">Chuyến được AI đề xuất từ chuyến gốc có &gt;90% lấp đầy ghế</small>
         </div>
     </div>
 
-    <form th:action="@{/admin/trips/approve}" method="post">
-        <input type="hidden" name="tripId" th:value="${trip.id}">
+    <!-- Alert messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <span th:text="${success}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <span th:text="${error}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
 
-        <div class="mb-3">
-            <label class="form-label">Chọn Xe (Chỉ hiển thị xe READY & đúng loại):</label>
-            <select name="busId" class="form-select" required>
-                <option value="">-- Chọn xe --</option>
-                <option th:each="bus : ${availableBuses}" th:value="${bus.id}"
-                    th:text="${bus.licensePlate + ' (' + bus.brand + ')'}"></option>
-            </select>
+    <!-- Thông tin chuyến xe -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <strong>📋 Thông tin chuyến tăng cường #<span th:text="${trip.id}"></span></strong>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>Tuyến đường:</strong>
+                        <span th:text="${trip.route.departurePoint + ' → ' + trip.route.destinationPoint}"></span>
+                    </p>
+                    <p class="mb-1"><strong>Giờ khởi hành:</strong>
+                        <span th:text="${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}"></span>
+                    </p>
+                    <p class="mb-1"><strong>Giờ đến dự kiến:</strong>
+                        <span th:if="${trip.arrivalTimeExpected != null}"
+                            th:text="${#temporals.format(trip.arrivalTimeExpected, 'HH:mm - dd/MM/yyyy')}"></span>
+                        <span th:unless="${trip.arrivalTimeExpected != null}" class="text-muted">Chưa xác định</span>
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>Số ghế:</strong>
+                        <span th:text="${trip.totalSeats}"></span> ghế
+                    </p>
+                    <p class="mb-1"><strong>Giá vé:</strong>
+                        <span th:text="${#numbers.formatDecimal(trip.price, 0, 'COMMA', 0, 'POINT')} + ' VNĐ'"></span>
+                    </p>
+                    <p class="mb-1"><strong>Trạng thái:</strong>
+                        <span class="badge bg-warning text-dark">Chờ phê duyệt</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================== -->
+    <!-- MODE A: AI ĐÃ PHÂN CÔNG ĐẦY ĐỦ → 1-CLICK CONFIRM    -->
+    <!-- ===================================================== -->
+    <div th:if="${isAutoAssigned}">
+
+        <div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+            <span style="font-size:1.5rem">🤖</span>
+            <div>
+                <strong>AI đã tự động phân công đầy đủ!</strong><br>
+                <small>Hệ thống đã kiểm tra tất cả ràng buộc. Bạn chỉ cần xem lại và xác nhận.</small>
+            </div>
         </div>
 
-        <div class="mb-3">
-            <label class="form-label">Chọn Tài xế (Chỉ hiển thị người rảnh & lái < 8h):</label>
-                    <select name="driverId" class="form-select" required>
-                        <option value="">-- Chọn tài xế --</option>
-                        <option th:each="driver : ${availableDrivers}" th:value="${driver.userId}"
-                            th:text="${driver.user.fullName + ' - Bằng: ' + driver.licenseNumber}"></option>
-                    </select>
+        <!-- Xe được phân công -->
+        <div class="card resource-card mb-3 p-3">
+            <h6 class="text-success mb-3">🚌 Xe được phân công</h6>
+            <div class="row align-items-center">
+                <div class="col">
+                    <strong th:text="${trip.bus.licensePlate}"></strong>
+                    <span class="text-muted ms-2" th:text="'(' + ${trip.bus.brand} + ')'"></span>
+                    <span class="badge bg-secondary ms-2"
+                        th:text="${trip.bus.busType != null ? trip.bus.busType.typeName : 'Không rõ loại'}"></span>
+                </div>
+                <div class="col-auto">
+                    <span class="badge bg-success constraint-badge">✔ READY</span>
+                    <span class="badge bg-info constraint-badge ms-1"
+                        th:text="${#numbers.formatDecimal(trip.bus.kmSinceLastMaintenance, 0, 'COMMA', 0, 'POINT') + ' km từ bảo trì'}"></span>
+                    <span th:if="${trip.bus.needsMaintenance()}"
+                        class="badge bg-warning text-dark constraint-badge ms-1">⚠ Cần bảo trì sớm</span>
+                </div>
+            </div>
         </div>
 
-        <button type="submit" class="btn btn-success">Kích hoạt chuyến xe</button>
-        <a href="/admin/trips/pending" class="btn btn-secondary">Quay lại</a>
-    </form>
+        <!-- Tài xế chính -->
+        <div class="card resource-card mb-3 p-3">
+            <h6 class="text-success mb-3">👨‍✈️ Tài xế chính</h6>
+            <div class="row align-items-center">
+                <div class="col">
+                    <strong th:text="${trip.driver.user.fullName}"></strong>
+                    <span class="text-muted ms-2"
+                        th:text="'— Bằng ' + ${trip.driver.licenseClass} + ' (' + ${trip.driver.licenseNumber} + ')'"></span>
+                </div>
+                <div class="col-auto">
+                    <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
+                    <span class="badge bg-info constraint-badge ms-1"
+                        th:text="${trip.driver.totalDrivingHours24h + 'h đã lái hôm nay'}"></span>
+                    <span class="badge bg-success constraint-badge ms-1">✔ &lt; 8h/ngày</span>
+                    <span class="badge bg-success constraint-badge ms-1">✔ Không bận</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phụ xe -->
+        <div th:if="${trip.assistant != null}" class="card resource-card mb-3 p-3">
+            <h6 class="text-success mb-3">🧑‍🔧 Phụ xe</h6>
+            <div class="row align-items-center">
+                <div class="col">
+                    <strong th:text="${trip.assistant.user.fullName}"></strong>
+                    <span class="text-muted ms-2"
+                        th:text="'— Bằng ' + ${trip.assistant.licenseClass} + ' (' + ${trip.assistant.licenseNumber} + ')'"></span>
+                </div>
+                <div class="col-auto">
+                    <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
+                    <span class="badge bg-info constraint-badge ms-1"
+                        th:text="${trip.assistant.totalDrivingHours24h + 'h đã làm hôm nay'}"></span>
+                    <span class="badge bg-success constraint-badge ms-1">✔ Không bận</span>
+                </div>
+            </div>
+        </div>
+        <div th:unless="${trip.assistant != null}" class="alert alert-warning py-2 mb-3">
+            <small>⚠️ <strong>Không tìm được phụ xe:</strong> Tất cả phụ xe đều bận hoặc đã đủ 8h.
+                Chuyến vẫn có thể chạy nhưng không có phụ xe.</small>
+        </div>
+
+        <!-- NÚT XÁC NHẬN 1-CLICK -->
+        <div class="d-flex gap-3 mt-4">
+            <form th:action="@{/admin/trips/confirm}" method="post">
+                <input type="hidden" name="tripId" th:value="${trip.id}">
+                <button type="submit" class="btn btn-success btn-lg px-5">
+                    ✅ Xác nhận & Kích hoạt chuyến
+                </button>
+            </form>
+
+            <form th:action="@{/admin/trips/reject/{id}(id=${trip.id})}" method="post"
+                onsubmit="return confirm('Xác nhận từ chối chuyến tăng cường này?')">
+                <button type="submit" class="btn btn-outline-danger btn-lg">
+                    ❌ Từ chối
+                </button>
+            </form>
+
+            <a href="/admin/trips/pending" class="btn btn-secondary btn-lg">Quay lại</a>
+        </div>
+    </div>
+
+    <!-- ===================================================== -->
+    <!-- MODE B: AI KHÔNG PHÂN CÔNG ĐƯỢC → FORM THỦ CÔNG      -->
+    <!-- ===================================================== -->
+    <div th:unless="${isAutoAssigned}">
+
+        <div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+            <span style="font-size:1.5rem">⚠️</span>
+            <div>
+                <strong>AI không thể tự động phân công!</strong><br>
+                <small>Không tìm đủ tài nguyên hợp lệ trong khung giờ này.
+                    Vui lòng chọn thủ công bên dưới.</small>
+            </div>
+        </div>
+
+        <div class="card manual-section mb-4">
+            <div class="card-header">
+                <strong>🔧 Phân công thủ công</strong>
+                <small class="text-muted ms-2">(Chỉ hiển thị tài nguyên hợp lệ: rảnh + đúng ràng buộc)</small>
+            </div>
+            <div class="card-body">
+                <form th:action="@{/admin/trips/approve}" method="post">
+                    <input type="hidden" name="tripId" th:value="${trip.id}">
+
+                    <!-- Chọn xe -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">🚌 Chọn xe
+                            <span class="badge bg-secondary ms-1"
+                                th:text="${#lists.size(availableBuses)} + ' xe sẵn sàng'"></span>
+                        </label>
+                        <select name="busId" class="form-select" required>
+                            <option value="">-- Chọn xe --</option>
+                            <option th:each="bus : ${availableBuses}" th:value="${bus.id}"
+                                th:text="${bus.licensePlate
+                                        + ' | ' + bus.brand
+                                        + ' | ' + (bus.busType != null ? bus.busType.typeName : 'N/A')
+                                        + ' | ' + #numbers.formatDecimal(bus.kmSinceLastMaintenance, 0, 'COMMA', 0, 'POINT') + ' km'}">
+                            </option>
+                        </select>
+                        <div th:if="${#lists.isEmpty(availableBuses)}" class="text-danger mt-1">
+                            <small>⛔ Không có xe nào phù hợp trong khung giờ này!</small>
+                        </div>
+                    </div>
+
+                    <!-- Chọn tài xế chính -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">👨‍✈️ Chọn tài xế chính
+                            <span class="badge bg-secondary ms-1"
+                                th:text="${#lists.size(availableDrivers)} + ' người hợp lệ'"></span>
+                        </label>
+                        <small class="text-muted d-block mb-2">
+                            Điều kiện: bằng còn hạn + rảnh + tổng giờ lái hôm nay + chuyến này ≤ 8h
+                        </small>
+                        <select name="driverId" class="form-select" required>
+                            <option value="">-- Chọn tài xế --</option>
+                            <option th:each="d : ${availableDrivers}" th:value="${d.userId}" th:text="${d.user.fullName
+                                        + ' | Bằng: ' + d.licenseClass
+                                        + ' | Đã lái: ' + d.totalDrivingHours24h + 'h hôm nay'}">
+                            </option>
+                        </select>
+                        <div th:if="${#lists.isEmpty(availableDrivers)}" class="text-danger mt-1">
+                            <small>⛔ Không có tài xế nào hợp lệ trong khung giờ này!</small>
+                        </div>
+                    </div>
+
+                    <!-- Chọn phụ xe (không bắt buộc) -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">🧑‍🔧 Chọn phụ xe
+                            <span class="badge bg-light text-dark border ms-1">Không bắt buộc</span>
+                        </label>
+                        <select name="assistantId" class="form-select">
+                            <option value="">-- Không có phụ xe --</option>
+                            <option th:each="d : ${availableDrivers}" th:value="${d.userId}" th:text="${d.user.fullName
+                                        + ' | Bằng: ' + d.licenseClass
+                                        + ' | Đã làm: ' + d.totalDrivingHours24h + 'h hôm nay'}">
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- Nút submit -->
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-primary btn-lg px-5"
+                            th:disabled="${#lists.isEmpty(availableBuses) or #lists.isEmpty(availableDrivers)}">
+                            🚀 Phân công & Kích hoạt
+                        </button>
+
+                        <form th:action="@{/admin/trips/reject/{id}(id=${trip.id})}" method="post"
+                            onsubmit="return confirm('Xác nhận từ chối chuyến tăng cường này?')">
+                            <button type="submit" class="btn btn-outline-danger btn-lg">❌ Từ chối</button>
+                        </form>
+
+                        <a href="/admin/trips/pending" class="btn btn-secondary btn-lg">Quay lại</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Giải thích ràng buộc -->
+        <div class="card bg-light border-0 p-3">
+            <h6 class="text-muted mb-2">ℹ️ Ràng buộc hệ thống đang kiểm tra:</h6>
+            <ul class="mb-0 text-muted small">
+                <li>Tài xế không được lái quá <strong>8 tiếng/ngày</strong> (tính tổng tất cả chuyến trong 24h)</li>
+                <li>Tài xế và phụ xe phải có <strong>nghỉ tối thiểu 30 phút</strong> giữa hai chuyến</li>
+                <li>Tài xế và phụ xe <strong>không được trùng nhau</strong></li>
+                <li>Xe phải có trạng thái <strong>READY</strong> và không bận trong khung giờ</li>
+                <li>Bằng lái của tài xế <strong>phải còn hạn</strong></li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

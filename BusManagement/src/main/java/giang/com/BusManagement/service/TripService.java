@@ -8,7 +8,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,149 +18,444 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TripService {
 
-    private final TripRepository tripRepository;
-    private final BusRepository busRepository;
-    private final DriverRepository driverRepository;
+        private final TripRepository tripRepository;
+        private final BusRepository busRepository;
+        private final DriverRepository driverRepository;
 
-    /**
-     * AI Logic: Quét các chuyến xe có tỉ lệ lấp đầy > 90%
-     * Chạy tự động mỗi 10 giây để kiểm tra
-     */
-    @Scheduled(fixedRate = 10000) // 10.000ms = 10 giây
-    @Transactional
-    public void scanAndSuggestExtraTrips() {
-        // 1. Tìm các chuyến ACTIVE sắp khởi hành (trong vòng 24h tới)
-        List<Trip> activeTrips = tripRepository.findByStatus(TripStatus.ACTIVE);
+        /**
+         * Thời gian nghỉ tối thiểu bắt buộc giữa 2 chuyến của cùng một tài xế/phụ xe
+         * (phút).
+         * Đảm bảo có đủ thời gian để di chuyển, kiểm tra xe và nghỉ ngơi ngắn.
+         */
+        private static final int MIN_REST_BETWEEN_TRIPS_MINUTES = 30;
 
-        for (Trip trip : activeTrips) {
-            // 2. Kiểm tra tỉ lệ lấp đầy (> 90%) và chưa có chuyến tăng cường nào được tạo
-            // cho nó
-            if (trip.getOccupancyRate() > 0.9 && !hasAlreadySuggested(trip)) {
+        /**
+         * Buffer thêm vào khi kiểm tra xe có bận không.
+         * Giúp xe kịp vệ sinh / chuẩn bị trước chuyến tiếp theo.
+         */
+        private static final int BUS_PREP_BUFFER_HOURS = 1;
 
-                System.out.println("🤖 AI Detection: Chuyến xe ID " + trip.getId() + " đạt " +
-                        (trip.getOccupancyRate() * 100) + "%. Đang tạo đề xuất...");
+        // =========================================================================
+        // SCHEDULED JOB: Quét & tự động tạo chuyến tăng cường
+        // =========================================================================
 
+        /**
+         * AI Scheduling Job: Mỗi 10 giây quét các chuyến ACTIVE có tỉ lệ lấp đầy > 90%.
+         * Khi phát hiện, tự động tạo chuyến tăng cường VÀ phân công đầy đủ
+         * (xe + tài xế + phụ xe) theo ràng buộc hệ thống.
+         *
+         * Chuyến tăng cường vẫn ở trạng thái PENDING_APPROVAL để Admin xác nhận 1
+         * click.
+         * Nếu AI không tìm đủ tài nguyên, chuyến được tạo không có phân công
+         * để Admin xử lý thủ công.
+         */
+        /**
+         * AI Scheduling Job: Mỗi 10 giây quét các chuyến ACTIVE có tỉ lệ lấp đầy > 90%.
+         *
+         * @Transactional BẮT BUỘC ở đây vì 2 lý do:
+         *                1. Giữ Hibernate session mở suốt vòng lặp → trip.getRoute()
+         *                (lazy) không bị
+         *                LazyInitializationException.
+         *                2. Khi gọi createExtraTrip() từ cùng class (self-invocation),
+         *                Spring AOP KHÔNG
+         *                tạo proxy → @Transactional trên method đó bị bỏ qua. Đặt ở đây
+         *                là đủ.
+         *
+         *                FK self-referential được xử lý bằng 2-step save bên trong
+         *                createExtraTrip():
+         *                INSERT với original_trip_id = NULL (không vi phạm FK) →
+         *                flush()
+         *                → UPDATE gán original_trip_id sau khi row đã tồn tại.
+         */
+        @Scheduled(fixedRate = 10_000)
+        @Transactional
+        public void scanAndSuggestExtraTrips() {
+                List<Trip> activeTrips = tripRepository.findByStatusWithRoute(TripStatus.ACTIVE);
+
+                for (Trip trip : activeTrips) {
+                        if (trip.getOccupancyRate() > 0.9 && !hasAlreadySuggested(trip)) {
+                                createExtraTrip(trip);
+                        }
+                }
+        }
+
+        /**
+         * Tạo và lưu một chuyến tăng cường.
+         * Chạy trong cùng transaction của scanAndSuggestExtraTrips (self-invocation).
+         *
+         * 2-step save pattern giải quyết self-referential FK:
+         * - Bước 1: INSERT extraTrip với original_trip_id = NULL → không vi phạm FK.
+         * - flush() → Hibernate ghi row xuống DB ngay, extraTrip có ID.
+         * - Bước 2: gán originalTrip, sau đó UPDATE → FK hợp lệ vì row gốc đã tồn tại.
+         */
+        private void createExtraTrip(Trip trip) {
+                System.out.printf("🤖 [AI] Chuyến #%d đạt %.1f%% lấp đầy. Đang tạo chuyến tăng cường...%n",
+                                trip.getId(), trip.getOccupancyRate() * 100);
+
+                // --- Tính thời gian ---
+                LocalDateTime extraDeparture = trip.getDepartureTime().plusMinutes(30);
+                int routeDurationMinutes = (trip.getRoute().getEstimatedDuration() != null)
+                                ? trip.getRoute().getEstimatedDuration()
+                                : 240;
+                LocalDateTime extraArrival = extraDeparture.plusMinutes(routeDurationMinutes);
+
+                // --- Bước 1: Save KHÔNG có originalTrip (null) để tránh FK violation ---
                 Trip extraTrip = new Trip();
                 extraTrip.setRoute(trip.getRoute());
-                extraTrip.setDepartureTime(trip.getDepartureTime().plusMinutes(30)); // Chạy sau 30p
-                extraTrip.setStatus(TripStatus.PENDING_APPROVAL); // Trạng thái chờ Admin duyệt
-                extraTrip.setOriginalTrip(trip); // Liên kết với chuyến gốc
+                extraTrip.setDepartureTime(extraDeparture);
+                extraTrip.setArrivalTimeExpected(extraArrival);
+                extraTrip.setStatus(TripStatus.PENDING_APPROVAL);
                 extraTrip.setTotalSeats(trip.getTotalSeats());
                 extraTrip.setPrice(trip.getPrice());
                 extraTrip.setExtraTrip(true);
+                // originalTrip = null → INSERT không vi phạm self-referential FK
+                tripRepository.save(extraTrip);
+                tripRepository.flush(); // ép Hibernate ghi xuống DB ngay → extraTrip có ID
+
+                // --- Bước 2: Gán originalTrip SAU KHI row đã tồn tại trong DB ---
+                extraTrip.setOriginalTrip(trip);
+
+                // --- Bước 3: AI phân công tài nguyên ---
+                AutoAssignResult result = autoAssignResources(extraTrip);
+
+                if (result.isSuccess()) {
+                        extraTrip.setBus(result.getBus());
+                        extraTrip.setDriver(result.getDriver());
+                        extraTrip.setAssistant(result.getAssistant());
+
+                        String assistantName = result.getAssistant() != null
+                                        ? result.getAssistant().getUser().getFullName()
+                                        : "Không có";
+
+                        System.out.printf("✅ [AI] Phân công thành công: Xe %s | Tài xế: %s | Phụ xe: %s%n",
+                                        result.getBus().getLicensePlate(),
+                                        result.getDriver().getUser().getFullName(),
+                                        assistantName);
+                } else {
+                        System.out.printf("⚠️ [AI] Không tự phân công được: %s → Admin xử lý thủ công.%n",
+                                        result.getFailureReason());
+                }
 
                 tripRepository.save(extraTrip);
-            }
         }
-    }
 
-    private boolean hasAlreadySuggested(Trip originalTrip) {
-        // Kiểm tra xem đã có chuyến nào PENDING hoặc ACTIVE mà trỏ tới originalTrip này
-        // chưa
+        // =========================================================================
+        // CORE AI: Auto-assign resources
+        // =========================================================================
 
-        return tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.PENDING_APPROVAL) ||
-                tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE);
-    }
+        /**
+         * Thuật toán trung tâm: Tự động phân công xe + tài xế chính + phụ xe
+         * cho một chuyến xe, tuân theo tất cả ràng buộc hệ thống.
+         */
+        private AutoAssignResult autoAssignResources(Trip trip) {
+                LocalDateTime departure = trip.getDepartureTime();
+                LocalDateTime arrival = trip.getArrivalTimeExpected();
+                double tripDurationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
 
-    /**
-     * Lấy danh sách xe SẴN SÀNG cho một chuyến xe cụ thể
-     */
-    public List<Bus> getAvailableBusesForTrip(Long tripId) {
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new RuntimeException("Trip not found"));
+                // Bước 1: Tìm xe phù hợp
+                Bus bus = findBestAvailableBus(trip, departure, arrival);
+                if (bus == null) {
+                        return AutoAssignResult.failure(
+                                        "Không có xe nào sẵn sàng / đúng loại / không bận trong khung giờ này");
+                }
 
-        // 1. Lấy loại xe yêu cầu từ Route
-        BusType requiredType = trip.getRoute().getSuitableBusType();
+                // Bước 2: Tìm tài xế chính
+                Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, null);
+                if (driver == null) {
+                        return AutoAssignResult.failure(
+                                        "Không có tài xế hợp lệ (cần: bằng còn hạn + rảnh + chưa đủ 8h hôm nay)");
+                }
 
-        // 2. Truy vấn tìm xe: Sẵn sàng + Đúng loại
-        if (requiredType != null) {
-            return busRepository.findByStatusAndBusType(BusStatus.READY, requiredType);
-        } else {
-            // Nếu tuyến đường không quy định loại xe, lấy tất cả xe đang READY
-            return busRepository.findByStatus(BusStatus.READY);
+                // Bước 3: Tìm phụ xe (khác tài xế chính) — không bắt buộc, best-effort
+                Driver assistant = findBestAvailableDriver(departure, arrival, tripDurationHours, driver);
+
+                return AutoAssignResult.success(bus, driver, assistant);
         }
-    }
 
-    /**
-     * Lấy danh sách tài xế HỢP LỆ (Không quá 8h lái/24h)
-     */
-    public List<Driver> getAvailableDriversForTrip(Long tripId) {
-        Trip trip = tripRepository.findById(tripId).orElseThrow();
-        LocalDateTime startTime = trip.getDepartureTime();
+        // =========================================================================
+        // HELPER: Tìm xe tốt nhất
+        // =========================================================================
 
-        System.out.println("get available driver: " + driverRepository.findAll());
+        /**
+         * Tìm xe READY, đúng loại, không bận, chưa cần bảo trì.
+         * Sắp xếp ưu tiên: xe ít km kể từ bảo trì nhất (xe "mới nhất") được chọn trước.
+         *
+         * Fallback: Nếu tất cả xe đều cần bảo trì thì vẫn chọn xe ít km nhất
+         * (sẽ ghi cảnh báo ở log).
+         */
+        private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival) {
+                BusType requiredType = trip.getRoute().getSuitableBusType();
 
-        return driverRepository.findAll().stream()
-                .filter(driver -> isDriverEligible(driver, startTime))
-                .collect(Collectors.toList());
-    }
+                // Lấy tất cả xe READY (và đúng loại nếu tuyến quy định)
+                List<Bus> candidates = (requiredType != null)
+                                ? busRepository.findByStatusAndBusType(BusStatus.READY, requiredType)
+                                : busRepository.findByStatus(BusStatus.READY);
 
-    /**
-     * Logic kiểm tra ràng buộc 8 tiếng lái xe
-     */
-    private boolean isDriverEligible(Driver driver, LocalDateTime newTripStart) {
+                // Mở rộng cửa sổ thời gian để đảm bảo xe kịp chuẩn bị
+                LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
+                LocalDateTime windowEnd = arrival.plusHours(BUS_PREP_BUFFER_HOURS);
 
-        System.out.println("Checking driver: " + driver.getUser().getFullName());
+                // Ưu tiên xe chưa cần bảo trì
+                Bus best = candidates.stream()
+                                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd))
+                                .filter(bus -> !bus.needsMaintenance())
+                                .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
+                                .orElse(null);
 
-        // 1. Kiểm tra tài xế có đang bận chuyến nào khác trùng giờ không
-        boolean isBusy = tripRepository.existsByDriverAndStatusInAndDepartureTimeBetween(
-                driver,
-                List.of(TripStatus.ACTIVE, TripStatus.DEPARTED),
-                newTripStart.minusHours(5), // Ước tính thời gian chuyến đi
-                newTripStart.plusHours(5));
+                if (best != null)
+                        return best;
 
-        System.out.println("isBusy: " + isBusy);
+                // Fallback: xe cần bảo trì nhưng vẫn READY — cảnh báo và dùng
+                Bus fallback = candidates.stream()
+                                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd))
+                                .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
+                                .orElse(null);
 
-        if (isBusy)
-            return false;
+                if (fallback != null) {
+                        System.out.printf("⚠️ [AI] Xe %s được chọn nhưng CẦN BẢO TRÌ (%.0f km kể từ bảo trì cuối)!%n",
+                                        fallback.getLicensePlate(), fallback.getKmSinceLastMaintenance());
+                }
 
-        // 2. Kiểm tra tổng giờ lái trong 24h qua (Requirement I.2.b)
-        // Lưu ý: Trong thực tế bạn sẽ query DriverLog để SUM(duration)
-        return driver.getTotalDrivingHours24h() < 8.0;
-    }
+                return fallback;
+        }
 
-    /**
-     * Admin phê duyệt chuyến xe: Gán Xe + Tài xế và kích hoạt
-     */
-    @Transactional
-    public void approveTrip(Long tripId, Long busId, Long driverId) {
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe"));
+        /**
+         * Kiểm tra xe có bị gán cho chuyến khác trong cửa sổ thời gian [windowStart,
+         * windowEnd] không.
+         */
+        private boolean isBusBusy(Bus bus, LocalDateTime windowStart, LocalDateTime windowEnd) {
+                return tripRepository.existsByBusAndStatusInAndDepartureTimeBetween(
+                                bus,
+                                List.of(TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL),
+                                windowStart,
+                                windowEnd);
+        }
 
-        Bus bus = busRepository.findById(busId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy xe"));
+        // =========================================================================
+        // HELPER: Tìm tài xế / phụ xe tốt nhất
+        // =========================================================================
 
-        Driver driver = driverRepository.findById(driverId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế"));
+        /**
+         * Tìm tài xế/phụ xe hợp lệ theo thứ tự ưu tiên:
+         * 1. Bằng lái còn hạn
+         * 2. Tổng giờ lái trong 24h + thời lượng chuyến mới ≤ 8 giờ
+         * 3. Không bận trong khoảng [departure - 30 phút, arrival + 30 phút]
+         * (bao gồm cả vai trò phụ xe ở các chuyến khác)
+         * 4. Không phải excludeDriver (tránh tài xế chính == phụ xe)
+         *
+         * Sắp xếp: Người ít giờ lái nhất trong ngày được ưu tiên → phân bổ đều tải.
+         *
+         * @param excludeDriver Tài xế cần loại trừ (null nếu đang tìm tài xế chính)
+         */
+        private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
+                        double tripDurationHours, Driver excludeDriver) {
+                // Cửa sổ kiểm tra = thêm thời gian nghỉ bắt buộc ở cả hai đầu
+                LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+                LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
 
-        // Cập nhật thông tin chuyến xe
-        trip.setBus(bus);
-        trip.setDriver(driver);
-        trip.setStatus(TripStatus.ACTIVE);
+                return driverRepository.findAll().stream()
+                                // Tài xế phải đang hoạt động
+                                .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
+                                // Loại trừ tài xế đã được chọn (để tránh driver == assistant)
+                                .filter(d -> excludeDriver == null || !d.getUserId().equals(excludeDriver.getUserId()))
+                                // Ràng buộc: bằng lái phải còn hạn
+                                .filter(Driver::isLicenseValid)
+                                // Ràng buộc: tổng giờ lái hôm nay + chuyến mới không được vượt 8 tiếng
+                                .filter(d -> d.getTotalDrivingHours24h() + tripDurationHours <= 8.0)
+                                // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
+                                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd))
+                                // Ưu tiên người ít giờ lái nhất trong ngày → phân bổ đều
+                                .min(Comparator.comparingDouble(Driver::getTotalDrivingHours24h))
+                                .orElse(null);
+        }
 
-        // Cập nhật trạng thái xe sang TRAVELING (hoặc giữ READY nếu chưa đến giờ chạy)
-        // bus.setStatus(BusStatus.TRAVELING);
+        /**
+         * Kiểm tra tài xế có đang bận trong cửa sổ thời gian (cả với tư cách driver và
+         * assistant).
+         */
+        private boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd) {
+                List<TripStatus> busyStatuses = List.of(
+                                TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
 
-        tripRepository.save(trip);
-        System.out.println("Admin: Đã phê duyệt chuyến xe " + tripId + " với xe " + bus.getLicensePlate());
-    }
+                // Bận với tư cách tài xế chính?
+                boolean busyAsDriver = tripRepository.existsByDriverAndStatusInAndDepartureTimeBetween(
+                                driver, busyStatuses, windowStart, windowEnd);
+                if (busyAsDriver)
+                        return true;
 
-    /**
-     * Lấy tất cả các chuyến xe đang chờ phê duyệt (do AI đề xuất)
-     * Thường dùng để hiển thị danh sách cho Admin.
-     */
-    public List<Trip> getPendingTrips() {
-        // Trả về danh sách các chuyến có status là PENDING_APPROVAL
-        return tripRepository.findByStatus(TripStatus.PENDING_APPROVAL);
-    }
+                // Bận với tư cách phụ xe?
+                return tripRepository.existsByAssistantAndStatusInAndDepartureTimeBetween(
+                                driver, busyStatuses, windowStart, windowEnd);
+        }
 
-    /**
-     * Lấy thông tin chi tiết của một chuyến xe theo ID
-     * 
-     * @throws RuntimeException nếu không tìm thấy ID
-     */
-    public Trip getTripById(Long id) {
-        return tripRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
-    }
+        // =========================================================================
+        // APPROVAL ACTIONS
+        // =========================================================================
+
+        /**
+         * Admin xác nhận chuyến đã được AI phân công đầy đủ — chỉ cần 1 click.
+         * Hệ thống kiểm tra lại ràng buộc trước khi kích hoạt.
+         */
+        @Transactional
+        public void confirmAutoAssignedTrip(Long tripId) {
+                Trip trip = tripRepository.findById(tripId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
+
+                if (trip.getBus() == null) {
+                        throw new IllegalStateException(
+                                        "Chuyến chưa được phân công xe. Vui lòng dùng form phân công thủ công.");
+                }
+                if (trip.getDriver() == null) {
+                        throw new IllegalStateException(
+                                        "Chuyến chưa được phân công tài xế. Vui lòng dùng form phân công thủ công.");
+                }
+
+                trip.setStatus(TripStatus.ACTIVE);
+                tripRepository.save(trip);
+
+                System.out.printf("✅ Admin xác nhận chuyến #%d | Xe: %s | Tài xế: %s | Phụ xe: %s%n",
+                                tripId,
+                                trip.getBus().getLicensePlate(),
+                                trip.getDriver().getUser().getFullName(),
+                                trip.getAssistant() != null ? trip.getAssistant().getUser().getFullName() : "Không có");
+        }
+
+        /**
+         * Admin phân công thủ công (dùng khi AI không tìm được tài nguyên tự động).
+         * Vẫn kiểm tra ràng buộc 8h lái/ngày trước khi lưu.
+         */
+        @Transactional
+        public void approveTrip(Long tripId, Long busId, Long driverId, Long assistantId) {
+                Trip trip = tripRepository.findById(tripId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
+
+                Bus bus = busRepository.findById(busId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy xe #" + busId));
+
+                Driver driver = driverRepository.findById(driverId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế #" + driverId));
+
+                // Kiểm tra ràng buộc tài xế
+                validateDriverForTrip(driver, trip, null);
+
+                trip.setBus(bus);
+                trip.setDriver(driver);
+
+                // Gán phụ xe nếu có
+                if (assistantId != null) {
+                        driverRepository.findById(assistantId).ifPresent(assistant -> {
+                                validateDriverForTrip(assistant, trip, driver);
+                                trip.setAssistant(assistant);
+                        });
+                }
+
+                trip.setStatus(TripStatus.ACTIVE);
+                tripRepository.save(trip);
+
+                System.out.printf("✅ Admin phân công thủ công chuyến #%d | Xe: %s | Tài xế: %s%n",
+                                tripId, bus.getLicensePlate(), driver.getUser().getFullName());
+        }
+
+        /**
+         * Kiểm tra ràng buộc tài xế trước khi gán thủ công.
+         * Ném IllegalArgumentException nếu vi phạm.
+         */
+        private void validateDriverForTrip(Driver driver, Trip trip, Driver excludeDriver) {
+                // Không trùng với người đã gán
+                if (excludeDriver != null && driver.getUserId().equals(excludeDriver.getUserId())) {
+                        throw new IllegalArgumentException("Phụ xe không được trùng với tài xế chính!");
+                }
+                // Bằng lái còn hạn
+                if (!driver.isLicenseValid()) {
+                        throw new IllegalArgumentException(
+                                        "Bằng lái của " + driver.getUser().getFullName() + " đã hết hạn!");
+                }
+                // Kiểm tra 8h lái
+                double durationHours = trip.getTripDurationHours();
+                if (driver.getTotalDrivingHours24h() + durationHours > 8.0) {
+                        throw new IllegalArgumentException(
+                                        String.format("%s đã lái %.1fh hôm nay, thêm chuyến %.1fh sẽ vượt 8h/ngày!",
+                                                        driver.getUser().getFullName(),
+                                                        driver.getTotalDrivingHours24h(), durationHours));
+                }
+        }
+
+        /**
+         * Admin từ chối chuyến tăng cường (AI đề xuất sai, không còn cần thiết).
+         */
+        @Transactional
+        public void rejectTrip(Long tripId) {
+                Trip trip = tripRepository.findById(tripId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
+                trip.setStatus(TripStatus.CANCELLED);
+                tripRepository.save(trip);
+                System.out.printf("❌ Admin từ chối chuyến tăng cường #%d%n", tripId);
+        }
+
+        // =========================================================================
+        // QUERY METHODS (dùng cho UI form)
+        // =========================================================================
+
+        /**
+         * Lấy xe sẵn sàng & không bận cho chuyến (dùng cho form phân công thủ công).
+         */
+        public List<Bus> getAvailableBusesForTrip(Long tripId) {
+                Trip trip = tripRepository.findById(tripId)
+                                .orElseThrow(() -> new RuntimeException("Trip not found"));
+
+                BusType requiredType = trip.getRoute().getSuitableBusType();
+                LocalDateTime departure = trip.getDepartureTime();
+                LocalDateTime arrival = trip.getArrivalTimeExpected() != null
+                                ? trip.getArrivalTimeExpected()
+                                : departure.plusHours(5);
+
+                LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
+                LocalDateTime windowEnd = arrival.plusHours(BUS_PREP_BUFFER_HOURS);
+
+                List<Bus> candidates = (requiredType != null)
+                                ? busRepository.findByStatusAndBusType(BusStatus.READY, requiredType)
+                                : busRepository.findByStatus(BusStatus.READY);
+
+                return candidates.stream()
+                                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd))
+                                .sorted(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
+                                .collect(Collectors.toList());
+        }
+
+        /**
+         * Lấy tài xế hợp lệ & rảnh cho chuyến (dùng cho form phân công thủ công).
+         */
+        public List<Driver> getAvailableDriversForTrip(Long tripId) {
+                Trip trip = tripRepository.findById(tripId).orElseThrow();
+                LocalDateTime departure = trip.getDepartureTime();
+                LocalDateTime arrival = trip.getArrivalTimeExpected() != null
+                                ? trip.getArrivalTimeExpected()
+                                : departure.plusHours(5);
+                double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
+
+                LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+                LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+
+                return driverRepository.findAll().stream()
+                                .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
+                                .filter(Driver::isLicenseValid)
+                                .filter(d -> d.getTotalDrivingHours24h() + durationHours <= 8.0)
+                                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd))
+                                .sorted(Comparator.comparingDouble(Driver::getTotalDrivingHours24h))
+                                .collect(Collectors.toList());
+        }
+
+        private boolean hasAlreadySuggested(Trip originalTrip) {
+                return tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.PENDING_APPROVAL)
+                                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE);
+        }
+
+        public List<Trip> getPendingTrips() {
+                return tripRepository.findByStatus(TripStatus.PENDING_APPROVAL);
+        }
+
+        public Trip getTripById(Long id) {
+                return tripRepository.findById(id)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
+        }
 }

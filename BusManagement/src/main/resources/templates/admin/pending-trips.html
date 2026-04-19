@@ -2,38 +2,151 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
 <head>
-    <title>AI Suggestions</title>
+    <title>Chuyến xe chờ phê duyệt</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .auto-assigned {
+            border-left: 4px solid #198754;
+        }
+
+        .needs-manual {
+            border-left: 4px solid #fd7e14;
+        }
+    </style>
 </head>
 
-<body class="container mt-5">
-    <h2 class="mb-4">AI Suggestions (High Demand)</h2>
+<body class="container mt-4">
 
-    <div th:if="${param.success}" class="alert alert-success">Phê duyệt chuyến xe thành công!</div>
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h2 class="mb-0">🤖 Chuyến tăng cường chờ phê duyệt</h2>
+            <small class="text-muted">AI tự động tạo khi tỉ lệ lấp đầy ghế &gt; 90%</small>
+        </div>
+        <a href="/admin/trip-management/trips" class="btn btn-outline-secondary">← Quản lý chuyến xe</a>
+    </div>
 
-    <table class="table table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>ID</th>
-                <th>Tuyến đường</th>
-                <th>Khởi hành</th>
-                <th>Chuyến gốc (ID)</th>
-                <th>Thao tác</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr th:each="trip : ${pendingTrips}">
-                <td th:text="${trip.id}"></td>
-                <td th:text="${trip.route.departurePoint + ' - ' + trip.route.destinationPoint}"></td>
-                <td th:text="${#temporals.format(trip.departureTime, 'dd-MM-yyyy HH:mm')}"></td>
-                <td th:text="${trip.originalTrip.id}"></td>
-                <td>
-                    <a th:href="@{/admin/trips/approve/{id}(id=${trip.id})}" class="btn btn-primary btn-sm">Duyệt & Gán
-                        Xe</a>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+    <!-- Flash messages -->
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show">
+        <span th:text="${success}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show">
+        <span th:text="${error}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Không có chuyến nào chờ -->
+    <div th:if="${#lists.isEmpty(pendingTrips)}" class="text-center py-5 text-muted">
+        <div style="font-size:3rem">✅</div>
+        <h5 class="mt-2">Không có chuyến nào cần xử lý</h5>
+        <p>Hệ thống AI đang theo dõi tự động. Trang sẽ cập nhật khi có đề xuất mới.</p>
+    </div>
+
+    <!-- Thống kê nhanh -->
+    <div th:unless="${#lists.isEmpty(pendingTrips)}" class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center border-0 bg-success bg-opacity-10">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-success" th:text="${autoAssignedCount}"></div>
+                    <small class="text-muted">Đã phân công tự động</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center border-0 bg-warning bg-opacity-10">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold text-warning" th:text="${needsManualCount}"></div>
+                    <small class="text-muted">Cần xử lý thủ công</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center border-0 bg-secondary bg-opacity-10">
+                <div class="card-body py-2">
+                    <div class="fs-4 fw-bold" th:text="${#lists.size(pendingTrips)}"></div>
+                    <small class="text-muted">Tổng chuyến chờ duyệt</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danh sách chuyến -->
+    <div th:each="trip : ${pendingTrips}" class="card mb-3"
+        th:classappend="${trip.bus != null and trip.driver != null} ? 'auto-assigned' : 'needs-manual'">
+        <div class="card-body">
+            <div class="row align-items-center">
+
+                <!-- Thông tin chuyến -->
+                <div class="col-md-4">
+                    <div class="fw-bold" th:text="${trip.route.departurePoint + ' → ' + trip.route.destinationPoint}">
+                    </div>
+                    <div class="text-muted small"
+                        th:text="'Khởi hành: ' + ${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}">
+                    </div>
+                    <div class="text-muted small" th:text="'Số ghế: ' + ${trip.totalSeats}">
+                    </div>
+                </div>
+
+                <!-- Trạng thái phân công AI -->
+                <div class="col-md-5">
+
+                    <!-- ĐÃ PHÂN CÔNG TỰ ĐỘNG -->
+                    <div th:if="${trip.bus != null and trip.driver != null}">
+                        <div class="badge bg-success mb-1">🤖 AI đã phân công</div>
+                        <div class="small">
+                            <span class="me-2">🚌 <strong th:text="${trip.bus.licensePlate}"></strong></span>
+                            <span class="me-2">👨‍✈️ <span th:text="${trip.driver.user.fullName}"></span></span>
+                            <span th:if="${trip.assistant != null}">
+                                🧑‍🔧 <span th:text="${trip.assistant.user.fullName}"></span>
+                            </span>
+                            <span th:unless="${trip.assistant != null}" class="text-muted">
+                                (Không có phụ xe)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- CẦN XỬ LÝ THỦ CÔNG -->
+                    <div th:unless="${trip.bus != null and trip.driver != null}">
+                        <div class="badge bg-warning text-dark mb-1">⚠️ Cần phân công thủ công</div>
+                        <div class="small text-muted">
+                            AI không tìm đủ tài nguyên trong khung giờ này.
+                            Nhấn "Xem & Phân công" để chọn thủ công.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nút hành động -->
+                <div class="col-md-3 text-end">
+                    <!-- Confirm 1-click nếu AI đã phân công đầy đủ -->
+                    <div th:if="${trip.bus != null and trip.driver != null}" class="d-flex gap-2 justify-content-end">
+                        <form th:action="@{/admin/trips/confirm}" method="post">
+                            <input type="hidden" name="tripId" th:value="${trip.id}">
+                            <button type="submit" class="btn btn-success btn-sm">
+                                ✅ Xác nhận
+                            </button>
+                        </form>
+                        <a th:href="@{/admin/trips/approve/{id}(id=${trip.id})}"
+                            class="btn btn-outline-secondary btn-sm">Chi tiết</a>
+                    </div>
+
+                    <!-- Xem & phân công thủ công -->
+                    <div th:unless="${trip.bus != null and trip.driver != null}">
+                        <a th:href="@{/admin/trips/approve/{id}(id=${trip.id})}" class="btn btn-warning btn-sm">🔧 Xem &
+                            Phân công</a>
+                    </div>
+
+                    <!-- Từ chối (cả 2 mode) -->
+                    <form th:action="@{/admin/trips/reject/{id}(id=${trip.id})}" method="post" class="mt-2"
+                        onsubmit="return confirm('Từ chối chuyến tăng cường này?')">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">Từ chối</button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
