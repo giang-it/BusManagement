@@ -50,23 +50,48 @@
 
         <div class="card shadow border-0">
             <div class="card-header bg-white py-3">
-                <h5 class="mb-0 text-primary font-weight-bold">Bảng điều khiển chức năng</h5>
+                <h5 class="mb-0 text-primary font-weight-bold"><i class="bi bi-grid-3x3-gap"></i> Bảng Điều Khiển Chức
+                    Năng</h5>
             </div>
             <div class="card-body">
                 <div class="row text-center">
+                    <!-- Hàng 1 -->
+                    <div class="col-md-4 mb-4">
+                        <a th:href="@{/admin/trip-management/trips}"
+                            class="btn btn-outline-primary btn-lg w-100 py-4 shadow-sm">
+                            <i class="bi bi-calendar-event fs-1"></i><br><span class="mt-2 d-block">Quản Lý Chuyến
+                                Xe</span>
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-4">
+                        <a th:href="@{/admin/trips/pending}"
+                            class="btn btn-outline-warning btn-lg w-100 py-4 shadow-sm">
+                            <i class="bi bi-check-circle fs-1"></i><br><span class="mt-2 d-block">Phê Duyệt Chuyến Tăng
+                                Cường</span>
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-4">
+                        <a th:href="@{/admin/master-data/stations}"
+                            class="btn btn-outline-info btn-lg w-100 py-4 shadow-sm">
+                            <i class="bi bi-geo-alt fs-1"></i><br><span class="mt-2 d-block">Quản Lý Trạm/Bến Xe</span>
+                        </a>
+                    </div>
+
+                    <!-- Hàng 2 -->
                     <div class="col-md-4 mb-3">
-                        <a th:href="@{/admin/users/new}" class="btn btn-outline-primary btn-lg w-100 py-4">
-                            <i class="bi bi-person-plus fs-1"></i><br>Tạo Người Dùng
+                        <a th:href="@{/admin/master-data/bus-types}"
+                            class="btn btn-outline-secondary btn-lg w-100 py-4 shadow-sm">
+                            <i class="bi bi-tags fs-1"></i><br><span class="mt-2 d-block">Quản Lý Loại Xe</span>
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a th:href="@{/admin/buses/new}" class="btn btn-outline-success btn-lg w-100 py-4">
-                            <i class="bi bi-truck fs-1"></i><br>Tạo Xe Mới
+                        <a th:href="@{/admin/buses/new}" class="btn btn-outline-success btn-lg w-100 py-4 shadow-sm">
+                            <i class="bi bi-truck fs-1"></i><br><span class="mt-2 d-block">Thêm Xe Mới</span>
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="#" class="btn btn-outline-info btn-lg w-100 py-4">
-                            <i class="bi bi-calendar-event fs-1"></i><br>Quản lý Chuyến
+                        <a th:href="@{/admin/users/new}" class="btn btn-outline-dark btn-lg w-100 py-4 shadow-sm">
+                            <i class="bi bi-person-plus fs-1"></i><br><span class="mt-2 d-block">Tạo Người Dùng</span>
                         </a>
                     </div>
                 </div>

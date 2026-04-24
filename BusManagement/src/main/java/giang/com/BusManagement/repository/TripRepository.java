@@ -13,13 +13,6 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
-import giang.com.BusManagement.domain.Driver;
-import giang.com.BusManagement.domain.Trip;
-import giang.com.BusManagement.domain.TripStatus;
-
 @Repository
 public interface TripRepository extends JpaRepository<Trip, Long> {
 
@@ -89,38 +82,47 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         boolean existsByOriginalTripAndStatus(Trip originalTrip, TripStatus status);
 
         /**
-         * Kiểm tra tài xế có đang bận (với tư cách TÀI XẾ CHÍNH) trong khoảng thời gian
-         * không.
+         * Kiểm tra tài xế có đang bận (với tư cách TÀI XẾ CHÍNH) trong khoảng thời gian không.
          * Bao gồm cả khoảng nghỉ 30 phút ở hai đầu (được thêm ở tầng service).
          */
-        boolean existsByDriverAndStatusInAndDepartureTimeBetween(
-                        Driver driver,
-                        Collection<TripStatus> statuses,
-                        LocalDateTime start,
-                        LocalDateTime end);
+        @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.driver = :driver AND t.status IN :statuses " +
+               "AND t.departureTime <= :end AND t.arrivalTimeExpected >= :start " +
+               "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+        boolean existsOverlappingTripForDriver(
+                        @Param("driver") Driver driver,
+                        @Param("statuses") Collection<TripStatus> statuses,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end,
+                        @Param("excludeTripId") Long excludeTripId);
 
         /**
-         * [MỚI] Kiểm tra tài xế có đang bận (với tư cách PHỤ XE) trong khoảng thời gian
-         * không.
+         * [MỚI] Kiểm tra tài xế có đang bận (với tư cách PHỤ XE) trong khoảng thời gian không.
          * Cần thiết để tránh gán một người vừa là phụ xe ở chuyến này
          * vừa là tài xế/phụ xe ở chuyến khác cùng khung giờ.
          */
-        boolean existsByAssistantAndStatusInAndDepartureTimeBetween(
-                        Driver assistant,
-                        Collection<TripStatus> statuses,
-                        LocalDateTime start,
-                        LocalDateTime end);
+        @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.assistant = :assistant AND t.status IN :statuses " +
+               "AND t.departureTime <= :end AND t.arrivalTimeExpected >= :start " +
+               "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+        boolean existsOverlappingTripForAssistant(
+                        @Param("assistant") Driver assistant,
+                        @Param("statuses") Collection<TripStatus> statuses,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end,
+                        @Param("excludeTripId") Long excludeTripId);
 
         /**
-         * [MỚI] Kiểm tra xe có đang được gán cho chuyến nào trong khoảng thời gian
-         * không.
+         * [MỚI] Kiểm tra xe có đang được gán cho chuyến nào trong khoảng thời gian không.
          * Bao gồm buffer chuẩn bị xe (được thêm ở tầng service).
          */
-        boolean existsByBusAndStatusInAndDepartureTimeBetween(
-                        Bus bus,
-                        Collection<TripStatus> statuses,
-                        LocalDateTime start,
-                        LocalDateTime end);
+        @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.bus = :bus AND t.status IN :statuses " +
+               "AND t.departureTime <= :end AND t.arrivalTimeExpected >= :start " +
+               "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+        boolean existsOverlappingTripForBus(
+                        @Param("bus") Bus bus,
+                        @Param("statuses") Collection<TripStatus> statuses,
+                        @Param("start") LocalDateTime start,
+                        @Param("end") LocalDateTime end,
+                        @Param("excludeTripId") Long excludeTripId);
 
         // =========================================================================
         // TRUY VẤN BỔ SUNG
