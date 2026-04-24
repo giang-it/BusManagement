@@ -44,28 +44,11 @@ public class TripService {
      * Khi phát hiện, tự động tạo chuyến tăng cường VÀ phân công đầy đủ
      * (xe + tài xế + phụ xe) theo ràng buộc hệ thống.
      *
-     * Chuyến tăng cường vẫn ở trạng thái PENDING_APPROVAL để Admin xác nhận 1
-     * click.
-     * Nếu AI không tìm đủ tài nguyên, chuyến được tạo không có phân công
-     * để Admin xử lý thủ công.
-     */
-    /**
-     * AI Scheduling Job: Mỗi 10 giây quét các chuyến ACTIVE có tỉ lệ lấp đầy > 90%.
-     *
-     * @Transactional BẮT BUỘC ở đây vì 2 lý do:
+     * @Transactional BẮT BUỘC ở đây vì:
      *                1. Giữ Hibernate session mở suốt vòng lặp → trip.getRoute()
-     *                (lazy) không bị
-     *                LazyInitializationException.
+     *                (lazy) không bị LazyInitializationException.
      *                2. Khi gọi createExtraTrip() từ cùng class (self-invocation),
-     *                Spring AOP KHÔNG
-     *                tạo proxy → @Transactional trên method đó bị bỏ qua. Đặt ở đây
-     *                là đủ.
-     *
-     *                FK self-referential được xử lý bằng 2-step save bên trong
-     *                createExtraTrip():
-     *                INSERT với original_trip_id = NULL (không vi phạm FK) →
-     *                flush()
-     *                → UPDATE gán original_trip_id sau khi row đã tồn tại.
+     *                Spring AOP KHÔNG tạo proxy → @Transactional trên method đó bị bỏ qua.
      */
     @Scheduled(fixedRate = 10_000)
     @Transactional
@@ -82,11 +65,7 @@ public class TripService {
     /**
      * Tạo và lưu một chuyến tăng cường.
      * Chạy trong cùng transaction của scanAndSuggestExtraTrips (self-invocation).
-     *
-     * 2-step save pattern giải quyết self-referential FK:
-     * - Bước 1: INSERT extraTrip với original_trip_id = NULL → không vi phạm FK.
-     * - flush() → Hibernate ghi row xuống DB ngay, extraTrip có ID.
-     * - Bước 2: gán originalTrip, sau đó UPDATE → FK hợp lệ vì row gốc đã tồn tại.
+     * Gán originalTrip trực tiếp vì chuyến gốc đã tồn tại trong DB.
      */
     private void createExtraTrip(Trip trip) {
         System.out.printf("🤖 [AI] Chuyến #%d đạt %.1f%% lấp đầy. Đang tạo chuyến tăng cường...%n",
@@ -99,7 +78,6 @@ public class TripService {
                 : 240;
         LocalDateTime extraArrival = extraDeparture.plusMinutes(routeDurationMinutes);
 
-        // --- Bước 1: Save KHÔNG có originalTrip (null) để tránh FK violation ---
         Trip extraTrip = new Trip();
         extraTrip.setRoute(trip.getRoute());
         extraTrip.setDepartureTime(extraDeparture);
@@ -108,12 +86,7 @@ public class TripService {
         extraTrip.setTotalSeats(trip.getTotalSeats());
         extraTrip.setPrice(trip.getPrice());
         extraTrip.setExtraTrip(true);
-        // originalTrip = null → INSERT không vi phạm self-referential FK
-        tripRepository.save(extraTrip);
-        tripRepository.flush(); // ép Hibernate ghi xuống DB ngay → extraTrip có ID
-
-        // --- Bước 2: Gán originalTrip SAU KHI row đã tồn tại trong DB ---
-        extraTrip.setOriginalTrip(trip);
+        extraTrip.setOriginalTrip(trip); // trip đã tồn tại trong DB, gán trực tiếp không vi phạm FK
 
         // --- Bước 3: AI phân công tài nguyên ---
         AutoAssignResult result = autoAssignResources(extraTrip);
@@ -200,7 +173,11 @@ public class TripService {
         // Ưu tiên xe chưa cần bảo trì VÀ sau chuyến này vẫn chưa vượt ngưỡng bảo trì
         Bus best = candidates.stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
-                .filter(bus -> bus.getKmSinceLastMaintenance() + tripDistance <= bus.getMaintenanceThreshold())
+                .filter(bus -> {
+                    Double threshold = bus.getMaintenanceThreshold();
+                    if (threshold == null) return true; // Không có ngưỡng → không cần kiểm tra
+                    return bus.getKmSinceLastMaintenance() + tripDistance <= threshold;
+                })
                 .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
                 .orElse(null);
 
@@ -263,8 +240,9 @@ public class TripService {
                 .filter(d -> excludeDriver == null || !d.getUserId().equals(excludeDriver.getUserId()))
                 // Ràng buộc: bằng lái phải còn hạn
                 .filter(Driver::isLicenseValid)
-                // Ràng buộc: tổng giờ lái hôm nay + chuyến mới không được vượt 8 tiếng
-                .filter(d -> d.getTotalDrivingHours24h() + tripDurationHours <= 8.0)
+                // Ràng buộc: tổng giờ lái hôm nay + thời lượng chuyến không được vượt 8 tiếng
+                // Với chuyến dài, giả định tối đa mỗi tài xế lái 8h/ngày
+                .filter(d -> d.getTotalDrivingHours24h() + Math.min(tripDurationHours, 8.0) <= 8.0)
                 // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .collect(Collectors.toList());
@@ -456,13 +434,12 @@ public class TripService {
         }
 
         double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
-        // Tổng giờ lái (nếu là update, lý tưởng phải trừ giờ của chuyến cũ đi nếu cùng ngày, nhưng đơn giản hoá ta tính tổng)
-        if (driver.getTotalDrivingHours24h() + durationHours > 8.0) {
-            // Note: In a real system, we should subtract the existing trip's duration if it's an update.
-            // But checking is better than no checking.
+        double effectiveHours = Math.min(durationHours, 8.0);
+        // Tổng giờ lái hôm nay + thời lượng chuyến (tối đa 8h/ngày)
+        if (driver.getTotalDrivingHours24h() + effectiveHours > 8.0) {
             throw new IllegalArgumentException(
-                    String.format("%s đã lái %.1fh hôm nay, thêm chuyến %.1fh sẽ vượt 8h/ngày!",
-                            driver.getUser().getFullName(), driver.getTotalDrivingHours24h(), durationHours));
+                    String.format("%s đã lái %.1fh hôm nay, thêm chuyến này sẽ vượt 8h/ngày!",
+                            driver.getUser().getFullName(), driver.getTotalDrivingHours24h()));
         }
     }
 
@@ -518,6 +495,7 @@ public class TripService {
                 ? trip.getArrivalTimeExpected()
                 : departure.plusHours(5);
         double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
+        double effectiveHours = Math.min(durationHours, 8.0);
 
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
@@ -525,7 +503,7 @@ public class TripService {
         return driverRepository.findAll().stream()
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(Driver::isLicenseValid)
-                .filter(d -> d.getTotalDrivingHours24h() + durationHours <= 8.0)
+                .filter(d -> d.getTotalDrivingHours24h() + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
                 .sorted(Comparator.comparingDouble(Driver::getTotalDrivingHours24h))
                 .collect(Collectors.toList());
@@ -533,11 +511,12 @@ public class TripService {
 
     private boolean hasAlreadySuggested(Trip originalTrip) {
         return tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.PENDING_APPROVAL)
-                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE);
+                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE)
+                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.CANCELLED);
     }
 
     public List<Trip> getPendingTrips() {
-        return tripRepository.findByStatus(TripStatus.PENDING_APPROVAL);
+        return tripRepository.findByStatusWithDetails(TripStatus.PENDING_APPROVAL);
     }
 
     public Trip getTripById(Long id) {

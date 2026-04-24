@@ -27,8 +27,20 @@ public class Bus {
     private BusType busType;
 
     private String brand;
-    private Double totalKm;
+    private Double odometer;
+    private Double lastMaintenanceOdometer;
+    private Double maintenanceThreshold;
 
     @Enumerated(EnumType.STRING)
     private BusStatus status; // READY, TRAVELING, REPAIRING
+
+    public double getKmSinceLastMaintenance() {
+        if (odometer == null || lastMaintenanceOdometer == null) return 0.0;
+        return odometer - lastMaintenanceOdometer;
+    }
+
+    public boolean needsMaintenance() {
+        if (maintenanceThreshold == null) return false;
+        return getKmSinceLastMaintenance() >= maintenanceThreshold;
+    }
 }

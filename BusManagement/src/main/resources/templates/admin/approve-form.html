@@ -130,7 +130,7 @@
                 <div class="col">
                     <strong th:text="${trip.driver.user.fullName}"></strong>
                     <span class="text-muted ms-2"
-                        th:text="'— Bằng ' + ${trip.driver.licenseClass} + ' (' + ${trip.driver.licenseNumber} + ')'"></span>
+                        th:text="'— Bằng (' + ${trip.driver.licenseNumber} + ')'"></span>
                 </div>
                 <div class="col-auto">
                     <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
@@ -149,7 +149,7 @@
                 <div class="col">
                     <strong th:text="${trip.assistant.user.fullName}"></strong>
                     <span class="text-muted ms-2"
-                        th:text="'— Bằng ' + ${trip.assistant.licenseClass} + ' (' + ${trip.assistant.licenseNumber} + ')'"></span>
+                        th:text="'— Bằng (' + ${trip.assistant.licenseNumber} + ')'"></span>
                 </div>
                 <div class="col-auto">
                     <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
@@ -239,7 +239,7 @@
                         <select name="driverId" class="form-select" required>
                             <option value="">-- Chọn tài xế --</option>
                             <option th:each="d : ${availableDrivers}" th:value="${d.userId}" th:text="${d.user.fullName
-                                        + ' | Bằng: ' + d.licenseClass
+                                        + ' | Bằng: ' + d.licenseNumber
                                         + ' | Đã lái: ' + d.totalDrivingHours24h + 'h hôm nay'}">
                             </option>
                         </select>
@@ -256,7 +256,7 @@
                         <select name="assistantId" class="form-select">
                             <option value="">-- Không có phụ xe --</option>
                             <option th:each="d : ${availableDrivers}" th:value="${d.userId}" th:text="${d.user.fullName
-                                        + ' | Bằng: ' + d.licenseClass
+                                        + ' | Bằng: ' + d.licenseNumber
                                         + ' | Đã làm: ' + d.totalDrivingHours24h + 'h hôm nay'}">
                             </option>
                         </select>

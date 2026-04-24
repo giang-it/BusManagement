@@ -24,4 +24,10 @@ public class Driver {
     private Integer experienceYears;
     private Double totalDrivingHours24h;
     private Integer monthlyRestDays;
+    private Boolean isActive = true;
+    private java.time.LocalDate licenseExpiryDate;
+
+    public boolean isLicenseValid() {
+        return licenseExpiryDate != null && licenseExpiryDate.isAfter(java.time.LocalDate.now());
+    }
 }
