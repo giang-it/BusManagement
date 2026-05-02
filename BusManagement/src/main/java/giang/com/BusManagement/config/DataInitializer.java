@@ -68,6 +68,11 @@ public class DataInitializer implements CommandLineRunner {
         Driver txDaLai4h = createDriver("tx_4h", "TX Đã lái 4h", "B2-010", 5, 4.0);
         Driver txDaLai6h = createDriver("tx_6h", "TX Đã lái 6h", "B2-011", 5, 6.0);
         Driver txDaLai7h = createDriver("tx_7h", "TX Đã lái 7h", "B2-012", 5, 7.0);
+        Driver txDaLai1h = createDriver("tx_1h", "TX Đã lái 1h", "B2-001", 5, 1.0);
+        Driver txDaLai2h = createDriver("tx_2h", "TX Đã lái 2h", "B2-002", 5, 2.0);
+        Driver txDaLai3h = createDriver("tx_3h", "TX Đã lái 3h", "B2-003", 5, 3.0);
+        Driver txDaLai5h = createDriver("tx_5h", "TX Đã lái 5h", "B2-004", 5, 5.0);
+        Driver txDaLai8h = createDriver("tx_8h", "TX Đã lái 8h", "B2-006", 5, 8.0);
 
         // Nhóm C: Tài xế sát ngưỡng / quá 8h — AI KHÔNG ĐƯỢC gán
         Driver txSatNguong = createDriver("tx_sat8h", "TX Sát 8h (7.9h)", "B2-020", 12, 7.9);
@@ -169,6 +174,7 @@ public class DataInitializer implements CommandLineRunner {
         // → AI sẽ bỏ qua chuyến này
         // ------------------------------------------------------------------
         createTrip(tuyenSG_DL, xeSanSang2, txRanh4, txRanh5, 40, 20, "300000", TripStatus.ACTIVE, 4);
+        createTrip(tuyenSG_DL, xeSanSang5, txDaLai1h, null, 40, 20, "300000", TripStatus.ACTIVE, 0);
 
         // ------------------------------------------------------------------
         // TRIP 4: Chuyến trống — Chưa gán bus/driver

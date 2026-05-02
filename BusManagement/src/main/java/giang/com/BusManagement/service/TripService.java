@@ -48,7 +48,8 @@ public class TripService {
      *                1. Giữ Hibernate session mở suốt vòng lặp → trip.getRoute()
      *                (lazy) không bị LazyInitializationException.
      *                2. Khi gọi createExtraTrip() từ cùng class (self-invocation),
-     *                Spring AOP KHÔNG tạo proxy → @Transactional trên method đó bị bỏ qua.
+     *                Spring AOP KHÔNG tạo proxy → @Transactional trên method đó bị
+     *                bỏ qua.
      */
     @Scheduled(fixedRate = 10_000)
     @Transactional
@@ -175,7 +176,8 @@ public class TripService {
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
                 .filter(bus -> {
                     Double threshold = bus.getMaintenanceThreshold();
-                    if (threshold == null) return true; // Không có ngưỡng → không cần kiểm tra
+                    if (threshold == null)
+                        return true; // Không có ngưỡng → không cần kiểm tra
                     return bus.getKmSinceLastMaintenance() + tripDistance <= threshold;
                 })
                 .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
@@ -184,15 +186,18 @@ public class TripService {
         if (best != null)
             return best;
 
-        // Fallback: xe sẽ cần bảo trì sau chuyến này (hoặc đã quá hạn) nhưng vẫn READY — cảnh báo và dùng
+        // Fallback: xe sẽ cần bảo trì sau chuyến này (hoặc đã quá hạn) nhưng vẫn READY
+        // — cảnh báo và dùng
         Bus fallback = candidates.stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
                 .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
                 .orElse(null);
 
         if (fallback != null) {
-            System.out.printf("⚠️ [AI] Xe %s được chọn nhưng SÁT/QUÁ NGƯỠNG BẢO TRÌ (Odo hiện tại: %.0f, ngưỡng: %.0f)!%n",
-                    fallback.getLicensePlate(), fallback.getKmSinceLastMaintenance(), fallback.getMaintenanceThreshold());
+            System.out.printf(
+                    "⚠️ [AI] Xe %s được chọn nhưng SÁT/QUÁ NGƯỠNG BẢO TRÌ (Odo hiện tại: %.0f, ngưỡng: %.0f)!%n",
+                    fallback.getLicensePlate(), fallback.getKmSinceLastMaintenance(),
+                    fallback.getMaintenanceThreshold());
         }
 
         return fallback;
@@ -241,23 +246,25 @@ public class TripService {
                 // Ràng buộc: bằng lái phải còn hạn
                 .filter(Driver::isLicenseValid)
                 // Ràng buộc: tổng giờ lái hôm nay + thời lượng chuyến không được vượt 8 tiếng
-                // Với chuyến dài, giả định tối đa mỗi tài xế lái 8h/ngày
-                .filter(d -> d.getTotalDrivingHours24h() + Math.min(tripDurationHours, 8.0) <= 8.0)
+                // Tính chính xác dựa trên CÁC CHUYẾN ĐÃ XẾP TRONG NGÀY
+                .filter(d -> getDrivingHoursForDate(d, departure, null) + Math.min(tripDurationHours, 8.0) <= 8.0)
                 // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .collect(Collectors.toList());
 
         // Ưu tiên 1: Bằng lái còn hạn trên 7 ngày
         Driver best = availableDrivers.stream()
-                .filter(d -> d.getLicenseExpiryDate() != null && d.getLicenseExpiryDate().isAfter(departure.toLocalDate().plusDays(7)))
-                .min(Comparator.comparingDouble(Driver::getTotalDrivingHours24h))
+                .filter(d -> d.getLicenseExpiryDate() != null
+                        && d.getLicenseExpiryDate().isAfter(departure.toLocalDate().plusDays(7)))
+                .min(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
                 .orElse(null);
 
-        if (best != null) return best;
+        if (best != null)
+            return best;
 
         // Fallback: Bằng lái sắp hết hạn (< 7 ngày) nhưng vẫn còn hạn
         Driver fallback = availableDrivers.stream()
-                .min(Comparator.comparingDouble(Driver::getTotalDrivingHours24h))
+                .min(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
                 .orElse(null);
 
         if (fallback != null) {
@@ -272,7 +279,8 @@ public class TripService {
      * Kiểm tra tài xế có đang bận trong cửa sổ thời gian (cả với tư cách driver và
      * assistant).
      */
-    private boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd, Long excludeTripId) {
+    private boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd,
+            Long excludeTripId) {
         List<TripStatus> busyStatuses = List.of(
                 TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
 
@@ -285,6 +293,38 @@ public class TripService {
         // Bận với tư cách phụ xe?
         return tripRepository.existsOverlappingTripForAssistant(
                 driver, busyStatuses, windowStart, windowEnd, excludeTripId);
+    }
+
+    /**
+     * Tính tổng số giờ lái xe của tài xế trong một ngày cụ thể.
+     */
+    private double getDrivingHoursForDate(Driver driver, LocalDateTime date, Long excludeTripId) {
+        LocalDateTime startOfDay = date.toLocalDate().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        List<TripStatus> busyStatuses = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
+
+        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay, endOfDay,
+                excludeTripId);
+
+        double hoursFromTrips = trips.stream()
+                .mapToDouble(t -> {
+                    LocalDateTime arr = t.getArrivalTimeExpected() != null ? t.getArrivalTimeExpected()
+                            : t.getDepartureTime().plusHours(5);
+                    double dur = Duration.between(t.getDepartureTime(), arr).toMinutes() / 60.0;
+                    return Math.min(dur, 8.0);
+                })
+                .sum();
+
+        // Nếu chuyến đi trong ngày hôm nay, cộng thêm giờ lái cơ sở (như dữ liệu khởi
+        // tạo ban đầu)
+        if (date.toLocalDate().equals(LocalDateTime.now().toLocalDate())) {
+            Double baseHours = driver.getTotalDrivingHours24h();
+            if (baseHours != null) {
+                hoursFromTrips += baseHours;
+            }
+        }
+
+        return hoursFromTrips;
     }
 
     // =========================================================================
@@ -367,13 +407,17 @@ public class TripService {
      */
     @Transactional
     public void createManualTrip(Trip trip) {
+        if (trip.getArrivalTimeExpected() != null && trip.getArrivalTimeExpected().isBefore(trip.getDepartureTime())) {
+            throw new IllegalArgumentException("Thời gian đến dự kiến phải sau thời gian khởi hành!");
+        }
+
         // Kiểm tra ràng buộc cho chuyến mới (tripId = null)
         validateBusForTrip(trip.getBus(), trip, null);
         validateDriverForTrip(trip.getDriver(), trip, null, null);
         if (trip.getAssistant() != null) {
             validateDriverForTrip(trip.getAssistant(), trip, trip.getDriver(), null);
         }
-        
+
         trip.setStatus(TripStatus.ACTIVE);
         tripRepository.save(trip);
     }
@@ -383,13 +427,24 @@ public class TripService {
      */
     @Transactional
     public void updateManualTrip(Trip existingTrip) {
+        if (existingTrip.getArrivalTimeExpected() != null
+                && existingTrip.getArrivalTimeExpected().isBefore(existingTrip.getDepartureTime())) {
+            throw new IllegalArgumentException("Thời gian đến dự kiến phải sau thời gian khởi hành!");
+        }
+
+        if (existingTrip.getTotalSeats() < existingTrip.getTicketsSold()) {
+            throw new IllegalArgumentException("Tổng số ghế (" + existingTrip.getTotalSeats()
+                    + ") không được nhỏ hơn số vé đã bán (" + existingTrip.getTicketsSold() + ")!");
+        }
+
         // Kiểm tra ràng buộc (loại trừ chính chuyến này)
         validateBusForTrip(existingTrip.getBus(), existingTrip, existingTrip.getId());
         validateDriverForTrip(existingTrip.getDriver(), existingTrip, null, existingTrip.getId());
         if (existingTrip.getAssistant() != null) {
-            validateDriverForTrip(existingTrip.getAssistant(), existingTrip, existingTrip.getDriver(), existingTrip.getId());
+            validateDriverForTrip(existingTrip.getAssistant(), existingTrip, existingTrip.getDriver(),
+                    existingTrip.getId());
         }
-        
+
         tripRepository.save(existingTrip);
     }
 
@@ -398,9 +453,9 @@ public class TripService {
      */
     private void validateBusForTrip(Bus bus, Trip trip, Long excludeTripId) {
         LocalDateTime departure = trip.getDepartureTime();
-        LocalDateTime arrival = trip.getArrivalTimeExpected() != null 
-            ? trip.getArrivalTimeExpected() 
-            : departure.plusHours(5);
+        LocalDateTime arrival = trip.getArrivalTimeExpected() != null
+                ? trip.getArrivalTimeExpected()
+                : departure.plusHours(5);
 
         LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
         LocalDateTime windowEnd = arrival.plusHours(BUS_PREP_BUFFER_HOURS);
@@ -420,26 +475,29 @@ public class TripService {
         if (!driver.isLicenseValid()) {
             throw new IllegalArgumentException("Bằng lái của " + driver.getUser().getFullName() + " đã hết hạn!");
         }
-        
+
         LocalDateTime departure = trip.getDepartureTime();
-        LocalDateTime arrival = trip.getArrivalTimeExpected() != null 
-            ? trip.getArrivalTimeExpected() 
-            : departure.plusHours(5);
-            
+        LocalDateTime arrival = trip.getArrivalTimeExpected() != null
+                ? trip.getArrivalTimeExpected()
+                : departure.plusHours(5);
+
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
 
         if (isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId)) {
-            throw new IllegalArgumentException("Tài xế/Phụ xe " + driver.getUser().getFullName() + " đang bận ở chuyến khác!");
+            throw new IllegalArgumentException(
+                    "Tài xế/Phụ xe " + driver.getUser().getFullName() + " đang bận ở chuyến khác!");
         }
 
         double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
         double effectiveHours = Math.min(durationHours, 8.0);
+
         // Tổng giờ lái hôm nay + thời lượng chuyến (tối đa 8h/ngày)
-        if (driver.getTotalDrivingHours24h() + effectiveHours > 8.0) {
+        double currentAssignedHours = getDrivingHoursForDate(driver, departure, excludeTripId);
+        if (currentAssignedHours + effectiveHours > 8.0) {
             throw new IllegalArgumentException(
-                    String.format("%s đã lái %.1fh hôm nay, thêm chuyến này sẽ vượt 8h/ngày!",
-                            driver.getUser().getFullName(), driver.getTotalDrivingHours24h()));
+                    String.format("%s đã được phân công lái %.1fh trong ngày %s, thêm chuyến này sẽ vượt 8h/ngày!",
+                            driver.getUser().getFullName(), currentAssignedHours, departure.toLocalDate().toString()));
         }
     }
 
@@ -503,9 +561,9 @@ public class TripService {
         return driverRepository.findAll().stream()
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(Driver::isLicenseValid)
-                .filter(d -> d.getTotalDrivingHours24h() + effectiveHours <= 8.0)
+                .filter(d -> getDrivingHoursForDate(d, departure, tripId) + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
-                .sorted(Comparator.comparingDouble(Driver::getTotalDrivingHours24h))
+                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
                 .collect(Collectors.toList());
     }
 

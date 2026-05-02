@@ -124,6 +124,20 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                         @Param("end") LocalDateTime end,
                         @Param("excludeTripId") Long excludeTripId);
 
+        /**
+         * [MỚI] Tìm các chuyến xe của một tài xế/phụ xe trong một ngày cụ thể (để tính tổng giờ lái/ngày)
+         */
+        @Query("SELECT t FROM Trip t WHERE (t.driver = :driver OR t.assistant = :driver) " +
+               "AND t.status IN :statuses " +
+               "AND t.departureTime >= :startOfDay AND t.departureTime < :endOfDay " +
+               "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+        List<Trip> findTripsForDriverOnDate(
+                        @Param("driver") Driver driver,
+                        @Param("statuses") Collection<TripStatus> statuses,
+                        @Param("startOfDay") LocalDateTime startOfDay,
+                        @Param("endOfDay") LocalDateTime endOfDay,
+                        @Param("excludeTripId") Long excludeTripId);
+
         // =========================================================================
         // TRUY VẤN BỔ SUNG
         // =========================================================================
