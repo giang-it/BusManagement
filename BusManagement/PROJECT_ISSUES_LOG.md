@@ -64,9 +64,19 @@ Người đánh giá: Antigravity AI
 ## 5. tôi tự thấy lỗi
 ### 5.1. không kiểm tra ngày khi tính tổng số giờ lái (fixed)
 - **Vấn đề:** khi admin tạo chuyến mới, trong lúc gán tài xế, hệ thống có kiểm tra nếu lái tổng quá số giờ lái sẽ báo lỗi nhưng dường như bỏ qua ngày, ví dụ hôm nay tx1 đã lái 4h thì nếu gán tiếp chuyến chạy 7h thì sẽ báo lỗi nhưng nếu để chạy vào ngày khác thì hệ thống vẫn báo lỗi đã lái 4h, mặc dù ngày đó chưa lái giờ nào  
-### 5.2. không cảnh báo xe sát bảo trì
+
+### 5.2. không cảnh báo xe sát bảo trì (fixed)
 - **Vấn đề:** khi sửa chyến hoặc tạo chuyến, nếu gán xe sát bảo trì thì hệ thống ko cảnh báo 
+### 5.2.1. không cảnh báo (cho phép gán) xe đang chạy hoặc đang sửa (fixed)
+- **Vấn đề:** khi sửa, tạo chuyến ta có thể gán xe đang chạy hoặc đang sửa vào chuyến, điều này ko nên 
+
 ### 5.3. số ghế của xe vượt ngưỡng
 - **Vấn đề:** không có bất kỳ kiểm tra số ghế vượt ngưỡng trong lúc sửa hoặc tạo chuyến (tôi không chắc đã có tính năng gán số ghế khi tạo xe chưa, ví dụ limosine ghi 22 ghế lúc tạo, như vậy db có thực sự lưu 22 ghế không hay chỉ là ghi tạm)như vậy nếu khi sửa hoặc tạo chuyến nếu để số ghế vượt ngưỡng của xe thì sao?
-### 5.4. sửa chuyến, không cảnh báo nếu gán tài xế quá giờ lái
+
+### 5.4. sửa chuyến, không cảnh báo nếu gán tài xế quá giờ lái (fixed)
 - **Vấn đề:** 
+- **giải pháp:** khi khởi tạo tài xế, nếu hardcode tài xế đã lái X giờ thì số giờ đó chỉ tính cho chuyến cùng với ngày khởi tạo, còn các chuyến ngày khác sẽ để về 0 giờ hết nên gán bth. 
+
+### 5.5. chỉ dropdown tài, phụ xe, xe đủ khả điều kiện, thay vì dropdown tất cả
+- **Vấn đề:** khi sửa, các mục dropdown tự động lấy tất cả, điều này gây phiền toái. -> nếu sửa thì phải chọn thời gian, ngày đi trước, từ đó mới lọc được tài, xe đủ điều kiện. (khá khó)
+

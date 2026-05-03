@@ -81,9 +81,12 @@ public class AdminTripController {
     public String confirmAutoAssigned(@RequestParam Long tripId,
             RedirectAttributes redirectAttributes) {
         try {
-            tripService.confirmAutoAssignedTrip(tripId);
+            String warning = tripService.confirmAutoAssignedTrip(tripId);
             redirectAttributes.addFlashAttribute("success",
                     "✅ Chuyến tăng cường #" + tripId + " đã được kích hoạt thành công!");
+            if (warning != null) {
+                redirectAttributes.addFlashAttribute("warning", warning);
+            }
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi xác nhận: " + e.getMessage());
             return "redirect:/admin/trips/approve/" + tripId;
@@ -106,9 +109,12 @@ public class AdminTripController {
             @RequestParam(required = false) Long assistantId,
             RedirectAttributes redirectAttributes) {
         try {
-            tripService.approveTrip(tripId, busId, driverId, assistantId);
+            String warning = tripService.approveTrip(tripId, busId, driverId, assistantId);
             redirectAttributes.addFlashAttribute("success",
                     "✅ Chuyến xe #" + tripId + " đã được phân công và kích hoạt thành công!");
+            if (warning != null) {
+                redirectAttributes.addFlashAttribute("warning", warning);
+            }
         } catch (IllegalArgumentException e) {
             // Lỗi vi phạm ràng buộc → báo cho Admin biết
             redirectAttributes.addFlashAttribute("error", "⛔ Vi phạm ràng buộc: " + e.getMessage());

@@ -336,7 +336,7 @@ public class TripService {
      * Hệ thống kiểm tra lại ràng buộc trước khi kích hoạt.
      */
     @Transactional
-    public void confirmAutoAssignedTrip(Long tripId) {
+    public String confirmAutoAssignedTrip(Long tripId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
 
@@ -349,7 +349,7 @@ public class TripService {
         }
 
         // Kiểm tra lại toàn bộ ràng buộc
-        validateBusForTrip(trip.getBus(), trip, tripId);
+        String warning = validateBusForTrip(trip.getBus(), trip, tripId);
         validateDriverForTrip(trip.getDriver(), trip, null, tripId);
         if (trip.getAssistant() != null) {
             validateDriverForTrip(trip.getAssistant(), trip, trip.getDriver(), tripId);
@@ -363,6 +363,8 @@ public class TripService {
                 trip.getBus().getLicensePlate(),
                 trip.getDriver().getUser().getFullName(),
                 trip.getAssistant() != null ? trip.getAssistant().getUser().getFullName() : "Không có");
+
+        return warning;
     }
 
     /**
@@ -370,7 +372,7 @@ public class TripService {
      * Vẫn kiểm tra ràng buộc trước khi lưu.
      */
     @Transactional
-    public void approveTrip(Long tripId, Long busId, Long driverId, Long assistantId) {
+    public String approveTrip(Long tripId, Long busId, Long driverId, Long assistantId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
 
@@ -380,7 +382,7 @@ public class TripService {
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế #" + driverId));
 
-        validateBusForTrip(bus, trip, tripId);
+        String warning = validateBusForTrip(bus, trip, tripId);
         validateDriverForTrip(driver, trip, null, tripId);
 
         trip.setBus(bus);
@@ -400,19 +402,21 @@ public class TripService {
 
         System.out.printf("✅ Admin phân công thủ công chuyến #%d | Xe: %s | Tài xế: %s%n",
                 tripId, bus.getLicensePlate(), driver.getUser().getFullName());
+
+        return warning;
     }
 
     /**
      * Admin tạo chuyến thủ công từ form
      */
     @Transactional
-    public void createManualTrip(Trip trip) {
+    public String createManualTrip(Trip trip) {
         if (trip.getArrivalTimeExpected() != null && trip.getArrivalTimeExpected().isBefore(trip.getDepartureTime())) {
             throw new IllegalArgumentException("Thời gian đến dự kiến phải sau thời gian khởi hành!");
         }
 
         // Kiểm tra ràng buộc cho chuyến mới (tripId = null)
-        validateBusForTrip(trip.getBus(), trip, null);
+        String warning = validateBusForTrip(trip.getBus(), trip, null);
         validateDriverForTrip(trip.getDriver(), trip, null, null);
         if (trip.getAssistant() != null) {
             validateDriverForTrip(trip.getAssistant(), trip, trip.getDriver(), null);
@@ -420,13 +424,15 @@ public class TripService {
 
         trip.setStatus(TripStatus.ACTIVE);
         tripRepository.save(trip);
+
+        return warning;
     }
 
     /**
      * Admin cập nhật chuyến thủ công từ form
      */
     @Transactional
-    public void updateManualTrip(Trip existingTrip) {
+    public String updateManualTrip(Trip existingTrip) {
         if (existingTrip.getArrivalTimeExpected() != null
                 && existingTrip.getArrivalTimeExpected().isBefore(existingTrip.getDepartureTime())) {
             throw new IllegalArgumentException("Thời gian đến dự kiến phải sau thời gian khởi hành!");
@@ -438,7 +444,7 @@ public class TripService {
         }
 
         // Kiểm tra ràng buộc (loại trừ chính chuyến này)
-        validateBusForTrip(existingTrip.getBus(), existingTrip, existingTrip.getId());
+        String warning = validateBusForTrip(existingTrip.getBus(), existingTrip, existingTrip.getId());
         validateDriverForTrip(existingTrip.getDriver(), existingTrip, null, existingTrip.getId());
         if (existingTrip.getAssistant() != null) {
             validateDriverForTrip(existingTrip.getAssistant(), existingTrip, existingTrip.getDriver(),
@@ -446,12 +452,23 @@ public class TripService {
         }
 
         tripRepository.save(existingTrip);
+
+        return warning;
     }
 
     /**
-     * Kiểm tra xe có đang bận không.
+     * Kiểm tra xe có đang bận không và trả về cảnh báo nếu sắp đến hạn bảo trì.
      */
-    private void validateBusForTrip(Bus bus, Trip trip, Long excludeTripId) {
+    private String validateBusForTrip(Bus bus, Trip trip, Long excludeTripId) {
+        if (bus.getStatus() == BusStatus.REPAIRING) {
+            throw new IllegalArgumentException(
+                    "Xe " + bus.getLicensePlate() + " đang được bảo trì/sửa chữa, không thể gán vào chuyến!");
+        }
+        if (bus.getStatus() == BusStatus.TRAVELING) {
+            throw new IllegalArgumentException("Xe " + bus.getLicensePlate()
+                    + " đang trên đường (TRAVELING), không thể gán vào chuyến mới cho đến khi hoàn thành chuyến hiện tại!");
+        }
+
         LocalDateTime departure = trip.getDepartureTime();
         LocalDateTime arrival = trip.getArrivalTimeExpected() != null
                 ? trip.getArrivalTimeExpected()
@@ -463,6 +480,16 @@ public class TripService {
         if (isBusBusy(bus, windowStart, windowEnd, excludeTripId)) {
             throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " đang bận trong khoảng thời gian này!");
         }
+
+        Double threshold = bus.getMaintenanceThreshold();
+        double tripDistance = trip.getRoute() != null && trip.getRoute().getDistanceKm() != null
+                ? trip.getRoute().getDistanceKm()
+                : 0.0;
+        if (threshold != null && bus.getKmSinceLastMaintenance() + tripDistance > threshold) {
+            return "Cảnh báo: Xe " + bus.getLicensePlate() + " (Odo: " + Math.round(bus.getKmSinceLastMaintenance())
+                    + ") sẽ chạm/vượt ngưỡng bảo trì (" + Math.round(threshold) + ") sau chuyến này!";
+        }
+        return null;
     }
 
     /**

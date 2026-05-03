@@ -102,9 +102,12 @@ public class AdminTripManagementController {
             trip.setExtraTrip(false);
 
             // Lưu trip thông qua Service để kích hoạt Validate
-            tripService.createManualTrip(trip);
+            String warning = tripService.createManualTrip(trip);
 
             redirectAttributes.addFlashAttribute("success", "Tạo chuyến xe thành công!");
+            if (warning != null) {
+                redirectAttributes.addFlashAttribute("warning", warning);
+            }
             return "redirect:/admin/trip-management/trips";
 
         } catch (Exception e) {
@@ -170,9 +173,12 @@ public class AdminTripManagementController {
             }
 
             // Cập nhật thông qua Service để kích hoạt Validate
-            tripService.updateManualTrip(existingTrip);
+            String warning = tripService.updateManualTrip(existingTrip);
 
             redirectAttributes.addFlashAttribute("success", "Cập nhật chuyến xe thành công!");
+            if (warning != null) {
+                redirectAttributes.addFlashAttribute("warning", warning);
+            }
             return "redirect:/admin/trip-management/trips";
 
         } catch (Exception e) {
