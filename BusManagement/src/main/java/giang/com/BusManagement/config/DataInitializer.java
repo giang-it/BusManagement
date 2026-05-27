@@ -63,6 +63,13 @@ public class DataInitializer implements CommandLineRunner {
         Driver txRanh6 = createDriver("tx_ranh6", "TX Rảnh 0h (A6)", "B2-006", 4, 0.0);
         Driver txRanh7 = createDriver("tx_ranh7", "TX Rảnh 0h (A7)", "B2-007", 7, 0.0);
         Driver txRanh8 = createDriver("tx_ranh8", "TX Rảnh 0h (A8)", "B2-008", 2, 0.0);
+        Driver txRanh9 = createDriver("tx_ranh9", "TX Rảnh 0h (A9)", "B2-009", 7, 0.0);
+        Driver txRanh10 = createDriver("tx_ranh10", "TX Rảnh 0h (A10)", "B2-010", 5, 0.0);
+        Driver txRanh11 = createDriver("tx_ranh11", "TX Rảnh 0h (A11)", "B2-011", 7, 0.0);
+        Driver txRanh12 = createDriver("tx_ranh12", "TX Rảnh 0h (A12)", "B2-012", 5, 0.0);
+        Driver txRanh13 = createDriver("tx_ranh13", "TX Rảnh 0h (A13)", "B2-013", 7, 0.0);
+        Driver txRanh14 = createDriver("tx_ranh14", "TX Rảnh 0h (A14)", "B2-014", 4, 0.0);
+        Driver txRanh15 = createDriver("tx_ranh15", "TX Rảnh 0h (A15)", "B2-015", 7, 0.0);
 
         // Nhóm B: Tài xế đã lái một số giờ
         Driver txDaLai4h = createDriver("tx_4h", "TX Đã lái 4h", "B2-010", 5, 4.0);
@@ -108,6 +115,16 @@ public class DataInitializer implements CommandLineRunner {
         Bus xeSanSang3 = createBus("29A-001.03", "Thaco-Mới", giuongNam, BusStatus.READY, 600.0);
         Bus xeSanSang4 = createBus("29A-001.04", "Thaco-Mới", giuongNam, BusStatus.READY, 700.0);
         Bus xeSanSang5 = createBus("29A-001.05", "Thaco-Mới", gheNgoi, BusStatus.READY, 300.0);
+        Bus xeSanSang6 = createBus("29A-001.06", "Thaco-Mới6", gheNgoi, BusStatus.READY, 30.0);
+        Bus xeSanSang7 = createBus("29A-001.07", "Thaco-Mới7", gheNgoi, BusStatus.READY, 40.0);
+        Bus xeSanSang8 = createBus("29A-001.08", "Thaco-Mới8", gheNgoi, BusStatus.READY, 50.0);
+        Bus xeSanSang9 = createBus("29A-001.09", "Thaco-Mới9", gheNgoi, BusStatus.READY, 60.0);
+        Bus xeSanSang10 = createBus("29A-001.10", "Thaco-Mới10", limousine, BusStatus.READY, 70.0);
+        Bus xeSanSang11 = createBus("29A-001.11", "Thaco-Mới11", limousine, BusStatus.READY, 80.0);
+        Bus xeSanSang12 = createBus("29A-001.12", "Thaco-Mới12", limousine, BusStatus.READY, 90.0);
+        Bus xeSanSang13 = createBus("29A-001.13", "Thaco-Mới13", limousine, BusStatus.READY, 100.0);
+        Bus xeSanSang14 = createBus("29A-001.14", "Thaco-Mới14", giuongNam, BusStatus.READY, 110.0);
+        Bus xeSanSang15 = createBus("29A-001.15", "Thaco-Mới15", giuongNam, BusStatus.READY, 120.0);
 
         // Xe sát ngưỡng bảo trì (4995km / 5000km) → Đi thêm > 5km là quá ngưỡng
         Bus xeSatBaoTri = createBus("51B-SAT.BT", "Xe Sát Bảo Trì", limousine, BusStatus.READY, 4995.0);
@@ -123,6 +140,14 @@ public class DataInitializer implements CommandLineRunner {
 
         // Xe mới tinh (Odo 0)
         Bus xeMoiTinh = createBus("51B-MOI.00", "Xe Mới Tinh", limousine, BusStatus.READY, 0.0);
+
+        // // Xe Limousine dự phòng cho AI tăng cường — đủ cho cả CT-SG lẫn SG-DL
+        // Bus xeExtraL1 = createBus("29A-002.1", "Limousine Dự Phòng 1", limousine,
+        // BusStatus.READY, 200.0);
+        // Bus xeExtraL2 = createBus("29A-002.2", "Limousine Dự Phòng 2", limousine,
+        // BusStatus.READY, 350.0);
+        // Bus xeExtraL3 = createBus("29A-002.3", "Limousine Dự Phòng 3", limousine,
+        // BusStatus.READY, 450.0);
 
         // =====================================================================
         // 5. TRẠM & TUYẾN ĐƯỜNG
@@ -167,71 +192,88 @@ public class DataInitializer implements CommandLineRunner {
         // TRIP 2: AI Tăng Cường — Chuyến sắp đầy (21/22 = 95.5%)
         // → AI sẽ tạo thêm chuyến extra
         // ------------------------------------------------------------------
+        // CT-SG: 21/22 ghế (95.5%) → cần tăng cường
+        // → dùng xeMoiTinh (Limousine) + txMoiTinh + txRanh3
         createTrip(tuyenCT_SG, xeMoiTinh, txMoiTinh, txRanh3, 22, 21, "200000", TripStatus.ACTIVE, 6);
+
+        // SG-DL #1: 29/30 ghế (96.7%) → cần tăng cường
+        // → dùng xeSanSang2 (Limousine) + txRanh4 + txRanh5, khởi hành sau 4h
+        createTrip(tuyenSG_DL, xeSanSang7, txRanh4, txRanh5, 30, 29, "20000", TripStatus.ACTIVE, 4);
 
         // ------------------------------------------------------------------
         // TRIP 3: Chuyến vừa đủ — Không cần tăng cường (20/40 = 50%)
         // → AI sẽ bỏ qua chuyến này
+        // → Dùng xe và tài xế KHÁC để tránh xung đột với SG-DL #1
         // ------------------------------------------------------------------
-        createTrip(tuyenSG_DL, xeSanSang2, txRanh4, txRanh5, 40, 20, "300000", TripStatus.ACTIVE, 4);
-        createTrip(tuyenSG_DL, xeSanSang5, txDaLai1h, null, 40, 20, "300000", TripStatus.ACTIVE, 0);
+        // SG-DL #2: 20/40 ghế (50%) → không cần tăng cường
+        // → dùng xeExtraL1 (Limousine, khởi hành +8h — không trùng với SG-DL #1 ở +4h)
+        createTrip(tuyenSG_DL, xeSanSang2, txRanh6, txRanh7, 40, 20, "300000", TripStatus.ACTIVE, 8);
+        // SG-DL #3 (test không có phụ xe): dùng xeExtraL2, khởi hành lúc now (50% ghế)
+        createTrip(tuyenSG_DL, xeSanSang3, txDaLai1h, null, 40, 20, "300000", TripStatus.ACTIVE, 0);
 
         // ------------------------------------------------------------------
         // TRIP 4: Chuyến trống — Chưa gán bus/driver
         // → Trên giao diện sẽ thấy "Chưa gán" cho xe/tài xế/phụ xe
         // ------------------------------------------------------------------
-        createTrip(tuyenDN_Hue, null, null, null, 50, 0, "150000", TripStatus.ACTIVE, 8);
+        // createTrip(tuyenDN_Hue, null, null, null, 50, 0, "150000", TripStatus.ACTIVE,
+        // 8);
 
         // ------------------------------------------------------------------
         // TRIP 5: TX Sát 8h — Gán ép tài xế 7.9h vào chuyến 2h
         // → Tổng = 7.9 + 2.0 = 9.9h > 8h → Admin thấy vi phạm
         // ------------------------------------------------------------------
-        createTrip(tuyenDN_Hue, xeSanSang3, txSatNguong, null, 50, 10, "150000", TripStatus.ACTIVE, 2);
+        // createTrip(tuyenDN_Hue, xeSanSang3, txSatNguong, null, 50, 10, "150000",
+        // TripStatus.ACTIVE, 2);
 
         // ------------------------------------------------------------------
         // TRIP 6: TX Quá 8h — Gán ép tài xế đã lái 9h
         // → Trực quan trên giao diện: tài xế tên "TX Quá 8h (9h)"
         // ------------------------------------------------------------------
-        createTrip(tuyenHP_HN, xeSanSang4, txQua8h_1, null, 60, 5, "120000", TripStatus.ACTIVE, 3);
+        // createTrip(tuyenHP_HN, xeSanSang4, txQua8h_1, null, 60, 5, "120000",
+        // TripStatus.ACTIVE, 3);
 
         // ------------------------------------------------------------------
         // TRIP 7: TX Bằng Lái Sắp Hết — Tài xế bằng lái còn 1 ngày
         // → AI đã cảnh báo nhưng vẫn gán (fallback)
         // ------------------------------------------------------------------
-        createTrip(tuyenHP_HN, xeSanSang5, txHetHanBL, txRanh6, 60, 30, "120000", TripStatus.ACTIVE, 10);
+        // createTrip(tuyenHP_HN, xeSanSang5, txHetHanBL, txRanh6, 60, 30, "120000",
+        // TripStatus.ACTIVE, 10);
 
         // ------------------------------------------------------------------
         // TRIP 8: Chuyến siêu dài (30h) — Tuyến HN → SG
         // → AI phải tìm tài xế 0h lái, xe giường nằm tốt
         // → effectiveHours = min(30, 8) = 8h
         // ------------------------------------------------------------------
-        createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 35, "900000", TripStatus.ACTIVE, 24);
+        // createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 35, "900000",
+        // TripStatus.ACTIVE, 24);
 
         // ------------------------------------------------------------------
         // TRIP 9: TX Đã Lái 6h + Chuyến 6h
         // → Tổng = 6 + min(6,8) = 12h > 8h → Vi phạm nếu kiểm tra
         // ------------------------------------------------------------------
-        createTrip(tuyenSG_DL, xeSanSang2, txDaLai6h, txDaLai4h, 22, 10, "300000", TripStatus.ACTIVE, 12);
+        // createTrip(tuyenSG_DL, xeSanSang2, txDaLai6h, txDaLai4h, 22, 10, "300000",
+        // TripStatus.ACTIVE, 12);
 
         // ------------------------------------------------------------------
         // TRIP 10: Chuyến với xe sát bảo trì
         // → Tuyến 120km + Odo 4995km = 5115km > 5000km ngưỡng → Cảnh báo
         // ------------------------------------------------------------------
-        createTrip(tuyenHN_HP, xeSatBaoTri, txDaLai7h, null, 22, 15, "250000", TripStatus.ACTIVE, 14);
+        // createTrip(tuyenHN_HP, xeSatBaoTri, txDaLai7h, null, 22, 15, "250000",
+        // TripStatus.ACTIVE, 14);
 
         // =====================================================================
-        System.out.println("✅ [Dữ liệu đã sẵn sàng]");
-        System.out.println("📊 Tổng: 10 chuyến | 16 tài xế | 11 xe | 7 tuyến");
-        System.out.println("🔍 Các test case trên giao diện:");
-        System.out.println("   Trip 1,2  → AI tự tạo chuyến tăng cường (>90% ghế)");
-        System.out.println("   Trip 3    → Bình thường (50% ghế) → AI bỏ qua");
-        System.out.println("   Trip 4    → Chưa gán xe/tài xế → Hiển thị 'Chưa gán'");
-        System.out.println("   Trip 5    → TX Sát 8h (7.9h) lái thêm 2h → Vi phạm");
-        System.out.println("   Trip 6    → TX Quá 8h (9h) → Vi phạm rõ ràng");
-        System.out.println("   Trip 7    → TX Bằng Lái Sắp Hết → Cảnh báo");
-        System.out.println("   Trip 8    → Chuyến 30h HN→SG (>90% ghế) → AI tăng cường");
-        System.out.println("   Trip 9    → TX 6h + Chuyến 6h = 12h → Vi phạm");
-        System.out.println("   Trip 10   → Xe sát bảo trì + tuyến 120km → Quá ngưỡng");
+        // System.out.println("✅ [Dữ liệu đã sẵn sàng]");
+        // System.out.println("📊 Tổng: 10 chuyến | 16 tài xế | 11 xe | 7 tuyến");
+        // System.out.println("🔍 Các test case trên giao diện:");
+        // System.out.println(" Trip 1,2 → AI tự tạo chuyến tăng cường (>90% ghế)");
+        // System.out.println(" Trip 3 → Bình thường (50% ghế) → AI bỏ qua");
+        // System.out.println(" Trip 4 → Chưa gán xe/tài xế → Hiển thị 'Chưa gán'");
+        // System.out.println(" Trip 5 → TX Sát 8h (7.9h) lái thêm 2h → Vi phạm");
+        // System.out.println(" Trip 6 → TX Quá 8h (9h) → Vi phạm rõ ràng");
+        // System.out.println(" Trip 7 → TX Bằng Lái Sắp Hết → Cảnh báo");
+        // System.out.println(" Trip 8 → Chuyến 30h HN→SG (>90% ghế) → AI tăng cường");
+        // System.out.println(" Trip 9 → TX 6h + Chuyến 6h = 12h → Vi phạm");
+        // System.out.println(" Trip 10 → Xe sát bảo trì + tuyến 120km → Quá ngưỡng");
     }
 
     // =====================================================================
