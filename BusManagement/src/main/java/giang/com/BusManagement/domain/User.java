@@ -34,4 +34,7 @@ public class User {
     private Role role; // ADMIN, DRIVER, USER
 
     private Boolean status = true;
+
+    @jakarta.persistence.OneToOne(mappedBy = "user", fetch = jakarta.persistence.FetchType.LAZY)
+    private Driver driver;
 }

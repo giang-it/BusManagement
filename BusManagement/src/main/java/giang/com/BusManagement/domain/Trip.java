@@ -33,6 +33,15 @@ public class Trip {
     @JoinColumn(name = "assistant_id")
     private Driver assistant; // Phụ xe/Conductor (cũng là Driver nhưng vai trò khác)
 
+    // === TÀI XẾ PHỤ (mới thêm để hỗ trợ chuyến đi > 8h) ===
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "trip_co_drivers",
+        joinColumns = @JoinColumn(name = "trip_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private java.util.List<User> coDrivers = new java.util.ArrayList<>();
+
     @Column(name = "departure_time")
     private LocalDateTime departureTime;
 

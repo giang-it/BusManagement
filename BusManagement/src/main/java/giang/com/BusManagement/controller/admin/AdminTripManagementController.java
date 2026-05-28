@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/admin/trip-management")
@@ -76,6 +79,7 @@ public class AdminTripManagementController {
             @RequestParam Long busId,
             @RequestParam Long driverId,
             @RequestParam(required = false) Long assistantId,
+            @RequestParam(required = false) List<Long> coDriverIds,
             RedirectAttributes redirectAttributes) {
         try {
             // Gán route, bus, driver
@@ -95,6 +99,18 @@ public class AdminTripManagementController {
                 Driver assistant = driverRepository.findById(assistantId)
                         .orElseThrow(() -> new RuntimeException("Không tìm thấy phụ xe"));
                 trip.setAssistant(assistant);
+            }
+
+            // Gán tài xế phụ nếu có
+            trip.getCoDrivers().clear();
+            if (coDriverIds != null) {
+                for (Long cdId : coDriverIds) {
+                    if (cdId != null && cdId > 0) {
+                        Driver cd = driverRepository.findById(cdId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
+                        trip.getCoDrivers().add(cd.getUser());
+                    }
+                }
             }
 
             // Đặt trạng thái mặc định
@@ -123,14 +139,30 @@ public class AdminTripManagementController {
      */
     @GetMapping("/trips/edit/{id}")
     public String showEditTripForm(@PathVariable Long id, Model model) {
-        Trip trip = tripRepository.findById(id)
+        Trip trip = tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến"));
 
+        List<Long> savedCoDriverIds = trip.getCoDrivers().stream()
+                .map(User::getId)
+                .toList();
+
         model.addAttribute("trip", trip);
+        model.addAttribute("savedCoDriverIds", savedCoDriverIds);
         model.addAttribute("routes", routeRepository.findAll());
-        model.addAttribute("buses", busRepository.findAll());
-        model.addAttribute("drivers", driverRepository.findAll());
+        model.addAttribute("buses", busRepository.findAllWithBusType());
+        List<Driver> drivers = driverRepository.findAllWithUser();
+        model.addAttribute("drivers", drivers);
         model.addAttribute("statuses", TripStatus.values());
+
+        List<Map<String, Object>> driversForJs = drivers.stream().map(d -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("userId", d.getUserId());
+            map.put("fullName", d.getUser() != null ? d.getUser().getFullName() : "ID: " + d.getUserId());
+            return map;
+        }).toList();
+
+        // Đẩy danh sách rút gọn này sang View
+        model.addAttribute("driversForJs", driversForJs);
 
         return "admin/trip-edit-form";
     }
@@ -144,10 +176,11 @@ public class AdminTripManagementController {
             @RequestParam Long busId,
             @RequestParam Long driverId,
             @RequestParam(required = false) Long assistantId,
+            @RequestParam(required = false) List<Long> coDriverIds,
             RedirectAttributes redirectAttributes) {
         try {
             // Lấy trip cũ từ DB
-            Trip existingTrip = tripRepository.findById(trip.getId())
+            Trip existingTrip = tripRepository.findByIdWithDetails(trip.getId())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến"));
 
             // Cập nhật các trường
@@ -170,6 +203,18 @@ public class AdminTripManagementController {
                 existingTrip.setAssistant(assistant);
             } else {
                 existingTrip.setAssistant(null);
+            }
+
+            // Cập nhật tài xế phụ
+            existingTrip.getCoDrivers().clear();
+            if (coDriverIds != null) {
+                for (Long cdId : coDriverIds) {
+                    if (cdId != null && cdId > 0) {
+                        Driver cd = driverRepository.findById(cdId)
+                                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
+                        existingTrip.getCoDrivers().add(cd.getUser());
+                    }
+                }
             }
 
             // Cập nhật thông qua Service để kích hoạt Validate

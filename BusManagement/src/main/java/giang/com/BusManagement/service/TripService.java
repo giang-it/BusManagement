@@ -96,14 +96,18 @@ public class TripService {
             extraTrip.setBus(result.getBus());
             extraTrip.setDriver(result.getDriver());
             extraTrip.setAssistant(result.getAssistant());
+            extraTrip.getCoDrivers().clear();
+            extraTrip.getCoDrivers().addAll(
+                    result.getCoDrivers().stream().map(Driver::getUser).collect(Collectors.toList()));
 
             String assistantName = result.getAssistant() != null
                     ? result.getAssistant().getUser().getFullName()
                     : "Không có";
 
-            System.out.printf("✅ [AI] Phân công thành công: Xe %s | Tài xế: %s | Phụ xe: %s%n",
+            System.out.printf("✅ [AI] Phân công thành công: Xe %s | Tài xế chính: %s | Số tài phụ: %d | Phụ xe: %s%n",
                     result.getBus().getLicensePlate(),
                     result.getDriver().getUser().getFullName(),
+                    result.getCoDrivers().size(),
                     assistantName);
         } else {
             System.out.printf("⚠️ [AI] Không tự phân công được: %s → Admin xử lý thủ công.%n",
@@ -133,17 +137,46 @@ public class TripService {
                     "Không có xe nào sẵn sàng / đúng loại / không bận trong khung giờ này");
         }
 
+        // Tính toán số tài xế cần thiết
+        int requiredDrivers = (int) Math.ceil(tripDurationHours / 8.0);
+        if (requiredDrivers < 1)
+            requiredDrivers = 1;
+
+        // Danh sách những người bị loại trừ (tránh trùng lặp)
+        java.util.List<Driver> assignedStaff = new java.util.ArrayList<>();
+
         // Bước 2: Tìm tài xế chính
-        Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, null);
+        Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers, assignedStaff);
         if (driver == null) {
             return AutoAssignResult.failure(
-                    "Không có tài xế hợp lệ (cần: bằng còn hạn + rảnh + chưa đủ 8h hôm nay)");
+                    "Không có tài xế chính hợp lệ (cần bằng còn hạn, rảnh, và đủ định mức ngày)");
+        }
+        assignedStaff.add(driver);
+
+        // Bước 3: Tìm các tài xế phụ (nếu chuyến dài > 8h)
+        java.util.List<Driver> coDrivers = new java.util.ArrayList<>();
+        for (int i = 1; i < requiredDrivers; i++) {
+            Driver coDriver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
+                    assignedStaff);
+            if (coDriver == null) {
+                return AutoAssignResult.failure(
+                        "Không tìm đủ số lượng tài xế phụ hợp lệ cho chuyến dài " + Math.round(tripDurationHours)
+                                + "h (cần " + requiredDrivers + " tài xế)");
+            }
+            coDrivers.add(coDriver);
+            assignedStaff.add(coDriver);
         }
 
-        // Bước 3: Tìm phụ xe (khác tài xế chính) — không bắt buộc, best-effort
-        Driver assistant = findBestAvailableDriver(departure, arrival, tripDurationHours, driver);
+        // Bước 4: Tìm phụ xe (nếu chuyến > 8h thì phụ xe là BẮT BUỘC, ngược lại là tùy
+        // chọn)
+        Driver assistant = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
+                assignedStaff);
+        if (assistant == null && tripDurationHours > 8.0) {
+            return AutoAssignResult.failure(
+                    "Không tìm thấy phụ xe hợp lệ (bắt buộc đối với chuyến xe dài trên 8 tiếng)");
+        }
 
-        return AutoAssignResult.success(bus, driver, assistant);
+        return AutoAssignResult.success(bus, driver, assistant, coDrivers);
     }
 
     // =========================================================================
@@ -233,21 +266,26 @@ public class TripService {
      * @param excludeDriver Tài xế cần loại trừ (null nếu đang tìm tài xế chính)
      */
     private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
-            double tripDurationHours, Driver excludeDriver) {
+            double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers) {
         // Cửa sổ kiểm tra = thêm thời gian nghỉ bắt buộc ở cả hai đầu
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
 
+        double shareDuration = tripDurationHours / totalDriversCount;
+        double effectiveHours = Math.min(shareDuration, 8.0);
+
         List<Driver> availableDrivers = driverRepository.findAll().stream()
                 // Tài xế phải đang hoạt động
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
-                // Loại trừ tài xế đã được chọn (để tránh driver == assistant)
-                .filter(d -> excludeDriver == null || !d.getUserId().equals(excludeDriver.getUserId()))
+                // Loại trừ tài xế đã được chọn (để tránh trùng lặp vai trò)
+                .filter(d -> excludeDrivers == null
+                        || excludeDrivers.stream().noneMatch(ex -> ex.getUserId().equals(d.getUserId())))
                 // Ràng buộc: bằng lái phải còn hạn
                 .filter(Driver::isLicenseValid)
                 // Ràng buộc: tổng giờ lái hôm nay + thời lượng chuyến không được vượt 8 tiếng
-                // Tính chính xác dựa trên CÁC CHUYẾN ĐÃ XẾP TRONG NGÀY
-                .filter(d -> getDrivingHoursForDate(d, departure, null) + Math.min(tripDurationHours, 8.0) <= 8.0)
+                // Tính chính xác dựa trên CÁC CHUYẾN ĐÃ XẾP TRONG NGÀY với lượng giờ chia sẻ
+                // thực tế
+                .filter(d -> getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
                 // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .collect(Collectors.toList());
@@ -286,7 +324,7 @@ public class TripService {
 
         // Bận với tư cách tài xế chính?
         boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
-                driver, busyStatuses, windowStart, windowEnd, excludeTripId);
+                driver, driver.getUser(), busyStatuses, windowStart, windowEnd, excludeTripId);
         if (busyAsDriver)
             return true;
 
@@ -303,15 +341,38 @@ public class TripService {
         LocalDateTime endOfDay = startOfDay.plusDays(1);
         List<TripStatus> busyStatuses = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
 
-        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay, endOfDay,
+        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, driver.getUser(), busyStatuses, startOfDay,
+                endOfDay,
                 excludeTripId);
 
         double hoursFromTrips = trips.stream()
                 .mapToDouble(t -> {
+                    // Nếu tài xế làm phụ xe (conductor/assistant) ở chuyến này thì giờ lái = 0.0
+                    if (t.getAssistant() != null && t.getAssistant().getUserId().equals(driver.getUserId())) {
+                        return 0.0;
+                    }
+
+                    // Kiểm tra xem tài xế có lái (chính hoặc phụ)
+                    boolean isDriving = (t.getDriver() != null && t.getDriver().getUserId().equals(driver.getUserId()))
+                            || (t.getCoDrivers() != null
+                                    && t.getCoDrivers().stream().anyMatch(cd -> cd.getId().equals(driver.getUserId())));
+
+                    if (!isDriving) {
+                        return 0.0;
+                    }
+
                     LocalDateTime arr = t.getArrivalTimeExpected() != null ? t.getArrivalTimeExpected()
                             : t.getDepartureTime().plusHours(5);
                     double dur = Duration.between(t.getDepartureTime(), arr).toMinutes() / 60.0;
-                    return Math.min(dur, 8.0);
+
+                    // Tính tổng số tài xế lái xe của chuyến này
+                    int totalDrivers = 1;
+                    if (t.getCoDrivers() != null) {
+                        totalDrivers += t.getCoDrivers().size();
+                    }
+
+                    double durShare = dur / totalDrivers;
+                    return Math.min(durShare, 8.0);
                 })
                 .sum();
 
@@ -350,18 +411,16 @@ public class TripService {
 
         // Kiểm tra lại toàn bộ ràng buộc
         String warning = validateBusForTrip(trip.getBus(), trip, tripId);
-        validateDriverForTrip(trip.getDriver(), trip, null, tripId);
-        if (trip.getAssistant() != null) {
-            validateDriverForTrip(trip.getAssistant(), trip, trip.getDriver(), tripId);
-        }
+        validateStaffForTrip(trip, tripId);
 
         trip.setStatus(TripStatus.ACTIVE);
         tripRepository.save(trip);
 
-        System.out.printf("✅ Admin xác nhận chuyến #%d | Xe: %s | Tài xế: %s | Phụ xe: %s%n",
+        System.out.printf("✅ Admin xác nhận chuyến #%d | Xe: %s | Tài xế chính: %s | Số tài xế phụ: %d | Phụ xe: %s%n",
                 tripId,
                 trip.getBus().getLicensePlate(),
                 trip.getDriver().getUser().getFullName(),
+                trip.getCoDrivers().size(),
                 trip.getAssistant() != null ? trip.getAssistant().getUser().getFullName() : "Không có");
 
         return warning;
@@ -372,7 +431,8 @@ public class TripService {
      * Vẫn kiểm tra ràng buộc trước khi lưu.
      */
     @Transactional
-    public String approveTrip(Long tripId, Long busId, Long driverId, Long assistantId) {
+    public String approveTrip(Long tripId, Long busId, Long driverId, Long assistantId,
+            java.util.List<Long> coDriverIds) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
 
@@ -382,20 +442,30 @@ public class TripService {
         Driver driver = driverRepository.findById(driverId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế #" + driverId));
 
-        String warning = validateBusForTrip(bus, trip, tripId);
-        validateDriverForTrip(driver, trip, null, tripId);
-
         trip.setBus(bus);
         trip.setDriver(driver);
 
-        if (assistantId != null) {
-            driverRepository.findById(assistantId).ifPresent(assistant -> {
-                validateDriverForTrip(assistant, trip, driver, tripId);
-                trip.setAssistant(assistant);
-            });
+        trip.getCoDrivers().clear();
+        if (coDriverIds != null) {
+            for (Long cdId : coDriverIds) {
+                if (cdId != null && cdId > 0) {
+                    Driver cd = driverRepository.findById(cdId)
+                            .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
+                    trip.getCoDrivers().add(cd.getUser());
+                }
+            }
+        }
+
+        if (assistantId != null && assistantId > 0) {
+            Driver assistant = driverRepository.findById(assistantId)
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy phụ xe #" + assistantId));
+            trip.setAssistant(assistant);
         } else {
             trip.setAssistant(null);
         }
+
+        String warning = validateBusForTrip(bus, trip, tripId);
+        validateStaffForTrip(trip, tripId);
 
         trip.setStatus(TripStatus.ACTIVE);
         tripRepository.save(trip);
@@ -417,10 +487,7 @@ public class TripService {
 
         // Kiểm tra ràng buộc cho chuyến mới (tripId = null)
         String warning = validateBusForTrip(trip.getBus(), trip, null);
-        validateDriverForTrip(trip.getDriver(), trip, null, null);
-        if (trip.getAssistant() != null) {
-            validateDriverForTrip(trip.getAssistant(), trip, trip.getDriver(), null);
-        }
+        validateStaffForTrip(trip, null);
 
         trip.setStatus(TripStatus.ACTIVE);
         tripRepository.save(trip);
@@ -445,11 +512,7 @@ public class TripService {
 
         // Kiểm tra ràng buộc (loại trừ chính chuyến này)
         String warning = validateBusForTrip(existingTrip.getBus(), existingTrip, existingTrip.getId());
-        validateDriverForTrip(existingTrip.getDriver(), existingTrip, null, existingTrip.getId());
-        if (existingTrip.getAssistant() != null) {
-            validateDriverForTrip(existingTrip.getAssistant(), existingTrip, existingTrip.getDriver(),
-                    existingTrip.getId());
-        }
+        validateStaffForTrip(existingTrip, existingTrip.getId());
 
         tripRepository.save(existingTrip);
 
@@ -493,38 +556,115 @@ public class TripService {
     }
 
     /**
-     * Kiểm tra ràng buộc tài xế.
+     * Kiểm tra toàn bộ ràng buộc nhân sự (tài xế chính, các tài xế phụ, phụ xe).
      */
-    private void validateDriverForTrip(Driver driver, Trip trip, Driver excludeDriver, Long excludeTripId) {
-        if (excludeDriver != null && driver.getUserId().equals(excludeDriver.getUserId())) {
-            throw new IllegalArgumentException("Phụ xe không được trùng với tài xế chính!");
-        }
-        if (!driver.isLicenseValid()) {
-            throw new IllegalArgumentException("Bằng lái của " + driver.getUser().getFullName() + " đã hết hạn!");
-        }
-
+    private void validateStaffForTrip(Trip trip, Long excludeTripId) {
         LocalDateTime departure = trip.getDepartureTime();
         LocalDateTime arrival = trip.getArrivalTimeExpected() != null
                 ? trip.getArrivalTimeExpected()
                 : departure.plusHours(5);
 
-        LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
-        LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
+        int requiredDrivers = (int) Math.ceil(durationHours / 8.0);
+        if (requiredDrivers < 1)
+            requiredDrivers = 1;
 
-        if (isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId)) {
-            throw new IllegalArgumentException(
-                    "Tài xế/Phụ xe " + driver.getUser().getFullName() + " đang bận ở chuyến khác!");
+        // 1. Kiểm tra tài xế chính
+        Driver driver = trip.getDriver();
+        if (driver == null) {
+            throw new IllegalArgumentException("Chuyến xe bắt buộc phải có tài xế chính!");
         }
 
-        double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
-        double effectiveHours = Math.min(durationHours, 8.0);
+        int assignedDriversCount = 1;
+        if (trip.getCoDrivers() != null) {
+            assignedDriversCount += trip.getCoDrivers().size();
+        }
 
-        // Tổng giờ lái hôm nay + thời lượng chuyến (tối đa 8h/ngày)
-        double currentAssignedHours = getDrivingHoursForDate(driver, departure, excludeTripId);
-        if (currentAssignedHours + effectiveHours > 8.0) {
+        // 2. Kiểm tra số lượng tài xế cho chuyến xe dài
+        if (assignedDriversCount < requiredDrivers) {
+            throw new IllegalArgumentException(String.format(
+                    "Chuyến xe kéo dài %.1fh, yêu cầu ít nhất %d tài xế lái xe, nhưng hiện tại chỉ gán %d người!",
+                    durationHours, requiredDrivers, assignedDriversCount));
+        }
+
+        // 3. Nếu chuyến dài hơn 8 tiếng, bắt buộc phải có phụ xe
+        Driver assistant = trip.getAssistant();
+        if (durationHours > 8.0 && assistant == null) {
+            throw new IllegalArgumentException("Chuyến xe kéo dài trên 8 tiếng bắt buộc phải có phụ xe!");
+        }
+
+        // 4. Kiểm tra trùng lặp nhân sự
+        java.util.Set<Long> staffIds = new java.util.HashSet<>();
+        staffIds.add(driver.getUserId());
+
+        if (trip.getCoDrivers() != null) {
+            for (User cd : trip.getCoDrivers()) {
+                if (!staffIds.add(cd.getId())) {
+                    throw new IllegalArgumentException(
+                            "Nhân sự phân công bị trùng lặp: Tài xế phụ trùng tài chính hoặc tài phụ khác!");
+                }
+            }
+        }
+
+        if (assistant != null) {
+            if (!staffIds.add(assistant.getUserId())) {
+                throw new IllegalArgumentException(
+                        "Nhân sự phân công bị trùng lặp: Phụ xe trùng với tài xế chính hoặc tài xế phụ!");
+            }
+        }
+
+        // 5. Kiểm tra hạn bằng lái & độ bận & tổng giờ chạy của từng tài xế (chính +
+        // phụ)
+        LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        double shareDuration = durationHours / assignedDriversCount;
+        double effectiveHours = Math.min(shareDuration, 8.0);
+
+        // Validate tài xế chính
+        if (!driver.isLicenseValid()) {
             throw new IllegalArgumentException(
-                    String.format("%s đã được phân công lái %.1fh trong ngày %s, thêm chuyến này sẽ vượt 8h/ngày!",
-                            driver.getUser().getFullName(), currentAssignedHours, departure.toLocalDate().toString()));
+                    "Bằng lái của tài xế chính " + driver.getUser().getFullName() + " đã hết hạn!");
+        }
+        if (isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId)) {
+            throw new IllegalArgumentException(
+                    "Tài xế chính " + driver.getUser().getFullName() + " đang bận ở chuyến khác!");
+        }
+        double driverAssignedHours = getDrivingHoursForDate(driver, departure, excludeTripId);
+        if (driverAssignedHours + effectiveHours > 8.0) {
+            throw new IllegalArgumentException(String.format(
+                    "Tài xế chính %s đã được phân công lái %.1fh trong ngày %s, thêm chuyến này (%.1fh) sẽ vượt 8h/ngày!",
+                    driver.getUser().getFullName(), driverAssignedHours, departure.toLocalDate().toString(),
+                    effectiveHours));
+        }
+
+        // Validate các tài xế phụ
+        if (trip.getCoDrivers() != null) {
+            for (User cd : trip.getCoDrivers()) {
+                Driver cdDriver = cd.getDriver();
+                if (cdDriver == null) {
+                    throw new IllegalArgumentException("Tài khoản " + cd.getFullName() + " không phải là tài xế!");
+                }
+                if (!cdDriver.isLicenseValid()) {
+                    throw new IllegalArgumentException("Bằng lái của tài xế phụ " + cd.getFullName() + " đã hết hạn!");
+                }
+                if (isDriverBusyInWindow(cdDriver, windowStart, windowEnd, excludeTripId)) {
+                    throw new IllegalArgumentException("Tài xế phụ " + cd.getFullName() + " đang bận ở chuyến khác!");
+                }
+                double cdAssignedHours = getDrivingHoursForDate(cdDriver, departure, excludeTripId);
+                if (cdAssignedHours + effectiveHours > 8.0) {
+                    throw new IllegalArgumentException(String.format(
+                            "Tài xế phụ %s đã được phân công lái %.1fh trong ngày %s, thêm chuyến này (%.1fh) sẽ vượt 8h/ngày!",
+                            cd.getFullName(), cdAssignedHours, departure.toLocalDate().toString(), effectiveHours));
+                }
+            }
+        }
+
+        // Validate phụ xe
+        if (assistant != null) {
+            if (isDriverBusyInWindow(assistant, windowStart, windowEnd, excludeTripId)) {
+                throw new IllegalArgumentException(
+                        "Phụ xe " + assistant.getUser().getFullName() + " đang bận ở chuyến khác!");
+            }
         }
     }
 
@@ -605,7 +745,7 @@ public class TripService {
     }
 
     public Trip getTripById(Long id) {
-        return tripRepository.findById(id)
+        return tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
     }
 }

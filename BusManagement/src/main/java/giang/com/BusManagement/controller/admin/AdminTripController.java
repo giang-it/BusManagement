@@ -107,9 +107,10 @@ public class AdminTripController {
             @RequestParam Long busId,
             @RequestParam Long driverId,
             @RequestParam(required = false) Long assistantId,
+            @RequestParam(required = false) List<Long> coDriverIds,
             RedirectAttributes redirectAttributes) {
         try {
-            String warning = tripService.approveTrip(tripId, busId, driverId, assistantId);
+            String warning = tripService.approveTrip(tripId, busId, driverId, assistantId, coDriverIds);
             redirectAttributes.addFlashAttribute("success",
                     "✅ Chuyến xe #" + tripId + " đã được phân công và kích hoạt thành công!");
             if (warning != null) {

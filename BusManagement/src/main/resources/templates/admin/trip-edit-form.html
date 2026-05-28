@@ -107,6 +107,22 @@
                         </div>
                     </div>
 
+                    <!-- TÀI XẾ PHỤ ĐỘNG (hiện khi chuyến > 8h) -->
+                    <div id="coDriverSection" class="mt-3" style="display:none;">
+                        <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
+                            <i class="fas fa-info-circle fs-5"></i>
+                            <div>
+                                <strong>Chuyến dài — cần thêm tài xế phụ!</strong>
+                                <span id="coDriverInfo" class="ms-1 text-muted"></span>
+                            </div>
+                        </div>
+                        <div id="coDriverSlots"></div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-1"
+                            onclick="addCoDriverSlot(null)">
+                            <i class="fas fa-plus"></i> Thêm tài xế phụ
+                        </button>
+                    </div>
+
                     <!-- THỜI GIAN -->
                     <h6 class="border-bottom pb-2 mb-3 mt-4">
                         <i class="fas fa-clock"></i> Thời gian
@@ -216,6 +232,104 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const driversForJs = /*[[${driversForJs}]]*/[];
+        // Dữ liệu coDrivers đã được lưu vào chuyến này
+        const savedCoDriverIds = /*[[${savedCoDriverIds}]]*/[];
+        /*]]>*/
+
+        let coDriverCount = 0;
+
+        function calcDurationHours() {
+            const dep = document.querySelector('[name="departureTime"]').value;
+            const arr = document.querySelector('[name="arrivalTimeExpected"]').value;
+            if (!dep || !arr) return 0;
+            const diff = (new Date(arr) - new Date(dep)) / 3600000;
+            return diff > 0 ? diff : 0;
+        }
+
+        function updateCoDriverSection() {
+            const durationHours = calcDurationHours();
+            const requiredDrivers = durationHours > 0 ? Math.ceil(durationHours / 8.0) : 1;
+            const neededCoDrivers = requiredDrivers - 1;
+
+            const section = document.getElementById('coDriverSection');
+            const info = document.getElementById('coDriverInfo');
+            const slotsDiv = document.getElementById('coDriverSlots');
+
+            if (neededCoDrivers <= 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            info.textContent = `(Chuyến ${durationHours.toFixed(1)}h → cần ít nhất ${requiredDrivers} tài xế, tối thiểu ${neededCoDrivers} tài xế phụ)`;
+
+            while (coDriverCount < neededCoDrivers) {
+                addCoDriverSlot(null);
+            }
+        }
+
+        function addCoDriverSlot(preselectedId) {
+            coDriverCount++;
+            const slotsDiv = document.getElementById('coDriverSlots');
+            const idx = coDriverCount;
+
+            let options = '<option value="">-- Chọn tài xế phụ --</option>';
+            driversForJs.forEach(d => {
+                // === ĐÃ SỬA TẠI ĐÂY: Đọc trực tiếp từ d.fullName gửi từ Controller ===
+                const name = d.fullName ? d.fullName : ('ID:' + d.userId);
+                const sel = preselectedId && String(d.userId) === String(preselectedId) ? ' selected' : '';
+                options += `<option value="${d.userId}"${sel}>${name}</option>`;
+            });
+
+            const div = document.createElement('div');
+            div.className = 'row mb-2 align-items-center';
+            div.id = `coDriverRow_${idx}`;
+            div.innerHTML = `
+                <div class="col">
+                    <label class="form-label"><i class="fas fa-user-shield"></i> Tài xế phụ ${idx}</label>
+                    <select name="coDriverIds" class="form-select form-select-sm">
+                        ${options}
+                    </select>
+                </div>
+                <div class="col-auto" style="padding-top:28px">
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeCoDriverSlot(${idx})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>`;
+            slotsDiv.appendChild(div);
+        }
+
+        function removeCoDriverSlot(idx) {
+            const row = document.getElementById(`coDriverRow_${idx}`);
+            if (row) row.remove();
+        }
+
+        // Khởi tạo khi trang load
+        document.addEventListener('DOMContentLoaded', function () {
+            // Pre-populate các slot tài xế phụ đã lưu
+            if (savedCoDriverIds && savedCoDriverIds.length > 0) {
+                const section = document.getElementById('coDriverSection');
+                section.style.display = 'block';
+                savedCoDriverIds.forEach(id => addCoDriverSlot(id));
+
+                // Cập nhật info text
+                const durationHours = calcDurationHours();
+                if (durationHours > 0) {
+                    const requiredDrivers = Math.ceil(durationHours / 8.0);
+                    document.getElementById('coDriverInfo').textContent =
+                        `(Chuyến ${durationHours.toFixed(1)}h → cần ít nhất ${requiredDrivers} tài xế)`;
+                }
+            }
+            // Tính toán dựa trên thời gian hiện tại của trip
+            updateCoDriverSection();
+        });
+
+        document.querySelector('[name="departureTime"]').addEventListener('change', updateCoDriverSection);
+        document.querySelector('[name="arrivalTimeExpected"]').addEventListener('change', updateCoDriverSection);
+    </script>
 </body>
 
 </html>

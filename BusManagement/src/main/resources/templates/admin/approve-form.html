@@ -142,9 +142,27 @@
             </div>
         </div>
 
+        <!-- Tài xế phụ (nếu có) -->
+        <div th:if="${trip.coDrivers != null and not #lists.isEmpty(trip.coDrivers)}"
+             class="card resource-card mb-3 p-3">
+            <h6 class="text-success mb-3">&#127947; Tài xế phụ (<span th:text="${#lists.size(trip.coDrivers)}"></span> người)</h6>
+            <div th:each="cd : ${trip.coDrivers}" class="row align-items-center mb-2">
+                <div class="col">
+                    <strong th:text="${cd.fullName}"></strong>
+                    <span class="text-muted ms-2"
+                        th:text="'— Bằng (' + ${cd.driver != null ? cd.driver.licenseNumber : 'N/A'} + ')'"></span>
+                </div>
+                <div class="col-auto">
+                    <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
+                    <span class="badge bg-info constraint-badge ms-1"
+                        th:text="${(cd.driver != null ? cd.driver.totalDrivingHours24h : 0) + 'h đã lái hôm nay'}"></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Phụ xe -->
         <div th:if="${trip.assistant != null}" class="card resource-card mb-3 p-3">
-            <h6 class="text-success mb-3">🧑‍🔧 Phụ xe</h6>
+            <h6 class="text-success mb-3">&#129351; Phụ xe</h6>
             <div class="row align-items-center">
                 <div class="col">
                     <strong th:text="${trip.assistant.user.fullName}"></strong>
@@ -248,9 +266,25 @@
                         </div>
                     </div>
 
-                    <!-- Chọn phụ xe (không bắt buộc) -->
+                    <!-- Chọn tài xế phụ (động theo số giờ chạy) -->
                     <div class="mb-4">
-                        <label class="form-label fw-bold">🧑‍🔧 Chọn phụ xe
+                        <div id="coDriverRequirementInfo" class="alert alert-secondary py-2" style="display:none;">
+                            <i class="fas fa-users-cog"></i>
+                            <strong>Chuyến dài</strong> — <span id="coDriverRequirementText"></span>
+                        </div>
+                        <label class="form-label fw-bold">
+                            &#129331; Tài xế phụ
+                            <span class="badge bg-light text-dark border ms-1" id="coDriverBadge">Tùy chọn</span>
+                        </label>
+                        <div id="coDriverSlotsApprove"></div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+                                onclick="addCoDriverSlotApprove(null)">
+                            <i class="fas fa-plus"></i> Thêm tài xế phụ
+                        </button>
+                    </div>
+                    <!-- Chọn phụ xe -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">&#129351; Chọn phụ xe
                             <span class="badge bg-light text-dark border ms-1">Không bắt buộc</span>
                         </label>
                         <select name="assistantId" class="form-select">
@@ -294,6 +328,82 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const approveDriversForJs = /*[[${availableDrivers}]]*/ [];
+        // Thời gian chuyến (server-side) để khởi tạo ban đầu
+        const tripDepartureStr = /*[[${trip.departureTime != null ? #temporals.format(trip.departureTime, 'yyyy-MM-dd''T''HH:mm') : ''}]]*/ '';
+        const tripArrivalStr   = /*[[${trip.arrivalTimeExpected != null ? #temporals.format(trip.arrivalTimeExpected, 'yyyy-MM-dd''T''HH:mm') : ''}]]*/ '';
+        /*]]>*/
+
+        let approveCoDriverCount = 0;
+
+        function calcApproveDurationHours() {
+            if (!tripDepartureStr || !tripArrivalStr) return 0;
+            const diff = (new Date(tripArrivalStr) - new Date(tripDepartureStr)) / 3600000;
+            return diff > 0 ? diff : 0;
+        }
+
+        function initApproveCoDriverSection() {
+            const durationHours = calcApproveDurationHours();
+            const requiredDrivers = durationHours > 0 ? Math.ceil(durationHours / 8.0) : 1;
+            const neededCoDrivers = requiredDrivers - 1;
+
+            const infoDiv = document.getElementById('coDriverRequirementInfo');
+            const infoText = document.getElementById('coDriverRequirementText');
+            const badge = document.getElementById('coDriverBadge');
+
+            if (neededCoDrivers > 0 && infoDiv) {
+                infoDiv.style.display = 'block';
+                infoText.textContent = `Chuyến ${durationHours.toFixed(1)}h → cần ít nhất ${requiredDrivers} tài xế (ít nhất ${neededCoDrivers} tài xế phụ)`;
+                badge.textContent = `BẮt buộc (ít nhất ${neededCoDrivers})`;
+                badge.className = 'badge bg-warning text-dark border ms-1';
+                // Tự thêm đủ slot tối thiểu
+                while (approveCoDriverCount < neededCoDrivers) {
+                    addCoDriverSlotApprove(null);
+                }
+            }
+        }
+
+        function addCoDriverSlotApprove(preselectedId) {
+            approveCoDriverCount++;
+            const slotsDiv = document.getElementById('coDriverSlotsApprove');
+            const idx = approveCoDriverCount;
+
+            let options = '<option value="">-- Chọn tài xế phụ --</option>';
+            approveDriversForJs.forEach(d => {
+                const name = d.user ? d.user.fullName : ('ID:' + d.userId);
+                const hours = d.totalDrivingHours24h !== undefined ? d.totalDrivingHours24h : 0;
+                const sel = preselectedId && String(d.userId) === String(preselectedId) ? ' selected' : '';
+                options += `<option value="${d.userId}"${sel}>${name} | Đã lái: ${hours}h</option>`;
+            });
+
+            const div = document.createElement('div');
+            div.className = 'row mb-2 align-items-center';
+            div.id = `approveCoRow_${idx}`;
+            div.innerHTML = `
+                <div class="col">
+                    <label class="form-label small text-muted">Tài xế phụ ${idx}</label>
+                    <select name="coDriverIds" class="form-select form-select-sm">
+                        ${options}
+                    </select>
+                </div>
+                <div class="col-auto" style="padding-top:28px">
+                    <button type="button" class="btn btn-outline-danger btn-sm"
+                            onclick="removeApproveCoDriver(${idx})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>`;
+            slotsDiv.appendChild(div);
+        }
+
+        function removeApproveCoDriver(idx) {
+            const row = document.getElementById(`approveCoRow_${idx}`);
+            if (row) row.remove();
+        }
+
+        document.addEventListener('DOMContentLoaded', initApproveCoDriverSection);
+    </script>
 </body>
 
 </html>
