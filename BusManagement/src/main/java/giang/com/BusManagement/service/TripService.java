@@ -2,6 +2,7 @@ package giang.com.BusManagement.service;
 
 import giang.com.BusManagement.domain.*;
 import giang.com.BusManagement.repository.*;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.scheduling.annotation.Scheduled;
@@ -313,6 +314,35 @@ public class TripService {
         return fallback;
     }
 
+    // Quản lý Finite State Machine (FSM)
+    private boolean canTransition(TripStatus from, TripStatus to) {
+        if (from == to)
+            return true; // Giữ nguyên trạng thái luôn hợp lệ
+
+        return switch (from) {
+            case PENDING_APPROVAL -> to == TripStatus.ACTIVE || to == TripStatus.CANCELLED;
+            case ACTIVE -> to == TripStatus.DEPARTED || to == TripStatus.CANCELLED;
+            case DEPARTED -> to == TripStatus.COMPLETED;
+            default -> false; // COMPLETED và CANCELLED là Terminal States (Trạng thái cuối)
+        };
+    }
+
+    @Transactional
+    public void updateTripStatus(Long tripId, TripStatus newStatus) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chuyến đi với ID: " + tripId));
+
+        // Kiểm tra tính hợp lệ theo thiết kế Whitelist FSM
+        if (!canTransition(trip.getStatus(), newStatus)) {
+            throw new IllegalStateException(
+                    String.format("Lỗi luồng vận hành: Không thể chuyển trạng thái chuyến xe từ [%s] sang [%s].",
+                            trip.getStatus(), newStatus));
+        }
+
+        trip.setStatus(newStatus);
+        tripRepository.save(trip);
+    }
+
     /**
      * Kiểm tra tài xế có đang bận trong cửa sổ thời gian (cả với tư cách driver và
      * assistant).
@@ -320,7 +350,7 @@ public class TripService {
     private boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd,
             Long excludeTripId) {
         List<TripStatus> busyStatuses = List.of(
-                TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
+                TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
         // Bận với tư cách tài xế chính?
         boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
@@ -339,7 +369,7 @@ public class TripService {
     private double getDrivingHoursForDate(Driver driver, LocalDateTime date, Long excludeTripId) {
         LocalDateTime startOfDay = date.toLocalDate().atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
-        List<TripStatus> busyStatuses = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
+        List<TripStatus> busyStatuses = List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
         List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, driver.getUser(), busyStatuses, startOfDay,
                 endOfDay,
@@ -376,8 +406,17 @@ public class TripService {
                 })
                 .sum();
 
-        // Nếu chuyến đi trong ngày hôm nay, cộng thêm giờ lái cơ sở (như dữ liệu khởi
-        // tạo ban đầu)
+        // -----------------------------------------------------------------------------------
+        // NOTE ĐỂ BẢO VỆ ĐỒ ÁN / DELIBERATE DESIGN:
+        // Trường 'totalDrivingHours24h' hiện tại đóng vai trò dữ liệu MOCK SEED từ
+        // DataInitializer.
+        // Nó phục vụ mục đích thiết lập giờ nền (Baseline Hours) cho các kịch bản demo
+        // chạy thực tế,
+        // chưa đồng bộ thời gian thực với bảng Trip. Khi tích hợp hệ thống phần cứng
+        // IoT/GPS thật,
+        // giá trị này sẽ được nạp thông qua một API cập nhật độc lập từ thiết bị giám
+        // sát hành trình.
+        // -----------------------------------------------------------------------------------
         if (date.toLocalDate().equals(LocalDateTime.now().toLocalDate())) {
             Double baseHours = driver.getTotalDrivingHours24h();
             if (baseHours != null) {
