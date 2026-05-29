@@ -70,6 +70,11 @@ public class DataInitializer implements CommandLineRunner {
         Driver txRanh13 = createDriver("tx_ranh13", "TX Rảnh 0h (A13)", "B2-013", 7, 0.0);
         Driver txRanh14 = createDriver("tx_ranh14", "TX Rảnh 0h (A14)", "B2-014", 4, 0.0);
         Driver txRanh15 = createDriver("tx_ranh15", "TX Rảnh 0h (A15)", "B2-015", 7, 0.0);
+        Driver txRanh16 = createDriver("tx_ranh16", "TX Rảnh 0h (A16)", "B2-016", 0, 0.0);
+        Driver txRanh17 = createDriver("tx_ranh17", "TX Rảnh 0h (A17)", "B2-017", 0, 0.0);
+        Driver txRanh18 = createDriver("tx_ranh18", "TX Rảnh 0h (A18)", "B2-018", 0, 0.0);
+        Driver txRanh19 = createDriver("tx_ranh19", "TX Rảnh 0h (A19)", "B2-019", 0, 0.0);
+        Driver txRanh20 = createDriver("tx_ranh20", "TX Rảnh 0h (A20)", "B2-020", 0, 0.0);
 
         // Nhóm B: Tài xế đã lái một số giờ
         Driver txDaLai4h = createDriver("tx_4h", "TX Đã lái 4h", "B2-010", 5, 4.0);
@@ -245,7 +250,7 @@ public class DataInitializer implements CommandLineRunner {
         // → effectiveHours = min(30, 8) = 8h
         // ------------------------------------------------------------------
         createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 35, "900000",
-                TripStatus.ACTIVE, 24);
+                TripStatus.ACTIVE, 01);
 
         // ------------------------------------------------------------------
         // TRIP 9: TX Đã Lái 6h + Chuyến 6h
