@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Bến Xe / Trạm Dừng</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2"><i class="bi bi-geo-alt"></i> Danh Sách Bến Xe & Trạm Dừng</h1>
+            <div>
+                <a th:href="@{/admin/dashboard}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Quay lại Dashboard
+                </a>
+                <a href="/admin/stations/create" class="btn btn-success"><i class="bi bi-plus-circle"></i> Thêm Bến Xe
+                    Mới</a>
+            </div>
+        </div>
+
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 10%;">ID</th>
+                            <th style="width: 30%;">Tên Bến Xe / Trạm</th>
+                            <th style="width: 45%;">Địa Chỉ Chi Tiết</th>
+                            <th style="width: 15%;" class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="station : ${stations}">
+                            <td th:text="${station.id}" class="fw-bold text-muted"></td>
+                            <td th:text="${station.stationName}" class="fw-semibold"></td>
+                            <td th:text="${station.address}"></td>
+                            <td class="text-center">
+                                <a th:href="@{/admin/stations/edit/{id}(id=${station.id})}"
+                                    class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Sửa</a>
+                                <a th:href="@{/admin/stations/delete/{id}(id=${station.id})}"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Hệ thống sẽ chặn xóa nếu bến xe này đang nằm trên lộ trình tuyến đường. Bạn có muốn tiếp tục?');"><i
+                                        class="bi bi-trash"></i> Xóa</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

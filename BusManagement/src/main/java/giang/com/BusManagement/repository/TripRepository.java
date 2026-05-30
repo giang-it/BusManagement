@@ -222,4 +222,20 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("start") LocalDateTime start,
                      @Param("end") LocalDateTime end,
                      @Param("excludeTripId") Long excludeTripId);
+
+       /**
+        * Kiểm tra xe đã từng được gán cho bất kỳ chuyến đi nào trong hệ
+        * thống chưa (quá khứ + tương lai)
+        * Spring Data JPA tự động phân tích: BusId -> truy cập vào trường bus và lấy
+        * thuộc tính id của Bus entity.
+        */
+       boolean existsByBusId(Long busId);
+
+       /**
+        * Kiểm tra xe có đang bận ở các chuyến đi có trạng thái nằm trong
+        * danh sách chỉ định hay không
+        * Thường dùng để chặn không cho xe đi bảo trì (REPAIRING) khi đang có lịch
+        * ACTIVE hoặc PENDING_APPROVAL
+        */
+       boolean existsByBusIdAndStatusIn(Long busId, List<TripStatus> statuses);
 }

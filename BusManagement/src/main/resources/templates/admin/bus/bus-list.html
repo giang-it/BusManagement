@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Xe Khách - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2"><i class="bi bi-bus-front"></i> Quản Lý Xe Khách</h1>
+            <div>
+                <a th:href="@{/admin/dashboard}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Quay lại Dashboard
+                </a>
+                <a href="/admin/buses/create" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Thêm Xe Mới</a>
+            </div>
+        </div>
+
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Biển Số Xe</th>
+                            <th>Hãng Xe</th>
+                            <th>Loại Xe</th>
+                            <th>Sức Chứa (Ghế)</th>
+                            <th>Odometer (Km)</th>
+                            <th>Chạy Từ Lần Bảo Trì Cuối</th>
+                            <th>Trạng Thái</th>
+                            <th>Cảnh Báo Bảo Dưỡng</th>
+                            <th class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="bus : ${buses}">
+                            <td th:text="${bus.id}" class="fw-bold text-muted"></td>
+                            <td><span class="badge bg-secondary fs-6 text-uppercase"
+                                    th:text="${bus.licensePlate}"></span></td>
+                            <td th:text="${bus.brand}"></td>
+                            <td th:text="${bus.busType != null ? bus.busType.typeName : 'N/A'}"></td>
+                            <td><span class="badge bg-info text-dark"
+                                    th:text="${bus.busType != null ? bus.busType.capacity + ' Ghế' : 'N/A'}"></span>
+                            </td>
+                            <td th:text="${#numbers.formatDecimal(bus.odometer, 1, 0)} + ' km'"></td>
+                            <td
+                                th:text="${#numbers.formatDecimal(bus.getKmSinceLastMaintenance(), 1, 0)} + ' / ' + ${#numbers.formatDecimal(bus.maintenanceThreshold, 1, 0)} + ' km'">
+                            </td>
+                            <td>
+                                <span th:if="${bus.status.name() == 'READY'}" class="badge bg-success">Sẵn Sàng</span>
+                                <span th:if="${bus.status.name() == 'TRAVELING'}" class="badge bg-primary">Đang
+                                    Chạy</span>
+                                <span th:if="${bus.status.name() == 'REPAIRING'}" class="badge bg-warning text-dark">Bảo
+                                    Trì</span>
+                            </td>
+                            <td>
+                                <span th:if="${bus.needsMaintenance()}" class="badge bg-danger animate-pulse"><i
+                                        class="bi bi-exclamation-octagon"></i> Cần bảo trì gấp!</span>
+                                <span th:unless="${bus.needsMaintenance()}"
+                                    class="badge bg-light text-success border border-success">An Toàn</span>
+                            </td>
+                            <td class="text-center">
+                                <a th:href="@{/admin/buses/edit/{id}(id=${bus.id})}"
+                                    class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Sửa</a>
+                                <a th:href="@{/admin/buses/delete/{id}(id=${bus.id})}"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Bạn có chắc chắn muốn xóa?');"><i class="bi bi-trash"></i>
+                                    Xóa</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

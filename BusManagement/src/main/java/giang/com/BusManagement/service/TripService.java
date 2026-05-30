@@ -787,4 +787,5 @@ public class TripService {
         return tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
     }
+
 }
