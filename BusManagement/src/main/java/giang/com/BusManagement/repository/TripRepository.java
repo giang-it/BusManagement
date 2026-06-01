@@ -53,7 +53,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
-                     LEFT JOIN FETCH cd.driver
                      """)
        List<Trip> findAllWithDetails();
 
@@ -71,7 +70,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
-                     LEFT JOIN FETCH cd.driver
                      WHERE t.status = :status
                      """)
        List<Trip> findByStatusWithDetails(@Param("status") TripStatus status);
@@ -86,7 +84,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
-                     LEFT JOIN FETCH cd.driver
                      WHERE t.id = :id
                      """)
        java.util.Optional<Trip> findByIdWithDetails(@Param("id") Long id);
@@ -118,13 +115,12 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        @Query("SELECT COUNT(t) > 0 FROM Trip t " +
                      "LEFT JOIN t.coDrivers cd " +
-                     "WHERE (t.driver = :driver OR cd = :user) " +
+                     "WHERE (t.driver = :driver OR cd = :driver) " +
                      "AND t.status IN :statuses " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
                      "AND (t.departureTime < :windowEnd AND t.arrivalTimeExpected > :windowStart)")
        boolean existsOverlappingTripForDriver(
                      @Param("driver") Driver driver,
-                     @Param("user") User user,
                      @Param("statuses") List<TripStatus> statuses,
                      @Param("windowStart") LocalDateTime windowStart,
                      @Param("windowEnd") LocalDateTime windowEnd,
@@ -170,13 +166,12 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        @Query("SELECT DISTINCT t FROM Trip t " +
                      "LEFT JOIN FETCH t.coDrivers cd " +
-                     "WHERE (t.driver = :driver OR cd = :user OR t.assistant = :driver) " +
+                     "WHERE (t.driver = :driver OR cd = :driver OR t.assistant = :driver) " +
                      "AND t.status IN :statuses " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
                      "AND (t.departureTime >= :startOfDay AND t.departureTime < :endOfDay)")
        List<Trip> findTripsForDriverOnDate(
                      @Param("driver") Driver driver,
-                     @Param("user") User user,
                      @Param("statuses") List<TripStatus> statuses,
                      @Param("startOfDay") LocalDateTime startOfDay,
                      @Param("endOfDay") LocalDateTime endOfDay,

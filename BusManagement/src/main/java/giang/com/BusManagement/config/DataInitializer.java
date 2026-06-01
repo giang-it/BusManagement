@@ -249,7 +249,7 @@ public class DataInitializer implements CommandLineRunner {
         // → AI phải tìm tài xế 0h lái, xe giường nằm tốt
         // → effectiveHours = min(30, 8) = 8h
         // ------------------------------------------------------------------
-        createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 35, "900000",
+        createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 39, "900000",
                 TripStatus.ACTIVE, 01);
 
         // ------------------------------------------------------------------

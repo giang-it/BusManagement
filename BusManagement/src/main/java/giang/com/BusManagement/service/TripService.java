@@ -98,8 +98,7 @@ public class TripService {
             extraTrip.setDriver(result.getDriver());
             extraTrip.setAssistant(result.getAssistant());
             extraTrip.getCoDrivers().clear();
-            extraTrip.getCoDrivers().addAll(
-                    result.getCoDrivers().stream().map(Driver::getUser).collect(Collectors.toList()));
+            extraTrip.getCoDrivers().addAll(result.getCoDrivers());
 
             String assistantName = result.getAssistant() != null
                     ? result.getAssistant().getUser().getFullName()
@@ -340,6 +339,19 @@ public class TripService {
         }
 
         trip.setStatus(newStatus);
+
+        // Đồng bộ BusStatus theo vòng đời của trip:
+        // ACTIVE → DEPARTED: xe lên đường, không thể gán cho chuyến khác
+        // DEPARTED → COMPLETED: xe hoàn thành, trả về sẵn sàng
+        if (trip.getBus() != null) {
+            if (newStatus == TripStatus.DEPARTED) {
+                trip.getBus().setStatus(BusStatus.TRAVELING);
+                busRepository.save(trip.getBus());
+            } else if (newStatus == TripStatus.COMPLETED) {
+                trip.getBus().setStatus(BusStatus.READY);
+                busRepository.save(trip.getBus());
+            }
+        }
         tripRepository.save(trip);
     }
 
@@ -354,7 +366,7 @@ public class TripService {
 
         // Bận với tư cách tài xế chính?
         boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
-                driver, driver.getUser(), busyStatuses, windowStart, windowEnd, excludeTripId);
+                driver, busyStatuses, windowStart, windowEnd, excludeTripId);
         if (busyAsDriver)
             return true;
 
@@ -371,7 +383,7 @@ public class TripService {
         LocalDateTime endOfDay = startOfDay.plusDays(1);
         List<TripStatus> busyStatuses = List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
-        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, driver.getUser(), busyStatuses, startOfDay,
+        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay,
                 endOfDay,
                 excludeTripId);
 
@@ -383,9 +395,11 @@ public class TripService {
                     }
 
                     // Kiểm tra xem tài xế có lái (chính hoặc phụ)
+                    // SAU
                     boolean isDriving = (t.getDriver() != null && t.getDriver().getUserId().equals(driver.getUserId()))
                             || (t.getCoDrivers() != null
-                                    && t.getCoDrivers().stream().anyMatch(cd -> cd.getId().equals(driver.getUserId())));
+                                    && t.getCoDrivers().stream()
+                                            .anyMatch(cd -> cd.getUserId().equals(driver.getUserId())));
 
                     if (!isDriving) {
                         return 0.0;
@@ -490,7 +504,7 @@ public class TripService {
                 if (cdId != null && cdId > 0) {
                     Driver cd = driverRepository.findById(cdId)
                             .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
-                    trip.getCoDrivers().add(cd.getUser());
+                    trip.getCoDrivers().add(cd);
                 }
             }
         }
@@ -637,8 +651,8 @@ public class TripService {
         staffIds.add(driver.getUserId());
 
         if (trip.getCoDrivers() != null) {
-            for (User cd : trip.getCoDrivers()) {
-                if (!staffIds.add(cd.getId())) {
+            for (Driver cd : trip.getCoDrivers()) {
+                if (!staffIds.add(cd.getUserId())) {
                     throw new IllegalArgumentException(
                             "Nhân sự phân công bị trùng lặp: Tài xế phụ trùng tài chính hoặc tài phụ khác!");
                 }
@@ -678,26 +692,24 @@ public class TripService {
 
         // Validate các tài xế phụ
         if (trip.getCoDrivers() != null) {
-            for (User cd : trip.getCoDrivers()) {
-                Driver cdDriver = cd.getDriver();
-                if (cdDriver == null) {
-                    throw new IllegalArgumentException("Tài khoản " + cd.getFullName() + " không phải là tài xế!");
+            for (Driver cd : trip.getCoDrivers()) {
+                if (!cd.isLicenseValid()) {
+                    throw new IllegalArgumentException(
+                            "Bằng lái của tài xế phụ " + cd.getUser().getFullName() + " đã hết hạn!");
                 }
-                if (!cdDriver.isLicenseValid()) {
-                    throw new IllegalArgumentException("Bằng lái của tài xế phụ " + cd.getFullName() + " đã hết hạn!");
+                if (isDriverBusyInWindow(cd, windowStart, windowEnd, excludeTripId)) {
+                    throw new IllegalArgumentException(
+                            "Tài xế phụ " + cd.getUser().getFullName() + " đang bận ở chuyến khác!");
                 }
-                if (isDriverBusyInWindow(cdDriver, windowStart, windowEnd, excludeTripId)) {
-                    throw new IllegalArgumentException("Tài xế phụ " + cd.getFullName() + " đang bận ở chuyến khác!");
-                }
-                double cdAssignedHours = getDrivingHoursForDate(cdDriver, departure, excludeTripId);
+                double cdAssignedHours = getDrivingHoursForDate(cd, departure, excludeTripId);
                 if (cdAssignedHours + effectiveHours > 8.0) {
                     throw new IllegalArgumentException(String.format(
                             "Tài xế phụ %s đã được phân công lái %.1fh trong ngày %s, thêm chuyến này (%.1fh) sẽ vượt 8h/ngày!",
-                            cd.getFullName(), cdAssignedHours, departure.toLocalDate().toString(), effectiveHours));
+                            cd.getUser().getFullName(), cdAssignedHours, departure.toLocalDate().toString(),
+                            effectiveHours));
                 }
             }
         }
-
         // Validate phụ xe
         if (assistant != null) {
             if (isDriverBusyInWindow(assistant, windowStart, windowEnd, excludeTripId)) {

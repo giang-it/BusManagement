@@ -108,7 +108,7 @@ public class AdminTripManagementController {
                     if (cdId != null && cdId > 0) {
                         Driver cd = driverRepository.findById(cdId)
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
-                        trip.getCoDrivers().add(cd.getUser());
+                        trip.getCoDrivers().add(cd);
                     }
                 }
             }
@@ -143,7 +143,7 @@ public class AdminTripManagementController {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến"));
 
         List<Long> savedCoDriverIds = trip.getCoDrivers().stream()
-                .map(User::getId)
+                .map(Driver::getUserId)
                 .toList();
 
         model.addAttribute("trip", trip);
@@ -212,7 +212,7 @@ public class AdminTripManagementController {
                     if (cdId != null && cdId > 0) {
                         Driver cd = driverRepository.findById(cdId)
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
-                        existingTrip.getCoDrivers().add(cd.getUser());
+                        existingTrip.getCoDrivers().add(cd);
                     }
                 }
             }
