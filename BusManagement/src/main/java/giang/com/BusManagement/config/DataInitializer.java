@@ -189,21 +189,21 @@ public class DataInitializer implements CommandLineRunner {
 
         // ------------------------------------------------------------------
         // TRIP 1: AI Tăng Cường — Chuyến gần đầy ghế (37/40 = 92.5%)
-        // → AI sẽ tự tạo chuyến tăng cường sau 10 giây
+        // → AI sẽ tự tạo chuyến tăng cường sau 10 giây (khởi hành sau 80h để qua gate 72h)
         // ------------------------------------------------------------------
-        createTrip(tuyenHN_HP, xeSanSang1, txRanh1, txRanh2, 40, 37, "250000", TripStatus.ACTIVE, 5);
+        createTrip(tuyenHN_HP, xeSanSang1, txRanh1, txRanh2, 40, 37, "250000", TripStatus.ACTIVE, 80);
 
         // ------------------------------------------------------------------
         // TRIP 2: AI Tăng Cường — Chuyến sắp đầy (21/22 = 95.5%)
-        // → AI sẽ tạo thêm chuyến extra
+        // → AI sẽ tạo thêm chuyến extra (khởi hành sau 85h)
         // ------------------------------------------------------------------
         // CT-SG: 21/22 ghế (95.5%) → cần tăng cường
         // → dùng xeMoiTinh (Limousine) + txMoiTinh + txRanh3
-        createTrip(tuyenCT_SG, xeMoiTinh, txMoiTinh, txRanh3, 22, 21, "200000", TripStatus.ACTIVE, 6);
+        createTrip(tuyenCT_SG, xeMoiTinh, txMoiTinh, txRanh3, 22, 21, "200000", TripStatus.ACTIVE, 85);
 
         // SG-DL #1: 29/30 ghế (96.7%) → cần tăng cường
-        // → dùng xeSanSang2 (Limousine) + txRanh4 + txRanh5, khởi hành sau 4h
-        createTrip(tuyenSG_DL, xeSanSang7, txRanh4, txRanh5, 30, 29, "20000", TripStatus.ACTIVE, 4);
+        // → dùng xeSanSang2 (Limousine) + txRanh4 + txRanh5, khởi hành sau 90h
+        createTrip(tuyenSG_DL, xeSanSang7, txRanh4, txRanh5, 30, 29, "20000", TripStatus.ACTIVE, 90);
 
         // ------------------------------------------------------------------
         // TRIP 3: Chuyến vừa đủ — Không cần tăng cường (20/40 = 50%)
@@ -211,7 +211,7 @@ public class DataInitializer implements CommandLineRunner {
         // → Dùng xe và tài xế KHÁC để tránh xung đột với SG-DL #1
         // ------------------------------------------------------------------
         // SG-DL #2: 20/40 ghế (50%) → không cần tăng cường
-        // → dùng xeExtraL1 (Limousine, khởi hành +8h — không trùng với SG-DL #1 ở +4h)
+        // → dùng xeExtraL1 (Limousine, khởi hành +8h — không trùng với SG-DL #1 ở +90h)
         createTrip(tuyenSG_DL, xeSanSang2, txRanh6, txRanh7, 40, 20, "300000", TripStatus.ACTIVE, 8);
         // SG-DL #3 (test không có phụ xe): dùng xeExtraL2, khởi hành lúc now (50% ghế)
         createTrip(tuyenSG_DL, xeSanSang3, txDaLai1h, null, 40, 20, "300000", TripStatus.ACTIVE, 0);
@@ -247,10 +247,10 @@ public class DataInitializer implements CommandLineRunner {
         // ------------------------------------------------------------------
         // TRIP 8: Chuyến siêu dài (30h) — Tuyến HN → SG
         // → AI phải tìm tài xế 0h lái, xe giường nằm tốt
-        // → effectiveHours = min(30, 8) = 8h
+        // → effectiveHours = min(30, 8) = 8h (khởi hành sau 95h)
         // ------------------------------------------------------------------
         createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 39, "900000",
-                TripStatus.ACTIVE, 01);
+                TripStatus.ACTIVE, 95);
 
         // ------------------------------------------------------------------
         // TRIP 9: TX Đã Lái 6h + Chuyến 6h
@@ -354,6 +354,10 @@ public class DataInitializer implements CommandLineRunner {
         t.setTicketsSold(sold);
         t.setPrice(new BigDecimal(price));
         t.setStatus(status);
+        if (status == TripStatus.ACTIVE) {
+            // Đặt thời gian mở bán cách đây 3 ngày để vượt qua chốt chặn MIN_SALE_OPEN_HOURS (48h)
+            t.setSaleOpenedAt(LocalDateTime.now().minusDays(3));
+        }
         LocalDateTime departure = LocalDateTime.now().plusHours(hoursFromNow);
         t.setDepartureTime(departure);
         // Dùng estimatedDuration từ Route thay vì hardcode +2h

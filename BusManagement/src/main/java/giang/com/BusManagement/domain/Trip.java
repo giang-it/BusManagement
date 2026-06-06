@@ -65,6 +65,9 @@ public class Trip {
     @Column(name = "is_extra_trip", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean isExtraTrip = false;
 
+    @Column(name = "sale_opened_at")
+    private LocalDateTime saleOpenedAt;
+
     // === HELPER METHODS ===
 
     // Tính tỉ lệ lấp đầy ghế
@@ -85,4 +88,19 @@ public class Trip {
             return 0;
         return java.time.Duration.between(departureTime, arrivalTimeExpected).toMinutes() / 60.0;
     }
+
+    /** Hours the trip has been open for sale (0 if not yet opened). */
+    public long getHoursOnSale() {
+        if (saleOpenedAt == null)
+            return 0;
+        return java.time.Duration.between(saleOpenedAt, LocalDateTime.now()).toHours();
+    }
+
+    /** Hours until departure from now (negative = already departed). */
+    public long getHoursUntilDeparture() {
+        if (departureTime == null)
+            return 0;
+        return java.time.Duration.between(LocalDateTime.now(), departureTime).toHours();
+    }
+
 }

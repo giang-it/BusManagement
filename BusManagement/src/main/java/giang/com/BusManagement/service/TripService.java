@@ -36,6 +36,25 @@ public class TripService {
      */
     private static final int BUS_PREP_BUFFER_HOURS = 1;
 
+    /**
+     * Minimum hours before departure for an extra trip to be worth creating.
+     * Below this, new tickets can't realistically be sold.
+     * 3 days is conservative; bump to 120 for long-haul routes.
+     */
+    private static final long MIN_HOURS_BEFORE_DEPARTURE = 72;
+
+    /**
+     * Minimum hours a trip must have been on sale before we trust its occupancy
+     * rate as signal. Guards against batch-upload spikes on brand-new trips.
+     */
+    private static final long MIN_SALE_OPEN_HOURS = 48;
+
+    /**
+     * If occupancy is at or above this, the trip is unambiguously hot and we
+     * skip the MIN_SALE_OPEN_HOURS gate entirely.
+     */
+    private static final double INSTANT_HOT_THRESHOLD = 0.95;
+
     // =========================================================================
     // SCHEDULED JOB: Quét & tự động tạo chuyến tăng cường
     // =========================================================================
@@ -58,10 +77,65 @@ public class TripService {
         List<Trip> activeTrips = tripRepository.findByStatusWithRoute(TripStatus.ACTIVE);
 
         for (Trip trip : activeTrips) {
-            if (trip.getOccupancyRate() > 0.9 && !hasAlreadySuggested(trip)) {
+            if (isHotTrip(trip) && !hasAlreadySuggested(trip)) {
                 createExtraTrip(trip);
             }
         }
+    }
+
+    /**
+     * Returns true when a trip genuinely needs an extra trip right now.
+     *
+     * Three time-based guards (on top of the existing occupancy check):
+     * 1. Departure must still be in the future.
+     * 2. Enough lead time left for customers to actually buy tickets on the new
+     * trip.
+     * 3. Trip has been on sale long enough for its occupancy to be meaningful
+     * signal,
+     * unless it's already past the instant-hot threshold.
+     */
+    private boolean isHotTrip(Trip trip) {
+        // ── Existing occupancy gate ──────────────────────────────────────────────
+        if (trip.getOccupancyRate() <= 0.9) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // ── Gate 3: departure must still be in the future ───────────────────────
+        if (trip.getDepartureTime() == null || !trip.getDepartureTime().isAfter(now)) {
+            System.out.printf("⏩ [AI] Chuyến #%d: đã khởi hành, bỏ qua.%n", trip.getId());
+            return false;
+        }
+
+        // ── Gate 4: enough lead time remaining ──────────────────────────────────
+        long hoursUntilDeparture = trip.getHoursUntilDeparture();
+        if (hoursUntilDeparture < MIN_HOURS_BEFORE_DEPARTURE) {
+            System.out.printf(
+                    "⏩ [AI] Chuyến #%d: còn %.1f giờ đến khởi hành (< %d giờ yêu cầu). Không đủ thời gian mở vé mới.%n",
+                    trip.getId(), (double) hoursUntilDeparture, MIN_HOURS_BEFORE_DEPARTURE);
+            return false;
+        }
+
+        // ── Gate 5: sale-velocity sanity check ──────────────────────────────────
+        // Skip wait if occupancy is already above the instant-hot threshold.
+        if (trip.getOccupancyRate() < INSTANT_HOT_THRESHOLD) {
+            long hoursOnSale = trip.getHoursOnSale();
+            if (hoursOnSale < MIN_SALE_OPEN_HOURS) {
+                System.out.printf(
+                        "⏩ [AI] Chuyến #%d: chỉ mới mở bán %.0f giờ (< %d giờ yêu cầu). Có thể là spike ảo.%n",
+                        trip.getId(), (double) hoursOnSale, MIN_SALE_OPEN_HOURS);
+                return false;
+            }
+        }
+
+        System.out.printf(
+                "🔥 [AI] Chuyến #%d HOT: %.1f%% ghế, còn %d giờ, đã mở bán %d giờ.%n",
+                trip.getId(),
+                trip.getOccupancyRate() * 100,
+                hoursUntilDeparture,
+                trip.getHoursOnSale());
+        return true;
     }
 
     /**
@@ -338,7 +412,11 @@ public class TripService {
                             trip.getStatus(), newStatus));
         }
 
-        trip.setStatus(newStatus);
+        if (newStatus == TripStatus.ACTIVE) {
+            changeStatusToActive(trip);
+        } else {
+            trip.setStatus(newStatus);
+        }
 
         // Đồng bộ BusStatus theo vòng đời của trip:
         // ACTIVE → DEPARTED: xe lên đường, không thể gán cho chuyến khác
@@ -466,7 +544,7 @@ public class TripService {
         String warning = validateBusForTrip(trip.getBus(), trip, tripId);
         validateStaffForTrip(trip, tripId);
 
-        trip.setStatus(TripStatus.ACTIVE);
+        changeStatusToActive(trip);
         tripRepository.save(trip);
 
         System.out.printf("✅ Admin xác nhận chuyến #%d | Xe: %s | Tài xế chính: %s | Số tài xế phụ: %d | Phụ xe: %s%n",
@@ -520,7 +598,7 @@ public class TripService {
         String warning = validateBusForTrip(bus, trip, tripId);
         validateStaffForTrip(trip, tripId);
 
-        trip.setStatus(TripStatus.ACTIVE);
+        changeStatusToActive(trip);
         tripRepository.save(trip);
 
         System.out.printf("✅ Admin phân công thủ công chuyến #%d | Xe: %s | Tài xế: %s%n",
@@ -542,7 +620,7 @@ public class TripService {
         String warning = validateBusForTrip(trip.getBus(), trip, null);
         validateStaffForTrip(trip, null);
 
-        trip.setStatus(TripStatus.ACTIVE);
+        changeStatusToActive(trip);
         tripRepository.save(trip);
 
         return warning;
@@ -800,4 +878,14 @@ public class TripService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
     }
 
+    /**
+     * Hàm Helper chuyên trách việc chuyển trạng thái chuyến xe sang ACTIVE.
+     * Đồng thời đóng dấu thời gian mở bán nếu chuyến xe chưa từng được mở bán.
+     */
+    private void changeStatusToActive(Trip trip) {
+        trip.setStatus(TripStatus.ACTIVE);
+        if (trip.getSaleOpenedAt() == null) {
+            trip.setSaleOpenedAt(LocalDateTime.now());
+        }
+    }
 }
