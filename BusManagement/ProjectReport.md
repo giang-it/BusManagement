@@ -6,7 +6,7 @@
 | **3** | Thiếu nhất quán |
 | **4** | Điểm tốt |
 
-## **🔴 Lỗi logic nghiêm trọng**
+## **🔴 Lỗi logic nghiêm trọng (already fixed) ** 
 
 ### **Bug \#1: BusStatus.TRAVELING không bao giờ được cập nhật tự động**
 
@@ -151,3 +151,58 @@ Qua phân tích và đối chiếu logic giữa tầng Backend (xử lý AI tự
 
 *   **Vấn đề:** Khi Admin chọn tài xế phụ (Co-drivers) thông qua giao diện JS động, dropdown tài xế phụ vẫn hiển thị toàn bộ danh sách tài xế, cho phép Admin chọn trùng tài xế phụ với tài xế chính hoặc trùng giữa các tài xế phụ với nhau. Lỗi này chỉ bị phát hiện khi gửi dữ liệu lên server (chặn bởi `validateStaffForTrip`).
 *   **Giải pháp:** Thêm một đoạn logic JavaScript nhỏ trên Frontend để tự động loại bỏ các tài xế đã được chọn ở dropdown Tài chính/Tài phụ khác khỏi danh sách lựa chọn của các dropdown còn lại.
+
+
+fix: enforce FSM for all trip status transitions
+
+Prior to this commit, three code paths bypassed TripService.updateTripStatus()
+and mutated Trip.status directly, allowing illegal FSM transitions (e.g.
+COMPLETED → ACTIVE, COMPLETED → CANCELLED) and leaving BusStatus out of
+sync with Trip.status.
+
+--- Changes ---
+
+AdminTripManagementController.updateTrip()
+  - Removed direct existingTrip.setStatus(trip.getStatus()) call
+  - Captured requested status into TripStatus newStatus before modifying
+    existingTrip
+  - Separated the update flow into two explicit steps:
+      Step 1: tripService.updateManualTrip(existingTrip)
+              saves non-status fields (route, bus, driver, times, price, seats)
+      Step 2: tripService.updateTripStatus(existingTrip.getId(), newStatus)
+              called only when status actually changes; re-fetches trip from DB
+              and runs canTransition() + BusStatus sync
+  - Added dedicated catch(IllegalStateException e) for FSM rejection to
+    surface a clear error message to the admin
+
+AdminTripManagementController.cancelTrip()
+  - Removed manual tripRepository.findById() + trip.setStatus() + tripRepository.save()
+  - Replaced with tripService.updateTripStatus(id, TripStatus.CANCELLED)
+  - Added dedicated catch(IllegalStateException e) to handle terminal-state
+    rejection (e.g. attempting to cancel a COMPLETED trip)
+
+TripService.rejectTrip()
+  - Removed direct trip.setStatus(TripStatus.CANCELLED) + tripRepository.save()
+  - Replaced with updateTripStatus(tripId, TripStatus.CANCELLED)
+  - All callers of rejectTrip() operate on PENDING_APPROVAL trips;
+    FSM allows PENDING_APPROVAL → CANCELLED so behavior is unchanged
+
+BusType.java
+  - Removed self-referential suitableBusType field (@ManyToOne BusType)
+    and its getSuitableBusType() method
+  - This field duplicated Route.suitableBusType with identical logic but
+    incorrect ownership; "suitable bus type for a route" is Route's
+    responsibility, not BusType's
+  - No callers of BusType.getSuitableBusType() existed in the codebase;
+    all service code already uses trip.getRoute().getSuitableBusType()
+  - Removes stale suitable_bus_type_id column from bus_types table
+    (ddl-auto=create-drop handles schema on next restart)
+
+--- FSM reference ---
+
+canTransition() whitelist (unchanged):
+  PENDING_APPROVAL → ACTIVE | CANCELLED
+  ACTIVE           → DEPARTED | CANCELLED
+  DEPARTED         → COMPLETED
+  COMPLETED        → (terminal, no transitions)
+  CANCELLED        → (terminal, no transitions)

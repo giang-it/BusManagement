@@ -799,13 +799,13 @@ public class TripService {
 
     /**
      * Admin từ chối chuyến tăng cường (AI đề xuất sai, không còn cần thiết).
+     * Delegate sang updateTripStatus() để FSM canTransition() được thực thi.
+     * Trạng thái hợp lệ để từ chối: PENDING_APPROVAL → CANCELLED (whitelist FSM cho
+     * phép).
      */
     @Transactional
     public void rejectTrip(Long tripId) {
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
-        trip.setStatus(TripStatus.CANCELLED);
-        tripRepository.save(trip);
+        updateTripStatus(tripId, TripStatus.CANCELLED);
         System.out.printf("❌ Admin từ chối chuyến tăng cường #%d%n", tripId);
     }
 
