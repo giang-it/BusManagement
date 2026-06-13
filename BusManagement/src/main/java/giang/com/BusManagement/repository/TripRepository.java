@@ -53,7 +53,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
-                     LEFT JOIN FETCH cd.driver
                      """)
        List<Trip> findAllWithDetails();
 
@@ -71,7 +70,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
-                     LEFT JOIN FETCH cd.driver
                      WHERE t.status = :status
                      """)
        List<Trip> findByStatusWithDetails(@Param("status") TripStatus status);
@@ -86,7 +84,6 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
-                     LEFT JOIN FETCH cd.driver
                      WHERE t.id = :id
                      """)
        java.util.Optional<Trip> findByIdWithDetails(@Param("id") Long id);
@@ -106,26 +103,29 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        // =========================================================================
 
        /**
-        * Kiểm tra xem chuyến gốc đã có chuyến tăng cường với trạng thái cụ thể chưa.
-        * Tránh tạo trùng chuyến tăng cường.
+        * Kiểm tra xem chuyến gốc đã có chuyến tăng cường với BẤT KỲ trạng thái nào
+        * trong danh sách cho trước.
+        * Dùng SQL IN clause — 1 truy vấn duy nhất thay vì nhiều lần gọi OR.
+        * Dùng bởi hasAlreadySuggested() để tránh tạo trùng chuyến tăng cường.
         */
-       boolean existsByOriginalTripAndStatus(Trip originalTrip, TripStatus status);
+       boolean existsByOriginalTripAndStatusIn(Trip originalTrip, Collection<TripStatus> statuses);
 
        /**
         * Kiểm tra tài xế có đang bận (với tư cách TÀI XẾ CHÍNH hoặc TÀI XẾ PHỤ) trong
         * khoảng thời gian không.
         * Bao gồm cả khoảng nghỉ 30 phút ở hai đầu (được thêm ở tầng service).
         */
-       @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE (t.driver = :driver OR :coDriver MEMBER OF t.coDrivers) AND t.status IN :statuses "
-                     +
-                     "AND t.departureTime <= :end AND t.arrivalTimeExpected >= :start " +
-                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+       @Query("SELECT COUNT(t) > 0 FROM Trip t " +
+                     "LEFT JOIN t.coDrivers cd " +
+                     "WHERE (t.driver = :driver OR cd = :driver) " +
+                     "AND t.status IN :statuses " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime < :windowEnd AND t.arrivalTimeExpected > :windowStart)")
        boolean existsOverlappingTripForDriver(
                      @Param("driver") Driver driver,
-                     @Param("coDriver") User coDriver,
-                     @Param("statuses") Collection<TripStatus> statuses,
-                     @Param("start") LocalDateTime start,
-                     @Param("end") LocalDateTime end,
+                     @Param("statuses") List<TripStatus> statuses,
+                     @Param("windowStart") LocalDateTime windowStart,
+                     @Param("windowEnd") LocalDateTime windowEnd,
                      @Param("excludeTripId") Long excludeTripId);
 
        /**
@@ -134,14 +134,16 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         * Cần thiết để tránh gán một người vừa là phụ xe ở chuyến này
         * vừa là tài xế/phụ xe ở chuyến khác cùng khung giờ.
         */
-       @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.assistant = :assistant AND t.status IN :statuses " +
-                     "AND t.departureTime <= :end AND t.arrivalTimeExpected >= :start " +
-                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+       @Query("SELECT COUNT(t) > 0 FROM Trip t " +
+                     "WHERE t.assistant = :driver " +
+                     "AND t.status IN :statuses " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime < :windowEnd AND t.arrivalTimeExpected > :windowStart)")
        boolean existsOverlappingTripForAssistant(
-                     @Param("assistant") Driver assistant,
-                     @Param("statuses") Collection<TripStatus> statuses,
-                     @Param("start") LocalDateTime start,
-                     @Param("end") LocalDateTime end,
+                     @Param("driver") Driver driver,
+                     @Param("statuses") List<TripStatus> statuses,
+                     @Param("windowStart") LocalDateTime windowStart,
+                     @Param("windowEnd") LocalDateTime windowEnd,
                      @Param("excludeTripId") Long excludeTripId);
 
        /**
@@ -164,15 +166,15 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         * tổng giờ lái/ngày)
         * Kiểm tra xem tài xế có lái (chính hoặc phụ) hay là phụ xe trong chuyến đó.
         */
-       @Query("SELECT t FROM Trip t WHERE (t.driver = :driver OR t.assistant = :driver OR :coDriver MEMBER OF t.coDrivers) "
-                     +
+       @Query("SELECT DISTINCT t FROM Trip t " +
+                     "LEFT JOIN FETCH t.coDrivers cd " +
+                     "WHERE (t.driver = :driver OR cd = :driver OR t.assistant = :driver) " +
                      "AND t.status IN :statuses " +
-                     "AND t.departureTime >= :startOfDay AND t.departureTime < :endOfDay " +
-                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime >= :startOfDay AND t.departureTime < :endOfDay)")
        List<Trip> findTripsForDriverOnDate(
                      @Param("driver") Driver driver,
-                     @Param("coDriver") User coDriver,
-                     @Param("statuses") Collection<TripStatus> statuses,
+                     @Param("statuses") List<TripStatus> statuses,
                      @Param("startOfDay") LocalDateTime startOfDay,
                      @Param("endOfDay") LocalDateTime endOfDay,
                      @Param("excludeTripId") Long excludeTripId);
@@ -187,4 +189,50 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        List<Trip> findByDepartureTimeBetweenAndStatus(
                      LocalDateTime start, LocalDateTime end, TripStatus status);
+
+       // 1. Kiểm tra xem tài xế có bận bất kỳ vai trò nào (Lái chính, Lái phụ, Phụ xe)
+       // trong khung giờ này không
+       @Query("SELECT COUNT(t) FROM Trip t " +
+                     "LEFT JOIN t.coDrivers cd " +
+                     "WHERE (t.driver.userId = :driverId " +
+                     "   OR t.assistant.userId = :driverId " +
+                     "   OR cd.id = :driverId) " +
+                     "AND t.status <> 'CANCELLED' " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime < :end AND t.arrivalTimeExpected > :start)")
+       Long countBusyTripsAnyRole(@Param("driverId") Long driverId,
+                     @Param("start") LocalDateTime start,
+                     @Param("end") LocalDateTime end,
+                     @Param("excludeTripId") Long excludeTripId);
+
+       // 2. Lấy TẤT CẢ các chuyến xe mà tài xế tham gia trong ngày (ở mọi vai trò) để
+       // tính tổng giờ làm việc
+       @Query("SELECT DISTINCT t FROM Trip t " +
+                     "LEFT JOIN t.coDrivers cd " +
+                     "WHERE (t.driver.userId = :driverId " +
+                     "   OR t.assistant.userId = :driverId " +
+                     "   OR cd.id = :driverId) " +
+                     "AND t.status <> 'CANCELLED' " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime >= :start AND t.departureTime <= :end)")
+       List<Trip> findAllTripsByDriverOnDate(@Param("driverId") Long driverId,
+                     @Param("start") LocalDateTime start,
+                     @Param("end") LocalDateTime end,
+                     @Param("excludeTripId") Long excludeTripId);
+
+       /**
+        * Kiểm tra xe đã từng được gán cho bất kỳ chuyến đi nào trong hệ
+        * thống chưa (quá khứ + tương lai)
+        * Spring Data JPA tự động phân tích: BusId -> truy cập vào trường bus và lấy
+        * thuộc tính id của Bus entity.
+        */
+       boolean existsByBusId(Long busId);
+
+       /**
+        * Kiểm tra xe có đang bận ở các chuyến đi có trạng thái nằm trong
+        * danh sách chỉ định hay không
+        * Thường dùng để chặn không cho xe đi bảo trì (REPAIRING) khi đang có lịch
+        * ACTIVE hoặc PENDING_APPROVAL
+        */
+       boolean existsByBusIdAndStatusIn(Long busId, List<TripStatus> statuses);
 }

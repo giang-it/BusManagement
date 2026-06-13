@@ -2,9 +2,20 @@ package giang.com.BusManagement.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Soft-delete design:
+ *   - @SQLDelete : mọi lệnh JPA delete() sẽ chạy UPDATE trips SET is_deleted=true
+ *                  thay vì DELETE vật lý, bảo toàn toàn vẹn FK và lịch sử giao dịch.
+ *   - @SQLRestriction: Hibernate tự động thêm WHERE is_deleted=false vào MỌI câu
+ *                  SELECT, khiến các chuyến đã xóa vô hình với toàn bộ query layer.
+ */
+@SQLDelete(sql = "UPDATE trips SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 @Entity
 @Table(name = "trips")
 @Data
@@ -35,12 +46,8 @@ public class Trip {
 
     // === TÀI XẾ PHỤ (mới thêm để hỗ trợ chuyến đi > 8h) ===
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "trip_co_drivers",
-        joinColumns = @JoinColumn(name = "trip_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
-    private java.util.List<User> coDrivers = new java.util.ArrayList<>();
+    @JoinTable(name = "trip_co_drivers", joinColumns = @JoinColumn(name = "trip_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
+    private java.util.List<Driver> coDrivers = new java.util.ArrayList<>();
 
     @Column(name = "departure_time")
     private LocalDateTime departureTime;
@@ -69,6 +76,17 @@ public class Trip {
     @Column(name = "is_extra_trip", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean isExtraTrip = false;
 
+    @Column(name = "sale_opened_at")
+    private LocalDateTime saleOpenedAt;
+
+    /**
+     * Cờ xóa mềm. TRUE = đã bị xóa (ẩn khỏi mọi query do @SQLRestriction).
+     * Không bao giờ nên được đặt trực tiếp — luôn dùng tripRepository.delete(trip)
+     * hoặc TripService.deleteTrip() để kích hoạt @SQLDelete.
+     */
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean isDeleted = false;
+
     // === HELPER METHODS ===
 
     // Tính tỉ lệ lấp đầy ghế
@@ -89,4 +107,19 @@ public class Trip {
             return 0;
         return java.time.Duration.between(departureTime, arrivalTimeExpected).toMinutes() / 60.0;
     }
+
+    /** Hours the trip has been open for sale (0 if not yet opened). */
+    public long getHoursOnSale() {
+        if (saleOpenedAt == null)
+            return 0;
+        return java.time.Duration.between(saleOpenedAt, LocalDateTime.now()).toHours();
+    }
+
+    /** Hours until departure from now (negative = already departed). */
+    public long getHoursUntilDeparture() {
+        if (departureTime == null)
+            return 0;
+        return java.time.Duration.between(LocalDateTime.now(), departureTime).toHours();
+    }
+
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+// AFTER (đúng - BusType chỉ mô tả loại xe, không mô tả tuyến)
 @Entity
 @Table(name = "bus_types")
 @Data
@@ -18,24 +19,4 @@ public class BusType {
 
     @Column(nullable = false)
     private int capacity; // Số lượng ghế thực tế
-
-    // Quy định loại xe phù hợp cho tuyến này (ví dụ: Tuyến Bắc-Nam -> Giường nằm)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "suitable_bus_type_id")
-    private BusType suitableBusType;
-
-    /**
-     * Hàm lấy loại xe phù hợp (Smart Logic)
-     * Nếu Admin chưa gán loại xe cụ thể, hệ thống tự gợi ý dựa trên quãng đường
-     */
-    public BusType getSuitableBusType() {
-        if (this.suitableBusType != null) {
-            return this.suitableBusType;
-        }
-
-        // Logic AI đơn giản: Nếu đi trên 300km thì ưu tiên xe giường nằm (giả định)
-        // Lưu ý: Logic này cần được xử lý ở tầng Service nếu cần truy vấn DB tìm
-        // BusType giường nằm
-        return null;
-    }
 }

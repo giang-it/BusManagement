@@ -2,6 +2,7 @@ package giang.com.BusManagement.service;
 
 import giang.com.BusManagement.domain.*;
 import giang.com.BusManagement.repository.*;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.scheduling.annotation.Scheduled;
@@ -35,6 +36,25 @@ public class TripService {
      */
     private static final int BUS_PREP_BUFFER_HOURS = 1;
 
+    /**
+     * Minimum hours before departure for an extra trip to be worth creating.
+     * Below this, new tickets can't realistically be sold.
+     * 3 days is conservative; bump to 120 for long-haul routes.
+     */
+    private static final long MIN_HOURS_BEFORE_DEPARTURE = 72;
+
+    /**
+     * Minimum hours a trip must have been on sale before we trust its occupancy
+     * rate as signal. Guards against batch-upload spikes on brand-new trips.
+     */
+    private static final long MIN_SALE_OPEN_HOURS = 48;
+
+    /**
+     * If occupancy is at or above this, the trip is unambiguously hot and we
+     * skip the MIN_SALE_OPEN_HOURS gate entirely.
+     */
+    private static final double INSTANT_HOT_THRESHOLD = 0.95;
+
     // =========================================================================
     // SCHEDULED JOB: Quét & tự động tạo chuyến tăng cường
     // =========================================================================
@@ -57,10 +77,65 @@ public class TripService {
         List<Trip> activeTrips = tripRepository.findByStatusWithRoute(TripStatus.ACTIVE);
 
         for (Trip trip : activeTrips) {
-            if (trip.getOccupancyRate() > 0.9 && !hasAlreadySuggested(trip)) {
+            if (isHotTrip(trip) && !hasAlreadySuggested(trip)) {
                 createExtraTrip(trip);
             }
         }
+    }
+
+    /**
+     * Returns true when a trip genuinely needs an extra trip right now.
+     *
+     * Three time-based guards (on top of the existing occupancy check):
+     * 1. Departure must still be in the future.
+     * 2. Enough lead time left for customers to actually buy tickets on the new
+     * trip.
+     * 3. Trip has been on sale long enough for its occupancy to be meaningful
+     * signal,
+     * unless it's already past the instant-hot threshold.
+     */
+    private boolean isHotTrip(Trip trip) {
+        // ── Existing occupancy gate ──────────────────────────────────────────────
+        if (trip.getOccupancyRate() <= 0.9) {
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // ── Gate 3: departure must still be in the future ───────────────────────
+        if (trip.getDepartureTime() == null || !trip.getDepartureTime().isAfter(now)) {
+            System.out.printf("⏩ [AI] Chuyến #%d: đã khởi hành, bỏ qua.%n", trip.getId());
+            return false;
+        }
+
+        // ── Gate 4: enough lead time remaining ──────────────────────────────────
+        long hoursUntilDeparture = trip.getHoursUntilDeparture();
+        if (hoursUntilDeparture < MIN_HOURS_BEFORE_DEPARTURE) {
+            System.out.printf(
+                    "⏩ [AI] Chuyến #%d: còn %.1f giờ đến khởi hành (< %d giờ yêu cầu). Không đủ thời gian mở vé mới.%n",
+                    trip.getId(), (double) hoursUntilDeparture, MIN_HOURS_BEFORE_DEPARTURE);
+            return false;
+        }
+
+        // ── Gate 5: sale-velocity sanity check ──────────────────────────────────
+        // Skip wait if occupancy is already above the instant-hot threshold.
+        if (trip.getOccupancyRate() < INSTANT_HOT_THRESHOLD) {
+            long hoursOnSale = trip.getHoursOnSale();
+            if (hoursOnSale < MIN_SALE_OPEN_HOURS) {
+                System.out.printf(
+                        "⏩ [AI] Chuyến #%d: chỉ mới mở bán %.0f giờ (< %d giờ yêu cầu). Có thể là spike ảo.%n",
+                        trip.getId(), (double) hoursOnSale, MIN_SALE_OPEN_HOURS);
+                return false;
+            }
+        }
+
+        System.out.printf(
+                "🔥 [AI] Chuyến #%d HOT: %.1f%% ghế, còn %d giờ, đã mở bán %d giờ.%n",
+                trip.getId(),
+                trip.getOccupancyRate() * 100,
+                hoursUntilDeparture,
+                trip.getHoursOnSale());
+        return true;
     }
 
     /**
@@ -97,8 +172,7 @@ public class TripService {
             extraTrip.setDriver(result.getDriver());
             extraTrip.setAssistant(result.getAssistant());
             extraTrip.getCoDrivers().clear();
-            extraTrip.getCoDrivers().addAll(
-                    result.getCoDrivers().stream().map(Driver::getUser).collect(Collectors.toList()));
+            extraTrip.getCoDrivers().addAll(result.getCoDrivers());
 
             String assistantName = result.getAssistant() != null
                     ? result.getAssistant().getUser().getFullName()
@@ -313,6 +387,52 @@ public class TripService {
         return fallback;
     }
 
+    // Quản lý Finite State Machine (FSM)
+    private boolean canTransition(TripStatus from, TripStatus to) {
+        if (from == to)
+            return true; // Giữ nguyên trạng thái luôn hợp lệ
+
+        return switch (from) {
+            case PENDING_APPROVAL -> to == TripStatus.ACTIVE || to == TripStatus.CANCELLED;
+            case ACTIVE -> to == TripStatus.DEPARTED || to == TripStatus.CANCELLED;
+            case DEPARTED -> to == TripStatus.COMPLETED;
+            default -> false; // COMPLETED và CANCELLED là Terminal States (Trạng thái cuối)
+        };
+    }
+
+    @Transactional
+    public void updateTripStatus(Long tripId, TripStatus newStatus) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chuyến đi với ID: " + tripId));
+
+        // Kiểm tra tính hợp lệ theo thiết kế Whitelist FSM
+        if (!canTransition(trip.getStatus(), newStatus)) {
+            throw new IllegalStateException(
+                    String.format("Lỗi luồng vận hành: Không thể chuyển trạng thái chuyến xe từ [%s] sang [%s].",
+                            trip.getStatus(), newStatus));
+        }
+
+        if (newStatus == TripStatus.ACTIVE) {
+            changeStatusToActive(trip);
+        } else {
+            trip.setStatus(newStatus);
+        }
+
+        // Đồng bộ BusStatus theo vòng đời của trip:
+        // ACTIVE → DEPARTED: xe lên đường, không thể gán cho chuyến khác
+        // DEPARTED → COMPLETED: xe hoàn thành, trả về sẵn sàng
+        if (trip.getBus() != null) {
+            if (newStatus == TripStatus.DEPARTED) {
+                trip.getBus().setStatus(BusStatus.TRAVELING);
+                busRepository.save(trip.getBus());
+            } else if (newStatus == TripStatus.COMPLETED) {
+                trip.getBus().setStatus(BusStatus.READY);
+                busRepository.save(trip.getBus());
+            }
+        }
+        tripRepository.save(trip);
+    }
+
     /**
      * Kiểm tra tài xế có đang bận trong cửa sổ thời gian (cả với tư cách driver và
      * assistant).
@@ -320,11 +440,11 @@ public class TripService {
     private boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd,
             Long excludeTripId) {
         List<TripStatus> busyStatuses = List.of(
-                TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
+                TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
         // Bận với tư cách tài xế chính?
         boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
-                driver, driver.getUser(), busyStatuses, windowStart, windowEnd, excludeTripId);
+                driver, busyStatuses, windowStart, windowEnd, excludeTripId);
         if (busyAsDriver)
             return true;
 
@@ -339,9 +459,9 @@ public class TripService {
     private double getDrivingHoursForDate(Driver driver, LocalDateTime date, Long excludeTripId) {
         LocalDateTime startOfDay = date.toLocalDate().atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
-        List<TripStatus> busyStatuses = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL);
+        List<TripStatus> busyStatuses = List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
-        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, driver.getUser(), busyStatuses, startOfDay,
+        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay,
                 endOfDay,
                 excludeTripId);
 
@@ -353,9 +473,11 @@ public class TripService {
                     }
 
                     // Kiểm tra xem tài xế có lái (chính hoặc phụ)
+                    // SAU
                     boolean isDriving = (t.getDriver() != null && t.getDriver().getUserId().equals(driver.getUserId()))
                             || (t.getCoDrivers() != null
-                                    && t.getCoDrivers().stream().anyMatch(cd -> cd.getId().equals(driver.getUserId())));
+                                    && t.getCoDrivers().stream()
+                                            .anyMatch(cd -> cd.getUserId().equals(driver.getUserId())));
 
                     if (!isDriving) {
                         return 0.0;
@@ -376,8 +498,17 @@ public class TripService {
                 })
                 .sum();
 
-        // Nếu chuyến đi trong ngày hôm nay, cộng thêm giờ lái cơ sở (như dữ liệu khởi
-        // tạo ban đầu)
+        // -----------------------------------------------------------------------------------
+        // NOTE ĐỂ BẢO VỆ ĐỒ ÁN / DELIBERATE DESIGN:
+        // Trường 'totalDrivingHours24h' hiện tại đóng vai trò dữ liệu MOCK SEED từ
+        // DataInitializer.
+        // Nó phục vụ mục đích thiết lập giờ nền (Baseline Hours) cho các kịch bản demo
+        // chạy thực tế,
+        // chưa đồng bộ thời gian thực với bảng Trip. Khi tích hợp hệ thống phần cứng
+        // IoT/GPS thật,
+        // giá trị này sẽ được nạp thông qua một API cập nhật độc lập từ thiết bị giám
+        // sát hành trình.
+        // -----------------------------------------------------------------------------------
         if (date.toLocalDate().equals(LocalDateTime.now().toLocalDate())) {
             Double baseHours = driver.getTotalDrivingHours24h();
             if (baseHours != null) {
@@ -413,7 +544,7 @@ public class TripService {
         String warning = validateBusForTrip(trip.getBus(), trip, tripId);
         validateStaffForTrip(trip, tripId);
 
-        trip.setStatus(TripStatus.ACTIVE);
+        changeStatusToActive(trip);
         tripRepository.save(trip);
 
         System.out.printf("✅ Admin xác nhận chuyến #%d | Xe: %s | Tài xế chính: %s | Số tài xế phụ: %d | Phụ xe: %s%n",
@@ -451,7 +582,7 @@ public class TripService {
                 if (cdId != null && cdId > 0) {
                     Driver cd = driverRepository.findById(cdId)
                             .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế phụ #" + cdId));
-                    trip.getCoDrivers().add(cd.getUser());
+                    trip.getCoDrivers().add(cd);
                 }
             }
         }
@@ -467,7 +598,7 @@ public class TripService {
         String warning = validateBusForTrip(bus, trip, tripId);
         validateStaffForTrip(trip, tripId);
 
-        trip.setStatus(TripStatus.ACTIVE);
+        changeStatusToActive(trip);
         tripRepository.save(trip);
 
         System.out.printf("✅ Admin phân công thủ công chuyến #%d | Xe: %s | Tài xế: %s%n",
@@ -489,7 +620,7 @@ public class TripService {
         String warning = validateBusForTrip(trip.getBus(), trip, null);
         validateStaffForTrip(trip, null);
 
-        trip.setStatus(TripStatus.ACTIVE);
+        changeStatusToActive(trip);
         tripRepository.save(trip);
 
         return warning;
@@ -598,8 +729,8 @@ public class TripService {
         staffIds.add(driver.getUserId());
 
         if (trip.getCoDrivers() != null) {
-            for (User cd : trip.getCoDrivers()) {
-                if (!staffIds.add(cd.getId())) {
+            for (Driver cd : trip.getCoDrivers()) {
+                if (!staffIds.add(cd.getUserId())) {
                     throw new IllegalArgumentException(
                             "Nhân sự phân công bị trùng lặp: Tài xế phụ trùng tài chính hoặc tài phụ khác!");
                 }
@@ -639,26 +770,24 @@ public class TripService {
 
         // Validate các tài xế phụ
         if (trip.getCoDrivers() != null) {
-            for (User cd : trip.getCoDrivers()) {
-                Driver cdDriver = cd.getDriver();
-                if (cdDriver == null) {
-                    throw new IllegalArgumentException("Tài khoản " + cd.getFullName() + " không phải là tài xế!");
+            for (Driver cd : trip.getCoDrivers()) {
+                if (!cd.isLicenseValid()) {
+                    throw new IllegalArgumentException(
+                            "Bằng lái của tài xế phụ " + cd.getUser().getFullName() + " đã hết hạn!");
                 }
-                if (!cdDriver.isLicenseValid()) {
-                    throw new IllegalArgumentException("Bằng lái của tài xế phụ " + cd.getFullName() + " đã hết hạn!");
+                if (isDriverBusyInWindow(cd, windowStart, windowEnd, excludeTripId)) {
+                    throw new IllegalArgumentException(
+                            "Tài xế phụ " + cd.getUser().getFullName() + " đang bận ở chuyến khác!");
                 }
-                if (isDriverBusyInWindow(cdDriver, windowStart, windowEnd, excludeTripId)) {
-                    throw new IllegalArgumentException("Tài xế phụ " + cd.getFullName() + " đang bận ở chuyến khác!");
-                }
-                double cdAssignedHours = getDrivingHoursForDate(cdDriver, departure, excludeTripId);
+                double cdAssignedHours = getDrivingHoursForDate(cd, departure, excludeTripId);
                 if (cdAssignedHours + effectiveHours > 8.0) {
                     throw new IllegalArgumentException(String.format(
                             "Tài xế phụ %s đã được phân công lái %.1fh trong ngày %s, thêm chuyến này (%.1fh) sẽ vượt 8h/ngày!",
-                            cd.getFullName(), cdAssignedHours, departure.toLocalDate().toString(), effectiveHours));
+                            cd.getUser().getFullName(), cdAssignedHours, departure.toLocalDate().toString(),
+                            effectiveHours));
                 }
             }
         }
-
         // Validate phụ xe
         if (assistant != null) {
             if (isDriverBusyInWindow(assistant, windowStart, windowEnd, excludeTripId)) {
@@ -670,13 +799,13 @@ public class TripService {
 
     /**
      * Admin từ chối chuyến tăng cường (AI đề xuất sai, không còn cần thiết).
+     * Delegate sang updateTripStatus() để FSM canTransition() được thực thi.
+     * Trạng thái hợp lệ để từ chối: PENDING_APPROVAL → CANCELLED (whitelist FSM cho
+     * phép).
      */
     @Transactional
     public void rejectTrip(Long tripId) {
-        Trip trip = tripRepository.findById(tripId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
-        trip.setStatus(TripStatus.CANCELLED);
-        tripRepository.save(trip);
+        updateTripStatus(tripId, TripStatus.CANCELLED);
         System.out.printf("❌ Admin từ chối chuyến tăng cường #%d%n", tripId);
     }
 
@@ -734,10 +863,25 @@ public class TripService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Kiểm tra xem chuyến gốc đã có một chuyến tăng cường đang "sống" hay không.
+     *
+     * Các trạng thái bị chặn (không cho tạo thêm):
+     *   - PENDING_APPROVAL : đang chờ Admin duyệt
+     *   - ACTIVE           : đã được kích hoạt, đang bán vé
+     *   - DEPARTED         : đã xuất phát (nếu không chặn → AI sẽ tạo lại liên tục)
+     *   - COMPLETED        : đã hoàn thành (sự kiện đã xảy ra, không cần thêm nữa)
+     *
+     * CANCELLED bị loại khỏi danh sách chặn để AI được phép đề xuất lại khi
+     * chuyến tăng cường cũ bị hủy (ví dụ: xe hỏng, tài xế ốm).
+     */
     private boolean hasAlreadySuggested(Trip originalTrip) {
-        return tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.PENDING_APPROVAL)
-                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE)
-                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.CANCELLED);
+        List<TripStatus> blockingStatuses = List.of(
+                TripStatus.PENDING_APPROVAL,
+                TripStatus.ACTIVE,
+                TripStatus.DEPARTED,
+                TripStatus.COMPLETED);
+        return tripRepository.existsByOriginalTripAndStatusIn(originalTrip, blockingStatuses);
     }
 
     public List<Trip> getPendingTrips() {
@@ -747,5 +891,74 @@ public class TripService {
     public Trip getTripById(Long id) {
         return tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
+    }
+
+    // =========================================================================
+    // XÓA MỀM (SOFT DELETE)
+    // =========================================================================
+
+    /**
+     * Xóa mềm một chuyến xe sau khi kiểm tra đầy đủ ràng buộc nghiệp vụ.
+     *
+     * Không thực hiện DELETE vật lý — JPA sẽ gọi @SQLDelete trên Trip entity,
+     * phát ra câu lệnh: UPDATE trips SET is_deleted = true WHERE id = ?
+     * Nhờ đó toàn vẹn FK được bảo toàn và lịch sử giao dịch không bị mất.
+     *
+     * Quy tắc xóa theo trạng thái:
+     *   DEPARTED  → NGHIÊM CẤM (đang trên đường, ảnh hưởng hành trình thực)
+     *   COMPLETED → NGHIÊM CẤM (báo cáo tài chính & lịch sử phải được giữ nguyên)
+     *   ACTIVE + có vé đã bán → BỊ CHẶN (yêu cầu dùng luồng Hủy chuyến)
+     *   ACTIVE + chưa bán vé  → Cho phép (chuyến chưa public hoặc chưa có khách)
+     *   PENDING_APPROVAL      → Cho phép (bản nháp AI / Admin, chưa public)
+     *   CANCELLED             → Cho phép (chuyến đã kết thúc vòng đời, dọn dẹp DB)
+     *
+     * @throws EntityNotFoundException nếu không tìm thấy chuyến
+     * @throws IllegalStateException   nếu vi phạm ràng buộc nghiệp vụ (→ HTTP 400)
+     */
+    @Transactional
+    public void deleteTrip(Long tripId) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chuyến xe #" + tripId));
+
+        switch (trip.getStatus()) {
+            case DEPARTED -> throw new IllegalStateException(
+                    "Chuyến #" + tripId + " đang trên đường (DEPARTED). " +
+                    "Không thể xóa chuyến đang vận hành — sẽ phá vỡ hành trình thực tế và dữ liệu GPS.");
+
+            case COMPLETED -> throw new IllegalStateException(
+                    "Chuyến #" + tripId + " đã hoàn thành (COMPLETED). " +
+                    "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa.");
+
+            case ACTIVE -> {
+                if (trip.getTicketsSold() > 0) {
+                    throw new IllegalStateException(String.format(
+                            "Chuyến #%d đang ACTIVE và đã có %d vé bán ra. " +
+                            "Vui lòng dùng chức năng 'Hủy chuyến' thay vì xóa " +
+                            "để hệ thống xử lý hoàn vé và thông báo cho hành khách.",
+                            tripId, trip.getTicketsSold()));
+                }
+                // ACTIVE nhưng chưa bán vé nào → an toàn để xóa mềm
+            }
+
+            // PENDING_APPROVAL và CANCELLED: cho phép xóa không điều kiện
+            case PENDING_APPROVAL, CANCELLED -> { /* proceed */ }
+        }
+
+        // Kích hoạt @SQLDelete: phát ra UPDATE trips SET is_deleted=true WHERE id=?
+        tripRepository.delete(trip);
+
+        System.out.printf("🗑️ Admin xóa mềm chuyến #%d (trạng thái cũ: %s)%n",
+                tripId, trip.getStatus());
+    }
+
+    /**
+     * Hàm Helper chuyên trách việc chuyển trạng thái chuyến xe sang ACTIVE.
+     * Đồng thời đóng dấu thời gian mở bán nếu chuyến xe chưa từng được mở bán.
+     */
+    private void changeStatusToActive(Trip trip) {
+        trip.setStatus(TripStatus.ACTIVE);
+        if (trip.getSaleOpenedAt() == null) {
+            trip.setSaleOpenedAt(LocalDateTime.now());
+        }
     }
 }

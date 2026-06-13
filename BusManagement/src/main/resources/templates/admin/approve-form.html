@@ -129,8 +129,7 @@
             <div class="row align-items-center">
                 <div class="col">
                     <strong th:text="${trip.driver.user.fullName}"></strong>
-                    <span class="text-muted ms-2"
-                        th:text="'— Bằng (' + ${trip.driver.licenseNumber} + ')'"></span>
+                    <span class="text-muted ms-2" th:text="'— Bằng (' + ${trip.driver.licenseNumber} + ')'"></span>
                 </div>
                 <div class="col-auto">
                     <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
@@ -144,18 +143,18 @@
 
         <!-- Tài xế phụ (nếu có) -->
         <div th:if="${trip.coDrivers != null and not #lists.isEmpty(trip.coDrivers)}"
-             class="card resource-card mb-3 p-3">
-            <h6 class="text-success mb-3">&#127947; Tài xế phụ (<span th:text="${#lists.size(trip.coDrivers)}"></span> người)</h6>
+            class="card resource-card mb-3 p-3">
+            <h6 class="text-success mb-3">&#127947; Tài xế phụ (<span th:text="${#lists.size(trip.coDrivers)}"></span>
+                người)</h6>
             <div th:each="cd : ${trip.coDrivers}" class="row align-items-center mb-2">
                 <div class="col">
-                    <strong th:text="${cd.fullName}"></strong>
-                    <span class="text-muted ms-2"
-                        th:text="'— Bằng (' + ${cd.driver != null ? cd.driver.licenseNumber : 'N/A'} + ')'"></span>
+                    <strong th:text="${cd.user.fullName}"></strong>
+                    <span class="text-muted ms-2" th:text="'— Bằng (' + ${cd.licenseNumber} + ')'"></span>
                 </div>
                 <div class="col-auto">
                     <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
                     <span class="badge bg-info constraint-badge ms-1"
-                        th:text="${(cd.driver != null ? cd.driver.totalDrivingHours24h : 0) + 'h đã lái hôm nay'}"></span>
+                        th:text="${(cd.totalDrivingHours24h != null ? cd.totalDrivingHours24h : 0) + 'h đã lái hôm nay'}"></span>
                 </div>
             </div>
         </div>
@@ -166,8 +165,7 @@
             <div class="row align-items-center">
                 <div class="col">
                     <strong th:text="${trip.assistant.user.fullName}"></strong>
-                    <span class="text-muted ms-2"
-                        th:text="'— Bằng (' + ${trip.assistant.licenseNumber} + ')'"></span>
+                    <span class="text-muted ms-2" th:text="'— Bằng (' + ${trip.assistant.licenseNumber} + ')'"></span>
                 </div>
                 <div class="col-auto">
                     <span class="badge bg-success constraint-badge">✔ Bằng còn hạn</span>
@@ -278,7 +276,7 @@
                         </label>
                         <div id="coDriverSlotsApprove"></div>
                         <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
-                                onclick="addCoDriverSlotApprove(null)">
+                            onclick="addCoDriverSlotApprove(null)">
                             <i class="fas fa-plus"></i> Thêm tài xế phụ
                         </button>
                     </div>
@@ -330,10 +328,10 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script th:inline="javascript">
         /*<![CDATA[*/
-        const approveDriversForJs = /*[[${availableDrivers}]]*/ [];
+        const approveDriversForJs = /*[[${availableDrivers}]]*/[];
         // Thời gian chuyến (server-side) để khởi tạo ban đầu
         const tripDepartureStr = /*[[${trip.departureTime != null ? #temporals.format(trip.departureTime, 'yyyy-MM-dd''T''HH:mm') : ''}]]*/ '';
-        const tripArrivalStr   = /*[[${trip.arrivalTimeExpected != null ? #temporals.format(trip.arrivalTimeExpected, 'yyyy-MM-dd''T''HH:mm') : ''}]]*/ '';
+        const tripArrivalStr = /*[[${trip.arrivalTimeExpected != null ? #temporals.format(trip.arrivalTimeExpected, 'yyyy-MM-dd''T''HH:mm') : ''}]]*/ '';
         /*]]>*/
 
         let approveCoDriverCount = 0;
