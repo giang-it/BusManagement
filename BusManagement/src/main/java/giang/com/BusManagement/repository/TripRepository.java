@@ -103,10 +103,12 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        // =========================================================================
 
        /**
-        * Kiểm tra xem chuyến gốc đã có chuyến tăng cường với trạng thái cụ thể chưa.
-        * Tránh tạo trùng chuyến tăng cường.
+        * Kiểm tra xem chuyến gốc đã có chuyến tăng cường với BẤT KỲ trạng thái nào
+        * trong danh sách cho trước.
+        * Dùng SQL IN clause — 1 truy vấn duy nhất thay vì nhiều lần gọi OR.
+        * Dùng bởi hasAlreadySuggested() để tránh tạo trùng chuyến tăng cường.
         */
-       boolean existsByOriginalTripAndStatus(Trip originalTrip, TripStatus status);
+       boolean existsByOriginalTripAndStatusIn(Trip originalTrip, Collection<TripStatus> statuses);
 
        /**
         * Kiểm tra tài xế có đang bận (với tư cách TÀI XẾ CHÍNH hoặc TÀI XẾ PHỤ) trong

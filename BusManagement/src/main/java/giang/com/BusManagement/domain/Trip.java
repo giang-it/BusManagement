@@ -2,9 +2,20 @@ package giang.com.BusManagement.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Soft-delete design:
+ *   - @SQLDelete : mọi lệnh JPA delete() sẽ chạy UPDATE trips SET is_deleted=true
+ *                  thay vì DELETE vật lý, bảo toàn toàn vẹn FK và lịch sử giao dịch.
+ *   - @SQLRestriction: Hibernate tự động thêm WHERE is_deleted=false vào MỌI câu
+ *                  SELECT, khiến các chuyến đã xóa vô hình với toàn bộ query layer.
+ */
+@SQLDelete(sql = "UPDATE trips SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 @Entity
 @Table(name = "trips")
 @Data
@@ -67,6 +78,14 @@ public class Trip {
 
     @Column(name = "sale_opened_at")
     private LocalDateTime saleOpenedAt;
+
+    /**
+     * Cờ xóa mềm. TRUE = đã bị xóa (ẩn khỏi mọi query do @SQLRestriction).
+     * Không bao giờ nên được đặt trực tiếp — luôn dùng tripRepository.delete(trip)
+     * hoặc TripService.deleteTrip() để kích hoạt @SQLDelete.
+     */
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean isDeleted = false;
 
     // === HELPER METHODS ===
 

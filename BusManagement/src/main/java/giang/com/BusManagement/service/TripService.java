@@ -863,10 +863,25 @@ public class TripService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Kiểm tra xem chuyến gốc đã có một chuyến tăng cường đang "sống" hay không.
+     *
+     * Các trạng thái bị chặn (không cho tạo thêm):
+     *   - PENDING_APPROVAL : đang chờ Admin duyệt
+     *   - ACTIVE           : đã được kích hoạt, đang bán vé
+     *   - DEPARTED         : đã xuất phát (nếu không chặn → AI sẽ tạo lại liên tục)
+     *   - COMPLETED        : đã hoàn thành (sự kiện đã xảy ra, không cần thêm nữa)
+     *
+     * CANCELLED bị loại khỏi danh sách chặn để AI được phép đề xuất lại khi
+     * chuyến tăng cường cũ bị hủy (ví dụ: xe hỏng, tài xế ốm).
+     */
     private boolean hasAlreadySuggested(Trip originalTrip) {
-        return tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.PENDING_APPROVAL)
-                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.ACTIVE)
-                || tripRepository.existsByOriginalTripAndStatus(originalTrip, TripStatus.CANCELLED);
+        List<TripStatus> blockingStatuses = List.of(
+                TripStatus.PENDING_APPROVAL,
+                TripStatus.ACTIVE,
+                TripStatus.DEPARTED,
+                TripStatus.COMPLETED);
+        return tripRepository.existsByOriginalTripAndStatusIn(originalTrip, blockingStatuses);
     }
 
     public List<Trip> getPendingTrips() {
@@ -876,6 +891,64 @@ public class TripService {
     public Trip getTripById(Long id) {
         return tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));
+    }
+
+    // =========================================================================
+    // XÓA MỀM (SOFT DELETE)
+    // =========================================================================
+
+    /**
+     * Xóa mềm một chuyến xe sau khi kiểm tra đầy đủ ràng buộc nghiệp vụ.
+     *
+     * Không thực hiện DELETE vật lý — JPA sẽ gọi @SQLDelete trên Trip entity,
+     * phát ra câu lệnh: UPDATE trips SET is_deleted = true WHERE id = ?
+     * Nhờ đó toàn vẹn FK được bảo toàn và lịch sử giao dịch không bị mất.
+     *
+     * Quy tắc xóa theo trạng thái:
+     *   DEPARTED  → NGHIÊM CẤM (đang trên đường, ảnh hưởng hành trình thực)
+     *   COMPLETED → NGHIÊM CẤM (báo cáo tài chính & lịch sử phải được giữ nguyên)
+     *   ACTIVE + có vé đã bán → BỊ CHẶN (yêu cầu dùng luồng Hủy chuyến)
+     *   ACTIVE + chưa bán vé  → Cho phép (chuyến chưa public hoặc chưa có khách)
+     *   PENDING_APPROVAL      → Cho phép (bản nháp AI / Admin, chưa public)
+     *   CANCELLED             → Cho phép (chuyến đã kết thúc vòng đời, dọn dẹp DB)
+     *
+     * @throws EntityNotFoundException nếu không tìm thấy chuyến
+     * @throws IllegalStateException   nếu vi phạm ràng buộc nghiệp vụ (→ HTTP 400)
+     */
+    @Transactional
+    public void deleteTrip(Long tripId) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chuyến xe #" + tripId));
+
+        switch (trip.getStatus()) {
+            case DEPARTED -> throw new IllegalStateException(
+                    "Chuyến #" + tripId + " đang trên đường (DEPARTED). " +
+                    "Không thể xóa chuyến đang vận hành — sẽ phá vỡ hành trình thực tế và dữ liệu GPS.");
+
+            case COMPLETED -> throw new IllegalStateException(
+                    "Chuyến #" + tripId + " đã hoàn thành (COMPLETED). " +
+                    "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa.");
+
+            case ACTIVE -> {
+                if (trip.getTicketsSold() > 0) {
+                    throw new IllegalStateException(String.format(
+                            "Chuyến #%d đang ACTIVE và đã có %d vé bán ra. " +
+                            "Vui lòng dùng chức năng 'Hủy chuyến' thay vì xóa " +
+                            "để hệ thống xử lý hoàn vé và thông báo cho hành khách.",
+                            tripId, trip.getTicketsSold()));
+                }
+                // ACTIVE nhưng chưa bán vé nào → an toàn để xóa mềm
+            }
+
+            // PENDING_APPROVAL và CANCELLED: cho phép xóa không điều kiện
+            case PENDING_APPROVAL, CANCELLED -> { /* proceed */ }
+        }
+
+        // Kích hoạt @SQLDelete: phát ra UPDATE trips SET is_deleted=true WHERE id=?
+        tripRepository.delete(trip);
+
+        System.out.printf("🗑️ Admin xóa mềm chuyến #%d (trạng thái cũ: %s)%n",
+                tripId, trip.getStatus());
     }
 
     /**

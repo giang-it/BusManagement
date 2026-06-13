@@ -284,25 +284,26 @@ public class AdminTripManagementController {
     }
 
     /**
-     * Xóa trip (chỉ nên xóa nếu chưa có vé bán)
+     * Xóa mềm chuyến xe — toàn bộ kiểm tra nghiệp vụ nằm trong TripService.deleteTrip().
+     *
+     * Các trường hợp lỗi được phân biệt rõ ràng:
+     *   IllegalStateException   → Vi phạm quy tắc nghiệp vụ (chuyến đang chạy, đã bán vé...)
+     *   EntityNotFoundException → Không tìm thấy chuyến trong DB
+     *   Exception               → Lỗi hệ thống không mong đợi
      */
     @PostMapping("/trips/delete/{id}")
     public String deleteTrip(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
-            Trip trip = tripRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến"));
-
-            // Kiểm tra đã bán vé chưa
-            if (trip.getTicketsSold() > 0) {
-                redirectAttributes.addFlashAttribute("error",
-                        "Không thể xóa chuyến đã có khách đặt vé! Hãy hủy chuyến thay vì xóa.");
-                return "redirect:/admin/trip-management/trips";
-            }
-
-            tripRepository.deleteById(id);
-            redirectAttributes.addFlashAttribute("success", "Xóa chuyến thành công!");
+            tripService.deleteTrip(id);
+            redirectAttributes.addFlashAttribute("success",
+                    "✅ Đã xóa chuyến xe #" + id + " thành công.");
+        } catch (IllegalStateException e) {
+            // Vi phạm ràng buộc nghiệp vụ → thông báo rõ ràng cho Admin
+            redirectAttributes.addFlashAttribute("error", "⛔ Không thể xóa: " + e.getMessage());
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            redirectAttributes.addFlashAttribute("error", "❌ Không tìm thấy chuyến xe #" + id);
         } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("error", "❌ Lỗi hệ thống: " + e.getMessage());
         }
         return "redirect:/admin/trip-management/trips";
     }
