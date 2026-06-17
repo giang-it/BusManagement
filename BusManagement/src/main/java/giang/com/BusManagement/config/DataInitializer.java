@@ -146,14 +146,6 @@ public class DataInitializer implements CommandLineRunner {
         // Xe mới tinh (Odo 0)
         Bus xeMoiTinh = createBus("51B-MOI.00", "Xe Mới Tinh", limousine, BusStatus.READY, 0.0);
 
-        // // Xe Limousine dự phòng cho AI tăng cường — đủ cho cả CT-SG lẫn SG-DL
-        // Bus xeExtraL1 = createBus("29A-002.1", "Limousine Dự Phòng 1", limousine,
-        // BusStatus.READY, 200.0);
-        // Bus xeExtraL2 = createBus("29A-002.2", "Limousine Dự Phòng 2", limousine,
-        // BusStatus.READY, 350.0);
-        // Bus xeExtraL3 = createBus("29A-002.3", "Limousine Dự Phòng 3", limousine,
-        // BusStatus.READY, 450.0);
-
         // =====================================================================
         // 5. TRẠM & TUYẾN ĐƯỜNG
         // =====================================================================
@@ -189,7 +181,8 @@ public class DataInitializer implements CommandLineRunner {
 
         // ------------------------------------------------------------------
         // TRIP 1: AI Tăng Cường — Chuyến gần đầy ghế (37/40 = 92.5%)
-        // → AI sẽ tự tạo chuyến tăng cường sau 10 giây (khởi hành sau 80h để qua gate 72h)
+        // → AI sẽ tự tạo chuyến tăng cường sau 10 giây (khởi hành sau 80h để qua gate
+        // 72h)
         // ------------------------------------------------------------------
         createTrip(tuyenHN_HP, xeSanSang1, txRanh1, txRanh2, 40, 37, "250000", TripStatus.ACTIVE, 80);
 
@@ -216,69 +209,6 @@ public class DataInitializer implements CommandLineRunner {
         // SG-DL #3 (test không có phụ xe): dùng xeExtraL2, khởi hành lúc now (50% ghế)
         createTrip(tuyenSG_DL, xeSanSang3, txDaLai1h, null, 40, 20, "300000", TripStatus.ACTIVE, 0);
 
-        // ------------------------------------------------------------------
-        // TRIP 4: Chuyến trống — Chưa gán bus/driver
-        // → Trên giao diện sẽ thấy "Chưa gán" cho xe/tài xế/phụ xe
-        // ------------------------------------------------------------------
-        // createTrip(tuyenDN_Hue, null, null, null, 50, 0, "150000", TripStatus.ACTIVE,
-        // 8);
-
-        // ------------------------------------------------------------------
-        // TRIP 5: TX Sát 8h — Gán ép tài xế 7.9h vào chuyến 2h
-        // → Tổng = 7.9 + 2.0 = 9.9h > 8h → Admin thấy vi phạm
-        // ------------------------------------------------------------------
-        // createTrip(tuyenDN_Hue, xeSanSang3, txSatNguong, null, 50, 10, "150000",
-        // TripStatus.ACTIVE, 2);
-
-        // ------------------------------------------------------------------
-        // TRIP 6: TX Quá 8h — Gán ép tài xế đã lái 9h
-        // → Trực quan trên giao diện: tài xế tên "TX Quá 8h (9h)"
-        // ------------------------------------------------------------------
-        // createTrip(tuyenHP_HN, xeSanSang4, txQua8h_1, null, 60, 5, "120000",
-        // TripStatus.ACTIVE, 3);
-
-        // ------------------------------------------------------------------
-        // TRIP 7: TX Bằng Lái Sắp Hết — Tài xế bằng lái còn 1 ngày
-        // → AI đã cảnh báo nhưng vẫn gán (fallback)
-        // ------------------------------------------------------------------
-        // createTrip(tuyenHP_HN, xeSanSang5, txHetHanBL, txRanh6, 60, 30, "120000",
-        // TripStatus.ACTIVE, 10);
-
-        // ------------------------------------------------------------------
-        // TRIP 8: Chuyến siêu dài (30h) — Tuyến HN → SG
-        // → AI phải tìm tài xế 0h lái, xe giường nằm tốt
-        // → effectiveHours = min(30, 8) = 8h (khởi hành sau 95h)
-        // ------------------------------------------------------------------
-        createTrip(tuyenHN_SG, xeSanSang3, txRanh7, txRanh8, 40, 39, "900000",
-                TripStatus.ACTIVE, 95);
-
-        // ------------------------------------------------------------------
-        // TRIP 9: TX Đã Lái 6h + Chuyến 6h
-        // → Tổng = 6 + min(6,8) = 12h > 8h → Vi phạm nếu kiểm tra
-        // ------------------------------------------------------------------
-        // createTrip(tuyenSG_DL, xeSanSang2, txDaLai6h, txDaLai4h, 22, 10, "300000",
-        // TripStatus.ACTIVE, 12);
-
-        // ------------------------------------------------------------------
-        // TRIP 10: Chuyến với xe sát bảo trì
-        // → Tuyến 120km + Odo 4995km = 5115km > 5000km ngưỡng → Cảnh báo
-        // ------------------------------------------------------------------
-        // createTrip(tuyenHN_HP, xeSatBaoTri, txDaLai7h, null, 22, 15, "250000",
-        // TripStatus.ACTIVE, 14);
-
-        // =====================================================================
-        // System.out.println("✅ [Dữ liệu đã sẵn sàng]");
-        // System.out.println("📊 Tổng: 10 chuyến | 16 tài xế | 11 xe | 7 tuyến");
-        // System.out.println("🔍 Các test case trên giao diện:");
-        // System.out.println(" Trip 1,2 → AI tự tạo chuyến tăng cường (>90% ghế)");
-        // System.out.println(" Trip 3 → Bình thường (50% ghế) → AI bỏ qua");
-        // System.out.println(" Trip 4 → Chưa gán xe/tài xế → Hiển thị 'Chưa gán'");
-        // System.out.println(" Trip 5 → TX Sát 8h (7.9h) lái thêm 2h → Vi phạm");
-        // System.out.println(" Trip 6 → TX Quá 8h (9h) → Vi phạm rõ ràng");
-        // System.out.println(" Trip 7 → TX Bằng Lái Sắp Hết → Cảnh báo");
-        // System.out.println(" Trip 8 → Chuyến 30h HN→SG (>90% ghế) → AI tăng cường");
-        // System.out.println(" Trip 9 → TX 6h + Chuyến 6h = 12h → Vi phạm");
-        // System.out.println(" Trip 10 → Xe sát bảo trì + tuyến 120km → Quá ngưỡng");
     }
 
     // =====================================================================
@@ -355,7 +285,8 @@ public class DataInitializer implements CommandLineRunner {
         t.setPrice(new BigDecimal(price));
         t.setStatus(status);
         if (status == TripStatus.ACTIVE) {
-            // Đặt thời gian mở bán cách đây 3 ngày để vượt qua chốt chặn MIN_SALE_OPEN_HOURS (48h)
+            // Đặt thời gian mở bán cách đây 3 ngày để vượt qua chốt chặn
+            // MIN_SALE_OPEN_HOURS (48h)
             t.setSaleOpenedAt(LocalDateTime.now().minusDays(3));
         }
         LocalDateTime departure = LocalDateTime.now().plusHours(hoursFromNow);

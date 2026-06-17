@@ -258,11 +258,15 @@ public class TripService {
     // =========================================================================
 
     /**
-     * Tìm xe READY, đúng loại, không bận, chưa cần bảo trì.
+     * Tìm xe READY, đúng loại, không bận, chưa quá hạn/sắp đến hạn bảo trì.
      * Sắp xếp ưu tiên: xe ít km kể từ bảo trì nhất (xe "mới nhất") được chọn trước.
      *
-     * Fallback: Nếu tất cả xe đều cần bảo trì thì vẫn chọn xe ít km nhất
-     * (sẽ ghi cảnh báo ở log).
+     * Dùng CHUNG ràng buộc bảo trì với validateBusForTrip()/Bus.isNearMaintenance()
+     * (>= 90% maintenanceThreshold sau khi cộng quãng đường chuyến này) để AI
+     * auto-assign không bao giờ chọn một xe mà luồng thủ công (Create/Edit/Approve)
+     * sẽ từ chối ngay sau đó. Không còn fallback "vẫn chọn xe sát/quá ngưỡng" —
+     * nếu không còn xe nào đủ điều kiện, trả về null để autoAssignResources() báo
+     * thất bại và Admin xử lý thủ công (đổi xe khác hoặc đưa xe đi bảo trì).
      */
     private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival) {
         BusType requiredType = trip.getRoute().getSuitableBusType();
@@ -278,36 +282,12 @@ public class TripService {
 
         double tripDistance = trip.getRoute().getDistanceKm() != null ? trip.getRoute().getDistanceKm() : 0.0;
 
-        // Ưu tiên xe chưa cần bảo trì VÀ sau chuyến này vẫn chưa vượt ngưỡng bảo trì
-        Bus best = candidates.stream()
+        return candidates.stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
-                .filter(bus -> {
-                    Double threshold = bus.getMaintenanceThreshold();
-                    if (threshold == null)
-                        return true; // Không có ngưỡng → không cần kiểm tra
-                    return bus.getKmSinceLastMaintenance() + tripDistance <= threshold;
-                })
+                .filter(bus -> !bus.needsMaintenance())
+                .filter(bus -> !bus.isNearMaintenance(tripDistance))
                 .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
                 .orElse(null);
-
-        if (best != null)
-            return best;
-
-        // Fallback: xe sẽ cần bảo trì sau chuyến này (hoặc đã quá hạn) nhưng vẫn READY
-        // — cảnh báo và dùng
-        Bus fallback = candidates.stream()
-                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
-                .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
-                .orElse(null);
-
-        if (fallback != null) {
-            System.out.printf(
-                    "⚠️ [AI] Xe %s được chọn nhưng SÁT/QUÁ NGƯỠNG BẢO TRÌ (Odo hiện tại: %.0f, ngưỡng: %.0f)!%n",
-                    fallback.getLicensePlate(), fallback.getKmSinceLastMaintenance(),
-                    fallback.getMaintenanceThreshold());
-        }
-
-        return fallback;
     }
 
     /**
@@ -651,7 +631,20 @@ public class TripService {
     }
 
     /**
-     * Kiểm tra xe có đang bận không và trả về cảnh báo nếu sắp đến hạn bảo trì.
+     * Kiểm tra toàn bộ ràng buộc liên quan đến xe trước khi gán vào chuyến.
+     *
+     * Chặn cứng (throw IllegalArgumentException) nếu:
+     * - Xe đang REPAIRING hoặc TRAVELING.
+     * - Xe đang bận (trùng lịch) trong cửa sổ [departure - 1h, arrival + 1h].
+     * - Xe đã QUÁ HẠN bảo trì (needsMaintenance() == true ngay hiện tại).
+     * - Quãng đường của chuyến này sẽ đẩy xe vào vùng SẮP/QUÁ hạn bảo trì
+     * (>= 90% maintenanceThreshold sau khi cộng route.distanceKm).
+     *
+     * Giữ kiểu trả về String (warning) để tương thích với các nơi gọi hiện tại
+     * (flash message "warning" ở Controller) — hiện tại luôn trả về null vì
+     * ràng buộc bảo trì đã chuyển từ "cảnh báo" sang "chặn cứng"; kênh này vẫn
+     * hữu ích nếu sau này cần thêm cảnh báo không-chặn khác (ví dụ bằng lái tài
+     * xế sắp hết hạn).
      */
     private String validateBusForTrip(Bus bus, Trip trip, Long excludeTripId) {
         if (bus.getStatus() == BusStatus.REPAIRING) {
@@ -675,14 +668,33 @@ public class TripService {
             throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " đang bận trong khoảng thời gian này!");
         }
 
-        Double threshold = bus.getMaintenanceThreshold();
+        // RÀNG BUỘC BẢO TRÌ: Xe đã quá hạn bảo trì (kmSinceLastMaintenance >=
+        // maintenanceThreshold NGAY BÂY GIỜ, chưa cần tính chuyến này) thì
+        // tuyệt đối KHÔNG được gán vào bất kỳ chuyến nào — đúng theo yêu cầu
+        // "Xe: Không gán xe đang trong lịch bảo trì" của functional spec.
+        if (bus.needsMaintenance()) {
+            throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " (Odo: "
+                    + Math.round(bus.getKmSinceLastMaintenance()) + "km) đã QUÁ HẠN bảo trì (ngưỡng: "
+                    + Math.round(bus.getMaintenanceThreshold())
+                    + "km) — không thể gán vào chuyến cho đến khi được bảo trì!");
+        }
+
+        // RÀNG BUỘC BẢO TRÌ: Nếu quãng đường của CHUYẾN NÀY sẽ đẩy xe vào vùng
+        // "sắp đến hạn" (>= 90% maintenanceThreshold, kể cả vượt quá 100%) thì
+        // cũng chặn — không chỉ cảnh báo. Điều này khiến hành vi nhất quán với
+        // findBestAvailableBus() (AI auto-assign), nơi xe sắp/quá hạn chỉ được
+        // dùng làm fallback cuối cùng kèm log cảnh báo, không nên trở thành lựa
+        // chọn hợp lệ ở luồng thủ công (Create/Edit) trong khi luồng AI từ chối.
         double tripDistance = trip.getRoute() != null && trip.getRoute().getDistanceKm() != null
                 ? trip.getRoute().getDistanceKm()
                 : 0.0;
-        if (threshold != null && bus.getKmSinceLastMaintenance() + tripDistance > threshold) {
-            return "Cảnh báo: Xe " + bus.getLicensePlate() + " (Odo: " + Math.round(bus.getKmSinceLastMaintenance())
-                    + ") sẽ chạm/vượt ngưỡng bảo trì (" + Math.round(threshold) + ") sau chuyến này!";
+        if (bus.isNearMaintenance(tripDistance)) {
+            throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " (Odo: "
+                    + Math.round(bus.getKmSinceLastMaintenance()) + "km) sẽ SẮP/QUÁ ngưỡng bảo trì ("
+                    + Math.round(bus.getMaintenanceThreshold())
+                    + "km) sau chuyến này — vui lòng chọn xe khác hoặc đưa xe đi bảo trì trước!");
         }
+
         return null;
     }
 
@@ -827,7 +839,10 @@ public class TripService {
     // =========================================================================
 
     /**
-     * Lấy xe sẵn sàng & không bận cho chuyến (dùng cho form phân công thủ công).
+     * Lấy xe sẵn sàng, không bận, và chưa quá hạn/sắp đến hạn bảo trì cho
+     * chuyến (dùng cho form phân công thủ công — AdminTripController approve
+     * form). Áp dụng cùng ràng buộc bảo trì với validateBusForTrip() để dropdown
+     * không bao giờ hiển thị một xe mà hệ thống sẽ từ chối khi submit.
      */
     public List<Bus> getAvailableBusesForTrip(Long tripId) {
         Trip trip = tripRepository.findById(tripId)
@@ -842,12 +857,18 @@ public class TripService {
         LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
         LocalDateTime windowEnd = arrival.plusHours(BUS_PREP_BUFFER_HOURS);
 
+        double tripDistance = trip.getRoute() != null && trip.getRoute().getDistanceKm() != null
+                ? trip.getRoute().getDistanceKm()
+                : 0.0;
+
         List<Bus> candidates = (requiredType != null)
                 ? busRepository.findByStatusAndBusType(BusStatus.READY, requiredType)
                 : busRepository.findByStatus(BusStatus.READY);
 
         return candidates.stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, tripId))
+                .filter(bus -> !bus.needsMaintenance())
+                .filter(bus -> !bus.isNearMaintenance(tripDistance))
                 .sorted(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
                 .collect(Collectors.toList());
     }
@@ -877,13 +898,22 @@ public class TripService {
     }
 
     /**
-     * Tìm tất cả xe READY và KHÔNG BỊ TRÙNG LỊCH trong khoảng [departure, arrival].
+     * Tìm tất cả xe READY, KHÔNG BỊ TRÙNG LỊCH, và chưa quá hạn/sắp đến hạn bảo
+     * trì trong khoảng [departure, arrival].
      *
      * Được gọi bởi TripRestController để cấp dữ liệu động cho Wizard Form.
      * Khác với getAvailableBusesForTrip(tripId) — method này KHÔNG cần tripId
      * có trước; nó dùng trực tiếp khung thời gian từ frontend.
      *
      * Buffer chuẩn bị xe (BUS_PREP_BUFFER_HOURS) vẫn được áp dụng đúng kiến trúc.
+     *
+     * LƯU Ý: Tại thời điểm này route/distanceKm CHƯA được biết (form chưa chọn
+     * tuyến cụ thể truyền vào đây), nên không thể tính chính xác "km sau chuyến
+     * này sẽ là bao nhiêu" như validateBusForTrip(). Áp dụng isNearMaintenance(0)
+     * — tức kiểm tra tình trạng HIỆN TẠI của xe (chưa cộng thêm km chuyến) — để
+     * loại các xe đã ở vùng cảnh báo ngay từ bước hiển thị; ràng buộc đầy đủ
+     * (có tính quãng đường tuyến) vẫn được validateBusForTrip() chặn cứng ở
+     * bước lưu, đảm bảo không xe nào lách qua được.
      *
      * @param departure Thời gian khởi hành dự kiến
      * @param arrival   Thời gian đến dự kiến (đã tính từ Route.estimatedDuration)
@@ -898,6 +928,8 @@ public class TripService {
         return busRepository.findAllWithBusType().stream()
                 .filter(bus -> bus.getStatus() == giang.com.BusManagement.domain.BusStatus.READY)
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
+                .filter(bus -> !bus.needsMaintenance())
+                .filter(bus -> !bus.isNearMaintenance(0))
                 .sorted(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
                 .collect(Collectors.toList());
     }

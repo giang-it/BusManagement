@@ -135,7 +135,18 @@ public class AdminTripManagementController {
     // ==================== SỬA & XÓA TRIP ====================
 
     /**
-     * Hiển thị form sửa trip
+     * Hiển thị form sửa trip.
+     *
+     * Danh sách xe đưa vào dropdown được lọc qua
+     * tripService.getAvailableBusesForTrip(id)
+     * — CÙNG logic với form tạo trip (READY, không bận, chưa quá hạn/sắp đến hạn
+     * bảo trì) — để Create và Edit nhất quán, không cho Admin chọn lại một xe mà
+     * validateBusForTrip() sẽ từ chối khi submit.
+     *
+     * Xe ĐANG được gán cho chính chuyến này luôn được thêm vào danh sách (nếu
+     * chưa có) để dropdown hiển thị đúng lựa chọn hiện tại, dù xe đó vừa rơi vào
+     * trạng thái không hợp lệ sau khi trip đã được tạo (ví dụ vừa quá hạn bảo
+     * trì) — Admin vẫn cần thấy xe nào đang được gán để chủ động đổi sang xe khác.
      */
     @GetMapping("/trips/edit/{id}")
     public String showEditTripForm(@PathVariable Long id, Model model) {
@@ -146,10 +157,16 @@ public class AdminTripManagementController {
                 .map(Driver::getUserId)
                 .toList();
 
+        List<Bus> availableBuses = new java.util.ArrayList<>(tripService.getAvailableBusesForTrip(id));
+        Bus currentBus = trip.getBus();
+        if (currentBus != null && availableBuses.stream().noneMatch(b -> b.getId().equals(currentBus.getId()))) {
+            availableBuses.add(currentBus);
+        }
+
         model.addAttribute("trip", trip);
         model.addAttribute("savedCoDriverIds", savedCoDriverIds);
         model.addAttribute("routes", routeRepository.findAll());
-        model.addAttribute("buses", busRepository.findAllWithBusType());
+        model.addAttribute("buses", availableBuses);
         List<Driver> drivers = driverRepository.findAllWithUser();
         model.addAttribute("drivers", drivers);
         model.addAttribute("statuses", TripStatus.values());
@@ -284,12 +301,14 @@ public class AdminTripManagementController {
     }
 
     /**
-     * Xóa mềm chuyến xe — toàn bộ kiểm tra nghiệp vụ nằm trong TripService.deleteTrip().
+     * Xóa mềm chuyến xe — toàn bộ kiểm tra nghiệp vụ nằm trong
+     * TripService.deleteTrip().
      *
      * Các trường hợp lỗi được phân biệt rõ ràng:
-     *   IllegalStateException   → Vi phạm quy tắc nghiệp vụ (chuyến đang chạy, đã bán vé...)
-     *   EntityNotFoundException → Không tìm thấy chuyến trong DB
-     *   Exception               → Lỗi hệ thống không mong đợi
+     * IllegalStateException → Vi phạm quy tắc nghiệp vụ (chuyến đang chạy, đã bán
+     * vé...)
+     * EntityNotFoundException → Không tìm thấy chuyến trong DB
+     * Exception → Lỗi hệ thống không mong đợi
      */
     @PostMapping("/trips/delete/{id}")
     public String deleteTrip(@PathVariable Long id, RedirectAttributes redirectAttributes) {
