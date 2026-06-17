@@ -40,7 +40,7 @@
                 </h5>
             </div>
             <div class="card-body">
-                <form action="/admin/trip-management/trips/update" method="post">
+                <form id="editTripForm" action="/admin/trip-management/trips/update" method="post" novalidate>
                     <input type="hidden" name="id" th:value="${trip.id}">
 
                     <!-- CHỌN TUYẾN -->
@@ -84,7 +84,7 @@
                             <label class="form-label">
                                 <i class="fas fa-user-tie"></i> Tài xế chính <span class="text-danger">*</span>
                             </label>
-                            <select name="driverId" class="form-select" required>
+                            <select id="mainDriverSelect" name="driverId" class="form-select" required>
                                 <option value="">-- Chọn tài xế --</option>
                                 <option th:each="driver : ${drivers}" th:value="${driver.userId}"
                                     th:text="${driver.user?.fullName}"
@@ -97,13 +97,14 @@
                             <label class="form-label">
                                 <i class="fas fa-user"></i> Phụ xe (tùy chọn)
                             </label>
-                            <select name="assistantId" class="form-select">
+                            <select id="assistantSelect" name="assistantId" class="form-select">
                                 <option value="">-- Không có --</option>
                                 <option th:each="driver : ${drivers}" th:value="${driver.userId}"
                                     th:text="${driver.user?.fullName}"
                                     th:selected="${driver.userId == trip.assistant?.userId}">
                                 </option>
                             </select>
+                            <div id="assistantError" class="text-danger small mt-1" style="display:none;"></div>
                         </div>
                     </div>
 
@@ -293,6 +294,7 @@
                     <select name="coDriverIds" class="form-select form-select-sm">
                         ${options}
                     </select>
+                    <div class="codriver-error text-danger small mt-1" style="display:none;"></div>
                 </div>
                 <div class="col-auto" style="padding-top:28px">
                     <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeCoDriverSlot(${idx})">
@@ -329,6 +331,70 @@
 
         document.querySelector('[name="departureTime"]').addEventListener('change', updateCoDriverSection);
         document.querySelector('[name="arrivalTimeExpected"]').addEventListener('change', updateCoDriverSection);
+
+        // ── Validate trùng tài xế trước khi submit ───────────────────────────────
+        function validateNoDriverConflict() {
+            let valid = true;
+
+            // Reset lỗi cũ
+            document.getElementById('assistantError').style.display = 'none';
+            document.querySelectorAll('.codriver-error').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('#coDriverSlots select').forEach(s => s.classList.remove('is-invalid'));
+            document.getElementById('assistantSelect').classList.remove('is-invalid');
+
+            const mainDriverId = document.getElementById('mainDriverSelect').value;
+            const assistantId  = document.getElementById('assistantSelect').value;
+            const usedIds = new Set();
+
+            if (mainDriverId) usedIds.add(mainDriverId);
+
+            // Kiểm tra tài xế phụ (assistant) trùng tài xế chính
+            if (assistantId && assistantId !== '' && usedIds.has(assistantId)) {
+                document.getElementById('assistantError').textContent =
+                    '⚠️ Phụ xe không được trùng với tài xế chính!';
+                document.getElementById('assistantError').style.display = 'block';
+                document.getElementById('assistantSelect').classList.add('is-invalid');
+                valid = false;
+            } else if (assistantId && assistantId !== '') {
+                usedIds.add(assistantId);
+            }
+
+            // Kiểm tra các slot tài xế phụ (coDriverIds)
+            document.querySelectorAll('#coDriverSlots .row').forEach(row => {
+                const sel = row.querySelector('select[name="coDriverIds"]');
+                const errDiv = row.querySelector('.codriver-error');
+                if (!sel) return;
+                const val = sel.value;
+                if (val && val !== '') {
+                    if (usedIds.has(val)) {
+                        errDiv.textContent = '⚠️ Tài xế phụ này đã được chọn ở vị trí khác!';
+                        errDiv.style.display = 'block';
+                        sel.classList.add('is-invalid');
+                        valid = false;
+                    } else {
+                        usedIds.add(val);
+                    }
+                }
+            });
+
+            return valid;
+        }
+
+        // ── Xử lý submit form ────────────────────────────────────────────────────
+        document.getElementById('editTripForm').addEventListener('submit', function(e) {
+            // 1. Native HTML5 validation
+            if (!this.checkValidity()) {
+                e.preventDefault();
+                this.reportValidity();
+                return;
+            }
+            // 2. Validate không trùng tài xế
+            if (!validateNoDriverConflict()) {
+                e.preventDefault();
+                const firstErr = document.querySelector('.is-invalid');
+                if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
     </script>
 </body>
 

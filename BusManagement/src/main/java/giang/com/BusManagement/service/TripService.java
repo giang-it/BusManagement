@@ -730,17 +730,30 @@ public class TripService {
 
         if (trip.getCoDrivers() != null) {
             for (Driver cd : trip.getCoDrivers()) {
+                if (cd.getUserId().equals(driver.getUserId())) {
+                    throw new IllegalArgumentException(
+                            "Nhân sự trùng lặp: Tài xế phụ "
+                                    + cd.getUser().getFullName() + " đang là tài xế chính của chuyến này!");
+                }
                 if (!staffIds.add(cd.getUserId())) {
                     throw new IllegalArgumentException(
-                            "Nhân sự phân công bị trùng lặp: Tài xế phụ trùng tài chính hoặc tài phụ khác!");
+                            "Nhân sự trùng lặp: Tài xế phụ "
+                                    + cd.getUser().getFullName() + " được chọn nhiều hơn một lần!");
                 }
             }
         }
 
         if (assistant != null) {
+            if (assistant.getUserId().equals(driver.getUserId())) {
+                throw new IllegalArgumentException(
+                        "Nhân sự trùng lặp: Phụ xe "
+                                + assistant.getUser().getFullName() + " đang là tài xế chính của chuyến này!");
+            }
             if (!staffIds.add(assistant.getUserId())) {
                 throw new IllegalArgumentException(
-                        "Nhân sự phân công bị trùng lặp: Phụ xe trùng với tài xế chính hoặc tài xế phụ!");
+                        "Nhân sự trùng lặp: Phụ xe "
+                                + assistant.getUser().getFullName()
+                                + " đã được phân công làm tài xế phụ trong chuyến này!");
             }
         }
 
@@ -864,13 +877,70 @@ public class TripService {
     }
 
     /**
+     * Tìm tất cả xe READY và KHÔNG BỊ TRÙNG LỊCH trong khoảng [departure, arrival].
+     *
+     * Được gọi bởi TripRestController để cấp dữ liệu động cho Wizard Form.
+     * Khác với getAvailableBusesForTrip(tripId) — method này KHÔNG cần tripId
+     * có trước; nó dùng trực tiếp khung thời gian từ frontend.
+     *
+     * Buffer chuẩn bị xe (BUS_PREP_BUFFER_HOURS) vẫn được áp dụng đúng kiến trúc.
+     *
+     * @param departure Thời gian khởi hành dự kiến
+     * @param arrival   Thời gian đến dự kiến (đã tính từ Route.estimatedDuration)
+     * @return Danh sách xe rảnh, sắp xếp theo km kể từ bảo trì (xe "mới" nhất
+     *         trước)
+     */
+    public List<Bus> getAvailableBusesForTimeRange(LocalDateTime departure, LocalDateTime arrival) {
+        LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
+        LocalDateTime windowEnd = arrival.plusHours(BUS_PREP_BUFFER_HOURS);
+
+        // Lấy tất cả xe READY (không lọc loại xe vì form này chưa biết tuyến nào)
+        return busRepository.findAllWithBusType().stream()
+                .filter(bus -> bus.getStatus() == giang.com.BusManagement.domain.BusStatus.READY)
+                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
+                .sorted(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Tìm tất cả tài xế ACTIVE, bằng lái còn hạn, KHÔNG TRÙNG LỊCH trong khoảng
+     * [departure, arrival].
+     *
+     * Được gọi bởi TripRestController để cấp dữ liệu động cho Wizard Form.
+     * Áp dụng cùng logic ràng buộc như getAvailableDriversForTrip(tripId):
+     * - Bằng lái còn hạn
+     * - Tổng giờ lái hôm nay + phần chia của chuyến này ≤ 8h
+     * - Không bận ở chuyến khác (kể cả vai trò phụ xe)
+     *
+     * @param departure Thời gian khởi hành dự kiến
+     * @param arrival   Thời gian đến dự kiến
+     * @return Danh sách tài xế rảnh, sắp xếp theo tổng giờ lái ít nhất
+     */
+    public List<Driver> getAvailableDriversForTimeRange(LocalDateTime departure, LocalDateTime arrival) {
+        double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
+        // effectiveHours: phần giờ mà mỗi tài xế phải lái (cắt tối đa 8h/người)
+        double effectiveHours = Math.min(durationHours, 8.0);
+
+        LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+
+        return driverRepository.findAllWithUser().stream()
+                .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
+                .filter(Driver::isLicenseValid)
+                .filter(d -> getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
+                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
+                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Kiểm tra xem chuyến gốc đã có một chuyến tăng cường đang "sống" hay không.
      *
      * Các trạng thái bị chặn (không cho tạo thêm):
-     *   - PENDING_APPROVAL : đang chờ Admin duyệt
-     *   - ACTIVE           : đã được kích hoạt, đang bán vé
-     *   - DEPARTED         : đã xuất phát (nếu không chặn → AI sẽ tạo lại liên tục)
-     *   - COMPLETED        : đã hoàn thành (sự kiện đã xảy ra, không cần thêm nữa)
+     * - PENDING_APPROVAL : đang chờ Admin duyệt
+     * - ACTIVE : đã được kích hoạt, đang bán vé
+     * - DEPARTED : đã xuất phát (nếu không chặn → AI sẽ tạo lại liên tục)
+     * - COMPLETED : đã hoàn thành (sự kiện đã xảy ra, không cần thêm nữa)
      *
      * CANCELLED bị loại khỏi danh sách chặn để AI được phép đề xuất lại khi
      * chuyến tăng cường cũ bị hủy (ví dụ: xe hỏng, tài xế ốm).
@@ -905,12 +975,12 @@ public class TripService {
      * Nhờ đó toàn vẹn FK được bảo toàn và lịch sử giao dịch không bị mất.
      *
      * Quy tắc xóa theo trạng thái:
-     *   DEPARTED  → NGHIÊM CẤM (đang trên đường, ảnh hưởng hành trình thực)
-     *   COMPLETED → NGHIÊM CẤM (báo cáo tài chính & lịch sử phải được giữ nguyên)
-     *   ACTIVE + có vé đã bán → BỊ CHẶN (yêu cầu dùng luồng Hủy chuyến)
-     *   ACTIVE + chưa bán vé  → Cho phép (chuyến chưa public hoặc chưa có khách)
-     *   PENDING_APPROVAL      → Cho phép (bản nháp AI / Admin, chưa public)
-     *   CANCELLED             → Cho phép (chuyến đã kết thúc vòng đời, dọn dẹp DB)
+     * DEPARTED → NGHIÊM CẤM (đang trên đường, ảnh hưởng hành trình thực)
+     * COMPLETED → NGHIÊM CẤM (báo cáo tài chính & lịch sử phải được giữ nguyên)
+     * ACTIVE + có vé đã bán → BỊ CHẶN (yêu cầu dùng luồng Hủy chuyến)
+     * ACTIVE + chưa bán vé → Cho phép (chuyến chưa public hoặc chưa có khách)
+     * PENDING_APPROVAL → Cho phép (bản nháp AI / Admin, chưa public)
+     * CANCELLED → Cho phép (chuyến đã kết thúc vòng đời, dọn dẹp DB)
      *
      * @throws EntityNotFoundException nếu không tìm thấy chuyến
      * @throws IllegalStateException   nếu vi phạm ràng buộc nghiệp vụ (→ HTTP 400)
@@ -923,25 +993,26 @@ public class TripService {
         switch (trip.getStatus()) {
             case DEPARTED -> throw new IllegalStateException(
                     "Chuyến #" + tripId + " đang trên đường (DEPARTED). " +
-                    "Không thể xóa chuyến đang vận hành — sẽ phá vỡ hành trình thực tế và dữ liệu GPS.");
+                            "Không thể xóa chuyến đang vận hành — sẽ phá vỡ hành trình thực tế và dữ liệu GPS.");
 
             case COMPLETED -> throw new IllegalStateException(
                     "Chuyến #" + tripId + " đã hoàn thành (COMPLETED). " +
-                    "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa.");
+                            "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa.");
 
             case ACTIVE -> {
                 if (trip.getTicketsSold() > 0) {
                     throw new IllegalStateException(String.format(
                             "Chuyến #%d đang ACTIVE và đã có %d vé bán ra. " +
-                            "Vui lòng dùng chức năng 'Hủy chuyến' thay vì xóa " +
-                            "để hệ thống xử lý hoàn vé và thông báo cho hành khách.",
+                                    "Vui lòng dùng chức năng 'Hủy chuyến' thay vì xóa " +
+                                    "để hệ thống xử lý hoàn vé và thông báo cho hành khách.",
                             tripId, trip.getTicketsSold()));
                 }
                 // ACTIVE nhưng chưa bán vé nào → an toàn để xóa mềm
             }
 
             // PENDING_APPROVAL và CANCELLED: cho phép xóa không điều kiện
-            case PENDING_APPROVAL, CANCELLED -> { /* proceed */ }
+            case PENDING_APPROVAL, CANCELLED -> {
+                /* proceed */ }
         }
 
         // Kích hoạt @SQLDelete: phát ra UPDATE trips SET is_deleted=true WHERE id=?

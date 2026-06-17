@@ -4,16 +4,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tạo Chuyến xe</title>
+    <title>Tạo Chuyến xe — Wizard Thông Minh</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ── Step indicator ──────────────────────────────────────────────────── */
+        .step-indicator {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            border: 1px solid #dee2e6;
+        }
+
+        .step-item {
+            flex: 1;
+            padding: 0.6rem 0.5rem;
+            text-align: center;
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: #6c757d;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            transition: background 0.2s;
+        }
+
+        .step-item:last-child {
+            border-right: none;
+        }
+
+        .step-item.active {
+            background: #0d6efd;
+            color: #fff;
+        }
+
+        .step-item.done {
+            background: #198754;
+            color: #fff;
+        }
+
+        .step-item .step-num {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            line-height: 20px;
+            font-size: 0.72rem;
+            margin-right: 4px;
+        }
+
+        /* ── Resource dropdown states ─────────────────────────────────────────── */
+        .resource-section {
+            transition: opacity 0.3s;
+        }
+
+        .resource-section.loading {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        /* ── Capacity badge bên cạnh ô totalSeats ─────────────────────────────── */
+        #capacityHint {
+            display: none;
+            font-size: 0.82rem;
+            color: #198754;
+            margin-top: 3px;
+        }
+    </style>
 </head>
 
 <body class="bg-light">
     <nav class="navbar navbar-dark bg-dark mb-4">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">
-                <i class="fas fa-plus-circle"></i> Tạo Chuyến xe thủ công
+                <i class="fas fa-magic"></i> Tạo Chuyến xe — Lịch Thông Minh
             </span>
             <a href="/admin/trip-management/trips" class="btn btn-outline-light btn-sm">
                 <i class="fas fa-arrow-left"></i> Quay lại
@@ -21,167 +87,235 @@
         </div>
     </nav>
 
-    <div class="container">
-        <!-- Alert Messages -->
-        <div th:if="${success}" class="alert alert-success alert-dismissible fade show mt-3" role="alert">
-            <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+    <div class="container pb-5">
 
-        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+        <!-- Alert Messages -->
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
             <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
 
-        <div class="card shadow mt-3">
+        <!-- ── Step Indicator ─────────────────────────────────────────────────── -->
+        <div class="step-indicator">
+            <div class="step-item active" id="stepBadge1">
+                <span class="step-num">1</span>Tuyến & Giờ
+            </div>
+            <div class="step-item" id="stepBadge2">
+                <span class="step-num">2</span>Thời gian tự tính
+            </div>
+            <div class="step-item" id="stepBadge3">
+                <span class="step-num">3</span>Xe & Nhân sự
+            </div>
+            <div class="step-item" id="stepBadge4">
+                <span class="step-num">4</span>Ghế & Giá
+            </div>
+        </div>
+
+        <div class="card shadow">
             <div class="card-header bg-success text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-edit"></i> Thông tin chuyến xe
+                    <i class="fas fa-route"></i> Thông tin chuyến xe mới
                 </h5>
             </div>
             <div class="card-body">
-                <form action="/admin/trip-management/trips/create" method="post">
+                <form id="createTripForm" action="/admin/trip-management/trips/create" method="post" novalidate>
 
-                    <!-- CHỌN TUYẾN -->
+                    <!-- ════════════════════════════════════════════════════════════
+                     BƯỚC 1 — TUYẾN ĐƯỜNG & THỜI GIAN KHỞI HÀNH
+                     ════════════════════════════════════════════════════════════ -->
                     <h6 class="border-bottom pb-2 mb-3">
-                        <i class="fas fa-route"></i> Thông tin tuyến đường
+                        <i class="fas fa-route"></i>
+                        Bước 1 — Chọn tuyến đường &amp; thời gian khởi hành
                     </h6>
                     <div class="row">
-                        <div class="col-md-12 mb-3">
+                        <!-- Tuyến đường — thêm data-duration để JS đọc estimatedDuration -->
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">
                                 Tuyến đường <span class="text-danger">*</span>
                             </label>
-                            <select name="routeId" class="form-select" required>
+                            <!--
+                            Mỗi <option> mang 2 data-attribute:
+                              data-duration = estimatedDuration (phút)
+                              data-type     = suitableBusType.id (để lọc xe theo tuyến nếu cần mở rộng)
+                        -->
+                            <select id="routeSelect" name="routeId" class="form-select" required>
                                 <option value="">-- Chọn tuyến --</option>
-                                <option th:each="route : ${routes}" th:value="${route.id}"
-                                    th:text="${route.departurePoint} + ' → ' + ${route.destinationPoint}">
+                                <option th:each="route : ${routes}" th:value="${route.id}" th:text="${route.departurePoint} + ' → ' + ${route.destinationPoint}
+                                              + ' (' + ${route.estimatedDuration} + ' phút)'"
+                                    th:attr="data-duration=${route.estimatedDuration}">
                                 </option>
                             </select>
-                        </div>
-                    </div>
-
-                    <!-- CHỌN XE VÀ TÀI XẾ -->
-                    <h6 class="border-bottom pb-2 mb-3 mt-4">
-                        <i class="fas fa-bus"></i> Phân công xe & nhân sự
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-bus"></i> Xe <span class="text-danger">*</span>
-                            </label>
-                            <select name="busId" class="form-select" required>
-                                <option value="">-- Chọn xe --</option>
-                                <option th:each="bus : ${buses}" th:value="${bus.id}"
-                                    th:text="${bus.licensePlate} + ' (' + ${bus.busType?.typeName} + ')'">
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-user-tie"></i> Tài xế chính <span class="text-danger">*</span>
-                            </label>
-                            <select name="driverId" class="form-select" required>
-                                <option value="">-- Chọn tài xế --</option>
-                                <option th:each="driver : ${drivers}" th:value="${driver.userId}"
-                                    th:text="${driver.user?.fullName}">
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-user"></i> Phụ xe (tùy chọn)
-                            </label>
-                            <select name="assistantId" class="form-select">
-                                <option value="">-- Không có --</option>
-                                <option th:each="driver : ${drivers}" th:value="${driver.userId}"
-                                    th:text="${driver.user?.fullName}">
-                                </option>
-                            </select>
-                            <div class="form-text">Phụ xe hỗ trợ bán vé và chăm sóc khách</div>
-                        </div>
-                    </div>
-
-                    <!-- TÀI XẾ PHỤ ĐỘNG (hiện khi chuyến > 8h) -->
-                    <div id="coDriverSection" class="mt-3" style="display:none;">
-                        <div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3">
-                            <i class="fas fa-info-circle fs-5"></i>
-                            <div>
-                                <strong>Chuyến dài — cần thêm tài xế phụ!</strong>
-                                <span id="coDriverInfo" class="ms-1 text-muted"></span>
+                            <div class="form-text text-muted" id="routeHint">
+                                Sau khi chọn tuyến và giờ khởi hành, hệ thống sẽ tự tính giờ đến và tìm xe/tài xế rảnh.
                             </div>
                         </div>
-                        <div id="coDriverSlots"></div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" onclick="addCoDriverSlot()">
-                            <i class="fas fa-plus"></i> Thêm tài xế phụ
-                        </button>
+
+                        <!-- Giờ khởi hành -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-calendar-day"></i>
+                                Thời gian khởi hành <span class="text-danger">*</span>
+                            </label>
+                            <input type="datetime-local" id="departureTimeInput" name="departureTime"
+                                class="form-control" required>
+                        </div>
                     </div>
 
-                    <!-- THỜI GIAN -->
-                    <h6 class="border-bottom pb-2 mb-3 mt-4">
-                        <i class="fas fa-clock"></i> Thời gian
+                    <!-- ════════════════════════════════════════════════════════════
+                     BƯỚC 2 — THỜI GIAN ĐẾN (TỰ ĐỘNG TÍNH, READONLY)
+                     ════════════════════════════════════════════════════════════ -->
+                    <h6 class="border-bottom pb-2 mb-3 mt-2">
+                        <i class="fas fa-clock"></i>
+                        Bước 2 — Thời gian đến dự kiến (tự động)
                     </h6>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">
-                                <i class="fas fa-calendar-day"></i> Thời gian khởi hành <span
-                                    class="text-danger">*</span>
+                                <i class="fas fa-calendar-check"></i>
+                                Thời gian đến dự kiến
                             </label>
-                            <input type="datetime-local" name="departureTime" class="form-control" required>
+                            <!--
+                            readonly: chỉ được điền bởi JS, không cho Admin nhập tay.
+                            Vẫn gửi lên server nhờ name="arrivalTimeExpected".
+                        -->
+                            <input type="datetime-local" id="arrivalTimeInput" name="arrivalTimeExpected"
+                                class="form-control bg-light" readonly required>
+                            <div class="form-text" id="durationDisplay" style="display:none;">
+                                <i class="fas fa-info-circle text-primary"></i>
+                                <span id="durationText"></span>
+                            </div>
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-calendar-check"></i> Thời gian đến dự kiến <span
-                                    class="text-danger">*</span>
-                            </label>
-                            <input type="datetime-local" name="arrivalTimeExpected" class="form-control" required>
-                        </div>
-                    </div>
-
-                    <!-- GHẾ VÀ GIÁ -->
-                    <h6 class="border-bottom pb-2 mb-3 mt-4">
-                        <i class="fas fa-tags"></i> Ghế ngồi & Giá vé
-                    </h6>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-chair"></i> Tổng số ghế <span class="text-danger">*</span>
-                            </label>
-                            <input type="number" name="totalSeats" class="form-control" required min="1" max="100"
-                                placeholder="40">
-                            <div class="form-text">Số ghế thực tế trên xe</div>
-                        </div>
-
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-dollar-sign"></i> Giá vé (VNĐ) <span class="text-danger">*</span>
-                            </label>
-                            <input type="number" name="price" class="form-control" required min="0" step="1000"
-                                placeholder="150000">
-                            <div class="form-text">Giá vé một ghế</div>
+                        <!-- Badge trạng thái tải tài nguyên -->
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div id="resourceLoadStatus" class="alert alert-secondary py-2 w-100 mb-0"
+                                style="display:none!important;">
+                                <span id="resourceLoadText"></span>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- CẢNH BÁO -->
-                    <div class="alert alert-warning">
-                        <h6><i class="fas fa-exclamation-triangle"></i> Lưu ý khi tạo chuyến:</h6>
-                        <ul class="mb-0">
-                            <li><strong>Xe:</strong> Đảm bảo xe đang ở trạng thái READY (không trong bảo trì)</li>
-                            <li><strong>Tài xế:</strong> Kiểm tra tài xế chưa lái quá 8h trong 24h qua</li>
-                            <li><strong>Chuyến &gt; 8h:</strong> Cần thêm tài xế phụ — hệ thống tự tính và hiển thị phía trên</li>
-                            <li><strong>Chuyến &gt; 8h:</strong> Phụ xe là <strong>BẮT BUỘC</strong></li>
-                            <li><strong>Thời gian:</strong> Thời gian đến phải sau thời gian khởi hành</li>
-                            <li><strong>Ghế:</strong> Số ghế phải khớp với xe được chọn</li>
-                        </ul>
+                    <!-- ════════════════════════════════════════════════════════════
+                     BƯỚC 3 — XE & NHÂN SỰ (NẠP ĐỘNG QUA FETCH API)
+                     ════════════════════════════════════════════════════════════ -->
+                    <div id="resourceSection" class="resource-section" style="display:none;">
+                        <h6 class="border-bottom pb-2 mb-3 mt-2">
+                            <i class="fas fa-bus"></i>
+                            Bước 3 — Phân công xe &amp; nhân sự (đã lọc theo lịch)
+                        </h6>
+
+                        <!-- Alert số lượng tài nguyên tìm được -->
+                        <div id="resourceSummary" class="alert alert-info py-2 mb-3" style="display:none;">
+                            <i class="fas fa-check-circle text-success"></i>
+                            <span id="resourceSummaryText"></span>
+                        </div>
+                        <div id="noResourceAlert" class="alert alert-danger py-2 mb-3" style="display:none;">
+                            <i class="fas fa-times-circle"></i>
+                            <strong>Không tìm thấy xe hoặc tài xế rảnh</strong> trong khung giờ này.
+                            Hãy thử chọn thời gian khác.
+                        </div>
+
+                        <div class="row">
+                            <!-- Chọn xe (được nạp động) -->
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-bus"></i>
+                                    Xe <span class="text-danger">*</span>
+                                </label>
+                                <select id="busSelect" name="busId" class="form-select" required disabled>
+                                    <option value="">-- Hệ thống đang tải xe rảnh... --</option>
+                                </select>
+                            </div>
+
+                            <!-- Tài xế chính (được nạp động) -->
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-user-tie"></i>
+                                    Tài xế chính <span class="text-danger">*</span>
+                                </label>
+                                <select id="mainDriverSelect" name="driverId" class="form-select" required disabled>
+                                    <option value="">-- Hệ thống đang tải tài xế rảnh... --</option>
+                                </select>
+                            </div>
+
+                            <!-- Phụ xe (nạp động, không required với chuyến ≤ 8h) -->
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-user"></i>
+                                    Phụ xe
+                                    <span id="assistantRequiredBadge" class="badge bg-danger ms-1"
+                                        style="display:none;">BẮT BUỘC</span>
+                                </label>
+                                <select id="assistantSelect" name="assistantId" class="form-select" disabled>
+                                    <option value="">-- Không có --</option>
+                                </select>
+                                <div id="assistantError" class="text-danger small mt-1" style="display:none;"></div>
+                                <div class="form-text">Phụ xe hỗ trợ bán vé và chăm sóc khách</div>
+                            </div>
+                        </div>
+
+                        <!-- TÀI XẾ PHỤ ĐỘNG (hiện khi chuyến > 8h) -->
+                        <div id="coDriverSection" style="display:none;">
+                            <div class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3">
+                                <i class="fas fa-exclamation-triangle fs-5"></i>
+                                <div>
+                                    <strong>Chuyến dài — cần thêm tài xế phụ!</strong>
+                                    <span id="coDriverInfo" class="ms-1 text-muted"></span>
+                                </div>
+                            </div>
+                            <div id="coDriverSlots"></div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1" id="addCoDriverBtn"
+                                onclick="addCoDriverSlot(null)" disabled>
+                                <i class="fas fa-plus"></i> Thêm tài xế phụ
+                            </button>
+                        </div>
                     </div>
 
+                    <!-- ════════════════════════════════════════════════════════════
+                     BƯỚC 4 — TỔNG GHẾ (TỰ ĐỘNG TỪ XE) & GIÁ VÉ
+                     ════════════════════════════════════════════════════════════ -->
+                    <div id="priceSection" style="display:none;">
+                        <h6 class="border-bottom pb-2 mb-3 mt-4">
+                            <i class="fas fa-tags"></i>
+                            Bước 4 — Ghế &amp; Giá vé
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-chair"></i>
+                                    Tổng số ghế <span class="text-danger">*</span>
+                                </label>
+                                <!--
+                                readonly: giá trị được điền tự động từ busType.capacity
+                                khi admin chọn xe. Admin không thể nhập sai capacity.
+                            -->
+                                <input type="number" id="totalSeatsInput" name="totalSeats"
+                                    class="form-control bg-light" readonly required min="1"
+                                    placeholder="Sẽ tự điền khi chọn xe">
+                                <div id="capacityHint">
+                                    <i class="fas fa-info-circle"></i>
+                                    Số ghế cố định của xe theo loại xe
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-dollar-sign"></i>
+                                    Giá vé (VNĐ) <span class="text-danger">*</span>
+                                </label>
+                                <input type="number" name="price" class="form-control" required min="0" step="1000"
+                                    placeholder="Ví dụ: 150000">
+                                <div class="form-text">Giá vé một ghế (VNĐ)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── Nút Submit ──────────────────────────────────────────── -->
                     <div class="d-flex justify-content-between mt-4">
                         <a href="/admin/trip-management/trips" class="btn btn-secondary">
                             <i class="fas fa-times"></i> Hủy
                         </a>
-                        <button type="submit" class="btn btn-success">
+                        <button type="submit" id="submitBtn" class="btn btn-success" disabled>
                             <i class="fas fa-save"></i> Tạo chuyến
                         </button>
                     </div>
@@ -189,107 +323,341 @@
             </div>
         </div>
 
-        <!-- Hướng dẫn -->
-        <div class="card mt-4">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0"><i class="fas fa-question-circle"></i> Hướng dẫn</h6>
+        <!-- Lưu ý nghiệp vụ -->
+        <div class="card mt-4 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="fas fa-info-circle"></i> Lưu ý hệ thống</h6>
             </div>
-            <div class="card-body">
-                <ol>
-                    <li><strong>Chọn tuyến:</strong> Chọn tuyến đường đã được cấu hình sẵn</li>
-                    <li><strong>Gán xe & tài xế:</strong> Hệ thống sẽ kiểm tra ràng buộc tự động</li>
-                    <li><strong>Phụ xe:</strong> Tùy chọn, giúp hỗ trợ bán vé và chăm sóc khách</li>
-                    <li><strong>Đặt thời gian:</strong> Thời gian khởi hành phải là tương lai</li>
-                    <li><strong>Giá vé:</strong> Có thể tham khảo bảng giá đã cấu hình cho tuyến</li>
-                </ol>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li>Danh sách xe và tài xế được lọc <strong>thời gian thực</strong> — chỉ hiển thị người/xe THỰC SỰ
+                        RẢNH.</li>
+                    <li>Chuyến <strong>&gt; 8 tiếng</strong>: hệ thống tự tính số tài xế phụ cần thiết và hiển thị ô
+                        chọn tương ứng.</li>
+                    <li>Chuyến <strong>&gt; 8 tiếng</strong>: phụ xe là <strong>bắt buộc</strong>.</li>
+                    <li>Số ghế được điền tự động từ loại xe — không thể sửa tay để tránh sai lệch dữ liệu.</li>
+                    <li>Thời gian đến được tính tự động từ <em>estimatedDuration</em> của tuyến.</li>
+                </ul>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-        // Danh sách tài xế từ server (dùng cho các slot tài xế phụ)
-        const ALL_DRIVERS = [
-            /*[# th:each="d : ${drivers}"]
-            { id: /*[[${d.userId}]]*/ 0, name: /*[[${d.user?.fullName}]]*/ '' },
-            /*[/]*/
+        /**
+         * ============================================================
+         * DYNAMIC SMART SCHEDULING WIZARD — Vanilla JS
+         * ============================================================
+         *
+         * Luồng hoạt động:
+         *  1. Admin chọn Route  → đọc data-duration → set routeDurationMinutes
+         *  2. Admin nhập Departure Time  → tự động tính Arrival Time
+         *  3. Khi đủ cả 2 → gọi Fetch API /api/admin/trips/available-resources
+         *  4. API trả về bus list + driver list → render vào các <select>
+         *  5. Admin chọn xe → tự điền totalSeats từ data-capacity
+         *  6. Nếu duration > 8h → hiện coDriverSection và assistantRequired
+         * ============================================================
+         */
+
+        // ── State ────────────────────────────────────────────────────────────────────
+        let routeDurationMinutes = null; // estimatedDuration của Route đang chọn
+        let coDriverCount = 0;           // số slot tài xế phụ đang hiện
+        let availableDriversData = [];   // dữ liệu tài xế rảnh (từ API) để dùng lại khi addCoDriverSlot()
+        let fetchAbortController = null; // để cancel fetch cũ khi user thay đổi input liên tục
+
+        // ── DOM refs ──────────────────────────────────────────────────────────────────
+        const routeSelect = document.getElementById('routeSelect');
+        const departureInput = document.getElementById('departureTimeInput');
+        const arrivalInput = document.getElementById('arrivalTimeInput');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const durationText = document.getElementById('durationText');
+
+        const resourceSection = document.getElementById('resourceSection');
+        const resourceSummary = document.getElementById('resourceSummary');
+        const noResourceAlert = document.getElementById('noResourceAlert');
+        const resourceSummaryText = document.getElementById('resourceSummaryText');
+
+        const busSelect = document.getElementById('busSelect');
+        const mainDriverSelect = document.getElementById('mainDriverSelect');
+        const assistantSelect = document.getElementById('assistantSelect');
+        const assistantReqBadge = document.getElementById('assistantRequiredBadge');
+        const assistantError = document.getElementById('assistantError');
+
+        const coDriverSection = document.getElementById('coDriverSection');
+        const coDriverInfo = document.getElementById('coDriverInfo');
+        const coDriverSlots = document.getElementById('coDriverSlots');
+        const addCoDriverBtn = document.getElementById('addCoDriverBtn');
+
+        const totalSeatsInput = document.getElementById('totalSeatsInput');
+        const capacityHint = document.getElementById('capacityHint');
+        const priceSection = document.getElementById('priceSection');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Step badges
+        const stepBadges = [
+            document.getElementById('stepBadge1'),
+            document.getElementById('stepBadge2'),
+            document.getElementById('stepBadge3'),
+            document.getElementById('stepBadge4'),
         ];
 
-        // Inline Thymeleaf để tạo mảng JS
-        const driversData = [];
-    </script>
-    <script th:inline="javascript">
-        /*<![CDATA[*/
-        const driversForJs = /*[[${drivers}]]*/ [];
-        /*]]>*/
+        // ── BƯỚC 1: Listener cho Route và Departure Time ─────────────────────────────
 
-        let coDriverCount = 0;
+        routeSelect.addEventListener('change', () => {
+            const selectedOption = routeSelect.options[routeSelect.selectedIndex];
+            routeDurationMinutes = selectedOption
+                ? parseInt(selectedOption.getAttribute('data-duration'), 10)
+                : null;
+            onScheduleChanged();
+        });
 
-        function calcDurationHours() {
-            const dep = document.querySelector('[name="departureTime"]').value;
-            const arr = document.querySelector('[name="arrivalTimeExpected"]').value;
-            if (!dep || !arr) return 0;
-            const diff = (new Date(arr) - new Date(dep)) / 3600000;
-            return diff > 0 ? diff : 0;
-        }
+        departureInput.addEventListener('change', onScheduleChanged);
 
-        function buildDriverOption(d, selectedId) {
-            const sel = selectedId && String(d.userId) === String(selectedId) ? ' selected' : '';
-            return `<option value="${d.userId}"${sel}>${d.user ? d.user.fullName : d.userId}</option>`;
-        }
+        /**
+         * Được gọi mỗi khi Route hoặc DepartureTime thay đổi.
+         * Tính arrival → hiện durationDisplay → trigger fetch API.
+         */
+        function onScheduleChanged() {
+            const depValue = departureInput.value;
 
-        function updateCoDriverSection() {
-            const durationHours = calcDurationHours();
-            const requiredDrivers = durationHours > 0 ? Math.ceil(durationHours / 8.0) : 1;
-            const neededCoDrivers = requiredDrivers - 1; // trừ tài xế chính
-
-            const section = document.getElementById('coDriverSection');
-            const info = document.getElementById('coDriverInfo');
-            const slotsDiv = document.getElementById('coDriverSlots');
-
-            if (neededCoDrivers <= 0) {
-                section.style.display = 'none';
-                slotsDiv.innerHTML = '';
-                coDriverCount = 0;
+            // Reset nếu thiếu dữ liệu
+            if (!depValue || !routeDurationMinutes || isNaN(routeDurationMinutes)) {
+                arrivalInput.value = '';
+                durationDisplay.style.display = 'none';
+                hideResourceSection();
+                setStep(1);
                 return;
             }
 
-            section.style.display = 'block';
-            info.textContent = `(Chuyến ${durationHours.toFixed(1)}h → cần ít nhất ${requiredDrivers} tài xế, tối thiểu ${neededCoDrivers} tài xế phụ)`;
+            // ── BƯỚC 2: Tự động tính arrivalTime ────────────────────────────────────
+            const depMs = new Date(depValue).getTime();
+            const arrMs = depMs + routeDurationMinutes * 60 * 1000;
+            const arrDate = new Date(arrMs);
 
-            // Đảm bảo đủ slots tối thiểu
-            while (coDriverCount < neededCoDrivers) {
-                addCoDriverSlot();
+            // Format thành "YYYY-MM-DDTHH:mm" cho datetime-local input
+            arrivalInput.value = toDatetimeLocalString(arrDate);
+
+            // Hiển thị thông tin thời lượng
+            const durationHours = routeDurationMinutes / 60;
+            durationText.textContent =
+                `Thời lượng tuyến: ${routeDurationMinutes} phút (${durationHours.toFixed(1)} giờ). ` +
+                `Đến dự kiến: ${arrDate.toLocaleString('vi-VN')}`;
+            durationDisplay.style.display = 'block';
+            setStep(2);
+
+            // ── BƯỚC 3 trigger: Gọi API lấy tài nguyên rảnh ─────────────────────────
+            triggerFetchResources(depValue, toDatetimeLocalString(arrDate), durationHours);
+        }
+
+        // ── BƯỚC 3: Fetch API Available Resources ────────────────────────────────────
+
+        /**
+         * Gọi REST API /api/admin/trips/available-resources với debounce 400ms
+         * (tránh spam khi user gõ nhanh).
+         */
+        let fetchDebounceTimer = null;
+        function triggerFetchResources(departure, arrival, durationHours) {
+            clearTimeout(fetchDebounceTimer);
+            fetchDebounceTimer = setTimeout(() => {
+                fetchAvailableResources(departure, arrival, durationHours);
+            }, 400);
+        }
+
+        async function fetchAvailableResources(departure, arrival, durationHours) {
+            // Cancel request trước nếu đang pending
+            if (fetchAbortController) {
+                fetchAbortController.abort();
+            }
+            fetchAbortController = new AbortController();
+
+            // Hiện skeleton loading
+            setResourceSectionLoading(true);
+            setStep(3);
+
+            try {
+                const url = `/api/admin/trips/available-resources?departure=${encodeURIComponent(departure)}&arrival=${encodeURIComponent(arrival)}`;
+
+                const response = await fetch(url, {
+                    signal: fetchAbortController.signal
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.error || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                renderResources(data.buses || [], data.drivers || [], durationHours);
+
+            } catch (err) {
+                if (err.name === 'AbortError') return; // bỏ qua cancel
+                console.error('[Wizard] Lỗi fetch tài nguyên:', err);
+                showNoResourceAlert('Lỗi kết nối máy chủ: ' + err.message);
+            } finally {
+                setResourceSectionLoading(false);
             }
         }
 
-        function addCoDriverSlot() {
-            coDriverCount++;
-            const slotsDiv = document.getElementById('coDriverSlots');
-            const idx = coDriverCount;
+        // ── Render xe và tài xế vào dropdown ────────────────────────────────────────
 
-            let options = '<option value="">-- Chọn tài xế phụ --</option>';
-            driversForJs.forEach(d => {
-                const name = d.user ? d.user.fullName : ('ID:' + d.userId);
-                options += `<option value="${d.userId}">${name}</option>`;
+        /**
+         * Render danh sách bus và driver vào các <select> tương ứng.
+         * Mỗi bus option mang data-capacity để BƯỚC 4 tự điền totalSeats.
+         */
+        function renderResources(buses, drivers, durationHours) {
+            availableDriversData = drivers; // lưu lại để dùng trong addCoDriverSlot()
+
+            resourceSection.style.display = 'block';
+            resourceSummary.style.display = 'none';
+            noResourceAlert.style.display = 'none';
+
+            const hasResources = buses.length > 0 && drivers.length > 0;
+
+            if (!hasResources) {
+                showNoResourceAlert(
+                    buses.length === 0 && drivers.length === 0
+                        ? 'Không có xe và tài xế rảnh trong khung giờ này.'
+                        : buses.length === 0
+                            ? 'Không có xe nào rảnh trong khung giờ này.'
+                            : 'Không có tài xế nào rảnh trong khung giờ này.'
+                );
+                lockDropdowns();
+                disableSubmit();
+                return;
+            }
+
+            // ── Render Bus select ────────────────────────────────────────────────────
+            busSelect.innerHTML = '<option value="">-- Chọn xe --</option>';
+            buses.forEach(bus => {
+                const opt = document.createElement('option');
+                opt.value = bus.id;
+                opt.textContent = `${bus.licensePlate} — ${bus.typeName} (${bus.capacity} ghế)${bus.brand ? ' | ' + bus.brand : ''}`;
+                opt.setAttribute('data-capacity', bus.capacity);
+                busSelect.appendChild(opt);
             });
+            busSelect.disabled = false;
+
+            // ── Render Driver selects ────────────────────────────────────────────────
+            const driverOptionsHtml = buildDriverOptions(drivers, '-- Chọn tài xế --');
+            mainDriverSelect.innerHTML = driverOptionsHtml;
+            mainDriverSelect.disabled = false;
+
+            const assistantOptionsHtml = buildDriverOptions(drivers, '-- Không có --', false);
+            assistantSelect.innerHTML = '<option value="">-- Không có --</option>' +
+                drivers.map(d =>
+                    `<option value="${d.userId}">${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}</option>`
+                ).join('');
+            assistantSelect.disabled = false;
+
+            // ── Hiện/ẩn section tài xế phụ theo thời lượng ──────────────────────────
+            updateCoDriverSection(durationHours, drivers);
+
+            // ── Cập nhật summary badge ────────────────────────────────────────────────
+            resourceSummary.style.display = 'block';
+            resourceSummaryText.textContent =
+                `Tìm thấy ${buses.length} xe rảnh và ${drivers.length} tài xế rảnh trong khung giờ này.`;
+
+            priceSection.style.display = 'block';
+            setStep(4);
+            submitBtn.disabled = false;
+        }
+
+        function buildDriverOptions(drivers, placeholder, includeEmpty = true) {
+            let html = includeEmpty ? `<option value="">${placeholder}</option>` : '';
+            html += drivers.map(d =>
+                `<option value="${d.userId}">${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}</option>`
+            ).join('');
+            return html;
+        }
+
+        function showNoResourceAlert(message) {
+            noResourceAlert.style.display = 'block';
+            noResourceAlert.querySelector('strong').textContent = message;
+            resourceSummary.style.display = 'none';
+        }
+
+        // ── BƯỚC 3b: Hiện/ẩn section tài xế phụ ────────────────────────────────────
+
+        /**
+         * Kiểm tra duration > 8h → hiện coDriverSection với số slot cần thiết.
+         * Cập nhật required cho phụ xe nếu chuyến dài.
+         */
+        function updateCoDriverSection(durationHours, drivers) {
+            const requiredTotalDrivers = durationHours > 0 ? Math.ceil(durationHours / 8.0) : 1;
+            const neededCoDrivers = requiredTotalDrivers - 1; // trừ tài xế chính
+
+            if (neededCoDrivers <= 0) {
+                // Chuyến ≤ 8h: ẩn section tài xế phụ, phụ xe tùy chọn
+                coDriverSection.style.display = 'none';
+                coDriverSlots.innerHTML = '';
+                coDriverCount = 0;
+                assistantSelect.removeAttribute('required');
+                assistantReqBadge.style.display = 'none';
+                return;
+            }
+
+            // Chuyến > 8h
+            coDriverSection.style.display = 'block';
+            coDriverInfo.textContent =
+                `(Chuyến ${durationHours.toFixed(1)}h → cần ít nhất ${requiredTotalDrivers} tài xế, ` +
+                `trong đó ${neededCoDrivers} tài xế phụ)`;
+
+            // Reset slots và tạo lại đúng số lượng
+            coDriverSlots.innerHTML = '';
+            coDriverCount = 0;
+            addCoDriverBtn.disabled = false;
+
+            for (let i = 0; i < neededCoDrivers; i++) {
+                addCoDriverSlot(null);
+            }
+
+            // Đặt required cho slot đã tạo (chuyến > 8h bắt buộc đủ người)
+            coDriverSlots.querySelectorAll('select[name="coDriverIds"]')
+                .forEach(s => s.setAttribute('required', 'required'));
+
+            // Phụ xe bắt buộc nếu > 8h
+            assistantSelect.setAttribute('required', 'required');
+            assistantReqBadge.style.display = 'inline';
+        }
+
+        /**
+         * Thêm một slot <select> tài xế phụ vào coDriverSlots.
+         * @param {string|null} preselectedId — userId để preselect (dùng lại khi re-render)
+         */
+        function addCoDriverSlot(preselectedId) {
+            coDriverCount++;
+            const idx = coDriverCount;
+            const durationHours = routeDurationMinutes ? routeDurationMinutes / 60 : 0;
+            const isRequired = durationHours > 8 ? 'required' : '';
+
+            const options = availableDriversData.map(d =>
+                `<option value="${d.userId}"${preselectedId && String(d.userId) === String(preselectedId) ? ' selected' : ''}>
+            ${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}
+         </option>`
+            ).join('');
 
             const div = document.createElement('div');
             div.className = 'row mb-2 align-items-center';
             div.id = `coDriverRow_${idx}`;
             div.innerHTML = `
-                <div class="col">
-                    <label class="form-label"><i class="fas fa-user-shield"></i> Tài xế phụ ${idx}</label>
-                    <select name="coDriverIds" class="form-select form-select-sm">
-                        ${options}
-                    </select>
-                </div>
-                <div class="col-auto" style="padding-top:28px">
-                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeCoDriverSlot(${idx})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>`;
-            slotsDiv.appendChild(div);
+        <div class="col">
+            <label class="form-label">
+                <i class="fas fa-user-shield"></i> Tài xế phụ ${idx}
+            </label>
+            <select name="coDriverIds" class="form-select form-select-sm" ${isRequired}>
+                <option value="">-- Chọn tài xế phụ --</option>
+                ${options}
+            </select>
+            <div class="codriver-error text-danger small mt-1" style="display:none;"></div>
+        </div>
+        <div class="col-auto" style="padding-top:28px">
+            <button type="button" class="btn btn-outline-danger btn-sm"
+                    onclick="removeCoDriverSlot(${idx})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>`;
+            coDriverSlots.appendChild(div);
         }
 
         function removeCoDriverSlot(idx) {
@@ -297,9 +665,128 @@
             if (row) row.remove();
         }
 
-        // Gắn listener
-        document.querySelector('[name="departureTime"]').addEventListener('change', updateCoDriverSection);
-        document.querySelector('[name="arrivalTimeExpected"]').addEventListener('change', updateCoDriverSection);
+        // ── BƯỚC 4: Điền số ghế tự động khi chọn xe ──────────────────────────────────
+
+        busSelect.addEventListener('change', () => {
+            const selectedOption = busSelect.options[busSelect.selectedIndex];
+            const capacity = selectedOption
+                ? parseInt(selectedOption.getAttribute('data-capacity'), 10)
+                : null;
+
+            if (capacity && capacity > 0) {
+                totalSeatsInput.value = capacity;
+                capacityHint.style.display = 'block';
+            } else {
+                totalSeatsInput.value = '';
+                capacityHint.style.display = 'none';
+            }
+        });
+
+        // ── Submit: Validate không trùng nhân sự ─────────────────────────────────────
+
+        document.getElementById('createTripForm').addEventListener('submit', function (e) {
+            if (!this.checkValidity()) {
+                e.preventDefault();
+                this.reportValidity();
+                return;
+            }
+            if (!validateNoDriverConflict()) {
+                e.preventDefault();
+                const firstErr = document.querySelector('.is-invalid');
+                if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+
+        /**
+         * Kiểm tra không có tài xế nào trùng nhau giữa:
+         * Tài xế chính ↔ Phụ xe ↔ Các tài xế phụ
+         */
+        function validateNoDriverConflict() {
+            let valid = true;
+
+            // Reset lỗi cũ
+            assistantError.style.display = 'none';
+            document.querySelectorAll('.codriver-error').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('#coDriverSlots select').forEach(s => s.classList.remove('is-invalid'));
+            assistantSelect.classList.remove('is-invalid');
+
+            const mainDriverId = mainDriverSelect.value;
+            const assistantId = assistantSelect.value;
+            const usedIds = new Set();
+
+            if (mainDriverId) usedIds.add(mainDriverId);
+
+            if (assistantId && assistantId !== '') {
+                if (usedIds.has(assistantId)) {
+                    assistantError.textContent = '⚠️ Phụ xe không được trùng với tài xế chính!';
+                    assistantError.style.display = 'block';
+                    assistantSelect.classList.add('is-invalid');
+                    valid = false;
+                } else {
+                    usedIds.add(assistantId);
+                }
+            }
+
+            coDriverSlots.querySelectorAll('.row').forEach(row => {
+                const sel = row.querySelector('select[name="coDriverIds"]');
+                const errDiv = row.querySelector('.codriver-error');
+                if (!sel) return;
+                const val = sel.value;
+                if (val && val !== '') {
+                    if (usedIds.has(val)) {
+                        errDiv.textContent = '⚠️ Tài xế này đã được chọn ở vị trí khác!';
+                        errDiv.style.display = 'block';
+                        sel.classList.add('is-invalid');
+                        valid = false;
+                    } else {
+                        usedIds.add(val);
+                    }
+                }
+            });
+
+            return valid;
+        }
+
+        // ── UI Helpers ────────────────────────────────────────────────────────────────
+
+        function setResourceSectionLoading(loading) {
+            resourceSection.classList.toggle('loading', loading);
+        }
+
+        function hideResourceSection() {
+            resourceSection.style.display = 'none';
+            priceSection.style.display = 'none';
+            disableSubmit();
+            coDriverSlots.innerHTML = '';
+            coDriverCount = 0;
+        }
+
+        function lockDropdowns() {
+            busSelect.disabled = true;
+            mainDriverSelect.disabled = true;
+            assistantSelect.disabled = true;
+            addCoDriverBtn.disabled = true;
+            resourceSection.style.display = 'block';
+        }
+
+        function disableSubmit() {
+            submitBtn.disabled = true;
+        }
+
+        function setStep(step) {
+            stepBadges.forEach((badge, i) => {
+                badge.classList.remove('active', 'done');
+                if (i + 1 < step) badge.classList.add('done');
+                else if (i + 1 === step) badge.classList.add('active');
+            });
+        }
+
+        /** Chuyển Date object thành chuỗi "YYYY-MM-DDTHH:mm" cho datetime-local */
+        function toDatetimeLocalString(date) {
+            const pad = n => String(n).padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+                `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        }
     </script>
 </body>
 
