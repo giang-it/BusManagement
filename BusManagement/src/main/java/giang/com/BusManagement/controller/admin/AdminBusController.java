@@ -49,7 +49,7 @@ public class AdminBusController {
             model.addAttribute("bus", bus);
             model.addAttribute("busTypes", busService.findAllBusTypes());
             model.addAttribute("statuses", BusStatus.values());
-            return "admin/bus-form";
+            return "admin/bus/bus-form";
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
             return "redirect:/admin/buses";

@@ -7,8 +7,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import giang.com.BusManagement.domain.Bus;
-import giang.com.BusManagement.domain.BusStatus;
 import giang.com.BusManagement.domain.Role;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.domain.User;
@@ -51,21 +49,6 @@ public class AdminController {
     public String saveUser(@ModelAttribute("user") User user) {
         adminService.createNewUser(user);
         return "redirect:/admin/dashboard?success=user";
-    }
-
-    // FORM TẠO XE
-    @GetMapping("/buses/new")
-    public String showBusForm(Model model) {
-        model.addAttribute("bus", new Bus());
-        model.addAttribute("busTypes", adminService.getAllBusTypes());
-        model.addAttribute("statuses", BusStatus.values());
-        return "admin/bus-form";
-    }
-
-    @PostMapping("/buses/save")
-    public String saveBus(@ModelAttribute("bus") Bus bus) {
-        adminService.createNewBus(bus);
-        return "redirect:/admin/dashboard?success=bus";
     }
 
 }
