@@ -44,7 +44,7 @@ public class AdminStationController {
             Station station = stationService.findById(id)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy bến xe với ID: " + id));
             model.addAttribute("station", station);
-            return "admin/station-form";
+            return "admin/station/station-form";
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
             return "redirect:/admin/stations";
