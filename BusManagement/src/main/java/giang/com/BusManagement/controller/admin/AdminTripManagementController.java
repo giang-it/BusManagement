@@ -64,7 +64,7 @@ public class AdminTripManagementController {
     @GetMapping("/trips/create")
     public String showCreateTripForm(Model model) {
         model.addAttribute("trip", new Trip());
-        model.addAttribute("routes", routeRepository.findAll());
+        model.addAttribute("routes", routeRepository.findAllWithStations());
         model.addAttribute("buses", busRepository.findAll());
         model.addAttribute("drivers", driverRepository.findAll());
         return "admin/trip-create-form";
@@ -165,7 +165,7 @@ public class AdminTripManagementController {
 
         model.addAttribute("trip", trip);
         model.addAttribute("savedCoDriverIds", savedCoDriverIds);
-        model.addAttribute("routes", routeRepository.findAll());
+        model.addAttribute("routes", routeRepository.findAllWithStations());
         model.addAttribute("buses", availableBuses);
         List<Driver> drivers = driverRepository.findAllWithUser();
         model.addAttribute("drivers", drivers);

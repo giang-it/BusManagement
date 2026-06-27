@@ -140,7 +140,7 @@
                         -->
                             <select id="routeSelect" name="routeId" class="form-select" required>
                                 <option value="">-- Chọn tuyến --</option>
-                                <option th:each="route : ${routes}" th:value="${route.id}" th:text="${route.departurePoint} + ' → ' + ${route.destinationPoint}
+                                <option th:each="route : ${routes}" th:value="${route.id}" th:text="${route.departurePointDisplay} + ' → ' + ${route.destinationPointDisplay}
                                               + ' (' + ${route.estimatedDuration} + ' phút)'"
                                     th:attr="data-duration=${route.estimatedDuration}">
                                 </option>

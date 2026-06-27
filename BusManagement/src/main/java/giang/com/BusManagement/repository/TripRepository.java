@@ -45,7 +45,7 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        @Query("""
                      SELECT DISTINCT t FROM Trip t
-                     LEFT JOIN FETCH t.route
+                     LEFT JOIN FETCH t.route r
                      LEFT JOIN FETCH t.bus b
                      LEFT JOIN FETCH b.busType
                      LEFT JOIN FETCH t.driver d
@@ -62,7 +62,7 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        @Query("""
                      SELECT DISTINCT t FROM Trip t
-                     LEFT JOIN FETCH t.route
+                     LEFT JOIN FETCH t.route r
                      LEFT JOIN FETCH t.bus b
                      LEFT JOIN FETCH b.busType
                      LEFT JOIN FETCH t.driver d
@@ -76,7 +76,7 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
 
        @Query("""
                      SELECT DISTINCT t FROM Trip t
-                     LEFT JOIN FETCH t.route
+                     LEFT JOIN FETCH t.route r
                      LEFT JOIN FETCH t.bus b
                      LEFT JOIN FETCH b.busType
                      LEFT JOIN FETCH t.driver d

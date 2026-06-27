@@ -384,9 +384,9 @@
                             <td class="ps-4 fw-medium text-muted">#<span th:text="${trip.id}"></span></td>
                             <td>
                                 <div class="fw-semibold text-main">
-                                    <span th:text="${trip.route.departurePoint}"></span>
+                                    <span th:text="${trip.route.departurePointDisplay}"></span>
                                     <i class="bi bi-arrow-right-short text-muted mx-1"></i>
-                                    <span th:text="${trip.route.destinationPoint}"></span>
+                                    <span th:text="${trip.route.destinationPointDisplay}"></span>
                                 </div>
                                 <span th:if="${trip.isExtraTrip}" class="badge badge-extra mt-1">
                                     <i class="bi bi-lightning-fill"></i> Tăng cường
