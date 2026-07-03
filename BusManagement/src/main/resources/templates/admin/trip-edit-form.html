@@ -55,7 +55,7 @@
                             <select name="routeId" class="form-select" required>
                                 <option value="">-- Chọn tuyến --</option>
                                 <option th:each="route : ${routes}" th:value="${route.id}"
-                                    th:text="${route.departurePoint} + ' → ' + ${route.destinationPoint}"
+                                    th:text="${route.departurePointDisplay} + ' → ' + ${route.destinationPointDisplay}"
                                     th:selected="${route.id == trip.route?.id}">
                                 </option>
                             </select>
@@ -343,7 +343,7 @@
             document.getElementById('assistantSelect').classList.remove('is-invalid');
 
             const mainDriverId = document.getElementById('mainDriverSelect').value;
-            const assistantId  = document.getElementById('assistantSelect').value;
+            const assistantId = document.getElementById('assistantSelect').value;
             const usedIds = new Set();
 
             if (mainDriverId) usedIds.add(mainDriverId);
@@ -381,7 +381,7 @@
         }
 
         // ── Xử lý submit form ────────────────────────────────────────────────────
-        document.getElementById('editTripForm').addEventListener('submit', function(e) {
+        document.getElementById('editTripForm').addEventListener('submit', function (e) {
             // 1. Native HTML5 validation
             if (!this.checkValidity()) {
                 e.preventDefault();

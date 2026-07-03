@@ -78,7 +78,8 @@
 
                 <!-- Thông tin chuyến -->
                 <div class="col-md-4">
-                    <div class="fw-bold" th:text="${trip.route.departurePoint + ' → ' + trip.route.destinationPoint}">
+                    <div class="fw-bold"
+                        th:text="${trip.route.departurePointDisplay + ' → ' + trip.route.destinationPointDisplay}">
                     </div>
                     <div class="text-muted small"
                         th:text="'Khởi hành: ' + ${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}">

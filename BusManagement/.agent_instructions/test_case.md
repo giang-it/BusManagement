@@ -373,14 +373,17 @@
 - **Mã TC:** TC_FSM_003
 - **Tên Kịch Bản:** Xe đang có chuyến ACTIVE trong khung giờ được lọc không được xuất hiện trong danh sách trả về
 - **Điều kiện tiên quyết:**
-  - Xe "29A-001.01" (ID=1) đang có chuyến ACTIVE từ `2026-09-01T08:00` đến `2026-09-01T14:00`
+  - Xe "29A-001.01" (ID=1) đang có chuyến ACTIVE từ `2026-06-23T06:00` đến `2026-06-23T10:00`
   - Các xe khác không bị trùng lịch
 - **Các bước thực hiện:**
-  1. `GET /api/admin/trips/available-resources?departure=2026-09-01T09:00&arrival=2026-09-01T13:00`
+  1. `GET /api/admin/trips/available-resources?departure=2026-06-23T06:00&arrival=2026-06-23T10:00`
 - **Kết quả mong đợi:**
   - `isBusBusy(busID1, windowStart=08:00, windowEnd=14:00, null)` → TRUE
   - Xe "29A-001.01" **KHÔNG** xuất hiện trong `buses` array của response
   - Các xe khác không bị trùng lịch vẫn xuất hiện bình thường
+- **lưu ý:**
+  - `buses` array: chỉ chứa xe READY, trạng thái hiện tại không phải REPAIRING/TRAVELING, không bận trong window `[05:00, 11:00]` (departure-1h đến arrival+1h), chưa quá hạn/sắp quá hạn bảo trì
+  - `drivers` array: chỉ chứa tài xế active, bằng lái còn hạn, tổng giờ lái hôm đó + 6h <= 8h, không bận trong window `[05:30, 10:30]` (departure-30p đến arrival+30p)
 
 ---
 
@@ -1069,7 +1072,7 @@
   - DB: INSERT chuyến mới với `original_trip_id=1`, `status=PENDING_APPROVAL`
 
 ---
-
+//////////////////////////////////////
 ### NHÓM 4.3: THUẬT TOÁN TỰ ĐỘNG PHÂN CÔNG TÀI NGUYÊN (autoAssignResources)
 
 ### TC_AI_010 — autoAssignResources: Gán xe tốt nhất (ít km nhất, đúng loại, không bận)

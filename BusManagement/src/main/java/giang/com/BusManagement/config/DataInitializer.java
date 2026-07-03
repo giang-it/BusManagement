@@ -157,23 +157,23 @@ public class DataInitializer implements CommandLineRunner {
         Station hue = createStation("Bến xe Huế", "Huế");
         Station ct = createStation("Bến xe Cần Thơ", "Cần Thơ");
 
-        // Tuyến ngắn (2h) — Limousine
-        Route tuyenHN_HP = createRoute("Hà Nội", "Hải Phòng", 120.0, 120, limousine);
+        // Tuyến ngắn (2h) — Limousine: Mỹ Đình -> Niệm Nghĩa
+        Route tuyenHN_HP = createRoute(hn, hp, 120.0, 120, limousine);
 
-        // Tuyến trung bình (6h) — Limousine
-        Route tuyenSG_DL = createRoute("Sài Gòn", "Đà Lạt", 300.0, 360, limousine);
+        // Tuyến trung bình (6h) — Limousine: Miền Đông -> Đà Lạt
+        Route tuyenSG_DL = createRoute(sg, dl, 300.0, 360, limousine);
 
-        // Tuyến ngắn (2h) — Giường nằm
-        Route tuyenDN_Hue = createRoute("Đà Nẵng", "Huế", 100.0, 120, giuongNam);
+        // Tuyến ngắn (2h) — Giường nằm: Đà Nẵng -> Huế
+        Route tuyenDN_Hue = createRoute(dn, hue, 100.0, 120, giuongNam);
 
-        // Tuyến cao tốc ngắn (1.5h)
-        Route tuyenHP_HN = createRoute("Hải Phòng", "Hà Nội", 120.0, 90, giuongNam);
+        // Tuyến cao tốc ngắn (1.5h): Niệm Nghĩa -> Mỹ Đình
+        Route tuyenHP_HN = createRoute(hp, hn, 120.0, 90, giuongNam);
 
-        // Tuyến miền Tây (3.5h) — Limousine
-        Route tuyenCT_SG = createRoute("Cần Thơ", "Sài Gòn", 180.0, 210, limousine);
+        // Tuyến miền Tây (3.5h) — Limousine: Cần Thơ -> Miền Đông
+        Route tuyenCT_SG = createRoute(ct, sg, 180.0, 210, limousine);
 
-        // Tuyến siêu dài (30h) — Giường nằm
-        Route tuyenHN_SG = createRoute("Hà Nội", "Sài Gòn", 1700.0, 1800, giuongNam);
+        // Tuyến siêu dài (30h) — Giường nằm: Mỹ Đình -> Miền Đông
+        Route tuyenHN_SG = createRoute(hn, sg, 1700.0, 1800, giuongNam);
 
         // =====================================================================
         // 6. CÁC CHUYẾN XE — TẤT CẢ STATUS = ACTIVE
@@ -215,14 +215,46 @@ public class DataInitializer implements CommandLineRunner {
     // CÁC HÀM TRỢ GIÚP (HELPER)
     // =====================================================================
 
-    private Route createRoute(String from, String to, double dist, int duration, BusType type) {
+    /**
+     * Tạo Route và đồng thời seed 2 bản ghi RouteStation (stopOrder=1 cho điểm
+     * đi, stopOrder=2 cho điểm đến), gắn Route vào hệ thống Station thật.
+     * KHÔNG còn nhận String tự do — đây là điểm hợp nhất 2 luồng dữ liệu.
+     */
+    private Route createRoute(Station from, Station to, double dist, int duration, BusType type) {
         Route r = new Route();
-        r.setDeparturePoint(from);
-        r.setDestinationPoint(to);
         r.setDistanceKm(dist);
         r.setEstimatedDuration(duration);
         r.setSuitableBusType(type);
-        return routeRepository.save(r);
+        r = routeRepository.save(r);
+
+        linkRouteStation(r, from, 1);
+        linkRouteStation(r, to, 2);
+
+        return r;
+    }
+
+    /**
+     * Helper tạo 1 bản ghi RouteStation nối Route với Station tại vị trí
+     * stopOrder cho trước. Dùng @EmbeddedId RouteStationId + @MapsId nên chỉ
+     * cần set route/station, id sẽ được Hibernate tự ánh xạ.
+     */
+    private RouteStation linkRouteStation(Route route, Station station, int stopOrder) {
+        RouteStation rs = new RouteStation();
+
+        // 1. BẮT BUỘC: Khởi tạo đối tượng khóa tổ hợp Id
+        RouteStationId id = new RouteStationId();
+        id.setRouteId(route.getId());
+        id.setStationId(station.getId());
+
+        // 2. Gán đối tượng khóa này vào RouteStation
+        rs.setId(id);
+
+        // 3. Thiết lập các mối quan hệ và thuộc tính khác như bình thường
+        rs.setRoute(route);
+        rs.setStation(station);
+        rs.setStopOrder(stopOrder);
+
+        return routeStationRepository.save(rs);
     }
 
     private BusType createBusType(String name, int cap) {

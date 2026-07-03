@@ -64,7 +64,8 @@
             <div class="row">
                 <div class="col-md-6">
                     <p class="mb-1"><strong>Tuyến đường:</strong>
-                        <span th:text="${trip.route.departurePoint + ' → ' + trip.route.destinationPoint}"></span>
+                        <span
+                            th:text="${trip.route.departurePointDisplay + ' → ' + trip.route.destinationPointDisplay}"></span>
                     </p>
                     <p class="mb-1"><strong>Giờ khởi hành:</strong>
                         <span th:text="${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}"></span>
