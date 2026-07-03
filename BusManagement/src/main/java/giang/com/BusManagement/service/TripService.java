@@ -407,6 +407,15 @@ public class TripService {
                 busRepository.save(trip.getBus());
             } else if (newStatus == TripStatus.COMPLETED) {
                 trip.getBus().setStatus(BusStatus.READY);
+
+                // Cộng quãng đường chuyến này vào odometer thực tế
+                if (trip.getRoute() != null && trip.getRoute().getDistanceKm() != null) {
+                    double currentOdo = trip.getBus().getOdometer() != null
+                            ? trip.getBus().getOdometer()
+                            : 0.0;
+                    trip.getBus().setOdometer(currentOdo + trip.getRoute().getDistanceKm());
+                }
+
                 busRepository.save(trip.getBus());
             }
         }
@@ -439,7 +448,8 @@ public class TripService {
     private double getDrivingHoursForDate(Driver driver, LocalDateTime date, Long excludeTripId) {
         LocalDateTime startOfDay = date.toLocalDate().atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
-        List<TripStatus> busyStatuses = List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
+        List<TripStatus> busyStatuses = List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED,
+                TripStatus.COMPLETED);
 
         List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay,
                 endOfDay,
@@ -651,9 +661,14 @@ public class TripService {
             throw new IllegalArgumentException(
                     "Xe " + bus.getLicensePlate() + " đang được bảo trì/sửa chữa, không thể gán vào chuyến!");
         }
-        if (bus.getStatus() == BusStatus.TRAVELING) {
-            throw new IllegalArgumentException("Xe " + bus.getLicensePlate()
-                    + " đang trên đường (TRAVELING), không thể gán vào chuyến mới cho đến khi hoàn thành chuyến hiện tại!");
+        if (bus.getStatus() == BusStatus.TRAVELING) { // ← THAY BẰNG ĐOẠN NÀY
+            boolean travelingForThisTrip = excludeTripId != null
+                    && trip.getId() != null
+                    && excludeTripId.equals(trip.getId());
+            if (!travelingForThisTrip) {
+                throw new IllegalArgumentException("Xe " + bus.getLicensePlate()
+                        + " đang trên đường (TRAVELING), không thể gán vào chuyến mới cho đến khi hoàn thành chuyến hiện tại!");
+            }
         }
 
         LocalDateTime departure = trip.getDepartureTime();
