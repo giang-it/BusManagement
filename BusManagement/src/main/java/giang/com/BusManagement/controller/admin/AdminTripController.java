@@ -64,6 +64,9 @@ public class AdminTripController {
             // MANUAL MODE: Chỉ load danh sách khi AI không tự phân công được
             model.addAttribute("availableBuses", tripService.getAvailableBusesForTrip(id));
             model.addAttribute("availableDrivers", tripService.getAvailableDriversForTrip(id));
+            // Phụ xe không trực tiếp lái xe nên dùng danh sách riêng, không áp ràng buộc
+            // giờ lái tối đa 8h/ngày (xem TripService.getAvailableAssistantsForTrip)
+            model.addAttribute("availableAssistants", tripService.getAvailableAssistantsForTrip(id));
         }
 
         return "admin/approve-form";

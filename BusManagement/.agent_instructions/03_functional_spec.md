@@ -15,7 +15,7 @@
   * **Xe:** Không gán xe đang trong lịch bảo trì.
 * **c) Cơ chế "Tăng cường" chuyến:** Khi tỉ lệ lấp đầy ghế > 90%, hệ thống gợi ý Admin mở thêm một chuyến xe phụ cùng khung giờ.
 * **d) Thay đổi:** thay vì admin phải tự gán tài và xe thì ta nên để AI tự gán luôn, thêm phụ xe và tài cho mỗi chuyến xe tăng cường. và phải có thời gian nghỉ cho tài và phụ xe.
-* **e) Thêm:** nếu chuyến quá 8h thì cần 2 tài xế (là 3 người: 2 tài xế, 1 phụ xe).
+* **e) Thêm:** nếu chuyến quá 8h thì cần thêm số tài xế cho hợp lệ.
 
 ### 3. Theo dõi bảo trì & An toàn
 * **a) Cảnh báo bảo dưỡng:** Tự động liệt kê các xe đã chạy quá 5.000km kể từ lần bảo trì cuối.
