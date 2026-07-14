@@ -285,10 +285,16 @@
                     <div class="mb-4">
                         <label class="form-label fw-bold">&#129351; Chọn phụ xe
                             <span class="badge bg-light text-dark border ms-1">Không bắt buộc</span>
+                            <span class="badge bg-secondary ms-1"
+                                th:text="${#lists.size(availableAssistants)} + ' người hợp lệ'"></span>
                         </label>
+                        <small class="text-muted d-block mb-2">
+                            Điều kiện: bằng còn hạn + rảnh (KHÔNG áp giới hạn 8h/ngày vì phụ xe không trực tiếp lái
+                            xe)
+                        </small>
                         <select name="assistantId" class="form-select">
                             <option value="">-- Không có phụ xe --</option>
-                            <option th:each="d : ${availableDrivers}" th:value="${d.userId}" th:text="${d.user.fullName
+                            <option th:each="d : ${availableAssistants}" th:value="${d.userId}" th:text="${d.user.fullName
                                         + ' | Bằng: ' + d.licenseNumber
                                         + ' | Đã làm: ' + d.totalDrivingHours24h + 'h hôm nay'}">
                             </option>

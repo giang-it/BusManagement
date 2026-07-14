@@ -220,18 +220,20 @@ public class TripService {
         java.util.List<Driver> assignedStaff = new java.util.ArrayList<>();
 
         // Bước 2: Tìm tài xế chính
-        Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers, assignedStaff);
+        Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
+                assignedStaff, false);
         if (driver == null) {
             return AutoAssignResult.failure(
                     "Không có tài xế chính hợp lệ (cần bằng còn hạn, rảnh, và đủ định mức ngày)");
         }
         assignedStaff.add(driver);
 
-        // Bước 3: Tìm các tài xế phụ (nếu chuyến dài > 8h)
+        // Bước 3: Tìm các tài xế phụ (nếu chuyến dài > 8h) — vẫn trực tiếp lái xe nên
+        // vẫn phải chịu ràng buộc giờ lái tối đa 8h/ngày như tài xế chính.
         java.util.List<Driver> coDrivers = new java.util.ArrayList<>();
         for (int i = 1; i < requiredDrivers; i++) {
             Driver coDriver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                    assignedStaff);
+                    assignedStaff, false);
             if (coDriver == null) {
                 return AutoAssignResult.failure(
                         "Không tìm đủ số lượng tài xế phụ hợp lệ cho chuyến dài " + Math.round(tripDurationHours)
@@ -242,9 +244,12 @@ public class TripService {
         }
 
         // Bước 4: Tìm phụ xe (nếu chuyến > 8h thì phụ xe là BẮT BUỘC, ngược lại là tùy
-        // chọn)
+        // chọn). Phụ xe KHÔNG trực tiếp lái xe (getDrivingHoursForDate() luôn tính
+        // 0.0h cho vai trò này) nên KHÔNG được áp ràng buộc giờ lái tối đa 8h/ngày —
+        // truyền isAssistantRole=true để bỏ qua điều kiện đó, chỉ còn kiểm tra bằng
+        // lái còn hạn + không trùng lịch (không thể có mặt ở 2 chuyến cùng lúc).
         Driver assistant = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                assignedStaff);
+                assignedStaff, true);
         if (assistant == null && tripDurationHours > 8.0) {
             return AutoAssignResult.failure(
                     "Không tìm thấy phụ xe hợp lệ (bắt buộc đối với chuyến xe dài trên 8 tiếng)");
@@ -317,10 +322,19 @@ public class TripService {
      *
      * Sắp xếp: Người ít giờ lái nhất trong ngày được ưu tiên → phân bổ đều tải.
      *
-     * @param excludeDriver Tài xế cần loại trừ (null nếu đang tìm tài xế chính)
+     * @param excludeDrivers  Các tài xế cần loại trừ (tránh trùng vai trò trong
+     *                        cùng 1 chuyến)
+     * @param isAssistantRole true nếu đang tìm PHỤ XE. Phụ xe không trực tiếp lái
+     *                        xe (getDrivingHoursForDate() luôn tính 0.0h cho vai
+     *                        trò này — xem method đó), nên ràng buộc "tổng giờ
+     *                        lái + chuyến mới ≤ 8h" KHÔNG áp dụng cho phụ xe.
+     *                        Ràng buộc bằng lái còn hạn và không trùng lịch vẫn
+     *                        được giữ nguyên vì phụ xe vẫn cần có mặt thực tế
+     *                        trên xe.
      */
     private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
-            double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers) {
+            double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
+            boolean isAssistantRole) {
         // Cửa sổ kiểm tra = thêm thời gian nghỉ bắt buộc ở cả hai đầu
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
@@ -336,10 +350,11 @@ public class TripService {
                         || excludeDrivers.stream().noneMatch(ex -> ex.getUserId().equals(d.getUserId())))
                 // Ràng buộc: bằng lái phải còn hạn
                 .filter(Driver::isLicenseValid)
-                // Ràng buộc: tổng giờ lái hôm nay + thời lượng chuyến không được vượt 8 tiếng
-                // Tính chính xác dựa trên CÁC CHUYẾN ĐÃ XẾP TRONG NGÀY với lượng giờ chia sẻ
-                // thực tế
-                .filter(d -> getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
+                // Ràng buộc: tổng giờ lái hôm nay + thời lượng chuyến không được vượt 8 tiếng.
+                // CHỈ áp dụng cho tài xế chính/tài xế phụ (isAssistantRole=false) — phụ xe
+                // không lái nên bỏ qua ràng buộc này (Tính chính xác dựa trên CÁC CHUYẾN ĐÃ
+                // XẾP TRONG NGÀY với lượng giờ chia sẻ thực tế).
+                .filter(d -> isAssistantRole || getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
                 // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .collect(Collectors.toList());
@@ -889,7 +904,9 @@ public class TripService {
     }
 
     /**
-     * Lấy tài xế hợp lệ & rảnh cho chuyến (dùng cho form phân công thủ công).
+     * Lấy tài xế hợp lệ & rảnh cho chuyến — dùng cho dropdown "Tài xế chính" /
+     * "Tài xế phụ" ở form phân công thủ công (họ đều trực tiếp lái xe nên vẫn
+     * chịu ràng buộc giờ lái tối đa 8h/ngày).
      */
     public List<Driver> getAvailableDriversForTrip(Long tripId) {
         Trip trip = tripRepository.findById(tripId).orElseThrow();
@@ -907,6 +924,34 @@ public class TripService {
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(Driver::isLicenseValid)
                 .filter(d -> getDrivingHoursForDate(d, departure, tripId) + effectiveHours <= 8.0)
+                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
+                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Lấy tài xế hợp lệ & rảnh để làm PHỤ XE cho chuyến — dùng riêng cho dropdown
+     * "Phụ xe" ở form phân công thủ công.
+     *
+     * Khác với getAvailableDriversForTrip(): KHÔNG áp ràng buộc "tổng giờ lái +
+     * chuyến mới ≤ 8h" vì phụ xe không trực tiếp lái xe (xem
+     * getDrivingHoursForDate() — vai trò assistant luôn được tính 0.0h). Vẫn giữ
+     * ràng buộc bằng lái còn hạn và không trùng lịch (phụ xe vẫn cần có mặt thực
+     * tế trên xe, không thể ở 2 chuyến cùng lúc).
+     */
+    public List<Driver> getAvailableAssistantsForTrip(Long tripId) {
+        Trip trip = tripRepository.findById(tripId).orElseThrow();
+        LocalDateTime departure = trip.getDepartureTime();
+        LocalDateTime arrival = trip.getArrivalTimeExpected() != null
+                ? trip.getArrivalTimeExpected()
+                : departure.plusHours(5);
+
+        LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+
+        return driverRepository.findAll().stream()
+                .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
+                .filter(Driver::isLicenseValid)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
                 .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
                 .collect(Collectors.toList());
