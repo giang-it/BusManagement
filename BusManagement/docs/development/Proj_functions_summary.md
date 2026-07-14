@@ -6,7 +6,7 @@
 
 ## 0. Thông tin chung
 
-- **Tech stack:** Java 17, Spring Boot 3.x, Spring Data JPA (Hibernate), Thymeleaf, MySQL, Lombok.
+- **Tech stack:** Java 17, Spring Boot 4.0.2, Spring Data JPA (Hibernate), Thymeleaf, MySQL, Lombok.
 - **Kiến trúc:** Layered (Controller → Service → Repository → Domain/Entity), có một REST Controller (`TripRestController`) phục vụ AJAX.
 - **Bảo mật:** `SecurityConfig` cho phép **mọi request không cần đăng nhập** (`anyRequest().permitAll()`, CSRF/form-login/http-basic đều bị tắt). Không có phân quyền ROLE_ADMIN/ROLE_DRIVER/ROLE_USER nào được enforce ở tầng Spring Security, dù entity `User`/`Role` có định nghĩa enum 3 vai trò.
 - **Database init:** `spring.jpa.hibernate.ddl-auto=create-drop` + `DataInitializer` (`CommandLineRunner`) xóa toàn bộ dữ liệu cũ và seed lại dữ liệu test mỗi lần khởi động app — **không phù hợp production**.

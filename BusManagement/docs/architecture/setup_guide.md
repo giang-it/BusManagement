@@ -9,7 +9,7 @@ This guide covers all steps to clone, configure, and run the Bus Management Syst
 | Requirement      | Version         | Notes                                          |
 |------------------|-----------------|------------------------------------------------|
 | Java (JDK)       | 17 or higher    | Required. App uses Java 17 features.           |
-| Apache Maven     | 3.x             | A Maven Wrapper (`mvnw`) is included.          |
+| Apache Maven     | 4.0.2           | A Maven Wrapper (`mvnw`) is included.          |
 | MySQL Server     | 8.x recommended | Must be running before starting the app.       |
 | Git              | Any recent      | For cloning the repository.                    |
 | Docker           | —               | **Not implemented.** No Dockerfile or compose file exists in this project. |
