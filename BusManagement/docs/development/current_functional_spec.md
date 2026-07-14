@@ -49,6 +49,7 @@ Only the Administrator workflow is currently exposed through the application:
 *   **Implemented Functionality:**
     *   A background process flags active trips experiencing high passenger demand (occupancy) and recommends a cloned "extra" trip.
     *   **Auto-Assignment:** The engine automatically attempts to assign an available `READY` bus and qualified drivers that meet all safety constraints. If it fails to find qualified resources, it creates the recommendation with empty resources for manual assignment by the Admin.
+    *   **Duplicate-Suggestion Prevention:** Because the scan runs every 10 seconds, the engine checks `hasAlreadySuggested()` before cloning a trip, so a single hot trip does not spawn more than one live extra-trip suggestion. See the detailed rule below.
 
 ---
 
@@ -75,7 +76,7 @@ During manual creation or modification, the backend enforces the following valid
 The background scheduler evaluates demand and proposes additional trips through the following logical flow:
 1.  **Scan for Active Trips:** Search the database for all active trips (`find ACTIVE`).
 2.  **Evaluate Demand (`isHotTrip()`):** Identify trips that exceed passenger occupancy thresholds and time constraints (occupancy $\ge 90\%$, departs in the future, $\ge 72$ hours remain before departure, and tickets have been on sale for $\ge 48$ hours; the sale duration requirement is bypassed if occupancy hits $\ge 95\%$).
-3.  **Check for Existing Suggestions (`hasAlreadySuggested()`):** Check if an extra trip suggestion has already been generated for the same route and time window to prevent duplicates.
+3.  **Check for Existing Suggestions (`hasAlreadySuggested()`):** Check whether the original trip already has an extra trip linked to it (via the `original_trip_id` self-reference) sitting in a "live" status, to prevent duplicates.
 4.  **Create Recommendation (`createExtraTrip()`):** Generate a new suggestion in `PENDING_APPROVAL` status with a departure time offset by +30 minutes from the original trip.
 5.  **Allocate Resources (`autoAssignResources()`):** Automatically attempt to allocate a free `READY` bus and qualified drivers satisfying all safety constraints.
 6.  **Persistence (`save`):** Save the recommendation to the database.
@@ -84,6 +85,11 @@ The background scheduler evaluates demand and proposes additional trips through 
     *   Occupancy is $\ge 90\%$, departure is in the future, at least 72 hours remain before departure, and tickets have been on sale for at least 48 hours.
     *   *Immediate Trigger:* If occupancy reaches $\ge 95\%$, the 48-hour sale requirement is bypassed.
 *   **Recommendation Creation:** The system creates a suggestion entry in status `PENDING_APPROVAL` with a departure time offset by +30 minutes from the original trip.
+*   **Duplicate-Suggestion Rule (`hasAlreadySuggested()`):**
+    *   **Problem it solves:** The scheduler re-scans all `ACTIVE` trips every 10 seconds. Without a guard, a trip that stays hot across multiple scans would get a new cloned extra trip created on every cycle.
+    *   **Mechanism:** The check looks up whether any `Trip` exists whose `originalTripId` points back to this trip AND whose status is in a blocking set — it is keyed to the specific original trip, not to route or time window.
+    *   **Blocking statuses:** `PENDING_APPROVAL`, `ACTIVE`, `DEPARTED`, `COMPLETED`. Any of these means a suggestion is already "live," so no new extra trip is created.
+    *   **`CANCELLED` is intentionally excluded from the blocking set.** If a previously AI-suggested extra trip for this original trip was rejected by the Admin (or later cancelled — e.g. the assigned bus broke down or the driver became unavailable), the underlying capacity problem may still exist. Previously cancelled AI-suggested trips therefore do **not** prevent future recommendations — the scheduler is allowed to propose a brand-new extra trip for the same original trip on a later scan instead of being permanently blocked by one dead, cancelled suggestion.
 
 ### Trip Status Transitions (FSM)
 Trip status changes are controlled by a Finite State Machine (FSM) implemented in `TripService`.

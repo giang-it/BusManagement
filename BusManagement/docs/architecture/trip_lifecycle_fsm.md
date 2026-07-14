@@ -95,9 +95,23 @@ The scheduler does **not** change existing trip statuses. It creates new `Trip` 
 
 1. Fetch all `ACTIVE` trips with route eager-loaded.
 2. `isHotTrip(trip)` — check occupancy > 90%, departure in future, ≥72 h lead time, ≥48 h on sale (waived at ≥95%).
-3. `hasAlreadySuggested(trip)` — skip if extra trip already exists in a non-cancelled state.
+3. `hasAlreadySuggested(trip)` — skip if an extra trip already exists for this `originalTrip` in a blocking status.
 4. `createExtraTrip(trip)` — build new `Trip` (status=`PENDING_APPROVAL`, `isExtraTrip=true`, departure+30 min).
 5. `autoAssignResources(extraTrip)` — try to assign bus + crew. Save regardless of success.
+
+### 6.1. Duplicate-Suggestion Prevention (`hasAlreadySuggested`)
+
+Because step 1 re-scans every `ACTIVE` trip on every 10-second tick, a trip that stays hot across several ticks would otherwise get a new cloned extra trip on each one. `hasAlreadySuggested(originalTrip)` guards against this by querying `existsByOriginalTripAndStatusIn(originalTrip, blockingStatuses)` — i.e. does any `Trip` already reference this one via `original_trip_id` while sitting in a blocking status.
+
+| Status of existing extra trip | Blocks new suggestion? |
+|--------------------------------|-------------------------|
+| `PENDING_APPROVAL`             | ✅ Yes                  |
+| `ACTIVE`                       | ✅ Yes                  |
+| `DEPARTED`                     | ✅ Yes                  |
+| `COMPLETED`                    | ✅ Yes                  |
+| `CANCELLED`                    | ❌ No — AI may re-suggest |
+
+`CANCELLED` is deliberately left out of the blocking set. A cancelled extra trip means the earlier suggestion was rejected by the Admin or fell through (e.g. bus broke down, driver became unavailable) — the original capacity problem can still exist, so previously cancelled AI-suggested trips do not prevent future recommendations. The next scan is free to propose a fresh extra trip for the same original trip.
 
 ---
 
