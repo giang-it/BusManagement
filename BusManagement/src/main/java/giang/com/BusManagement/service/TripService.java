@@ -524,6 +524,16 @@ public class TripService {
         return hoursFromTrips;
     }
 
+    /**
+     * Public wrapper cho getDrivingHoursForDate() — dùng bởi DashboardService để
+     * hiển thị tải giờ lái của tài xế trong ngày (Strategic Analytics, tab Tài
+     * xế). Không có tripId nào cần loại trừ nên excludeTripId luôn null.
+     * Chỉ expose lại logic tính toán đã có, không thêm/thay đổi business rule.
+     */
+    public double getDrivingHoursForDate(Driver driver, LocalDateTime date) {
+        return getDrivingHoursForDate(driver, date, null);
+    }
+
     // =========================================================================
     // APPROVAL ACTIONS
     // =========================================================================

@@ -235,4 +235,54 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         * ACTIVE hoặc PENDING_APPROVAL
         */
        boolean existsByBusIdAndStatusIn(Long busId, List<TripStatus> statuses);
+
+       // =========================================================================
+       // TRUY VẤN CHO DASHBOARD (Strategic Analytics / Operational KPIs)
+       // =========================================================================
+
+       /**
+        * Đếm chuyến tăng cường (isExtraTrip = true) theo từng TripStatus.
+        * Dùng để dựng cả OperationalKpisDto.aiSuggestionsPendingCount (lấy bucket
+        * PENDING_APPROVAL) lẫn AiStatsDto (activated/rejected/pending) từ CÙNG một
+        * truy vấn, tránh gọi lặp lại 2 lần cho cùng một câu hỏi.
+        */
+       @Query("SELECT t.status, COUNT(t) FROM Trip t WHERE t.isExtraTrip = true GROUP BY t.status")
+       List<Object[]> countAiSuggestionsByStatus();
+
+       /**
+        * Lấy (totalSeats, ticketsSold) của từng chuyến theo trạng thái — dùng để
+        * tính occupancy rate trung bình và phân bố theo bucket ở tab Occupancy.
+        * Chỉ lấy 2 cột cần thiết, không JOIN FETCH quan hệ nào, tránh N+1/over-fetch
+        * cho một phép tính thuần số.
+        */
+       @Query("SELECT t.totalSeats, t.ticketsSold FROM Trip t WHERE t.status = :status")
+       List<Object[]> findSeatsAndSoldByStatus(@Param("status") TripStatus status);
+
+       /**
+        * Tổng số vé đã bán và tổng doanh thu (price * ticketsSold) trên các chuyến
+        * có trạng thái nằm trong danh sách cho trước. SUM không kèm GROUP BY luôn
+        * trả về đúng 1 dòng (kể cả khi không có chuyến nào khớp — khi đó các cột
+        * SUM sẽ là null). Khai báo trả về Object[] trực tiếp (thay vì
+        * List<Object[]>) bị Spring Data hiểu nhầm thành "ép toàn bộ result list
+        * thành mảng" chứ không phải "1 dòng kết quả" — nên phải dùng
+        * List<Object[]> rồi lấy phần tử đầu tiên ở tầng service.
+        */
+       @Query("SELECT SUM(t.ticketsSold), SUM(t.price * t.ticketsSold) FROM Trip t WHERE t.status IN :statuses")
+       List<Object[]> sumTicketsSoldAndRevenueByStatuses(@Param("statuses") Collection<TripStatus> statuses);
+
+       /**
+        * Số chuyến và doanh thu theo từng tuyến, giới hạn trong các trạng thái
+        * cho trước — dùng cho bảng xếp hạng tuyến đường (RouteStatsDto.topRoutes).
+        */
+       @Query("SELECT t.route.id, COUNT(t), SUM(t.price * t.ticketsSold) FROM Trip t " +
+                     "WHERE t.status IN :statuses GROUP BY t.route.id")
+       List<Object[]> aggregateByRoute(@Param("statuses") Collection<TripStatus> statuses);
+
+       /**
+        * Danh sách routeId đã từng xuất hiện trong ít nhất 1 chuyến (bất kỳ trạng
+        * thái nào) — dùng để tính routesWithNoTrips = totalRoutes - kích thước danh
+        * sách này.
+        */
+       @Query("SELECT DISTINCT t.route.id FROM Trip t")
+       List<Long> findDistinctRouteIdsWithTrips();
 }
