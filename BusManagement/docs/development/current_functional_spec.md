@@ -73,6 +73,7 @@ During manual creation or modification, the backend enforces the following valid
     *   **Double-Booking Check:** The bus must not be assigned to another trip overlapping with the window `[departure - 1 hour, arrival + 1 hour]` (preparation buffer).
     *   **Maintenance Block:** The bus cannot be assigned if it has already exceeded its maintenance threshold (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`) or if the distance of the trip will push the odometer into the warning threshold (`odometer + distance >= maintenanceThreshold * 0.9`).
 *   **Driver Availability Constraints:**
+    *   The driver (main, co-driver, or assistant) must be active (`isActive = true`).
     *   The driver must hold a valid, unexpired driver license.
     *   **Double-Booking Check:** The driver must not be busy on another trip overlapping with the window `[departure - 30 minutes, arrival + 30 minutes]` (minimum rest buffer).
     *   **Daily Driving Limit:** The accumulated driving hours for a driver on a single calendar day (including the duration of the new trip, split equally among assigned drivers) must not exceed 8 hours.
