@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Bus Management - Dashboard & Analytics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .kpi-card .fs-3 {
+            line-height: 1.1;
+        }
+
+        .chart-box {
+            position: relative;
+            height: 260px;
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">🚌 BusManager Admin — Dashboard & Analytics</span>
+            <a th:href="@{/admin/dashboard}" class="btn btn-outline-light btn-sm">← Trang chủ</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4" style="max-width:1400px;">
+
+        <!-- =================================================================
+             OPERATIONAL KPIs — luôn hiển thị, không nằm trong tab
+             ================================================================= -->
+        <h5 class="text-muted mb-3"><i class="bi bi-lightning-charge-fill text-warning"></i> Cần xử lý ngay</h5>
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card kpi-card border-0 bg-warning bg-opacity-10 h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Chờ duyệt</div>
+                        <div class="fs-3 fw-bold" th:text="${overview.operational.pendingApprovalsCount}">0</div>
+                        <div class="small text-muted"
+                            th:text="${overview.operational.pendingAutoAssignedCount} + ' tự động · ' + ${overview.operational.pendingNeedsManualCount} + ' thủ công'">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card kpi-card border-0 bg-info bg-opacity-10 h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Sắp khởi hành (48h)</div>
+                        <div class="fs-3 fw-bold" th:text="${overview.operational.upcomingTripsCount}">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card kpi-card border-0 bg-primary bg-opacity-10 h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Đang bán vé (ACTIVE)</div>
+                        <div class="fs-3 fw-bold" th:text="${overview.operational.activeTripsCount}">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card kpi-card border-0 bg-danger bg-opacity-10 h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Cảnh báo bảo trì</div>
+                        <div class="fs-3 fw-bold"
+                            th:text="${overview.operational.maintenanceOverdueCount + overview.operational.maintenanceNearCount}">
+                            0</div>
+                        <div class="small text-muted"
+                            th:text="${overview.operational.maintenanceOverdueCount} + ' quá hạn · ' + ${overview.operational.maintenanceNearCount} + ' sắp đến hạn'">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card kpi-card border-0 bg-success bg-opacity-10 h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Đề xuất AI chờ duyệt</div>
+                        <div class="fs-3 fw-bold" th:text="${overview.operational.aiSuggestionsPendingCount}">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="card kpi-card border-0 bg-secondary bg-opacity-10 h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Tài nguyên sẵn sàng</div>
+                        <div class="fs-5 fw-bold">
+                            <span th:text="${overview.operational.availableBusesCount}">0</span> xe ·
+                            <span th:text="${overview.operational.activeDriversCount}">0</span> tài xế
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danh sách hành động chi tiết -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <i class="bi bi-hourglass-split"></i> Chờ duyệt gần nhất
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item text-muted small"
+                            th:if="${#lists.isEmpty(overview.operational.pendingApprovalsPreview)}">
+                            Không có chuyến nào chờ duyệt.
+                        </li>
+                        <li class="list-group-item" th:each="t : ${overview.operational.pendingApprovalsPreview}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-medium" th:text="'#' + ${t.id} + ' — ' + ${t.routeLabel}"></div>
+                                    <div class="small text-muted"
+                                        th:text="${#temporals.format(t.departureTime, 'HH:mm - dd/MM/yyyy')}"></div>
+                                </div>
+                                <span th:if="${t.autoAssigned}" class="badge bg-success">AI đã gán</span>
+                                <span th:unless="${t.autoAssigned}" class="badge bg-warning text-dark">Cần thủ công</span>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="card-footer text-end bg-white">
+                        <a th:href="@{/admin/trips/pending}" class="btn btn-sm btn-outline-primary">Xem tất cả</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <i class="bi bi-calendar-event"></i> Sắp khởi hành
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item text-muted small"
+                            th:if="${#lists.isEmpty(overview.operational.upcomingTripsPreview)}">
+                            Không có chuyến nào trong 48 giờ tới.
+                        </li>
+                        <li class="list-group-item" th:each="t : ${overview.operational.upcomingTripsPreview}">
+                            <div class="fw-medium" th:text="'#' + ${t.id} + ' — ' + ${t.routeLabel}"></div>
+                            <div class="small text-muted"
+                                th:text="${#temporals.format(t.departureTime, 'HH:mm - dd/MM/yyyy')} + ' · ' + ${t.ticketsSold} + '/' + ${t.totalSeats} + ' ghế'">
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="card-footer text-end bg-white">
+                        <a th:href="@{/admin/trip-management/trips}" class="btn btn-sm btn-outline-primary">Xem tất
+                            cả</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <i class="bi bi-tools"></i> Cảnh báo bảo trì
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item text-muted small"
+                            th:if="${#lists.isEmpty(overview.operational.maintenanceAlertsPreview)}">
+                            Không có xe nào cần chú ý.
+                        </li>
+                        <li class="list-group-item" th:each="b : ${overview.operational.maintenanceAlertsPreview}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-medium" th:text="${b.licensePlate}"></div>
+                                    <div class="small text-muted"
+                                        th:text="${#numbers.formatDecimal(b.kmSinceLastMaintenance, 0, 0)} + ' / ' + ${#numbers.formatDecimal(b.maintenanceThreshold, 0, 0)} + ' km'">
+                                    </div>
+                                </div>
+                                <span th:if="${b.overdue}" class="badge bg-danger">Quá hạn</span>
+                                <span th:unless="${b.overdue}" class="badge bg-warning text-dark">Sắp đến hạn</span>
+                            </div>
+                        </li>
+                    </ul>
+                    <div class="card-footer text-end bg-white">
+                        <a th:href="@{/admin/buses}" class="btn btn-sm btn-outline-primary">Xem tất cả</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- =================================================================
+             STRATEGIC ANALYTICS — nội dung trong tab
+             ================================================================= -->
+        <h5 class="text-muted mb-3"><i class="bi bi-graph-up"></i> Phân tích & Thống kê</h5>
+
+        <ul class="nav nav-tabs" id="analyticsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-fleet" type="button">Đội
+                    xe</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-trips" type="button">Chuyến
+                    đi</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-routes" type="button">Tuyến
+                    đường</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-drivers" type="button">Tài
+                    xế</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-occupancy" type="button">Lấp đầy
+                    ghế</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ai" type="button">AI
+                    Recommendation</button>
+            </li>
+        </ul>
+
+        <div class="tab-content bg-white border border-top-0 rounded-bottom p-4 mb-4 shadow-sm">
+
+            <!-- TAB: FLEET -->
+            <div class="tab-pane fade show active" id="tab-fleet" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tổng số xe</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.fleet.totalBuses}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Sẵn sàng / Đang chạy / Bảo trì</div>
+                        <div class="fs-5 fw-bold">
+                            <span th:text="${overview.strategic.fleet.readyCount}"></span> /
+                            <span th:text="${overview.strategic.fleet.travelingCount}"></span> /
+                            <span th:text="${overview.strategic.fleet.repairingCount}"></span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tỉ lệ xe đang vận hành</div>
+                        <div class="fs-4 fw-bold"
+                            th:text="${#numbers.formatPercent(overview.strategic.fleet.utilizationRate, 1, 1)}">0%
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="text-muted small mb-2">Phân bố theo trạng thái</div>
+                        <div class="chart-box"><canvas id="fleetStatusChart"></canvas></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small mb-2">Phân bố theo loại xe</div>
+                        <div class="chart-box"><canvas id="fleetBusTypeChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: TRIPS -->
+            <div class="tab-pane fade" id="tab-trips" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tổng số chuyến</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.trips.totalTrips}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tổng vé đã bán</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.trips.totalTicketsSold}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Doanh thu (Active/Departed/Completed)</div>
+                        <div class="fs-4 fw-bold" th:text="${#numbers.formatDecimal(overview.strategic.trips.totalRevenue, 0, 'COMMA', 0, 'POINT')} + ' đ'">
+                            0</div>
+                    </div>
+                </div>
+                <div class="chart-box mb-2" style="max-width:600px;"><canvas id="tripStatusChart"></canvas></div>
+            </div>
+
+            <!-- TAB: ROUTES -->
+            <div class="tab-pane fade" id="tab-routes" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tổng số tuyến</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.routes.totalRoutes}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tuyến chưa có chuyến nào</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.routes.routesWithNoTrips}">0</div>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Tuyến</th>
+                                    <th class="text-end">Số chuyến</th>
+                                    <th class="text-end">Doanh thu</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="r : ${overview.strategic.routes.topRoutes}">
+                                    <td th:text="${r.routeLabel}"></td>
+                                    <td class="text-end" th:text="${r.tripCount}"></td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(r.revenue, 0, 'COMMA', 0, 'POINT')}"></td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(overview.strategic.routes.topRoutes)}">
+                                    <td colspan="3" class="text-muted text-center">Chưa có dữ liệu</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small mb-2">Top tuyến theo số chuyến</div>
+                        <div class="chart-box"><canvas id="routeTripsChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: DRIVERS -->
+            <div class="tab-pane fade" id="tab-drivers" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tổng / Hoạt động / Ngừng</div>
+                        <div class="fs-5 fw-bold">
+                            <span th:text="${overview.strategic.drivers.totalDrivers}"></span> /
+                            <span th:text="${overview.strategic.drivers.activeDrivers}"></span> /
+                            <span th:text="${overview.strategic.drivers.inactiveDrivers}"></span>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Bằng lái sắp hết hạn (7 ngày)</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.drivers.expiringLicenseCount}">0
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Kinh nghiệm trung bình</div>
+                        <div class="fs-4 fw-bold"
+                            th:text="${#numbers.formatDecimal(overview.strategic.drivers.avgExperienceYears, 0, 1)} + ' năm'">
+                            0</div>
+                    </div>
+                </div>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="text-muted small mb-2">Tài xế có tải cao nhất hôm nay</div>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Tài xế</th>
+                                    <th class="text-end">Giờ lái hôm nay</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="d : ${overview.strategic.drivers.topLoadedDrivers}">
+                                    <td th:text="${d.fullName}"></td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(d.drivingHoursToday, 0, 1)}"></td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(overview.strategic.drivers.topLoadedDrivers)}">
+                                    <td colspan="2" class="text-muted text-center">Chưa có dữ liệu</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small mb-2">Hoạt động / Ngừng hoạt động</div>
+                        <div class="chart-box"><canvas id="driverActiveChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: OCCUPANCY -->
+            <div class="tab-pane fade" id="tab-occupancy" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tỉ lệ lấp đầy trung bình (chuyến ACTIVE)</div>
+                        <div class="fs-4 fw-bold"
+                            th:text="${#numbers.formatPercent(overview.strategic.occupancy.averageOccupancyRate, 1, 1)}">
+                            0%</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Chuyến "hot" (&gt;90%)</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.occupancy.hotTripsCount}">0</div>
+                    </div>
+                </div>
+                <div class="chart-box mb-2" style="max-width:600px;"><canvas id="occupancyBucketChart"></canvas>
+                </div>
+            </div>
+
+            <!-- TAB: AI RECOMMENDATION -->
+            <div class="tab-pane fade" id="tab-ai" role="tabpanel">
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Tổng đề xuất AI</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.aiAnalytics.totalSuggested}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Đã kích hoạt</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.aiAnalytics.activatedCount}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Bị từ chối</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.aiAnalytics.rejectedCount}">0</div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="text-muted small">Đang chờ duyệt</div>
+                        <div class="fs-4 fw-bold" th:text="${overview.strategic.aiAnalytics.pendingCount}">0</div>
+                    </div>
+                </div>
+                <div class="chart-box mb-2" style="max-width:500px;"><canvas id="aiOutcomeChart"></canvas></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        document.addEventListener('DOMContentLoaded', function () {
+            // Màu theo đúng bảng màu Bootstrap contextual đã dùng cho card/badge ở trên
+            // (primary/success/warning/danger/secondary), giữ nhất quán, không thêm palette riêng.
+            var PALETTE = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6c757d', '#0dcaf0'];
+
+            function makeDoughnut(canvasId, labels, values) {
+                var el = document.getElementById(canvasId);
+                if (!el) return null;
+                return new Chart(el, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{ data: values, backgroundColor: PALETTE }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            function makeBar(canvasId, labels, values, seriesLabel) {
+                var el = document.getElementById(canvasId);
+                if (!el) return null;
+                return new Chart(el, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{ label: seriesLabel, data: values, backgroundColor: '#0d6efd' }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                    }
+                });
+            }
+
+            // Dữ liệu chart lấy trực tiếp từ ChartSeriesDto (DashboardService đã tổng hợp sẵn),
+            // không tính toán lại logic nghiệp vụ nào ở tầng view.
+            var fleetStatusLabels = /*[[${overview.strategic.fleet.statusChart.labels}]]*/[];
+            var fleetStatusValues = /*[[${overview.strategic.fleet.statusChart.values}]]*/[];
+            var fleetBusTypeLabels = /*[[${overview.strategic.fleet.busTypeChart.labels}]]*/[];
+            var fleetBusTypeValues = /*[[${overview.strategic.fleet.busTypeChart.values}]]*/[];
+            var tripStatusLabels = /*[[${overview.strategic.trips.statusChart.labels}]]*/[];
+            var tripStatusValues = /*[[${overview.strategic.trips.statusChart.values}]]*/[];
+            var routeTripsLabels = /*[[${overview.strategic.routes.tripsPerRouteChart.labels}]]*/[];
+            var routeTripsValues = /*[[${overview.strategic.routes.tripsPerRouteChart.values}]]*/[];
+            var driverActiveLabels = /*[[${overview.strategic.drivers.activeInactiveChart.labels}]]*/[];
+            var driverActiveValues = /*[[${overview.strategic.drivers.activeInactiveChart.values}]]*/[];
+            var occupancyBucketLabels = /*[[${overview.strategic.occupancy.occupancyBucketChart.labels}]]*/[];
+            var occupancyBucketValues = /*[[${overview.strategic.occupancy.occupancyBucketChart.values}]]*/[];
+            var aiOutcomeLabels = /*[[${overview.strategic.aiAnalytics.outcomeChart.labels}]]*/[];
+            var aiOutcomeValues = /*[[${overview.strategic.aiAnalytics.outcomeChart.values}]]*/[];
+
+            var charts = {
+                fleetStatus: makeDoughnut('fleetStatusChart', fleetStatusLabels, fleetStatusValues),
+                fleetBusType: makeBar('fleetBusTypeChart', fleetBusTypeLabels, fleetBusTypeValues, 'Số xe'),
+                tripStatus: makeBar('tripStatusChart', tripStatusLabels, tripStatusValues, 'Số chuyến'),
+                routeTrips: makeBar('routeTripsChart', routeTripsLabels, routeTripsValues, 'Số chuyến'),
+                driverActive: makeDoughnut('driverActiveChart', driverActiveLabels, driverActiveValues),
+                occupancyBucket: makeBar('occupancyBucketChart', occupancyBucketLabels, occupancyBucketValues, 'Số chuyến'),
+                aiOutcome: makeDoughnut('aiOutcomeChart', aiOutcomeLabels, aiOutcomeValues)
+            };
+
+            // Chart.js đo kích thước canvas lúc khởi tạo; canvas nằm trong tab-pane
+            // đang display:none (Bootstrap tab ẩn) sẽ bị đo là 0x0. Phải resize() lại
+            // khi tab thực sự được hiển thị.
+            document.querySelectorAll('#analyticsTabs button[data-bs-toggle="tab"]').forEach(function (tabButton) {
+                tabButton.addEventListener('shown.bs.tab', function () {
+                    Object.keys(charts).forEach(function (key) {
+                        if (charts[key]) charts[key].resize();
+                    });
+                });
+            });
+        });
+        /*]]>*/
+    </script>
+</body>
+
+</html>

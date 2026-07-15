@@ -260,6 +260,11 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 - **`DriverRepository`**: `findAllWithUser` (JOIN FETCH user).
 - **`RouteStationRepository`**: `findByRouteIdOrderByStopOrderAsc`.
 - **`StationRepository`**: `findByStationNameContainingIgnoreCase`.
+- **Bổ sung cho Dashboard & Analytics (đọc-only, xem mục 14):**
+  - `BusRepository.countByStatus(BusStatus)`.
+  - `DriverRepository.countByIsActive(Boolean)`, `findAverageExperienceYears()`, `countActiveDriversWithLicenseExpiringBetween(from, to)`.
+  - `TripRepository.countAiSuggestionsByStatus()`, `findSeatsAndSoldByStatus(status)`, `sumTicketsSoldAndRevenueByStatuses(statuses)`, `aggregateByRoute(statuses)`, `findDistinctRouteIdsWithTrips()`.
+  - **Lưu ý kỹ thuật đã gặp thực tế khi triển khai:** khai báo 1 query aggregate đa cột (`SUM`, không `GROUP BY`) trả về `Object[]` trực tiếp bị Spring Data hiểu nhầm thành "ép cả result list thành mảng" thay vì "1 dòng kết quả duy nhất" → `ClassCastException` lúc runtime. Lỗi này **không** bị compile hay context-load test bắt được, chỉ lộ ra khi gọi qua HTTP thật. Đã sửa `sumTicketsSoldAndRevenueByStatuses` sang `List<Object[]>` + lấy phần tử đầu ở tầng service — đây là pattern chuẩn, không mơ hồ của Spring Data JPA cho loại query này.
 
 ---
 
@@ -277,6 +282,7 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 | `admin/pending-trips.html` | Danh sách trip chờ duyệt, phân loại auto-assigned vs cần thủ công |
 | `admin/approve-form.html` | Form duyệt trip (2 mode: auto-confirm 1-click hoặc chọn thủ công) |
 | `admin/suggestions.html` | (tồn tại trong templates, liên quan đề xuất AI — chưa rõ controller route gọi tới) |
+| `admin/dashboard-analytics.html` | Dashboard & Analytics (xem mục 14): dải KPI vận hành cố định + 6 tab Strategic Analytics (Fleet/Trips/Routes/Drivers/Occupancy/AI), 7 chart Chart.js |
 | `hello.html` | Trang chủ mặc định (`/`) qua `helloController` |
 
 ---
@@ -307,6 +313,7 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 - Cơ chế phát hiện chuyến "hot" (occupancy >90%) với 3 cổng thời gian chống tạo trùng/tạo quá sớm/tạo theo spike ảo.
 - Soft-delete Trip với rule theo từng status.
 - REST API hỗ trợ form tạo trip lọc tài nguyên rảnh theo thời gian thực.
+- Dashboard & Analytics (đọc-only, xem mục 14): Operational KPIs (Pending Approvals, Upcoming Trips, Active Trips, Maintenance Alerts, AI Suggestions, Available Resources) + Strategic Analytics theo 6 tab (Fleet/Trips/Routes/Drivers/Occupancy/AI), biểu đồ Chart.js. Không thêm entity/cột DB nào; không đổi business rule nào ngoài 1 method public wrapper tái sử dụng `TripService.getDrivingHoursForDate()`.
 
 **Chưa làm (có trong spec nhưng không có code):**
 - Đặt vé, chọn ghế, thanh toán online (Client/User module — toàn bộ).
@@ -316,3 +323,41 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 - Notification (Email/SMS).
 - Cron job reset giờ lái 00:00 hàng ngày (chỉ có job quét extra-trip mỗi 10 giây, không có job reset).
 - Locking xử lý đặt ghế đồng thời (chưa có Ticket/Seat entity nên chưa cần).
+
+---
+
+## 14. Module: Dashboard & Analytics (đọc-only reporting) — `DashboardController` (`/admin/analytics`)
+
+Bổ sung sau khi hệ thống AI Scheduling đã ổn định. Toàn bộ module này **chỉ đọc dữ liệu hiện có** — không thêm entity, không thêm cột DB, không thay đổi business rule nào trong `TripService`/FSM (ngoại trừ 1 method public wrapper thuần tái sử dụng, xem mục 14.4).
+
+### 14.1. Cấu trúc
+- **Controller:** `DashboardController` (`/admin/analytics`) — duy nhất 1 `GET`, gọi `dashboardService.getOverview()`, render `admin/dashboard-analytics.html`. Tách riêng khỏi `AdminController` (vốn chỉ là trang chủ/shortcut đơn giản), theo đúng quy ước 1 controller/1 mối quan tâm đã có trong package `controller.admin`.
+- **Service:** `DashboardService` — `@Transactional(readOnly = true)`, constructor-inject `TripRepository`, `BusRepository`, `DriverRepository`, `RouteRepository`, và `TripService` (chỉ để tái sử dụng `getDrivingHoursForDate()`).
+- **DTO package mới:** `giang.com.BusManagement.dto` (14 class) — `DashboardOverviewDto` là view-model gốc, gồm `OperationalKpisDto` (dải KPI cố định) và `StrategicAnalyticsDto` (nội dung 6 tab: `FleetStatsDto`, `TripStatsDto`, `RouteStatsDto`, `DriverStatsDto`, `OccupancyStatsDto`, `AiStatsDto`), cộng các DTO phụ trợ (`TripPreviewDto`, `BusAlertDto`, `RoutePerformanceDto`, `DriverWorkloadDto`, `ChartSeriesDto` dùng chung cho mọi chart).
+
+### 14.2. Operational KPIs (luôn hiển thị, không nằm trong tab)
+- **Pending Approvals** (tổng + số AI đã auto-assign vs cần thủ công) — tái sử dụng `TripService.getPendingTrips()`.
+- **Upcoming Trips** (48h tới, status ACTIVE) — tái sử dụng `TripRepository.findByDepartureTimeBetweenAndStatus()` (đã tồn tại sẵn trong repo nhưng trước đó chưa nơi nào gọi tới).
+- **Active Trips** — tái sử dụng `TripRepository.countByStatus()`.
+- **Maintenance Alerts** (quá hạn / sắp đến hạn) — dùng lại `Bus.needsMaintenance()`/`Bus.isNearMaintenance(0)` nguyên vẹn, không tính lại ngưỡng bảo trì ở tầng khác.
+- **AI Suggestions Pending** — lấy bucket `PENDING_APPROVAL` từ `countAiSuggestionsByStatus()`.
+- **Available Resources** — số xe `READY` + số tài xế `isActive`.
+
+### 14.3. Strategic Analytics (6 tab Bootstrap)
+Fleet, Trips, Routes, Drivers, Occupancy, AI Recommendation — mỗi tab có card số liệu + bảng + 1 chart Chart.js (Bar hoặc Doughnut, load qua CDN), dữ liệu lấy từ các query repository mới thêm (mục 10) hoặc tổng hợp trong `DashboardService` (không tính toán business rule mới, chỉ nhóm/đếm số liệu đã có).
+
+**Ngưỡng dùng lại nguyên vẹn từ `TripService`, không định nghĩa lại:**
+- "Hot trip" = `occupancyRate > 0.90`, đúng ngưỡng `Trip.needsReinforcement()`.
+- "Bằng lái sắp hết hạn" = trong vòng 7 ngày, đúng ngưỡng `findBestAvailableDriver()` đang dùng.
+
+Bootstrap tabs dùng `data-bs-toggle="tab"` thuần client-side (không gọi lại server) — toàn bộ dữ liệu 6 tab được nạp 1 lần trong cùng response HTML. Có xử lý riêng: canvas Chart.js nằm trong tab đang ẩn (`display:none`) bị đo kích thước 0x0 lúc khởi tạo, nên có listener `shown.bs.tab` gọi `chart.resize()` mỗi khi chuyển tab.
+
+### 14.4. Thay đổi kỹ thuật nhỏ để hỗ trợ Dashboard
+- `TripService`: thêm 1 method `public double getDrivingHoursForDate(Driver driver, LocalDateTime date)` — thuần delegate sang method `private` đã có sẵn (`excludeTripId = null`), không đổi logic nghiệp vụ nào của method gốc.
+- Không có thay đổi nào khác trong `TripService`, `BusService`, `StationService`, FSM, hay AI scheduler.
+- 1 shortcut link mới trong `admin/dashboard.html` trỏ tới `/admin/analytics`, không đổi 6 shortcut cũ.
+
+### 14.5. Giới hạn có chủ đích (đã thống nhất với người dùng khi thiết kế, không phải thiếu sót)
+- **Không có "Recent Activity" feed:** không có cột `createdAt`/`updatedAt` nào trên `Trip` hay entity khác; việc thêm cột mới chỉ để phục vụ Dashboard đã bị từ chối có chủ đích khi thiết kế — nếu sau này cần lịch sử hoạt động thật, nên thiết kế Audit Log riêng, không sửa từng entity hiện có.
+- **Utilization rate / AI outcome breakdown chỉ là snapshot tức thời**, không phải xu hướng lịch sử (không có bảng lưu trạng thái theo thời gian).
+- **Không có entity Ticket/Assistant/MaintenanceRecord riêng** — Dashboard suy ra toàn bộ số liệu liên quan từ field có sẵn trên `Trip`/`Bus`/`Driver` (assistant vẫn là `Driver` qua FK `Trip.assistant`, không phải entity riêng).

@@ -639,9 +639,9 @@
   2. `POST /admin/trip-management/trips/create`
 - **Kết quả mong đợi:**
   - `validateStaffForTrip`: tài xế được load từ DB, `driver.getIsActive() = false`
-  - Lưu ý: `validateStaffForTrip` không tự kiểm tra `isActive`, nhưng `findBestAvailableDriver` trong AI path thì có
-  - **Lỗ hổng tiềm ẩn:** Nếu Admin thủ công chọn tài xế bị khóa qua form, `validateStaffForTrip` hiện tại KHÔNG có kiểm tra `isActive` → cần bổ sung test để phát hiện thiếu sót này
-  - **Kết quả thực tế hiện tại:** Chuyến có thể được tạo thành công dù tài xế đã bị khóa (đây là bug tiềm ẩn)
+  - `!Boolean.TRUE.equals(driver.getIsActive())` → TRUE → `throw new IllegalArgumentException("Tài xế chính TX Bị Khóa đã bị khóa (ngừng hoạt động)!")`
+  - `flash[error]` chứa thông báo lỗi tương ứng, DB không thay đổi
+  - **Đã sửa:** `validateStaffForTrip` nay kiểm tra `isActive` cho cả tài xế chính, tài xế phụ (coDriver), và phụ xe (assistant) — đồng nhất với `findBestAvailableDriver` (AI path) và `getAvailableDriversForTrip`/`getAvailableAssistantsForTrip` (dropdown thủ công), vốn đã luôn lọc theo `isActive`.
 
 ---
 

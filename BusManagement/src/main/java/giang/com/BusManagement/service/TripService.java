@@ -524,6 +524,16 @@ public class TripService {
         return hoursFromTrips;
     }
 
+    /**
+     * Public wrapper cho getDrivingHoursForDate() — dùng bởi DashboardService để
+     * hiển thị tải giờ lái của tài xế trong ngày (Strategic Analytics, tab Tài
+     * xế). Không có tripId nào cần loại trừ nên excludeTripId luôn null.
+     * Chỉ expose lại logic tính toán đã có, không thêm/thay đổi business rule.
+     */
+    public double getDrivingHoursForDate(Driver driver, LocalDateTime date) {
+        return getDrivingHoursForDate(driver, date, null);
+    }
+
     // =========================================================================
     // APPROVAL ACTIONS
     // =========================================================================
@@ -807,6 +817,10 @@ public class TripService {
         double effectiveHours = Math.min(shareDuration, 8.0);
 
         // Validate tài xế chính
+        if (!Boolean.TRUE.equals(driver.getIsActive())) {
+            throw new IllegalArgumentException(
+                    "Tài xế chính " + driver.getUser().getFullName() + " đã bị khóa (ngừng hoạt động)!");
+        }
         if (!driver.isLicenseValid()) {
             throw new IllegalArgumentException(
                     "Bằng lái của tài xế chính " + driver.getUser().getFullName() + " đã hết hạn!");
@@ -826,6 +840,10 @@ public class TripService {
         // Validate các tài xế phụ
         if (trip.getCoDrivers() != null) {
             for (Driver cd : trip.getCoDrivers()) {
+                if (!Boolean.TRUE.equals(cd.getIsActive())) {
+                    throw new IllegalArgumentException(
+                            "Tài xế phụ " + cd.getUser().getFullName() + " đã bị khóa (ngừng hoạt động)!");
+                }
                 if (!cd.isLicenseValid()) {
                     throw new IllegalArgumentException(
                             "Bằng lái của tài xế phụ " + cd.getUser().getFullName() + " đã hết hạn!");
@@ -845,6 +863,10 @@ public class TripService {
         }
         // Validate phụ xe
         if (assistant != null) {
+            if (!Boolean.TRUE.equals(assistant.getIsActive())) {
+                throw new IllegalArgumentException(
+                        "Phụ xe " + assistant.getUser().getFullName() + " đã bị khóa (ngừng hoạt động)!");
+            }
             if (isDriverBusyInWindow(assistant, windowStart, windowEnd, excludeTripId)) {
                 throw new IllegalArgumentException(
                         "Phụ xe " + assistant.getUser().getFullName() + " đang bận ở chuyến khác!");

@@ -20,8 +20,9 @@ The application follows a standard Layered Architecture. The root package is `gi
 *   `giang.com.BusManagement.config`: System configurations (e.g., Security, CORS).
 *   `giang.com.BusManagement.domain`: JPA Entities representing the database schema (e.g., `Bus`, `Trip`, `Driver`, `Route`, `Station`, `RouteStation`, `User`).
 *   `giang.com.BusManagement.repository`: Spring Data JPA repositories.
-*   `giang.com.BusManagement.service`: Core business logic layers (`TripService`, `BusService`, `StationService`).
+*   `giang.com.BusManagement.service`: Core business logic layers (`TripService`, `BusService`, `StationService`, `DashboardService`).
 *   `giang.com.BusManagement.controller`: Controllers managing web views and REST endpoints. Admin routes are grouped in the `.admin` subpackage.
+*   `giang.com.BusManagement.dto`: Read-only view-model classes. Currently used only by the Dashboard & Analytics module (Section 10) — not a general-purpose response wrapper for other controllers.
 
 ## 5. Database Layer & Persistence
 *   **Naming Conventions:** Table names are in plural `snake_case` forms (e.g., `buses`, `drivers`, `trips`).
@@ -81,3 +82,10 @@ Unless they are explicitly required by the current task or already exist in the 
 If the implementation or requirements are unclear, stop and ask the user instead of making assumptions.
 
 Always inspect the current implementation in the codebase first. If a rule or feature is not explicitly defined in the active code, stop and ask the user for clarification.
+
+## 10. Dashboard & Analytics (Reporting)
+*   **Purpose:** A read-only reporting page for the Administrator, built entirely from data already produced by the modules above. It does not introduce new business rules, entities, or database columns.
+*   **Entry point:** `GET /admin/analytics` (`DashboardController`), backed by `DashboardService` (`@Transactional(readOnly = true)`).
+*   **Structure:** Two groups — **Operational KPIs** (Pending Approvals, Upcoming Trips, Active Trips, Maintenance Alerts, AI Suggestions Pending, Available Resources; always visible) and **Strategic Analytics** (Fleet, Trips, Routes, Drivers, Occupancy, AI Recommendation; shown in Bootstrap tabs), each backed by DTOs in `giang.com.BusManagement.dto`.
+*   **AI Developer Constraint:** This module reuses existing thresholds verbatim — e.g., the 90% "hot trip" occupancy threshold from `Trip.needsReinforcement()`, and the 7-day "license expiring soon" window already used in `TripService`'s driver auto-assignment. Do not invent new thresholds for Dashboard metrics; if a KPI has no existing basis in the code, treat it as unsupported rather than approximating it.
+*   **Known, deliberate gap:** No "Recent Activity"/audit-trail widget exists, because no entity has creation/update timestamps; adding one was explicitly declined for this feature. Do not assume such a field exists or add one without being asked.

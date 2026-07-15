@@ -18,4 +18,7 @@ public interface BusRepository extends JpaRepository<Bus, Long> {
 
     @Query("SELECT DISTINCT b FROM Bus b LEFT JOIN FETCH b.busType")
     List<Bus> findAllWithBusType();
+
+    /** Dùng cho Dashboard: đếm xe theo từng BusStatus (READY/TRAVELING/REPAIRING). */
+    long countByStatus(BusStatus status);
 }
