@@ -4,13 +4,27 @@ import giang.com.BusManagement.domain.*;
 import giang.com.BusManagement.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Seed dữ liệu mẫu cho môi trường demo/thử nghiệm.
+ *
+ * CHỈ chạy khi profile "demo" được kích hoạt (@Profile("demo")).
+ * Lý do: run() gọi deleteAll() trên TOÀN BỘ bảng trước khi seed lại — nếu bean
+ * này chạy ở profile mặc định (persist), mọi dữ liệu lịch sử tích lũy được sẽ
+ * bị xóa sạch mỗi lần khởi động app, khiến các module phân tích/dự báo (xem
+ * docs/development/THESIS_ROADMAP.md, Phase 5-7) mất nền dữ liệu mà KHÔNG hề
+ * báo lỗi — chỉ âm thầm chạy trên DB rỗng.
+ *
+ * Chạy demo: ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+ */
 @Component
+@Profile("demo")
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
 

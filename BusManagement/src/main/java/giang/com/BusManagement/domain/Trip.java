@@ -2,6 +2,7 @@ package giang.com.BusManagement.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 import java.math.BigDecimal;
@@ -78,6 +79,23 @@ public class Trip {
 
     @Column(name = "sale_opened_at")
     private LocalDateTime saleOpenedAt;
+
+    /**
+     * Thời điểm bản ghi chuyến được tạo. Hibernate tự đóng dấu khi INSERT
+     * (@CreationTimestamp), không bao giờ set thủ công và không đổi khi UPDATE
+     * (updatable = false).
+     *
+     * Khác với saleOpenedAt (mốc nghiệp vụ — thời điểm mở bán vé, do FSM đóng
+     * dấu khi chuyển sang ACTIVE): createdAt là mốc kỹ thuật, dùng làm nền cho
+     * dữ liệu lịch sử/phân tích xu hướng sau này.
+     *
+     * LƯU Ý: các chuyến đã tồn tại trong DB trước khi cột này được thêm sẽ có
+     * giá trị NULL (@CreationTimestamp chỉ điền lúc INSERT). Nơi nào đọc field
+     * này phải xử lý null.
+     */
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     /**
      * Cờ xóa mềm. TRUE = đã bị xóa (ẩn khỏi mọi query do @SQLRestriction).
