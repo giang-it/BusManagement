@@ -128,7 +128,9 @@ The application implements a Spring Scheduler (`@Scheduled`) to manage backgroun
 *   **Database:** MySQL database mapped via Hibernate.
 *   **Schema Structure:** Main entities include `users`, `drivers`, `buses`, `bus_types`, `trips`, `routes`, `stations`, and `route_stations`.
 *   **Transactions:** State mutation operations are wrapped in Spring `@Transactional` annotations to guarantee database consistency.
-*   **Database Seeding (`DataInitializer`):** A custom `DataInitializer` class seeds development mock data (including test users, routes, stations, buses, and active trips) into the database on startup when configured in development mode.
+*   **Database Seeding (`DataInitializer`):** A custom `DataInitializer` class seeds mock data (including test users, routes, stations, buses, and active trips) into the database on startup. It is annotated `@Profile("demo")` and therefore runs **only** under the `demo` profile, where it first deletes all existing rows and then reseeds. Under the default (persistent) profile it does not run at all.
+*   **Data Retention Profiles:** The **default** profile uses `ddl-auto=update` — the schema is preserved and transactional records survive restarts. The **`demo`** profile uses `ddl-auto=create-drop` and wipes/reseeds everything, for a clean demonstration environment. Tests run against a separate `busmanagement_test` database and never touch real data.
+*   **Timestamps:** `Trip.createdAt` (`@CreationTimestamp`, `updatable = false`) records when a trip row was inserted. It is distinct from the business-level `saleOpenedAt` (stamped by the FSM when a trip becomes `ACTIVE`). Trips inserted before this column existed have `NULL`.
 
 ---
 
@@ -150,7 +152,7 @@ The following capabilities are intentionally deferred or omitted from the curren
 2.  **Client Ticketing & Payments:** Customers cannot search for trips, reserve seats, purchase tickets, or complete online payments.
 3.  **Driver & Crew Logs:** No interface exists for drivers to log hours, view personal schedules, perform check-ins, or submit incident reports.
 4.  **Notifications:** The system does not support sending email or SMS alerts, booking confirmations, or QR codes.
-5.  **Persistent Data Retention:** The database strategy runs in a recreate-on-startup mode (`create-drop`), which clears transactional records between restarts.
+5.  ~~**Persistent Data Retention:** The database strategy runs in a recreate-on-startup mode (`create-drop`), which clears transactional records between restarts.~~ **Resolved:** the default profile now persists data (`ddl-auto=update`, `DataInitializer` gated to `@Profile("demo")`). Wiping requires explicitly running the `demo` profile. Note that no migration tool (Flyway/Liquibase) exists — schema evolution still relies on Hibernate's `update`.
 6.  **No reporting or analytics:** The system lacks utilization charts, revenue analysis, or reports.
 7.  **No audit logs:** Admin actions and historical configuration changes are not tracked in audit trails.
 8.  **No activity/audit-log-based analytics:** A "Recent Activity" widget was considered for the Dashboard & Analytics module but intentionally omitted — no entity has `createdAt`/`updatedAt` columns, and adding one just for this feature was explicitly declined. A proper audit log would need to be designed separately.

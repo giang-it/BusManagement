@@ -9,7 +9,7 @@
 - **Tech stack:** Java 17, Spring Boot 4.0.2, Spring Data JPA (Hibernate), Thymeleaf, MySQL, Lombok.
 - **Kiến trúc:** Layered (Controller → Service → Repository → Domain/Entity), có một REST Controller (`TripRestController`) phục vụ AJAX.
 - **Bảo mật:** `SecurityConfig` cho phép **mọi request không cần đăng nhập** (`anyRequest().permitAll()`, CSRF/form-login/http-basic đều bị tắt). Không có phân quyền ROLE_ADMIN/ROLE_DRIVER/ROLE_USER nào được enforce ở tầng Spring Security, dù entity `User`/`Role` có định nghĩa enum 3 vai trò.
-- **Database init:** `spring.jpa.hibernate.ddl-auto=create-drop` + `DataInitializer` (`CommandLineRunner`) xóa toàn bộ dữ liệu cũ và seed lại dữ liệu test mỗi lần khởi động app — **không phù hợp production**.
+- **Database init:** Mặc định `spring.jpa.hibernate.ddl-auto=update` — dữ liệu **được giữ** qua các lần khởi động, `DataInitializer` không chạy. Chỉ profile `demo` (`-Dspring-boot.run.profiles=demo`) mới dùng `create-drop` + chạy `DataInitializer` (`@Profile("demo")`) để xóa sạch và seed lại dữ liệu test. Test dùng DB riêng `busmanagement_test`.
 - **Soft delete:** `Trip` dùng `@SQLDelete` + `@SQLRestriction("is_deleted = false")` — mọi `delete()` qua JPA chỉ là UPDATE `is_deleted=true`, và mọi SELECT tự động loại các trip đã xóa.
 
 ### Khoảng cách giữa spec ban đầu và code thực tế
@@ -298,7 +298,7 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 7. **`countBusyTripsAnyRole`/`findAllTripsByDriverOnDate`** là dead code (định nghĩa nhưng không gọi), trùng chức năng với cặp query đang dùng thật.
 8. **Password không được mã hóa** khi tạo User (`AdminService.createNewUser` có TODO comment nhưng chưa implement BCrypt).
 9. **Spring Security tắt hoàn toàn** — không có phân quyền thực tế dù có enum `Role` với 3 cấp.
-10. **`ddl-auto=create-drop` + xóa toàn bộ data mỗi lần start** — không an toàn nếu deploy thật, chỉ phù hợp demo/dev.
+10. ~~**`ddl-auto=create-drop` + xóa toàn bộ data mỗi lần start**~~ — **đã xử lý (Phase 0)**: mặc định giờ là `update` (giữ dữ liệu), việc wipe+seed phải opt-in qua profile `demo`. Vẫn còn hạn chế: chưa có công cụ migration (Flyway/Liquibase), schema tiến hóa dựa vào `update` của Hibernate.
 11. **Khoảng cách lớn giữa spec (`03_functional_spec.md`) và code thực tế** — Ticket/Payment/Seat/QR-checkin/Review/Notification/JWT/Driver-app/Client-app đều chưa được lập trình; chỉ phần Admin Smart Scheduling được triển khai đầy đủ.
 
 ---

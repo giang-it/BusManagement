@@ -1468,13 +1468,13 @@
 
 ---
 
-### TC_SEC_005 — DataInitializer: Dữ liệu seed được tái tạo đúng khi khởi động lại ứng dụng
+### TC_SEC_005 — DataInitializer: Dữ liệu seed được tái tạo đúng khi khởi động với profile `demo`
 
 - **Mã TC:** TC_SEC_005
 - **Tên Kịch Bản:** Kiểm tra `DataInitializer.run()` xóa dữ liệu cũ và tạo lại đúng bộ seed data
 - **Điều kiện tiên quyết:** Có dữ liệu cũ trong DB từ lần chạy trước
 - **Các bước thực hiện:**
-  1. Khởi động lại ứng dụng
+  1. Khởi động ứng dụng **với profile `demo`**: `./mvnw spring-boot:run -Dspring-boot.run.profiles=demo`
   2. Kiểm tra DB sau khi khởi động
 - **Kết quả mong đợi:**
   - Thứ tự xóa: `trips → drivers → users → buses → busTypes → routeStations → routes → stations` (đúng thứ tự FK)
@@ -1483,6 +1483,38 @@
   - Tạo xe với các trạng thái READY/REPAIRING/TRAVELING như đã định nghĩa
   - Tạo 7 bến xe, 6 tuyến đường, các chuyến test TRIP1-TRIPX ở trạng thái ACTIVE
   - Log: `"🤖 [AI Test Setup] Đang khởi tạo dữ liệu test..."`
+
+---
+
+### TC_SEC_005B — DataInitializer KHÔNG chạy ở profile mặc định (dữ liệu được giữ nguyên)
+
+- **Mã TC:** TC_SEC_005B
+- **Tên Kịch Bản:** Kiểm tra `@Profile("demo")` chặn `DataInitializer` ở profile mặc định — dữ liệu sống sót qua restart
+- **Điều kiện tiên quyết:** DB `busmanagement` có sẵn dữ liệu (VD: N chuyến)
+- **Các bước thực hiện:**
+  1. Khởi động ứng dụng **không kèm cờ profile**: `./mvnw spring-boot:run`
+  2. Đếm lại số chuyến trong DB
+- **Kết quả mong đợi:**
+  - Log KHÔNG xuất hiện dòng `"🤖 [AI Test Setup] Đang khởi tạo dữ liệu test..."`
+  - Log hiển thị `No active profile set, falling back to 1 default profile: "default"`
+  - Số chuyến vẫn đúng bằng N — không có bản ghi nào bị xóa hay seed thêm
+  - Cột `trips.created_at` tồn tại (`ddl-auto=update` tự bổ sung mà không drop bảng)
+
+---
+
+### TC_SEC_005C — Test suite không đụng vào database thật
+
+- **Mã TC:** TC_SEC_005C
+- **Tên Kịch Bản:** Kiểm tra `src/test/resources/application.properties` cách ly test khỏi DB `busmanagement`
+- **Điều kiện tiên quyết:** DB `busmanagement` có sẵn dữ liệu (VD: N chuyến)
+- **Các bước thực hiện:**
+  1. Chạy `./mvnw test`
+  2. Đếm lại số chuyến trong `busmanagement`
+- **Kết quả mong đợi:**
+  - Test pass (`BUILD SUCCESS`)
+  - Database `busmanagement_test` được tự động tạo (`createDatabaseIfNotExist=true`)
+  - Số chuyến trong `busmanagement` vẫn đúng bằng N — test không xóa dữ liệu thật
+  - Log KHÔNG xuất hiện `"🤖 [AI Test Setup]"` (test không kích hoạt profile `demo`)
 
 ---
 

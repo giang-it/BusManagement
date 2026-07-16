@@ -27,7 +27,8 @@ The application follows a standard Layered Architecture. The root package is `gi
 ## 5. Database Layer & Persistence
 *   **Naming Conventions:** Table names are in plural `snake_case` forms (e.g., `buses`, `drivers`, `trips`).
 *   **Soft Deletion:** The system uses soft deletes for `Trip` entities through `@SQLDelete` and `@SQLRestriction("is_deleted = false")`. Physical deletions of trips are not allowed in the database.
-*   **Development Schema Strategy:** The development profile regenerates the schema on startup and calls a data initialization routine (`DataInitializer`) to seed mock database assets.
+*   **Schema Strategy:** The **default** profile is persistent (`ddl-auto=update`) — data survives restarts and `DataInitializer` does not run. The **`demo`** profile (`-Dspring-boot.run.profiles=demo`) regenerates the schema (`ddl-auto=create-drop`) and runs `DataInitializer` (`@Profile("demo")`) to wipe and reseed mock database assets. Tests use a separate database (`busmanagement_test`) via `src/test/resources/application.properties`. See `docs/architecture/setup_guide.md` Section 4.
+*   **Timestamps:** `Trip.createdAt` (`@CreationTimestamp`, column `created_at`) is the only technical audit timestamp in the schema; rows created before the column was introduced hold `NULL`. No other entity has creation/update timestamps.
 
 ## 6. Security Architecture (Deferred)
 *   **Current State:** User authentication and authorization checks are **intentionally deferred** to a later phase. 

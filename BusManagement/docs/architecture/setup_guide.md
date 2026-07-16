@@ -65,17 +65,46 @@ The `${MYSQL_HOST:localhost}` syntax allows overriding the host via an environme
 
 ## 4. Schema & Seed Data
 
-The application uses `spring.jpa.hibernate.ddl-auto=create-drop`.
+The application has two data policies, selected by Spring profile.
 
-> **Warning:** On every startup, Hibernate drops and recreates the entire schema. All transactional data is lost between restarts. This is intentional for development.
+### 4.1 Default (persistent) — no profile flag
 
-A `DataInitializer` bean executes after schema creation to seed:
+```properties
+spring.jpa.hibernate.ddl-auto=update
+```
+
+Data is **preserved across restarts**. Hibernate only adds missing schema elements; it never drops tables. `DataInitializer` is annotated `@Profile("demo")` and therefore does **not** run — nothing is deleted or seeded.
+
+This is the default because historical data is a hard prerequisite for the analytics/forecasting modules (see `docs/development/THESIS_ROADMAP.md`, Phase 5-7). If wiping were the default, a single restart without the right flag would silently destroy the dataset.
+
+### 4.2 Demo profile — explicit opt-in
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+```
+
+```properties
+# application-demo.properties
+spring.jpa.hibernate.ddl-auto=create-drop
+```
+
+> **Warning:** This **drops the entire `busmanagement` schema and wipes all data**, then reseeds. Do not use it when the database holds historical data you need to keep.
+
+Under this profile a `DataInitializer` bean executes after schema creation to seed:
 - Test users and driver profiles
 - Bus types and vehicles
 - Stations and routes
 - Pre-scheduled active trips for demonstration
 
 No manual SQL import is needed.
+
+**First-time setup:** a fresh clone starts with an empty database. Run once with `-Dspring-boot.run.profiles=demo` to populate sample data, then use the default profile from then on to accumulate data.
+
+### 4.3 Test configuration
+
+`src/test/resources/application.properties` points the test suite at a **separate database** (`busmanagement_test`, auto-created via `createDatabaseIfNotExist=true`) using `create-drop`. This keeps `mvnw test` from touching the real `busmanagement` database.
+
+Note that this file **fully shadows** `src/main/resources/application.properties` during tests (the test classpath takes precedence; the two files are not merged), so every required property is redeclared there.
 
 ---
 
@@ -111,6 +140,8 @@ On Windows:
 
 ## 7. Run the Application
 
+Default (persistent — keeps existing data):
+
 ```bash
 ./mvnw spring-boot:run
 ```
@@ -118,6 +149,17 @@ On Windows:
 On Windows:
 ```powershell
 .\mvnw.cmd spring-boot:run
+```
+
+Demo (**wipes the database** and reseeds sample data — see Section 4.2):
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=demo
+```
+
+On Windows:
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=demo"
 ```
 
 The application starts on **port 8080** (Spring Boot default). No port override is configured in `application.properties`.
@@ -137,7 +179,7 @@ All configuration is in `src/main/resources/application.properties`.
 | Property                              | Value / Default            | Notes                                       |
 |---------------------------------------|----------------------------|---------------------------------------------|
 | `spring.application.name`            | `BusManagement`            |                                             |
-| `spring.jpa.hibernate.ddl-auto`      | `create-drop`              | Drops and recreates schema on every start   |
+| `spring.jpa.hibernate.ddl-auto`      | `update` (default)         | Preserves data. Overridden to `create-drop` by the `demo` profile — see Section 4 |
 | `spring.datasource.url`              | `jdbc:mysql://...`         | Uses `MYSQL_HOST` env var (default: localhost) |
 | `spring.datasource.username`         | `root` (default)           | Change before running                       |
 | `spring.datasource.password`         | *(hardcoded placeholder)*  | Change before running                       |
@@ -174,9 +216,13 @@ BusManagement/                      ← Maven project root
 │   │   │       ├── AdminService.java
 │   │   │       └── AutoAssignResult.java       ← Result wrapper for auto-assign
 │   │   └── resources/
-│   │       ├── application.properties
+│   │       ├── application.properties           ← Default: persistent (ddl-auto=update)
+│   │       ├── application-demo.properties      ← Profile "demo": wipe + reseed
 │   │       └── templates/                      ← Thymeleaf HTML templates
 │   │           └── admin/
+│   └── test/
+│       └── resources/
+│           └── application.properties           ← Isolated test DB (busmanagement_test)
 └── docs/                                       ← Project documentation
     ├── ai/
     ├── development/
@@ -194,8 +240,20 @@ BusManagement/                      ← Maven project root
 
 ### Schema not created / `Table 'trips' doesn't exist`
 **Symptom:** Hibernate queries fail immediately after startup.  
-**Cause:** `ddl-auto=create-drop` requires the database to exist. Hibernate creates tables but not the schema/database itself.  
+**Cause:** Hibernate creates tables but not the database itself — the `busmanagement` database must already exist.  
 **Fix:** Manually create the `busmanagement` database in MySQL before starting the app (see Section 3.1).
+
+> A `Table 'busmanagement.trips' doesn't exist` line may also appear **harmlessly** in the startup log under the `demo` profile: `create-drop` issues DROP statements before the tables exist on a fresh database. If the application continues to start normally, this is expected noise, not a failure.
+
+### App starts with no data / dashboard is empty
+**Symptom:** Every list page is empty on a fresh clone.  
+**Cause:** The default profile is persistent and does **not** seed anything — an empty database stays empty.  
+**Fix:** Run once with the demo profile to populate sample data: `./mvnw spring-boot:run -Dspring-boot.run.profiles=demo` (see Section 4.2).
+
+### Data disappeared after a restart
+**Symptom:** Previously created trips/buses are gone.  
+**Cause:** The application was started with `-Dspring-boot.run.profiles=demo`, which drops the schema and reseeds fixed sample data.  
+**Fix:** Use the default profile (no flag) whenever data must be preserved.
 
 ### `LazyInitializationException` in scheduler
 **Symptom:** Error log during `scanAndSuggestExtraTrips()` execution.  
