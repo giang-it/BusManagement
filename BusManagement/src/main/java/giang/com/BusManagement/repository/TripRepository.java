@@ -233,6 +233,66 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        boolean existsByBusId(Long busId);
 
        /**
+        * Kiểm tra tuyến đã từng được dùng cho bất kỳ chuyến đi nào chưa.
+        * Dùng bởi RouteService.deleteRoute() để chặn xóa tuyến đã có lịch sử vận
+        * hành — cùng nguyên tắc với existsByBusId() ở BusService.deleteBus().
+        */
+       boolean existsByRouteId(Long routeId);
+
+       /**
+        * Kiểm tra tài xế đã từng tham gia BẤT KỲ chuyến nào chưa (mọi vai trò: tài
+        * xế chính, tài xế phụ, phụ xe; mọi trạng thái).
+        * Dùng bởi DriverService.deleteDriver() để chặn xóa hồ sơ đã có lịch sử vận
+        * hành — cùng nguyên tắc với existsByBusId() ở BusService.deleteBus().
+        */
+       @Query("SELECT COUNT(t) > 0 FROM Trip t " +
+                     "LEFT JOIN t.coDrivers cd " +
+                     "WHERE t.driver.userId = :driverId " +
+                     "   OR t.assistant.userId = :driverId " +
+                     "   OR cd.userId = :driverId")
+       boolean existsAnyTripForDriver(@Param("driverId") Long driverId);
+
+       /**
+        * Kiểm tra tài xế có chuyến nào đang ở một trong các trạng thái cho trước
+        * hay không (mọi vai trò). Dùng bởi DriverService để chặn khóa
+        * (isActive=false) một tài xế còn chuyến dở dang.
+        */
+       @Query("SELECT COUNT(t) > 0 FROM Trip t " +
+                     "LEFT JOIN t.coDrivers cd " +
+                     "WHERE (t.driver.userId = :driverId " +
+                     "   OR t.assistant.userId = :driverId " +
+                     "   OR cd.userId = :driverId) " +
+                     "AND t.status IN :statuses")
+       boolean existsTripForDriverWithStatusIn(@Param("driverId") Long driverId,
+                     @Param("statuses") Collection<TripStatus> statuses);
+
+       /**
+        * Lấy các chuyến cho bảng điều hành (Dispatch Center): mọi chuyến đang chạy
+        * (DEPARTED) và các chuyến sắp khởi hành trong cửa sổ thời gian cho trước.
+        * JOIN FETCH đầy đủ quan hệ để view hiển thị được xe/tài xế/tuyến mà không
+        * phụ thuộc open-in-view.
+        *
+        * Chỉ JOIN FETCH duy nhất 1 collection kiểu List (t.coDrivers) — thêm
+        * r.routeStations sẽ gây MultipleBagFetchException; quan hệ đó đã dùng
+        * @BatchSize(20) để tránh N+1 (xem Route.java).
+        */
+       @Query("""
+                     SELECT DISTINCT t FROM Trip t
+                     LEFT JOIN FETCH t.route r
+                     LEFT JOIN FETCH t.bus b
+                     LEFT JOIN FETCH b.busType
+                     LEFT JOIN FETCH t.driver d
+                     LEFT JOIN FETCH d.user
+                     LEFT JOIN FETCH t.assistant a
+                     LEFT JOIN FETCH a.user
+                     LEFT JOIN FETCH t.coDrivers cd
+                     WHERE t.status IN :statuses
+                       AND t.departureTime <= :until
+                     """)
+       List<Trip> findDispatchBoardTrips(@Param("statuses") Collection<TripStatus> statuses,
+                     @Param("until") LocalDateTime until);
+
+       /**
         * Kiểm tra xe có đang bận ở các chuyến đi có trạng thái nằm trong
         * danh sách chỉ định hay không
         * Thường dùng để chặn không cho xe đi bảo trì (REPAIRING) khi đang có lịch

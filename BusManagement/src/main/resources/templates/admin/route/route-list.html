@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Quản Lý Tuyến Đường - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2"><i class="bi bi-signpost-split"></i> Quản Lý Tuyến Đường</h1>
+            <div>
+                <a th:href="@{/admin/dashboard}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Quay lại Dashboard
+                </a>
+                <a href="/admin/routes/create" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Thêm Tuyến
+                    Mới</a>
+            </div>
+        </div>
+
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Điểm Đi → Điểm Đến</th>
+                            <th>Lộ Trình Đầy Đủ</th>
+                            <th>Quãng Đường</th>
+                            <th>Thời Gian Dự Kiến</th>
+                            <th>Loại Xe Phù Hợp</th>
+                            <th class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:if="${#lists.isEmpty(routes)}">
+                            <td colspan="7" class="text-center text-muted py-4">
+                                Chưa có tuyến đường nào. Bấm <strong>Thêm Tuyến Mới</strong> để bắt đầu.
+                            </td>
+                        </tr>
+                        <tr th:each="route : ${routes}">
+                            <td th:text="${route.id}" class="fw-bold text-muted"></td>
+                            <td class="fw-semibold">
+                                <span th:text="${route.getDeparturePointDisplay()}"></span>
+                                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                <span th:text="${route.getDestinationPointDisplay()}"></span>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border me-1"
+                                    th:each="rs : ${route.getOrderedRouteStations()}"
+                                    th:text="${rs.stopOrder} + '. ' + ${rs.station.stationName}">
+                                </span>
+                                <span th:if="${#lists.isEmpty(route.routeStations)}" class="text-muted">(Chưa gán
+                                    trạm)</span>
+                            </td>
+                            <td th:text="${#numbers.formatDecimal(route.distanceKm, 1, 0)} + ' km'"></td>
+                            <td>
+                                <span th:text="${route.estimatedDuration} + ' phút'"></span>
+                                <span class="text-muted small"
+                                    th:text="'(~' + ${#numbers.formatDecimal(route.estimatedDuration / 60.0, 1, 1)} + 'h)'"></span>
+                            </td>
+                            <td>
+                                <span th:if="${route.suitableBusType != null}" class="badge bg-info text-dark"
+                                    th:text="${route.suitableBusType.typeName}"></span>
+                                <span th:if="${route.suitableBusType == null}" class="text-muted">Không giới hạn</span>
+                            </td>
+                            <td class="text-center">
+                                <a th:href="@{/admin/routes/edit/{id}(id=${route.id})}"
+                                    class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Sửa</a>
+                                <a th:href="@{/admin/routes/delete/{id}(id=${route.id})}"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Bạn có chắc chắn muốn xóa tuyến này?');"><i
+                                        class="bi bi-trash"></i> Xóa</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p class="text-muted small mt-3">
+            <i class="bi bi-info-circle"></i>
+            Tuyến đã có chuyến xe sử dụng không thể xóa — dữ liệu lịch sử vận hành và doanh thu phải được giữ nguyên.
+        </p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

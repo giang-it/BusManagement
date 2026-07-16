@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cấu Hình Tuyến Đường</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-9">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="card-title mb-0">
+                            <i class="bi bi-signpost-split"></i>
+                            <span th:text="${route.id == null} ? 'Thêm Tuyến Đường Mới' : 'Sửa Tuyến Đường'"></span>
+                        </h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <div th:if="${error}" class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle-fill"></i> <span th:text="${error}"></span>
+                        </div>
+
+                        <form
+                            th:action="${route.id == null} ? @{/admin/routes/create} : @{/admin/routes/edit/{id}(id=${route.id})}"
+                            method="post" class="needs-validation" novalidate id="routeForm">
+
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Quãng Đường (Km) <span
+                                            class="text-danger">*</span></label>
+                                    <input type="number" step="0.1" min="0.1" class="form-control" name="distanceKm"
+                                        th:value="${route.distanceKm}" required placeholder="120">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Thời Gian Dự Kiến (Phút) <span
+                                            class="text-danger">*</span></label>
+                                    <input type="number" min="1" class="form-control" name="estimatedDuration"
+                                        th:value="${route.estimatedDuration}" required placeholder="120">
+                                    <div class="form-text text-muted">Dùng để tính giờ đến dự kiến của chuyến.</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-semibold">Loại Xe Phù Hợp</label>
+                                    <select class="form-select" name="suitableBusType">
+                                        <option value="">-- Không giới hạn --</option>
+                                        <option th:each="type : ${busTypes}" th:value="${type.id}"
+                                            th:text="${type.typeName} + ' (' + ${type.capacity} + ' Ghế)'"
+                                            th:selected="${route.suitableBusType != null and route.suitableBusType.id == type.id}">
+                                        </option>
+                                    </select>
+                                    <div class="form-text text-muted">Bỏ trống nếu tuyến chạy được mọi loại xe.</div>
+                                </div>
+                            </div>
+
+                            <hr class="my-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="text-muted mb-0"><i class="bi bi-geo-alt"></i> Lộ Trình (Các Trạm Dừng)</h5>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="addStopBtn">
+                                    <i class="bi bi-plus-circle"></i> Thêm Trạm Dừng
+                                </button>
+                            </div>
+                            <div class="alert alert-light border small">
+                                <i class="bi bi-info-circle"></i>
+                                Thứ tự các dòng chính là thứ tự dừng: <strong>dòng đầu = điểm đi</strong>,
+                                <strong>dòng cuối = điểm đến</strong>. Mỗi bến chỉ được xuất hiện một lần trong lộ
+                                trình.
+                            </div>
+
+                            <div id="stopList">
+                                <div class="input-group mb-2 stop-row" th:each="stationId : ${selectedStationIds}">
+                                    <span class="input-group-text stop-index" style="min-width: 3.5rem;"></span>
+                                    <select class="form-select" name="stationIds" required>
+                                        <option value="">-- Chọn bến xe --</option>
+                                        <option th:each="s : ${stations}" th:value="${s.id}" th:text="${s.stationName}"
+                                            th:selected="${s.id == stationId}"></option>
+                                    </select>
+                                    <button type="button" class="btn btn-outline-danger remove-stop"
+                                        title="Xóa trạm này"><i class="bi bi-x-lg"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-end mt-4">
+                                <a href="/admin/routes" class="btn btn-outline-secondary me-2">Hủy Bỏ</a>
+                                <button type="submit" class="btn btn-dark px-4"><i class="bi bi-save"></i> Lưu
+                                    Tuyến</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mẫu 1 dòng chọn trạm, JS clone ra khi bấm "Thêm Trạm Dừng" -->
+    <template id="stopRowTemplate">
+        <div class="input-group mb-2 stop-row">
+            <span class="input-group-text stop-index" style="min-width: 3.5rem;"></span>
+            <select class="form-select" name="stationIds" required>
+                <option value="">-- Chọn bến xe --</option>
+                <option th:each="s : ${stations}" th:value="${s.id}" th:text="${s.stationName}"></option>
+            </select>
+            <button type="button" class="btn btn-outline-danger remove-stop" title="Xóa trạm này"><i
+                    class="bi bi-x-lg"></i></button>
+        </div>
+    </template>
+
+    <script>
+        (() => {
+            'use strict';
+            const MIN_STOPS = 2; // Tuyến tối thiểu phải có điểm đi + điểm đến (khớp RouteService)
+            const stopList = document.getElementById('stopList');
+            const template = document.getElementById('stopRowTemplate');
+
+            /** Đánh lại số thứ tự hiển thị và khóa nút xóa khi chỉ còn 2 trạm. */
+            function refresh() {
+                const rows = stopList.querySelectorAll('.stop-row');
+                rows.forEach((row, i) => {
+                    row.querySelector('.stop-index').textContent = (i + 1);
+                });
+                rows.forEach(row => {
+                    row.querySelector('.remove-stop').disabled = rows.length <= MIN_STOPS;
+                });
+            }
+
+            function addRow() {
+                stopList.appendChild(template.content.cloneNode(true));
+                refresh();
+            }
+
+            document.getElementById('addStopBtn').addEventListener('click', addRow);
+
+            stopList.addEventListener('click', event => {
+                const btn = event.target.closest('.remove-stop');
+                if (!btn || btn.disabled) return;
+                btn.closest('.stop-row').remove();
+                refresh();
+            });
+
+            // Tạo mới (chưa có dòng nào) → dựng sẵn 2 dòng trống cho điểm đi/điểm đến.
+            while (stopList.querySelectorAll('.stop-row').length < MIN_STOPS) {
+                addRow();
+            }
+            refresh();
+
+            // Chặn submit khi có bến bị chọn trùng — cùng quy tắc RouteService kiểm tra
+            // ở backend, báo sớm cho Admin thay vì để lỗi quay về sau khi submit.
+            document.getElementById('routeForm').addEventListener('submit', event => {
+                const values = Array.from(stopList.querySelectorAll('select[name="stationIds"]'))
+                    .map(s => s.value).filter(v => v !== '');
+                if (new Set(values).size !== values.length) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    alert('Một bến xe chỉ được xuất hiện một lần trong lộ trình. Vui lòng kiểm tra lại.');
+                }
+            });
+
+            const forms = document.querySelectorAll('.needs-validation');
+            Array.from(forms).forEach(form => {
+                form.addEventListener('submit', event => {
+                    if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        })();
+    </script>
+</body>
+
+</html>

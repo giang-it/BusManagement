@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bảng Điều Hành - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4">
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div>
+                <h1 class="h2 mb-0"><i class="bi bi-broadcast-pin"></i> Bảng Điều Hành</h1>
+                <small class="text-muted">
+                    Cập nhật lúc <span th:text="${#temporals.format(now, 'HH:mm:ss dd/MM/yyyy')}"></span>
+                </small>
+            </div>
+            <div>
+                <a th:href="@{/admin/dashboard}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Quay lại Dashboard
+                </a>
+                <a th:href="@{/admin/dispatch}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-clockwise"></i> Làm mới
+                </a>
+            </div>
+        </div>
+
+        <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill"></i> <span th:text="${success}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> <span th:text="${error}"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- ============ TRỄ GIỜ ============ -->
+        <div class="card shadow-sm border-0 mb-4" th:if="${!#lists.isEmpty(overdueTrips)}">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-octagon-fill"></i> Trễ Giờ Khởi Hành
+                    <span class="badge bg-light text-danger ms-2" th:text="${#lists.size(overdueTrips)}"></span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Chuyến</th>
+                            <th>Tuyến</th>
+                            <th>Giờ Khởi Hành</th>
+                            <th>Xe</th>
+                            <th>Tài Xế</th>
+                            <th>Vé</th>
+                            <th class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="trip : ${overdueTrips}" class="table-danger">
+                            <td class="fw-bold">#<span th:text="${trip.id}"></span></td>
+                            <td th:text="${trip.route != null ? trip.route.getDeparturePointDisplay() + ' → ' + trip.route.getDestinationPointDisplay() : '—'}">
+                            </td>
+                            <td>
+                                <span class="fw-semibold"
+                                    th:text="${#temporals.format(trip.departureTime, 'HH:mm dd/MM')}"></span>
+                                <span class="badge bg-danger ms-1">Quá giờ</span>
+                            </td>
+                            <td th:text="${trip.bus != null ? trip.bus.licensePlate : '(Chưa gán)'}"></td>
+                            <td
+                                th:text="${trip.driver != null and trip.driver.user != null ? trip.driver.user.fullName : '(Chưa gán)'}">
+                            </td>
+                            <td><span class="badge bg-secondary"
+                                    th:text="${trip.ticketsSold} + '/' + ${trip.totalSeats}"></span></td>
+                            <td class="text-center">
+                                <form th:action="@{/admin/dispatch/status}" method="post" class="d-inline">
+                                    <input type="hidden" name="tripId" th:value="${trip.id}">
+                                    <input type="hidden" name="newStatus" value="DEPARTED">
+                                    <button type="submit" class="btn btn-sm btn-success"><i
+                                            class="bi bi-play-fill"></i> Xuất phát</button>
+                                </form>
+                                <form th:action="@{/admin/dispatch/status}" method="post" class="d-inline"
+                                    onsubmit="return confirm('Hủy chuyến này?');">
+                                    <input type="hidden" name="tripId" th:value="${trip.id}">
+                                    <input type="hidden" name="newStatus" value="CANCELLED">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i
+                                            class="bi bi-x-circle"></i> Hủy</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============ ĐANG CHẠY ============ -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-bus-front-fill"></i> Đang Trên Đường
+                    <span class="badge bg-light text-primary ms-2" th:text="${#lists.size(inProgressTrips)}"></span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Chuyến</th>
+                            <th>Tuyến</th>
+                            <th>Khởi Hành</th>
+                            <th>Đến Dự Kiến</th>
+                            <th>Xe</th>
+                            <th>Tài Xế</th>
+                            <th>Phụ Xe</th>
+                            <th class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:if="${#lists.isEmpty(inProgressTrips)}">
+                            <td colspan="8" class="text-center text-muted py-4">Không có chuyến nào đang chạy.</td>
+                        </tr>
+                        <tr th:each="trip : ${inProgressTrips}">
+                            <td class="fw-bold">#<span th:text="${trip.id}"></span></td>
+                            <td th:text="${trip.route != null ? trip.route.getDeparturePointDisplay() + ' → ' + trip.route.getDestinationPointDisplay() : '—'}">
+                            </td>
+                            <td th:text="${#temporals.format(trip.departureTime, 'HH:mm dd/MM')}"></td>
+                            <td
+                                th:text="${trip.arrivalTimeExpected != null ? #temporals.format(trip.arrivalTimeExpected, 'HH:mm dd/MM') : '—'}">
+                            </td>
+                            <td><span class="badge bg-primary"
+                                    th:text="${trip.bus != null ? trip.bus.licensePlate : '—'}"></span></td>
+                            <td
+                                th:text="${trip.driver != null and trip.driver.user != null ? trip.driver.user.fullName : '—'}">
+                            </td>
+                            <td
+                                th:text="${trip.assistant != null and trip.assistant.user != null ? trip.assistant.user.fullName : '—'}">
+                            </td>
+                            <td class="text-center">
+                                <form th:action="@{/admin/dispatch/status}" method="post" class="d-inline">
+                                    <input type="hidden" name="tripId" th:value="${trip.id}">
+                                    <input type="hidden" name="newStatus" value="COMPLETED">
+                                    <button type="submit" class="btn btn-sm btn-success"><i
+                                            class="bi bi-check2-circle"></i> Hoàn thành</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ============ SẮP KHỞI HÀNH ============ -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Sắp Khởi Hành
+                    <small class="fw-normal">(trong <span th:text="${windowHours}"></span> giờ tới)</small>
+                    <span class="badge bg-light text-dark ms-2" th:text="${#lists.size(upcomingTrips)}"></span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Chuyến</th>
+                            <th>Tuyến</th>
+                            <th>Khởi Hành</th>
+                            <th>Xe</th>
+                            <th>Tài Xế</th>
+                            <th>Vé</th>
+                            <th class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:if="${#lists.isEmpty(upcomingTrips)}">
+                            <td colspan="7" class="text-center text-muted py-4">
+                                Không có chuyến nào sắp khởi hành trong <span th:text="${windowHours}"></span> giờ tới.
+                            </td>
+                        </tr>
+                        <tr th:each="trip : ${upcomingTrips}">
+                            <td class="fw-bold">#<span th:text="${trip.id}"></span></td>
+                            <td th:text="${trip.route != null ? trip.route.getDeparturePointDisplay() + ' → ' + trip.route.getDestinationPointDisplay() : '—'}">
+                            </td>
+                            <td th:text="${#temporals.format(trip.departureTime, 'HH:mm dd/MM')}"></td>
+                            <td th:text="${trip.bus != null ? trip.bus.licensePlate : '(Chưa gán)'}"></td>
+                            <td
+                                th:text="${trip.driver != null and trip.driver.user != null ? trip.driver.user.fullName : '(Chưa gán)'}">
+                            </td>
+                            <td><span class="badge bg-secondary"
+                                    th:text="${trip.ticketsSold} + '/' + ${trip.totalSeats}"></span></td>
+                            <td class="text-center">
+                                <form th:action="@{/admin/dispatch/status}" method="post" class="d-inline">
+                                    <input type="hidden" name="tripId" th:value="${trip.id}">
+                                    <input type="hidden" name="newStatus" value="DEPARTED">
+                                    <button type="submit" class="btn btn-sm btn-outline-success"><i
+                                            class="bi bi-play-fill"></i> Xuất phát</button>
+                                </form>
+                                <form th:action="@{/admin/dispatch/status}" method="post" class="d-inline"
+                                    onsubmit="return confirm('Hủy chuyến này?');">
+                                    <input type="hidden" name="tripId" th:value="${trip.id}">
+                                    <input type="hidden" name="newStatus" value="CANCELLED">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i
+                                            class="bi bi-x-circle"></i> Hủy</button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <p class="text-muted small mt-3">
+            <i class="bi bi-info-circle"></i>
+            Mọi thay đổi trạng thái đều đi qua FSM của <code>TripService</code>: chuyển sang
+            <strong>DEPARTED</strong> sẽ tự đặt xe thành <em>TRAVELING</em>, chuyển sang <strong>COMPLETED</strong>
+            trả xe về <em>READY</em> và cộng quãng đường vào odometer.
+        </p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

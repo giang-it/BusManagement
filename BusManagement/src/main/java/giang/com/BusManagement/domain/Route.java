@@ -67,6 +67,21 @@ public class Route {
     // =====================================================================
 
     /**
+     * Lộ trình đầy đủ, đã sắp theo stopOrder tăng dần.
+     * Tầng Thymeleaf không sắp xếp được (SpEL không hỗ trợ lambda cho
+     * Comparator), nên việc sắp xếp để hiển thị được gom về đây — cùng chỗ với
+     * getDepartureStation()/getDestinationStation() vốn đã dựa vào stopOrder.
+     */
+    public List<RouteStation> getOrderedRouteStations() {
+        if (routeStations == null) {
+            return List.of();
+        }
+        return routeStations.stream()
+                .sorted(Comparator.comparing(RouteStation::getStopOrder))
+                .toList();
+    }
+
+    /**
      * Trạm xuất phát = bản ghi RouteStation có stopOrder nhỏ nhất.
      * Trả về null nếu tuyến chưa được gán trạm dừng nào.
      */
