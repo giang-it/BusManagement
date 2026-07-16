@@ -85,14 +85,14 @@ During manual creation or modification, the backend enforces the following valid
 ### AI Recommendation Workflow
 The background scheduler evaluates demand and proposes additional trips through the following logical flow:
 1.  **Scan for Active Trips:** Search the database for all active trips (`find ACTIVE`).
-2.  **Evaluate Demand (`isHotTrip()`):** Identify trips that exceed passenger occupancy thresholds and time constraints (occupancy $\ge 90\%$, departs in the future, $\ge 72$ hours remain before departure, and tickets have been on sale for $\ge 48$ hours; the sale duration requirement is bypassed if occupancy hits $\ge 95\%$).
+2.  **Evaluate Demand (`isHotTrip()`):** Identify trips that exceed passenger occupancy thresholds and time constraints (occupancy $> 90\%$, departs in the future, $\ge 72$ hours remain before departure, and tickets have been on sale for $\ge 48$ hours; the sale duration requirement is bypassed if occupancy hits $\ge 95\%$).
 3.  **Check for Existing Suggestions (`hasAlreadySuggested()`):** Check whether the original trip already has an extra trip linked to it (via the `original_trip_id` self-reference) sitting in a "live" status, to prevent duplicates.
 4.  **Create Recommendation (`createExtraTrip()`):** Generate a new suggestion in `PENDING_APPROVAL` status with a departure time offset by +30 minutes from the original trip.
 5.  **Allocate Resources (`autoAssignResources()`):** Automatically attempt to allocate a free `READY` bus and qualified drivers satisfying all safety constraints.
 6.  **Persistence (`save`):** Save the recommendation to the database.
 
 *   **Hot Trip Flagging:** The background scheduler identifies active trips that meet the following thresholds:
-    *   Occupancy is $\ge 90\%$, departure is in the future, at least 72 hours remain before departure, and tickets have been on sale for at least 48 hours.
+    *   Occupancy is $> 90\%$, departure is in the future, at least 72 hours remain before departure, and tickets have been on sale for at least 48 hours.
     *   *Immediate Trigger:* If occupancy reaches $\ge 95\%$, the 48-hour sale requirement is bypassed.
 *   **Recommendation Creation:** The system creates a suggestion entry in status `PENDING_APPROVAL` with a departure time offset by +30 minutes from the original trip.
 *   **Duplicate-Suggestion Rule (`hasAlreadySuggested()`):**

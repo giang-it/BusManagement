@@ -150,9 +150,13 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         * [MỚI] Kiểm tra xe có đang được gán cho chuyến nào trong khoảng thời gian
         * không.
         * Bao gồm buffer chuẩn bị xe (được thêm ở tầng service).
+        * Dùng toán tử so sánh chặt (</>), khớp với existsOverlappingTripForDriver()/
+        * existsOverlappingTripForAssistant() — hai khoảng thời gian chỉ được coi là
+        * "trùng" khi thực sự giao nhau; chạm đúng biên (VD: chuyến khác khởi hành
+        * đúng lúc buffer của chuyến này kết thúc) là đủ khoảng đệm, không bị chặn.
         */
        @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.bus = :bus AND t.status IN :statuses " +
-                     "AND t.departureTime <= :end AND t.arrivalTimeExpected >= :start " +
+                     "AND t.departureTime < :end AND t.arrivalTimeExpected > :start " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId)")
        boolean existsOverlappingTripForBus(
                      @Param("bus") Bus bus,
@@ -196,7 +200,7 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      "LEFT JOIN t.coDrivers cd " +
                      "WHERE (t.driver.userId = :driverId " +
                      "   OR t.assistant.userId = :driverId " +
-                     "   OR cd.id = :driverId) " +
+                     "   OR cd.userId = :driverId) " +
                      "AND t.status <> 'CANCELLED' " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
                      "AND (t.departureTime < :end AND t.arrivalTimeExpected > :start)")
@@ -211,7 +215,7 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      "LEFT JOIN t.coDrivers cd " +
                      "WHERE (t.driver.userId = :driverId " +
                      "   OR t.assistant.userId = :driverId " +
-                     "   OR cd.id = :driverId) " +
+                     "   OR cd.userId = :driverId) " +
                      "AND t.status <> 'CANCELLED' " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
                      "AND (t.departureTime >= :start AND t.departureTime <= :end)")
