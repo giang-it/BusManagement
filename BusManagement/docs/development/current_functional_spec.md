@@ -29,11 +29,27 @@ Only the Administrator workflow is currently exposed through the application:
     *   Vehicles exceeding their maintenance thresholds cannot be assigned to trips.
     *   Bus status is automatically synchronized during trip lifecycle transitions.
 
+### Driver Management
+*   **Purpose:** Maintain driver personnel records.
+*   **Implemented Functionality:**
+    *   CRUD management of Drivers (`AdminDriverController` / `DriverService`, entry point `/admin/drivers`): login account details, full name, contact, licence number, licence expiry, years of experience, and an active/locked switch.
+    *   Creating a driver creates the backing `User` in the same form and forces its role to `ROLE_DRIVER` — `Driver` maps its primary key to `User.id` via `@MapsId` and cannot exist without one.
+*   **Business Rules:**
+    *   A driver whose licence has expired, or who is locked (`isActive = false`), is excluded from every trip assignment path (see Trip Management constraints).
+    *   A driver cannot be locked while holding a trip in `PENDING_APPROVAL`, `ACTIVE`, or `DEPARTED` — the same "busy" definition used by `TripService.isDriverBusyInWindow()`.
+    *   A driver who has ever been assigned to a trip cannot be hard-deleted (operational history is preserved); the driver is locked instead. Deleting an unused driver removes the backing `User` too, via `User.driver`'s `cascade = ALL`.
+    *   `monthlyRestDays` and `totalDrivingHours24h` are not editable through this module — see Known Behavioral Notes.
+
 ### Route & Station Management
 *   **Purpose:** Define the geographical network of bus operations.
 *   **Implemented Functionality:**
     *   CRUD management of Stations (name, address).
-    *   CRUD management of Routes (route name, total distance in kilometers, and ordered list of stations using a sequence-based join entity `RouteStation`).
+    *   CRUD management of Routes (`AdminRouteController` / `RouteService`, entry point `/admin/routes`): total distance in kilometres, estimated duration in minutes, an optional suitable bus type, and an ordered list of stops held in the join entity `RouteStation`. The form supports adding/removing stops; `stopOrder` is renumbered `1..n` from the submitted row order, so the first stop is the departure point and the last is the destination.
+    *   A route has **no name field** — its display label is derived from its first and last stop (`Route.getDeparturePointDisplay()` / `getDestinationPointDisplay()`).
+*   **Business Rules:**
+    *   A route must have at least 2 stops (a departure point and a destination).
+    *   A station may appear at most once per route: `RouteStation`'s primary key is the composite `(routeId, stationId)`, so a route revisiting the same station (e.g. A→B→A) is not representable.
+    *   A route already used by any trip cannot be deleted (operational and revenue history is preserved). Deleting an unused route removes its `RouteStation` rows via `cascade = ALL`.
 
 ### Trip Management
 *   **Purpose:** Coordinate specific dispatches of vehicles and staff.
@@ -43,6 +59,13 @@ Only the Administrator workflow is currently exposed through the application:
     *   Resource allocation.
     *   Administrative management of trip lifecycle including creation, modification, approval, cancellation, and operational state transitions.
     *   Dynamic resource allocation API endpoint (`/api/admin/trips/available-resources`) that returns conflict-free available buses and drivers for a specified timeframe.
+
+### Dispatch Center
+*   **Purpose:** A single operational board for the Administrator to run the day: what is on the road, what is about to leave, and what is late.
+*   **Implemented Functionality:**
+    *   Entry point `GET /admin/dispatch` (`DispatchController`), grouping trips into three sections: **Trễ Giờ** (still `ACTIVE` past its departure time), **Đang Trên Đường** (`DEPARTED`), and **Sắp Khởi Hành** (`ACTIVE` departing within the next 48 hours — the same window the Dashboard uses for its "Upcoming Trips" KPI).
+    *   Quick status actions (Xuất phát / Hoàn thành / Hủy) posted to `/admin/dispatch/status`.
+*   **Business Rules:** This module defines none of its own. Every status change is delegated to `TripService.updateTripStatus()`, so the FSM whitelist and the bus-status/odometer side effects behave exactly as they do elsewhere; invalid transitions are rejected there and surfaced to the Admin as an error.
 
 ### AI Scheduling & Recommendations
 *   **Purpose:** Automatically schedule extra trips to prevent capacity bottlenecks.
@@ -135,6 +158,7 @@ The application implements a Spring Scheduler (`@Scheduled`) to manage backgroun
 ---
 
 ## 7. Known Behavioral Notes
+*   **Unused driver fields:** `Driver.monthlyRestDays` is persisted but read nowhere — the original proposal's "at least 2 rest days per month" constraint has never been implemented. `Driver.totalDrivingHours24h` *is* used (`TripService.getDrivingHoursForDate()` adds it as baseline hours) but is documented in that method as mock seed data intended to be fed by an external IoT/GPS integration. Neither is exposed in the driver management form, to avoid implying an effect that does not exist.
 *   **Workflow Status Inconsistency:**
     *   *Manual Workflow:* Creating a trip manually places it directly into the `ACTIVE` status (stamping `saleOpenedAt = now()`), bypassing approval.
     *   *AI Workflow:* Auto-suggested extra trips are created in the `PENDING_APPROVAL` status and require explicit admin approval to transition to `ACTIVE`.
