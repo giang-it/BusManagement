@@ -1072,6 +1072,15 @@ public class TripService {
         return tripRepository.findByStatusWithDetails(TripStatus.PENDING_APPROVAL);
     }
 
+    /**
+     * Toàn bộ chuyến kèm quan hệ đầy đủ (mọi trạng thái) — dùng cho các dropdown
+     * chọn chuyến ở tầng UI. Giữ tên trung lập theo nghiệp vụ chuyến xe để không
+     * ràng buộc TripService vào một màn hình cụ thể nào.
+     */
+    public List<Trip> getAllTrips() {
+        return tripRepository.findAllWithDetails();
+    }
+
     public Trip getTripById(Long id) {
         return tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));

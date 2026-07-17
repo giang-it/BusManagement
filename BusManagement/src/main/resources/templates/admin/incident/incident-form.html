@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Ghi Nhận Sự Cố</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow border-0">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="card-title mb-0">
+                            <i class="bi bi-cone-striped"></i>
+                            <span th:text="${incident.id == null} ? 'Ghi Nhận Sự Cố Mới' : 'Cập Nhật Sự Cố'"></span>
+                        </h4>
+                    </div>
+                    <div class="card-body p-4">
+                        <div th:if="${error}" class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle-fill"></i> <span th:text="${error}"></span>
+                        </div>
+
+                        <form
+                            th:action="${incident.id == null} ? @{/admin/incidents/create} : @{/admin/incidents/edit/{id}(id=${incident.id})}"
+                            method="post" class="needs-validation" novalidate>
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Xe Gặp Sự Cố <span
+                                            class="text-danger">*</span></label>
+                                    <select class="form-select" name="bus" required>
+                                        <option value="">-- Chọn xe --</option>
+                                        <option th:each="b : ${buses}" th:value="${b.id}"
+                                            th:text="${b.licensePlate} + (${b.busType != null} ? ' (' + ${b.busType.typeName} + ')' : '')"
+                                            th:selected="${incident.bus != null and incident.bus.id == b.id}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Loại Sự Cố <span
+                                            class="text-danger">*</span></label>
+                                    <select class="form-select" name="incidentType" required>
+                                        <option value="">-- Chọn loại --</option>
+                                        <option th:each="t : ${incidentTypes}" th:value="${t.name()}"
+                                            th:text="${t.name() == 'VEHICLE_BREAKDOWN'} ? 'Xe hỏng'
+                                                   : (${t.name() == 'ACCIDENT'} ? 'Tai nạn giao thông'
+                                                   : (${t.name() == 'ROAD_ISSUE'} ? 'Sự cố trên đường'
+                                                   : (${t.name() == 'STAFF_ISSUE'} ? 'Sự cố nhân sự' : 'Khác')))"
+                                            th:selected="${incident.incidentType != null and incident.incidentType.name() == t.name()}">
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-12">
+                                    <label class="form-label">Chuyến Xe Liên Quan</label>
+                                    <select class="form-select" name="trip">
+                                        <option value="">-- Không thuộc chuyến nào (sự cố ngoài hành trình) --</option>
+                                        <option th:each="t : ${trips}" th:value="${t.id}"
+                                            th:text="'#' + ${t.id} + ' — ' + (${t.route != null} ? ${t.route.getDeparturePointDisplay()} + ' → ' + ${t.route.getDestinationPointDisplay()} : '(Chưa gán tuyến)') + ' — ' + ${#temporals.format(t.departureTime, 'HH:mm dd/MM/yyyy')} + ' [' + ${t.status} + ']'"
+                                            th:selected="${incident.trip != null and incident.trip.id == t.id}">
+                                        </option>
+                                    </select>
+                                    <div class="form-text text-muted">Bỏ trống nếu xe gặp sự cố khi không chạy chuyến
+                                        nào (ví dụ hỏng trong bãi).</div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">Tài Xế Báo Cáo / Liên Quan</label>
+                                    <select class="form-select" name="driver">
+                                        <option value="">-- Không xác định --</option>
+                                        <option th:each="d : ${drivers}" th:value="${d.userId}"
+                                            th:text="${d.user != null ? d.user.fullName : 'Tài xế #' + d.userId}"
+                                            th:selected="${incident.driver != null and incident.driver.userId == d.userId}">
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Trạng Thái Xử Lý <span
+                                            class="text-danger">*</span></label>
+                                    <select class="form-select" name="status" required>
+                                        <option th:each="s : ${incidentStatuses}" th:value="${s.name()}"
+                                            th:text="${s.name() == 'OPEN'} ? 'Mới ghi nhận'
+                                                   : (${s.name() == 'IN_PROGRESS'} ? 'Đang xử lý' : 'Đã xử lý xong')"
+                                            th:selected="${(incident.status != null and incident.status.name() == s.name())
+                                                        or (incident.status == null and s.name() == 'OPEN')}">
+                                        </option>
+                                    </select>
+                                    <div class="form-text text-muted">Chuyển sang <em>Đã xử lý xong</em> sẽ tự đóng dấu
+                                        thời điểm hoàn tất.</div>
+                                </div>
+
+                                <div class="col-md-12">
+                                    <label class="form-label fw-semibold">Mô Tả Chi Tiết</label>
+                                    <textarea class="form-control" name="description" rows="4"
+                                        th:text="${incident.description}"
+                                        placeholder="Diễn biến, vị trí, thiệt hại, hướng xử lý..."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-light border small mt-4">
+                                <i class="bi bi-info-circle"></i>
+                                Ghi nhận sự cố <strong>không</strong> tự chuyển xe sang trạng thái bảo trì. Nếu xe cần
+                                dừng hoạt động, hãy đổi trạng thái xe ở màn hình
+                                <a th:href="@{/admin/buses}">Quản Lý Xe</a>.
+                            </div>
+
+                            <div class="d-flex justify-content-end mt-4">
+                                <a href="/admin/incidents" class="btn btn-outline-secondary me-2">Hủy Bỏ</a>
+                                <button type="submit" class="btn btn-dark px-4"><i class="bi bi-save"></i> Lưu Sự
+                                    Cố</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (() => {
+            'use strict';
+            const forms = document.querySelectorAll('.needs-validation');
+            Array.from(forms).forEach(form => {
+                form.addEventListener('submit', event => {
+                    if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        })();
+    </script>
+</body>
+
+</html>
