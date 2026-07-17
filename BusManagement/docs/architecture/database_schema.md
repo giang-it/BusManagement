@@ -19,6 +19,7 @@ This document is derived from the JPA entity definitions in `src/main/java/giang
 | `RouteStation`    | `route_stations`  | Ordered stop sequence linking a route to stations    |
 | `Trip`            | `trips`           | Scheduled dispatch: route + bus + crew + status      |
 | *(join table)*    | `trip_co_drivers` | Many-to-many link between trips and co-drivers       |
+| `Incident`        | `incidents`       | Operational incidents reported against a vehicle     |
 
 ---
 
@@ -208,7 +209,53 @@ Defined via `@JoinTable` on `Trip.coDrivers`.
 
 ---
 
+### `incidents`
+
+Operational incidents reported to the control centre.
+
+| Column          | Java Type       | Constraints                        | Notes                                                        |
+|-----------------|-----------------|------------------------------------|--------------------------------------------------------------|
+| `id`            | `Long`          | PK, auto-increment                 |                                                              |
+| `bus_id`        | `Long`          | FK → `buses.id`, **NOT NULL**      | Every incident resolves to one vehicle                       |
+| `trip_id`       | `Long`          | FK → `trips.id`, nullable          | Null when the incident happened outside any trip             |
+| `driver_id`     | `Long`          | FK → `drivers.user_id`, nullable   | Reporting/involved driver; null when unknown                 |
+| `incident_type` | `String`        | Enum as VARCHAR, NOT NULL          | See `IncidentType`                                           |
+| `status`        | `String`        | Enum as VARCHAR, NOT NULL, default `OPEN` | See `IncidentStatus`                                  |
+| `description`   | `String`        | `TEXT`, nullable                   | Free-text detail                                             |
+| `reported_at`   | `LocalDateTime` | nullable, `updatable = false`      | `@CreationTimestamp` — stamped on insert, never changed      |
+| `resolved_at`   | `LocalDateTime` | nullable                           | Managed by `IncidentService`, not entered by hand: stamped on entering `RESOLVED`, cleared on leaving it |
+
+**Relationships:**
+- `ManyToOne` → `buses` (mandatory), `trips` (optional), `drivers` (optional)
+
+**Notes:**
+- Recording an incident has **no** side effect on `buses.status`; moving a bus to `REPAIRING` stays a manual Fleet Management action.
+- Referential integrity for `bus_id`/`driver_id` is enforced in the **service layer**, not by the database: the JDBC URL sets `sessionVariables=foreign_key_checks=0`, so MySQL will not reject an orphan. `BusService.deleteBus()` and `DriverService.deleteDriver()` therefore refuse to hard-delete a bus/driver still referenced by any incident.
+- `trips` is soft-deleted (`@SQLRestriction`), so an incident pointing at a soft-deleted trip renders as having no trip. Nothing throws — see the Known Behavioral Note in `docs/development/current_functional_spec.md`.
+
+---
+
 ## Enumerations
+
+### `IncidentType`
+Stored as `VARCHAR` in `incidents.incident_type`.
+
+| Value               | Meaning                                              |
+|---------------------|------------------------------------------------------|
+| `VEHICLE_BREAKDOWN` | Mechanical failure (engine, tyre, brakes...)         |
+| `ACCIDENT`          | Traffic accident                                     |
+| `ROAD_ISSUE`        | External road conditions: congestion, flooding, closure, weather |
+| `STAFF_ISSUE`       | Crew problem: driver/assistant ill, unable to continue |
+| `OTHER`             | Anything not covered above                           |
+
+### `IncidentStatus`
+Stored as `VARCHAR` in `incidents.status`. **Not** governed by an FSM — all transitions are permitted, including reopening.
+
+| Value         | Meaning                          |
+|---------------|----------------------------------|
+| `OPEN`        | Reported, not yet handled        |
+| `IN_PROGRESS` | Being handled                    |
+| `RESOLVED`    | Handled; stamps `resolved_at`    |
 
 ### `TripStatus`
 Stored as `VARCHAR` in `trips.status`.

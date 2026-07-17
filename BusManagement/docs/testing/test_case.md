@@ -16,6 +16,7 @@
 4. [Module 4: Hệ thống AI Đề xuất Chuyến tăng cường (AI Scheduler)](#module-4)
 5. [Module 5: Quy trình Phê duyệt của Admin (Admin Approval Flow)](#module-5)
 6. [Module 6: Tầng Bảo mật & Cấu hình (Security & Config)](#module-6)
+7. [Module 7: Quản lý Sự cố (Incident Management)](#module-7)
 
 ---
 
@@ -1536,6 +1537,278 @@
 
 ---
 
+## MODULE 7: QUẢN LÝ SỰ CỐ (Incident Management)
+
+> Module này tương ứng Phase 2 của `docs/development/THESIS_ROADMAP.md`.
+> Điểm vào: Dashboard → **"Quản Lý Sự Cố"**, hoặc `/admin/incidents`.
+>
+> **CẢNH BÁO KHI TEST:** chạy app ở profile **mặc định**
+> (`./mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=8099"`).
+> **Không** dùng `-Dspring-boot.run.profiles=demo` — profile đó **xóa sạch** database.
+
+### NHÓM 7.1: CRUD CƠ BẢN
+
+### TC_INC_001 — Hiển thị danh sách sự cố và dải thống kê
+
+- **Mã TC:** TC_INC_001
+- **Tên Kịch Bản:** Admin mở trang quản lý sự cố
+- **Điều kiện tiên quyết:** Có ít nhất 1 sự cố trong DB
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents`
+- **Kết quả mong đợi:**
+  - Trang trả HTTP 200, không có lỗi template
+  - Bảng liệt kê sự cố, **mới nhất xếp trước** (sắp theo thời điểm báo giảm dần)
+  - 3 ô đếm hiển thị đúng số lượng theo trạng thái: **Mới ghi nhận** / **Đang xử lý** / **Đã xử lý xong** — tổng 3 ô phải khớp số dòng trong bảng
+  - Danh sách rỗng → hiện dòng "Chưa có sự cố nào được ghi nhận."
+
+---
+
+### TC_INC_002 — Ghi nhận sự cố đầy đủ thông tin (Happy Path)
+
+- **Mã TC:** TC_INC_002
+- **Tên Kịch Bản:** Admin ghi sự cố có gắn cả chuyến và tài xế
+- **Điều kiện tiên quyết:** Tồn tại ít nhất 1 xe, 1 chuyến, 1 tài xế
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/create`
+  2. Chọn Xe, Loại sự cố, Chuyến, Tài xế, Trạng thái; nhập Mô tả
+  3. Bấm **Lưu Sự Cố**
+- **Kết quả mong đợi:**
+  - `flash[success]` = `"Đã ghi nhận sự cố mới!"`, redirect về `/admin/incidents`
+  - Dòng mới hiển thị đúng biển số xe, `#id` + tuyến của chuyến, tên tài xế
+  - Cột **Thời Điểm Báo** được tự động đóng dấu (Admin không nhập tay)
+
+---
+
+### TC_INC_003 — Ghi nhận sự cố ngoài hành trình (chuyến & tài xế bỏ trống)
+
+- **Mã TC:** TC_INC_003
+- **Tên Kịch Bản:** Xe hỏng trong bãi — không thuộc chuyến nào, không rõ người báo
+- **Điều kiện tiên quyết:** Tồn tại ít nhất 1 xe
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/create`
+  2. Chỉ chọn **Xe** + **Loại sự cố**; để Chuyến = "-- Không thuộc chuyến nào --", Tài xế = "-- Không xác định --"
+  3. Lưu
+- **Kết quả mong đợi:**
+  - Lưu thành công (chuyến và tài xế là **tùy chọn**)
+  - DB: `trip_id = NULL`, `driver_id = NULL` (chuỗi rỗng được chuyển thành NULL)
+  - Cột Chuyến hiển thị **"Ngoài hành trình"**, cột Tài xế hiển thị **"—"**
+
+---
+
+### TC_INC_004 — Chặn ghi sự cố khi không chọn xe
+
+- **Mã TC:** TC_INC_004
+- **Tên Kịch Bản:** Admin cố lưu sự cố mà không gắn xe
+- **Điều kiện tiên quyết:** Không có
+- **Các bước thực hiện:**
+  1. `POST /admin/incidents/create` với trường Xe bỏ trống
+- **Kết quả mong đợi:**
+  - `flash[error]` = `"Lỗi: Sự cố bắt buộc phải gắn với một xe cụ thể!"`
+  - Redirect về `/admin/incidents/create`, **không** bản ghi nào được tạo
+  - *(Ghi chú: form có `required` phía trình duyệt; test này nhắm ràng buộc tầng server)*
+
+---
+
+### TC_INC_005 — Sửa sự cố: Thời điểm báo không bao giờ thay đổi
+
+- **Mã TC:** TC_INC_005
+- **Tên Kịch Bản:** Admin sửa mô tả/loại của một sự cố nhiều lần
+- **Điều kiện tiên quyết:** Tồn tại sự cố ID=X đã có `reported_at`
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/edit/X` → đổi Mô tả → Lưu
+  2. Lặp lại bước 1 lần nữa
+- **Kết quả mong đợi:**
+  - `flash[success]` = `"Cập nhật sự cố thành công!"`
+  - Cột **Thời Điểm Báo** giữ **nguyên giá trị ban đầu** sau cả 2 lần sửa
+
+---
+
+### NHÓM 7.2: VÒNG ĐỜI TRẠNG THÁI (KHÔNG CÓ FSM)
+
+> Khác với `TripStatus`, `IncidentStatus` **không** bị FSM ràng buộc: Admin được
+> chuyển tự do giữa 3 giá trị, kể cả mở lại sự cố đã đóng. Ràng buộc duy nhất là
+> mốc **Xử Lý Xong Lúc**, do hệ thống tự quản lý — không nhập tay.
+
+### TC_INC_006 — Chuyển sang "Đã xử lý xong" → tự đóng dấu thời điểm
+
+- **Mã TC:** TC_INC_006
+- **Điều kiện tiên quyết:** Sự cố ID=X đang ở trạng thái **Mới ghi nhận**, cột Xử Lý Xong Lúc = "—"
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/edit/X` → đổi Trạng thái → **Đã xử lý xong** → Lưu
+- **Kết quả mong đợi:**
+  - Cột **Xử Lý Xong Lúc** tự điền thời điểm hiện tại
+
+---
+
+### TC_INC_007 — Mở lại sự cố đã đóng → gỡ mốc thời điểm
+
+- **Mã TC:** TC_INC_007
+- **Tên Kịch Bản:** Admin đóng nhầm một sự cố và mở lại (nghiệp vụ hợp lệ, không bị chặn)
+- **Điều kiện tiên quyết:** Sự cố ID=X đang **Đã xử lý xong**, đã có mốc Xử Lý Xong Lúc
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/edit/X` → đổi Trạng thái → **Đang xử lý** → Lưu
+- **Kết quả mong đợi:**
+  - Chuyển trạng thái **thành công** (không có FSM chặn, `RESOLVED` không phải trạng thái cuối)
+  - Cột **Xử Lý Xong Lúc** bị **xóa về "—"** (`resolved_at = NULL`)
+
+---
+
+### TC_INC_008 — Tạo mới trực tiếp ở trạng thái "Đã xử lý xong"
+
+- **Mã TC:** TC_INC_008
+- **Tên Kịch Bản:** Admin ghi nhận hồi tố một sự cố đã xử lý xong
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/create` → chọn Xe + Loại → Trạng thái = **Đã xử lý xong** → Lưu
+- **Kết quả mong đợi:**
+  - Mốc **Xử Lý Xong Lúc** được đóng dấu **ngay khi tạo**
+
+---
+
+### TC_INC_009 — Xóa sự cố: Không bị chặn
+
+- **Mã TC:** TC_INC_009
+- **Tên Kịch Bản:** Admin xóa một bản ghi sự cố ghi nhầm
+- **Điều kiện tiên quyết:** Tồn tại sự cố ID=X ở bất kỳ trạng thái nào
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/delete/X` → xác nhận
+- **Kết quả mong đợi:**
+  - `flash[success]` = `"Xóa bản ghi sự cố thành công!"`
+  - Xóa được **ngay, không ràng buộc** — một báo cáo ghi nhầm không phải lịch sử vận hành theo nghĩa của chuyến/tuyến
+  - Đây cũng là lối thoát duy nhất cho TC_INC_010
+
+---
+
+### NHÓM 7.3: RÀNG BUỘC TOÀN VẸN VỚI XE / TÀI XẾ
+
+> Toàn vẹn tham chiếu ở đây được canh ở **tầng service**, không phải ở DB: JDBC URL
+> đặt `foreign_key_checks=0` nên MySQL **không** chặn bản ghi mồ côi.
+
+### TC_INC_010 — Chặn xóa xe khi xe còn bản ghi sự cố
+
+- **Mã TC:** TC_INC_010
+- **Tên Kịch Bản:** Admin cố xóa cứng một chiếc xe đang có sự cố gắn với nó
+- **Điều kiện tiên quyết:** Xe ID=X **chưa từng có chuyến nào** (để cô lập ràng buộc sự cố) nhưng **có ít nhất 1 sự cố**
+- **Các bước thực hiện:**
+  1. `GET /admin/buses/delete/X`
+- **Kết quả mong đợi:**
+  - `flash[error]` = `"Lỗi: Không thể xóa xe này vì đang có bản ghi sự cố gắn với nó. Hãy xóa các bản ghi sự cố của xe ở màn hình Quản Lý Sự Cố trước, hoặc đổi trạng thái xe sang bảo trì thay vì xóa cứng!"`
+  - DB: xe ID=X **vẫn còn**, sự cố **vẫn còn**
+  - *(Vì Xe là trường **bắt buộc** của sự cố nên không thể gỡ liên kết — bắt buộc phải xóa bản ghi sự cố trước)*
+
+---
+
+### TC_INC_011 — Xóa xe thành công sau khi đã dọn hết sự cố
+
+- **Mã TC:** TC_INC_011
+- **Tên Kịch Bản:** Chứng minh ràng buộc TC_INC_010 là lời nhắc dọn dẹp, **không phải ngõ cụt**
+- **Điều kiện tiên quyết:** Tiếp nối TC_INC_010
+- **Các bước thực hiện:**
+  1. Xóa toàn bộ sự cố của xe ID=X (`/admin/incidents/delete/...`)
+  2. `GET /admin/buses/delete/X`
+- **Kết quả mong đợi:**
+  - `flash[success]` = `"Xóa xe thành công!"`, xe ID=X không còn trong DB
+
+---
+
+### TC_INC_012 — Chặn xóa tài xế khi tài xế còn bản ghi sự cố
+
+- **Mã TC:** TC_INC_012
+- **Điều kiện tiên quyết:** Tài xế ID=Y **chưa từng được phân công chuyến nào**, nhưng có ít nhất 1 sự cố ghi nhận tài xế đó
+- **Các bước thực hiện:**
+  1. `GET /admin/drivers/delete/Y`
+- **Kết quả mong đợi:**
+  - `flash[error]` = `"Lỗi: Không thể xóa tài xế này vì đang có bản ghi sự cố gắn với họ. Hãy gỡ tài xế khỏi các bản ghi sự cố đó (chọn 'Không xác định') hoặc xóa các bản ghi đó trước, hoặc khóa hồ sơ (bỏ tick 'Đang hoạt động') thay vì xóa cứng!"`
+  - DB: hồ sơ tài xế và tài khoản `User` đi kèm **vẫn còn**
+
+---
+
+### TC_INC_013 — Gỡ tài xế khỏi sự cố → xóa tài xế thành công, sự cố vẫn còn
+
+- **Mã TC:** TC_INC_013
+- **Tên Kịch Bản:** Lối thoát **riêng** của nhánh tài xế — khác với xe, không cần xóa bản ghi sự cố
+- **Điều kiện tiên quyết:** Tiếp nối TC_INC_012
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/edit/Z` → đổi Tài xế về **"-- Không xác định --"** → Lưu
+  2. `GET /admin/drivers/delete/Y`
+- **Kết quả mong đợi:**
+  - Sau bước 1: sự cố Z có `driver_id = NULL`, cột Tài xế hiển thị "—"
+  - Sau bước 2: `flash[success]` = `"Xóa tài xế thành công!"`; hồ sơ tài xế **và** `User` đi kèm bị xóa (cascade)
+  - **Sự cố Z vẫn tồn tại** — không mất dữ liệu sự cố khi xóa tài xế
+
+---
+
+### TC_INC_014 — Sự cố đã "Đã xử lý xong" VẪN chặn xóa xe
+
+- **Mã TC:** TC_INC_014
+- **Tên Kịch Bản:** Xác nhận ràng buộc **không** lọc theo trạng thái sự cố (quyết định có chủ đích)
+- **Điều kiện tiên quyết:** Xe ID=X không có chuyến, chỉ có **1 sự cố duy nhất ở trạng thái "Đã xử lý xong"**
+- **Các bước thực hiện:**
+  1. `GET /admin/buses/delete/X`
+- **Kết quả mong đợi:**
+  - **Vẫn bị chặn**, cùng thông báo như TC_INC_010; xe ID=X vẫn còn
+  - Đây là hành vi **đúng theo thiết kế**, không phải bug: ràng buộc bảo vệ toàn vẹn tham chiếu, không phải "việc còn đang mở". Lịch sử sự cố đã đóng chính là dữ liệu Phase 7 sẽ dùng để xếp hạng đề xuất thay xe
+
+---
+
+### TC_INC_015 — Xe có cả chuyến lẫn sự cố: ràng buộc chuyến báo trước
+
+- **Mã TC:** TC_INC_015
+- **Điều kiện tiên quyết:** Xe ID=1 có **≥1 chuyến** và **≥1 sự cố**
+- **Các bước thực hiện:**
+  1. `GET /admin/buses/delete/1`
+- **Kết quả mong đợi:**
+  - Hiện thông báo của **ràng buộc chuyến** trước (`"...xe đã có dữ liệu lịch sử vận hành hoặc phân công..."`), vì ràng buộc chuyến được kiểm tra trước
+  - Ràng buộc sự cố chỉ lộ ra khi đã dọn hết chuyến — Admin gặp **2 bức tường nối tiếp**, đây là hành vi đã biết
+
+---
+
+### NHÓM 7.4: CÁC TÁC ĐỘNG CỐ TÌNH **KHÔNG** XẢY RA
+
+> Nhóm này kiểm chứng những gì **không** được phép xảy ra. Đây là **scope đã duyệt**
+> (xem Hidden Cost #6 trong roadmap), không phải thiếu sót.
+
+### TC_INC_016 — Ghi sự cố KHÔNG tự đổi trạng thái xe
+
+- **Mã TC:** TC_INC_016
+- **Điều kiện tiên quyết:** Xe ID=X đang ở trạng thái **READY**
+- **Các bước thực hiện:**
+  1. Ghi 1 sự cố loại **Xe hỏng**, trạng thái **Mới ghi nhận**, cho xe ID=X
+  2. Mở `/admin/buses`
+- **Kết quả mong đợi:**
+  - Xe ID=X **vẫn READY** — ghi sự cố **không** tự chuyển xe sang bảo trì
+  - Đưa xe vào bảo trì vẫn là thao tác **thủ công** ở màn hình Quản Lý Xe
+
+---
+
+### TC_INC_017 — Xe đang có sự cố mở VẪN được gán cho chuyến mới
+
+- **Mã TC:** TC_INC_017
+- **Tên Kịch Bản:** Xác nhận sự cố **không** tham gia vào luồng gán tài nguyên
+- **Điều kiện tiên quyết:** Tiếp nối TC_INC_016 (xe ID=X có sự cố "Xe hỏng" đang mở, vẫn READY)
+- **Các bước thực hiện:**
+  1. Tạo chuyến mới / để hệ thống tự gán tài nguyên cho khung giờ mà xe ID=X rảnh
+- **Kết quả mong đợi:**
+  - Xe ID=X **vẫn được gán bình thường**, không cảnh báo gì
+  - Tương tự với tài xế: sự cố loại **Sự cố nhân sự** **không** loại tài xế khỏi luồng gán
+  - Sợi dây duy nhất nối sự cố với điều hành là Admin **tự** đổi trạng thái xe sang bảo trì
+
+---
+
+### TC_INC_018 — Xóa mềm chuyến đang được sự cố tham chiếu
+
+- **Mã TC:** TC_INC_018
+- **Tên Kịch Bản:** Hành vi đã biết — không crash, nhưng hiển thị gây hiểu nhầm
+- **Điều kiện tiên quyết:** Sự cố ID=Z đang gắn với chuyến ID=T
+- **Các bước thực hiện:**
+  1. Xóa mềm chuyến ID=T
+  2. Mở `/admin/incidents` và `/admin/incidents/edit/Z`
+- **Kết quả mong đợi:**
+  - Cả 2 trang **vẫn trả HTTP 200**, không ném lỗi
+  - Sự cố Z hiển thị **"Ngoài hành trình"** như thể chưa từng có chuyến — hiển thị này **gây hiểu nhầm** nhưng đã được chấp nhận
+  - ⚠️ Nếu **lưu lại** sự cố Z ở trạng thái đó, `trip_id` bị xóa **vĩnh viễn** (chuyến đã xóa mềm không còn trong dropdown)
+
+---
+
 ## PHỤ LỤC: MA TRẬN CHUYỂN TRẠNG THÁI FSM
 
 | Từ → Đến | ACTIVE | PENDING | DEPARTED | COMPLETED | CANCELLED |
@@ -1586,7 +1859,19 @@
 | Module 4 — AI Scheduler | 18 | 5 | 13 |
 | Module 5 — Admin Approval | 10 | 4 | 6 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
-| **TỔNG** | **76** | **24** | **52** |
+| Module 7 — Incident Management | 18 | 10 | 8 |
+| **TỔNG** | **94** | **34** | **60** |
+
+> **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
+> số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
+> **8** case (Phase 0 thêm `TC_SEC_005B`/`TC_SEC_005C` nhưng không cập nhật bảng này), `TC_FSM`
+> thực có **29**, và **8** case `TC_DEL` không được tính vào module nào. Chỉ dòng Module 7 và
+> dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
+> đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng.
+
+> **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
+> chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
+> TC_INC_012/TC_INC_013. Đây là nợ tài liệu, không phải nợ tính năng.
 
 ---
 

@@ -18,9 +18,9 @@ The **Bus Management System** is a Spring Boot application designed to manage bu
 The application follows a standard Layered Architecture. The root package is `giang.com.BusManagement`.
 
 *   `giang.com.BusManagement.config`: System configurations (e.g., Security, CORS).
-*   `giang.com.BusManagement.domain`: JPA Entities representing the database schema (e.g., `Bus`, `Trip`, `Driver`, `Route`, `Station`, `RouteStation`, `User`).
+*   `giang.com.BusManagement.domain`: JPA Entities representing the database schema (e.g., `Bus`, `Trip`, `Driver`, `Route`, `Station`, `RouteStation`, `User`, `Incident`).
 *   `giang.com.BusManagement.repository`: Spring Data JPA repositories.
-*   `giang.com.BusManagement.service`: Core business logic layers (`TripService`, `BusService`, `DriverService`, `RouteService`, `StationService`, `DashboardService`).
+*   `giang.com.BusManagement.service`: Core business logic layers (`TripService`, `BusService`, `DriverService`, `RouteService`, `StationService`, `IncidentService`, `DashboardService`).
 *   `giang.com.BusManagement.controller`: Controllers managing web views and REST endpoints. Admin routes are grouped in the `.admin` subpackage.
 *   `giang.com.BusManagement.dto`: Read-only view-model classes. Currently used only by the Dashboard & Analytics module (Section 10) — not a general-purpose response wrapper for other controllers.
 

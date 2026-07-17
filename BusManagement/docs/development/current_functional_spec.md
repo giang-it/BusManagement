@@ -28,6 +28,7 @@ Only the Administrator workflow is currently exposed through the application:
     *   A bus has one of three statuses: `READY` (available for dispatch), `TRAVELING` (currently on a trip), or `REPAIRING` (under maintenance).
     *   Vehicles exceeding their maintenance thresholds cannot be assigned to trips.
     *   Bus status is automatically synchronized during trip lifecycle transitions.
+    *   A bus that has ever been assigned to a trip, or that has **any** incident recorded against it, cannot be hard-deleted — operational history is preserved; the bus is moved to `REPAIRING` instead. "Any" includes incidents already `RESOLVED`: the guard protects referential integrity, not open work. Because `Incident.bus` is mandatory, an incident cannot be unlinked from its bus, so the incident records must be deleted first if the bus itself is genuinely to be removed.
 
 ### Driver Management
 *   **Purpose:** Maintain driver personnel records.
@@ -37,7 +38,7 @@ Only the Administrator workflow is currently exposed through the application:
 *   **Business Rules:**
     *   A driver whose licence has expired, or who is locked (`isActive = false`), is excluded from every trip assignment path (see Trip Management constraints).
     *   A driver cannot be locked while holding a trip in `PENDING_APPROVAL`, `ACTIVE`, or `DEPARTED` — the same "busy" definition used by `TripService.isDriverBusyInWindow()`.
-    *   A driver who has ever been assigned to a trip cannot be hard-deleted (operational history is preserved); the driver is locked instead. Deleting an unused driver removes the backing `User` too, via `User.driver`'s `cascade = ALL`.
+    *   A driver who has ever been assigned to a trip, or who has any incident recorded against them (regardless of its status, as for a bus), cannot be hard-deleted (operational history is preserved); the driver is locked instead. Unlike a bus, `Incident.driver` is optional, so an incident can simply be unlinked from the driver ("Không xác định") rather than deleted. Deleting an unused driver removes the backing `User` too, via `User.driver`'s `cascade = ALL`.
     *   `monthlyRestDays` and `totalDrivingHours24h` are not editable through this module — see Known Behavioral Notes.
 
 ### Route & Station Management
@@ -59,6 +60,21 @@ Only the Administrator workflow is currently exposed through the application:
     *   Resource allocation.
     *   Administrative management of trip lifecycle including creation, modification, approval, cancellation, and operational state transitions.
     *   Dynamic resource allocation API endpoint (`/api/admin/trips/available-resources`) that returns conflict-free available buses and drivers for a specified timeframe.
+
+### Incident Management
+*   **Purpose:** Record operational incidents reported to the control centre — the module matching the original proposal's "Báo cáo sự cố về trung tâm (xe hỏng, vấn đề trên đường)".
+*   **Implemented Functionality:**
+    *   CRUD management of Incidents (`AdminIncidentController` / `IncidentService`, entry point `/admin/incidents`): vehicle, incident type, optional trip, optional reporting/involved driver, free-text description, handling status, and a status count strip.
+    *   `IncidentType`: `VEHICLE_BREAKDOWN`, `ACCIDENT`, `ROAD_ISSUE`, `STAFF_ISSUE`, `OTHER`.
+    *   `IncidentStatus`: `OPEN`, `IN_PROGRESS`, `RESOLVED`.
+*   **Business Rules:**
+    *   An incident **must** reference a bus; the trip and the driver are optional (a bus can fail in the depot, outside any trip; and with authentication deferred, the reporter cannot always be identified).
+    *   `IncidentStatus` is **not** governed by an FSM — unlike `TripStatus`, the Admin may move freely between all three values, including reopening a closed incident. The only enforced rule is that `resolvedAt` is stamped when the status becomes `RESOLVED` and cleared when it leaves `RESOLVED`; it is never entered by hand.
+    *   `reportedAt` is stamped by Hibernate on insert (`@CreationTimestamp`, `updatable = false`) and never changes on edit.
+    *   Recording an incident **does not** change the bus status. Taking a bus out of service remains a manual action in Fleet Management, where the existing rule "a bus with unfinished trips cannot be moved to `REPAIRING`" still applies.
+    *   Incidents can be deleted without restriction — a mis-filed report is not operational history in the sense that a trip or a route is. This is also what keeps the Fleet Management guard escapable: an incident is the one end of that relationship the Admin is always free to remove.
+    *   Conversely, an incident **blocks** hard-deletion of the bus (and of the driver) it references, so that no incident is left pointing at a record that no longer exists. This is enforced in `BusService`/`DriverService`, not by the database — the JDBC URL sets `foreign_key_checks=0`, so MySQL would not stop the orphan.
+*   **Known Behavioral Note:** if a trip referenced by an incident is soft-deleted, `Trip`'s `@SQLRestriction` hides it from every query, so the incident silently displays as if it had no trip ("Ngoài hành trình") and re-saving it will clear `trip_id`. Nothing fails or throws.
 
 ### Dispatch Center
 *   **Purpose:** A single operational board for the Administrator to run the day: what is on the road, what is about to leave, and what is late.
