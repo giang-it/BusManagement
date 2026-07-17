@@ -6,6 +6,7 @@ import giang.com.BusManagement.domain.BusType;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.repository.BusRepository;
 import giang.com.BusManagement.repository.BusTypeRepository;
+import giang.com.BusManagement.repository.IncidentRepository;
 import giang.com.BusManagement.repository.TripRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class BusService {
     private final BusRepository busRepository;
     private final BusTypeRepository busTypeRepository;
     private final TripRepository tripRepository;
+    private final IncidentRepository incidentRepository;
 
     public List<Bus> findAllWithBusType() {
         return busRepository.findAllWithBusType();
@@ -74,6 +76,19 @@ public class BusService {
         if (hasAnyTrip) {
             throw new RuntimeException(
                     "Không thể xóa xe này vì xe đã có dữ liệu lịch sử vận hành hoặc phân công. Hãy đổi trạng thái sang bảo trì thay vì xóa cứng!");
+        }
+
+        // RÀNG BUỘC: Chặn xóa xe còn bản ghi sự cố trỏ tới nó — cùng nguyên tắc giữ
+        // lịch sử vận hành với ràng buộc chuyến ở trên.
+        // Kiểm tra ở tầng service là bắt buộc, KHÔNG thể dựa vào FK: JDBC URL đặt
+        // sessionVariables=foreign_key_checks=0 nên MySQL không chặn, xóa sẽ âm thầm
+        // để lại incidents.bus_id trỏ vào xe không còn tồn tại — trong khi Incident
+        // khai báo bus là optional=false/nullable=false.
+        // Incident.bus BẮT BUỘC nên Admin không thể gỡ liên kết; lối thoát duy nhất
+        // là xóa bản ghi sự cố trước (Incident cho xóa tự do, không guard).
+        if (incidentRepository.existsByBusId(id)) {
+            throw new RuntimeException(
+                    "Không thể xóa xe này vì đang có bản ghi sự cố gắn với nó. Hãy xóa các bản ghi sự cố của xe ở màn hình Quản Lý Sự Cố trước, hoặc đổi trạng thái xe sang bảo trì thay vì xóa cứng!");
         }
 
         busRepository.delete(bus);

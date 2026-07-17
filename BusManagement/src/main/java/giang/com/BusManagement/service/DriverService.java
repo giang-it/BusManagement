@@ -5,6 +5,7 @@ import giang.com.BusManagement.domain.Role;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.domain.User;
 import giang.com.BusManagement.repository.DriverRepository;
+import giang.com.BusManagement.repository.IncidentRepository;
 import giang.com.BusManagement.repository.TripRepository;
 import giang.com.BusManagement.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class DriverService {
     private final DriverRepository driverRepository;
     private final UserRepository userRepository;
     private final TripRepository tripRepository;
+    private final IncidentRepository incidentRepository;
 
     /**
      * Các trạng thái khiến một tài xế được coi là "còn ràng buộc công việc".
@@ -111,9 +113,10 @@ public class DriverService {
     /**
      * Xóa hồ sơ tài xế.
      *
-     * Chặn xóa cứng nếu tài xế đã từng tham gia bất kỳ chuyến nào — giữ nguyên
-     * lịch sử vận hành, đúng nguyên tắc BusService.deleteBus() đang áp dụng cho
-     * xe. Trường hợp đó Admin dùng chức năng khóa (isActive=false) thay thế.
+     * Chặn xóa cứng nếu tài xế đã từng tham gia bất kỳ chuyến nào, hoặc còn bản
+     * ghi sự cố trỏ tới — giữ nguyên lịch sử vận hành, đúng nguyên tắc
+     * BusService.deleteBus() đang áp dụng cho xe. Trường hợp đó Admin dùng chức
+     * năng khóa (isActive=false) thay thế.
      *
      * Xóa qua userRepository: User.driver khai báo cascade=ALL nên Hibernate tự
      * xóa bản ghi Driver kèm theo. Nếu chỉ xóa Driver, User (ROLE_DRIVER) sẽ trở
@@ -128,6 +131,18 @@ public class DriverService {
             throw new RuntimeException(
                     "Không thể xóa tài xế này vì đã có dữ liệu lịch sử vận hành (từng được phân công cho chuyến xe). "
                             + "Hãy khóa hồ sơ (bỏ tick 'Đang hoạt động') thay vì xóa cứng!");
+        }
+
+        // RÀNG BUỘC: Chặn xóa tài xế còn bản ghi sự cố trỏ tới — cùng lý do với
+        // BusService.deleteBus(): foreign_key_checks=0 nên DB không chặn, xóa sẽ để
+        // lại incidents.driver_id trỏ vào hồ sơ không còn tồn tại.
+        // KHÁC với xe: Incident.driver là tùy chọn, nên Admin còn một lối thoát nhẹ
+        // hơn là gỡ tài xế khỏi bản ghi sự cố thay vì phải xóa cả bản ghi đó.
+        if (incidentRepository.existsByDriverUserId(userId)) {
+            throw new RuntimeException(
+                    "Không thể xóa tài xế này vì đang có bản ghi sự cố gắn với họ. "
+                            + "Hãy gỡ tài xế khỏi các bản ghi sự cố đó (chọn 'Không xác định') hoặc xóa các bản ghi đó trước, "
+                            + "hoặc khóa hồ sơ (bỏ tick 'Đang hoạt động') thay vì xóa cứng!");
         }
 
         userRepository.delete(driver.getUser());
