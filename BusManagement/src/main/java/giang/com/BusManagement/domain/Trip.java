@@ -86,8 +86,12 @@ public class Trip {
      * (updatable = false).
      *
      * Khác với saleOpenedAt (mốc nghiệp vụ — thời điểm mở bán vé, do FSM đóng
-     * dấu khi chuyển sang ACTIVE): createdAt là mốc kỹ thuật, dùng làm nền cho
-     * dữ liệu lịch sử/phân tích xu hướng sau này.
+     * dấu khi chuyển sang ACTIVE): createdAt là mốc kỹ thuật (thời điểm bản ghi
+     * được insert), phục vụ audit và các phân tích dựa trên tốc độ đặt vé
+     * (booking velocity) sau này. KHÔNG dùng làm trục thời gian cho Demand
+     * Forecast (Phase 6) — trục đó là departureTime, vì backfill dữ liệu lịch
+     * sử (Phase 5) không thể set createdAt về quá khứ (@CreationTimestamp
+     * luôn đóng dấu lúc INSERT, không phụ thuộc giá trị gán thủ công).
      *
      * LƯU Ý: các chuyến đã tồn tại trong DB trước khi cột này được thêm sẽ có
      * giá trị NULL (@CreationTimestamp chỉ điền lúc INSERT). Nơi nào đọc field
