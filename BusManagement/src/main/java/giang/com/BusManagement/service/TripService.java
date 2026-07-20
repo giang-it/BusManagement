@@ -874,6 +874,82 @@ public class TripService {
         }
     }
 
+    // =========================================================================
+    // BUSINESS RULE VALIDATION — DRY-RUN (không throw)
+    // =========================================================================
+
+    /**
+     * Bản dry-run của validateBusForTrip(): trả về kết quả dưới dạng dữ liệu
+     * thay vì ném exception.
+     *
+     * Đây là WRAPPER THUẦN TÚY — nó gọi đúng validator gốc, không sao chép,
+     * không sửa, không bổ sung một ràng buộc nào. Mọi thay đổi nghiệp vụ sau
+     * này chỉ cần sửa ở validateBusForTrip() và bản dry-run tự động đi theo,
+     * nên hai luồng không bao giờ lệch nhau.
+     *
+     * Dành cho tầng Decision Support (Phase 7) — nơi việc một xe không hợp lệ
+     * là kết quả BÌNH THƯỜNG cần ghi lại, không phải sự cố cần exception. Luồng
+     * throw hiện tại (createManualTrip / updateManualTrip / approveTrip /
+     * confirmAutoAssignedTrip) không đổi và không gọi qua đây.
+     *
+     * CHỈ BÁO ĐƯỢC MỘT LỖI: validator gốc fail-fast (throw ngay ràng buộc đầu
+     * tiên bị vi phạm) nên không tồn tại lỗi thứ hai để trả về. Đây là quyết
+     * định đã chốt của Phase 3, không phải thiếu sót — cổng xác nhận ở Phase 7
+     * chỉ cần biết đạt/không đạt.
+     *
+     * CHỈ BẮT IllegalArgumentException — đúng loại mà validator dùng để báo vi
+     * phạm nghiệp vụ. Các exception khác (NullPointerException khi bus == null,
+     * lỗi truy cập dữ liệu...) là LỖI KỸ THUẬT và vẫn được ném ra ngoài: nuốt
+     * chúng thành "không hợp lệ" sẽ biến một bug thành một lý do nghiệp vụ giả.
+     *
+     * Yêu cầu gọi trong phạm vi transaction/session đang mở (giống mọi method
+     * đọc khác trong class này) vì validator truy cập quan hệ lazy.
+     *
+     * @param bus           xe cần kiểm tra — KHÔNG được null (validator gốc
+     *                      dereference ngay, sẽ ném NullPointerException)
+     * @param trip          chuyến đang xét
+     * @param excludeTripId bỏ qua chính chuyến này khi kiểm tra trùng lịch
+     * @return pass (kèm warning nếu validator gốc trả về) hoặc fail kèm đúng
+     *         thông điệp gốc
+     */
+    public ValidationResult validateBusForTripDryRun(Bus bus, Trip trip, Long excludeTripId) {
+        try {
+            return ValidationResult.pass(validateBusForTrip(bus, trip, excludeTripId));
+        } catch (IllegalArgumentException e) {
+            return ValidationResult.fail(e.getMessage());
+        }
+    }
+
+    /**
+     * Bản dry-run của validateStaffForTrip(): trả về kết quả dưới dạng dữ liệu
+     * thay vì ném exception.
+     *
+     * Mọi ghi chú của validateBusForTripDryRun() ở trên đều áp dụng nguyên vẹn
+     * cho method này (wrapper thuần túy, một lỗi duy nhất, chỉ bắt
+     * IllegalArgumentException, cần session đang mở).
+     *
+     * Khác một điểm: validator gốc trả về void nên ở đây không có kênh warning
+     * để chuyển tiếp — hợp lệ luôn là pass() rỗng.
+     *
+     * Lưu ý khi đọc kết quả: thiếu tài xế chính ĐƯỢC validator gốc báo bằng
+     * IllegalArgumentException ("Chuyến xe bắt buộc phải có tài xế chính!") nên
+     * ra fail bình thường — khác với trường hợp bus == null ở method trên vốn
+     * ném NullPointerException. Sự bất đối xứng này nằm trong validator gốc,
+     * Phase 3 cố tình không sửa (xem Developer Notes).
+     *
+     * @param trip          chuyến kèm tài xế chính / tài xế phụ / phụ xe cần kiểm tra
+     * @param excludeTripId bỏ qua chính chuyến này khi kiểm tra trùng lịch
+     * @return pass hoặc fail kèm đúng thông điệp gốc
+     */
+    public ValidationResult validateStaffForTripDryRun(Trip trip, Long excludeTripId) {
+        try {
+            validateStaffForTrip(trip, excludeTripId);
+            return ValidationResult.pass();
+        } catch (IllegalArgumentException e) {
+            return ValidationResult.fail(e.getMessage());
+        }
+    }
+
     /**
      * Admin từ chối chuyến tăng cường (AI đề xuất sai, không còn cần thiết).
      * Delegate sang updateTripStatus() để FSM canTransition() được thực thi.
