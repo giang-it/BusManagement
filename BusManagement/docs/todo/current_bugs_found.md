@@ -54,6 +54,24 @@ chủ dự án trước khi xử lý.
 
 ## 1. Bằng lái được kiểm tra theo NGÀY HÔM NAY, không theo ngày khởi hành
 
+> **✅ ĐÃ SỬA (2026-07-20).** Thêm `Driver.isLicenseValid(LocalDate)`; bản không
+> tham số giữ nguyên và chỉ còn dùng cho nhãn hiển thị ở danh sách tài xế. Toàn
+> bộ 6 điểm kiểm tra trong `TripService` nay truyền ngày khởi hành, và
+> `DriverRecommendationService` truyền ngày Admin chọn.
+>
+> **Phát hiện thêm khi sửa:** `findBestAvailableDriver()` vốn ĐÃ mâu thuẫn với
+> chính nó — tầng ưu tiên (dòng 365) so bằng lái với `departure + 7 ngày`, trong
+> khi bộ lọc gốc (dòng 352) so với hôm nay. Hậu quả: tài xế hết hạn trước ngày
+> chạy lọt qua bộ lọc gốc, trượt tầng ưu tiên, rồi được nhánh **fallback** chọn
+> kèm log `⚠️ bằng lái SẮP HẾT HẠN` — trong khi thực tế bằng đã hết hạn hẳn vào
+> ngày khởi hành. Dòng 365 chính là bằng chứng ý định ban đầu của tác giả là
+> tính theo ngày khởi hành; dòng 352 chỉ đơn giản là chưa được sửa theo.
+>
+> Kiểm chứng: chuyến khởi hành 2027-08-01 với tài xế hết hạn 2027-07-16 nay bị
+> chặn (trước đây cho qua); chuyến khởi hành trước ngày hết hạn vẫn qua bình
+> thường; endpoint cấp tài nguyên cho dropdown trả 0 tài xế thay vì 26 cho ngày
+> sau hạn. Không có chuyến nào đang tồn tại trong DB bị ảnh hưởng.
+
 - **Mức độ:** nghiệp vụ — đây là lỗi thật, không phải chuyện hiển thị.
 - **Ở đâu:** `Driver.isLicenseValid()` (`domain/Driver.java`) so `licenseExpiryDate`
   với `LocalDate.now()`. Được dùng bởi `TripService.validateStaffForTrip()`,

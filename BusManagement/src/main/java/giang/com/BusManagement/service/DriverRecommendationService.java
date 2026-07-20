@@ -68,7 +68,9 @@ public class DriverRecommendationService {
      * sự gán người, nên danh sách này không bao giờ đề xuất một tài xế mà hệ
      * thống sẽ từ chối ngay sau đó:
      * - đang hoạt động (isActive) — validator chặn "đã bị khóa";
-     * - bằng lái còn hạn (isLicenseValid) — validator chặn "bằng lái hết hạn";
+     * - bằng lái còn hiệu lực VÀO NGÀY ĐƯỢC CHỌN (isLicenseValid(date), cùng
+     * hàm mà validator dùng với ngày khởi hành) — validator chặn "bằng lái hết
+     * hạn trước ngày khởi hành";
      * - còn hạn mức giờ trong ngày — validator chặn "vượt 8h/ngày".
      *
      * @param date ngày cần xét (Admin chọn; không giới hạn quá khứ/tương lai)
@@ -84,12 +86,12 @@ public class DriverRecommendationService {
                 .toList();
 
         long licenseBlockedCount = activeDrivers.stream()
-                .filter(d -> !d.isLicenseValid())
+                .filter(d -> !d.isLicenseValid(date))
                 .count();
 
         List<DriverRecommendationDto> assignable = activeDrivers.stream()
-                .filter(Driver::isLicenseValid)
-                .map(d -> toDto(d, tripService.getDrivingHoursForDate(d, reference)))
+                .filter(d -> d.isLicenseValid(date))
+                .map(d -> toDto(d, tripService.getDrivingHoursForDate(d, reference), date))
                 .toList();
 
         List<DriverRecommendationDto> withCapacity = assignable.stream()
@@ -113,14 +115,14 @@ public class DriverRecommendationService {
                 licenseBlockedCount);
     }
 
-    private DriverRecommendationDto toDto(Driver driver, double drivingHours) {
+    private DriverRecommendationDto toDto(Driver driver, double drivingHours, LocalDate date) {
         double remaining = MAX_DAILY_DRIVING_HOURS - drivingHours;
         return new DriverRecommendationDto(
                 driver.getUserId(),
                 driver.getUser() != null ? driver.getUser().getFullName() : "Tài xế #" + driver.getUserId(),
                 drivingHours,
                 remaining,
-                driver.isLicenseValid(),
+                driver.isLicenseValid(date),
                 driver.getLicenseExpiryDate(),
                 driver.getExperienceYears(),
                 drivingHours <= 0.0 ? "Trống cả ngày" : "Đã phân công một phần",

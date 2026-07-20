@@ -348,8 +348,11 @@ public class TripService {
                 // Loại trừ tài xế đã được chọn (để tránh trùng lặp vai trò)
                 .filter(d -> excludeDrivers == null
                         || excludeDrivers.stream().noneMatch(ex -> ex.getUserId().equals(d.getUserId())))
-                // Ràng buộc: bằng lái phải còn hạn
-                .filter(Driver::isLicenseValid)
+                // Ràng buộc: bằng lái phải còn hạn VÀO NGÀY KHỞI HÀNH (không phải
+                // vào hôm nay) — cùng mốc thời gian mà tầng ưu tiên 7 ngày bên dưới
+                // đã dùng, nếu không tài xế hết hạn trước ngày chạy sẽ lọt qua đây
+                // rồi rơi xuống nhánh fallback và được chọn kèm log sai sự thật.
+                .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 // Ràng buộc: tổng giờ lái hôm nay + thời lượng chuyến không được vượt 8 tiếng.
                 // CHỈ áp dụng cho tài xế chính/tài xế phụ (isAssistantRole=false) — phụ xe
                 // không lái nên bỏ qua ràng buộc này (Tính chính xác dựa trên CÁC CHUYẾN ĐÃ
@@ -821,9 +824,10 @@ public class TripService {
             throw new IllegalArgumentException(
                     "Tài xế chính " + driver.getUser().getFullName() + " đã bị khóa (ngừng hoạt động)!");
         }
-        if (!driver.isLicenseValid()) {
-            throw new IllegalArgumentException(
-                    "Bằng lái của tài xế chính " + driver.getUser().getFullName() + " đã hết hạn!");
+        if (!driver.isLicenseValid(departure.toLocalDate())) {
+            throw new IllegalArgumentException(String.format(
+                    "Bằng lái của tài xế chính %s hết hạn ngày %s — không còn hiệu lực vào ngày khởi hành %s!",
+                    driver.getUser().getFullName(), driver.getLicenseExpiryDate(), departure.toLocalDate()));
         }
         if (isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId)) {
             throw new IllegalArgumentException(
@@ -844,9 +848,10 @@ public class TripService {
                     throw new IllegalArgumentException(
                             "Tài xế phụ " + cd.getUser().getFullName() + " đã bị khóa (ngừng hoạt động)!");
                 }
-                if (!cd.isLicenseValid()) {
-                    throw new IllegalArgumentException(
-                            "Bằng lái của tài xế phụ " + cd.getUser().getFullName() + " đã hết hạn!");
+                if (!cd.isLicenseValid(departure.toLocalDate())) {
+                    throw new IllegalArgumentException(String.format(
+                            "Bằng lái của tài xế phụ %s hết hạn ngày %s — không còn hiệu lực vào ngày khởi hành %s!",
+                            cd.getUser().getFullName(), cd.getLicenseExpiryDate(), departure.toLocalDate()));
                 }
                 if (isDriverBusyInWindow(cd, windowStart, windowEnd, excludeTripId)) {
                     throw new IllegalArgumentException(
@@ -1020,7 +1025,7 @@ public class TripService {
 
         return driverRepository.findAll().stream()
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
-                .filter(Driver::isLicenseValid)
+                .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> getDrivingHoursForDate(d, departure, tripId) + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
                 .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
@@ -1049,7 +1054,7 @@ public class TripService {
 
         return driverRepository.findAll().stream()
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
-                .filter(Driver::isLicenseValid)
+                .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
                 .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
                 .collect(Collectors.toList());
@@ -1116,7 +1121,7 @@ public class TripService {
 
         return driverRepository.findAllWithUser().stream()
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
-                .filter(Driver::isLicenseValid)
+                .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))

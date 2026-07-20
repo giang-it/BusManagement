@@ -36,7 +36,7 @@ Only the Administrator workflow is currently exposed through the application:
     *   CRUD management of Drivers (`AdminDriverController` / `DriverService`, entry point `/admin/drivers`): login account details, full name, contact, licence number, licence expiry, years of experience, and an active/locked switch.
     *   Creating a driver creates the backing `User` in the same form and forces its role to `ROLE_DRIVER` — `Driver` maps its primary key to `User.id` via `@MapsId` and cannot exist without one.
 *   **Business Rules:**
-    *   A driver whose licence has expired, or who is locked (`isActive = false`), is excluded from every trip assignment path (see Trip Management constraints).
+    *   A driver who is locked (`isActive = false`), or whose licence will have expired by the departure date of the trip in question, is excluded from every trip assignment path (see Trip Management constraints). The "Hết hạn" badge on the driver list itself reports validity **today**, since that screen has no trip context.
     *   A driver cannot be locked while holding a trip in `PENDING_APPROVAL`, `ACTIVE`, or `DEPARTED` — the same "busy" definition used by `TripService.isDriverBusyInWindow()`.
     *   A driver who has ever been assigned to a trip, or who has any incident recorded against them (regardless of its status, as for a bus), cannot be hard-deleted (operational history is preserved); the driver is locked instead. Unlike a bus, `Incident.driver` is optional, so an incident can simply be unlinked from the driver ("Không xác định") rather than deleted. Deleting an unused driver removes the backing `User` too, via `User.driver`'s `cascade = ALL`.
     *   `monthlyRestDays` and `totalDrivingHours24h` are not editable through this module — see Known Behavioral Notes.
@@ -113,7 +113,7 @@ During manual creation or modification, the backend enforces the following valid
     *   **Maintenance Block:** The bus cannot be assigned if it has already exceeded its maintenance threshold (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`) or if the distance of the trip will push the odometer into the warning threshold (`odometer + distance >= maintenanceThreshold * 0.9`).
 *   **Driver Availability Constraints:**
     *   The driver (main, co-driver, or assistant) must be active (`isActive = true`).
-    *   The driver must hold a valid, unexpired driver license.
+    *   The driver must hold a driver licence that is still valid **on the trip's departure date** (`licenceExpiryDate > departureDate`) — not merely valid on the day the assignment is made. A trip departing after the licence expires is rejected even if the licence is still valid today.
     *   **Double-Booking Check:** The driver must not be busy on another trip overlapping with the window `[departure - 30 minutes, arrival + 30 minutes]` (minimum rest buffer).
     *   **Daily Driving Limit:** The accumulated driving hours for a driver on a single calendar day (including the duration of the new trip, split equally among assigned drivers) must not exceed 8 hours.
 *   **Long-Haul Crew Requirements:**
