@@ -293,6 +293,17 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("until") LocalDateTime until);
 
        /**
+        * Kiểm tra đã tồn tại chuyến của tuyến này khởi hành ĐÚNG mốc thời gian này
+        * hay chưa.
+        *
+        * Dùng bởi HistoricalDataBackfill để chạy lại được nhiều lần mà không nhân
+        * bản dữ liệu: mỗi ô (tuyến × mốc khởi hành) của bộ dữ liệu lịch sử là duy
+        * nhất và sinh ra một cách tất định, nên chỉ cần hỏi đúng câu này là biết ô
+        * đó đã được backfill hay chưa — không cần thêm cột đánh dấu vào Trip.
+        */
+       boolean existsByRouteIdAndDepartureTime(Long routeId, LocalDateTime departureTime);
+
+       /**
         * Kiểm tra xe có đang bận ở các chuyến đi có trạng thái nằm trong
         * danh sách chỉ định hay không
         * Thường dùng để chặn không cho xe đi bảo trì (REPAIRING) khi đang có lịch

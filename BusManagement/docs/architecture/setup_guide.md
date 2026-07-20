@@ -100,7 +100,24 @@ No manual SQL import is needed.
 
 **First-time setup:** a fresh clone starts with an empty database. Run once with `-Dspring-boot.run.profiles=demo` to populate sample data, then use the default profile from then on to accumulate data.
 
-### 4.3 Test configuration
+### 4.3 Backfill profile — historical dataset (Phase 5)
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill
+```
+
+Runs `HistoricalDataBackfill`, which generates **12 weeks of simulated historical trips** (5 routes × 3 departure slots × 84 days = 1,260 rows, `COMPLETED`/`CANCELLED`) ending yesterday. This is the dataset Demand Forecast (Phase 6) consumes.
+
+- **Additive, never destructive.** This profile does **not** activate `demo`, so `DataInitializer` does not run and nothing is wiped. The default `ddl-auto=update` still applies.
+- **Safe to re-run.** Each row is a deterministic `(route, departureTime)` slot and is skipped if it already exists, so a second run inserts 0 rows.
+- **Deterministic.** A fixed random seed means the same dataset is produced on any machine.
+- **Never combine with `demo`** — that profile uses `create-drop` and would wipe the schema before the backfill runs.
+
+The generated rows carry the **script's run date** in `created_at` (Hibernate `@CreationTimestamp` cannot be backdated, and the column is `updatable = false`). This is expected: the dataset's time axis is `departure_time`. Do not "fix" it with native SQL.
+
+> **The data is simulated.** After running this, dashboard totals (trip counts, tickets sold, revenue) are dominated by generated figures. Say so explicitly in any report or demo.
+
+### 4.4 Test configuration
 
 `src/test/resources/application.properties` points the test suite at a **separate database** (`busmanagement_test`, auto-created via `createDatabaseIfNotExist=true`) using `create-drop`. This keeps `mvnw test` from touching the real `busmanagement` database.
 
