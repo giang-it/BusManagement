@@ -24,7 +24,7 @@
 |---|---|---|
 | `User` | Tài khoản hệ thống | `username`, `password` (plaintext, không mã hóa), `role` (enum `Role`), quan hệ 1-1 với `Driver` |
 | `Role` | Enum | `ROLE_ADMIN`, `ROLE_DRIVER`, `ROLE_USER` — định nghĩa nhưng không được Spring Security sử dụng để phân quyền |
-| `Driver` | Hồ sơ tài xế, `@MapsId` dùng chung PK với `User` | `licenseNumber`, `licenseExpiryDate`, `experienceYears`, `totalDrivingHours24h` (giờ lái baseline, dữ liệu mock seed), `monthlyRestDays`, `isActive`; method `isLicenseValid()` |
+| `Driver` | Hồ sơ tài xế, `@MapsId` dùng chung PK với `User` | `licenseNumber`, `licenseExpiryDate`, `experienceYears`, `totalDrivingHours24h` (giờ lái baseline, dữ liệu mock seed), `monthlyRestDays`, `isActive`; method `isLicenseValid(LocalDate)` (kiểm theo ngày khởi hành) + `isLicenseValid()` (theo hôm nay, chỉ để hiển thị) |
 | `Bus` | Xe khách | `licensePlate`, `busType` (N-1 `BusType`), `odometer`, `lastMaintenanceOdometer`, `maintenanceThreshold`, `status` (enum `BusStatus`); methods `getKmSinceLastMaintenance()`, `needsMaintenance()` |
 | `BusStatus` | Enum | `READY`, `TRAVELING`, `REPAIRING` |
 | `BusType` | Loại xe | `typeName` (unique), `capacity` |
@@ -151,7 +151,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 3. Tổng số tài xế đã gán (`driver` + `coDrivers`) phải ≥ `requiredDrivers`, nếu không → throw.
 4. Nếu `durationHours > 8.0` và `assistant == null` → throw ("chuyến >8h bắt buộc phải có phụ xe").
 5. Check trùng lặp nhân sự: coDriver không được trùng driver chính, không trùng nhau, assistant không được trùng driver chính hoặc trùng coDriver nào.
-6. Với mỗi người (driver chính, từng coDriver, assistant): check `isLicenseValid()` (driver/coDriver bắt buộc; assistant không check riêng dòng này), check không bận trong cửa sổ `[departure - 30p, arrival + 30p]` qua `isDriverBusyInWindow()` (gồm cả vai trò driver chính, coDriver, assistant ở các trip khác có status `PENDING_APPROVAL/ACTIVE/DEPARTED`).
+6. Với mỗi người (driver chính, từng coDriver, assistant): check `isLicenseValid(ngày khởi hành)` — bằng lái phải còn hiệu lực VÀO NGÀY KHỞI HÀNH, không phải hôm nay (áp cho CẢ driver chính, từng coDriver VÀ phụ xe — phụ xe cũng là Driver nên cũng bắt buộc còn bằng), check không bận trong cửa sổ `[departure - 30p, arrival + 30p]` qua `isDriverBusyInWindow()` (gồm cả vai trò driver chính, coDriver, assistant ở các trip khác có status `PENDING_APPROVAL/ACTIVE/DEPARTED`).
 7. Với driver chính và mỗi coDriver: tính `effectiveHours = min(durationHours / assignedDriversCount, 8.0)`, cộng với giờ đã lái trong ngày (`getDrivingHoursForDate`) — nếu tổng > 8.0 → throw.
    - **Lưu ý nghiệp vụ đã biết:** assistant (phụ xe) **không** bị áp ràng buộc giờ lái 8h/ngày trong `validateStaffForTrip` (đúng vì phụ xe không trực tiếp lái) nhưng **không nhất quán** với `findBestAvailableDriver()` (AI auto-assign) — hàm AI áp dụng cùng filter giờ-lái cho cả vai trò driver và assistant, có thể loại nhầm một tài xế đủ điều kiện làm phụ xe.
 
@@ -197,7 +197,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 ### 7.7. `findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount, excludeDrivers)`
 - Cửa sổ bận: `±MIN_REST_BETWEEN_TRIPS_MINUTES (30 phút)`.
 - `effectiveHours = min(tripDurationHours / totalDriversCount, 8.0)`.
-- Filter: `isActive = true`, không thuộc `excludeDrivers`, `isLicenseValid()`, `getDrivingHoursForDate(d, departure) + effectiveHours <= 8.0`, không bận trong cửa sổ (cả vai trò driver chính và assistant ở chuyến khác).
+- Filter: `isActive = true`, không thuộc `excludeDrivers`, `isLicenseValid(departure.toLocalDate())`, `getDrivingHoursForDate(d, departure) + effectiveHours <= 8.0`, không bận trong cửa sổ (cả vai trò driver chính và assistant ở chuyến khác).
 - Ưu tiên 1: bằng lái còn hạn > 7 ngày tính từ ngày khởi hành, chọn người có giờ lái trong ngày thấp nhất (load balancing).
 - Fallback: nếu không ai thỏa "còn hạn >7 ngày", chọn người giờ lái thấp nhất trong số còn lại (bằng lái sắp hết hạn nhưng vẫn hợp lệ), kèm log cảnh báo.
 - **Áp dụng chung cho cả vai trò driver chính, coDriver, và assistant** — đây là nguồn của vấn đề "phụ xe bị áp sai ràng buộc giờ lái" đã ghi nhận ở mục 6.7.
@@ -248,7 +248,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 | `getAvailableBusesForTimeRange(departure, arrival)` | Lấy xe rảnh theo khung giờ tự do (chưa có trip) | Dùng cho Wizard tạo trip mới qua REST API, không lọc theo loại xe (chưa biết route) |
 | `getAvailableDriversForTimeRange(departure, arrival)` | Tương tự cho driver | Dùng cho REST API `/api/admin/trips/available-resources` |
 
-Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, `isLicenseValid()`, giờ lái trong ngày + effective hours ≤ 8h, không bận trong cửa sổ nghỉ tối thiểu.
+Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, `isLicenseValid(ngày khởi hành)`, giờ lái trong ngày + effective hours ≤ 8h, không bận trong cửa sổ nghỉ tối thiểu.
 
 ---
 

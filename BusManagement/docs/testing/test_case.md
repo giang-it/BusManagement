@@ -624,9 +624,24 @@
 - **Các bước thực hiện:**
   1. `POST /admin/trip-management/trips/create` với driverId của "TX Bằng Lái Đã Hết"
 - **Kết quả mong đợi:**
-  - `validateStaffForTrip`: `driver.isLicenseValid()` → `licenseExpiryDate.isAfter(LocalDate.now())` = FALSE
-  - `throw new IllegalArgumentException("Bằng lái của tài xế chính TX Bằng Lái Đã Hết đã hết hạn!")`
+  - `validateStaffForTrip`: `driver.isLicenseValid(departure.toLocalDate())` → `licenseExpiryDate.isAfter(departureDate)` = FALSE (bằng đã hết hạn từ trước ngày khởi hành)
+  - `throw new IllegalArgumentException("Bằng lái của tài xế chính TX Bằng Lái Đã Hết hết hạn ngày <licenseExpiryDate> — không còn hiệu lực vào ngày khởi hành <departureDate>!")`
   - `flash[error]` chứa thông báo lỗi
+
+---
+
+### TC_FSM_018B — Ràng buộc nhân sự: Chặn PHỤ XE bằng lái đã hết hạn (theo ngày khởi hành)
+
+- **Mã TC:** TC_FSM_018B
+- **Tên Kịch Bản:** Admin gán phụ xe có bằng lái hết hạn trước ngày khởi hành
+- **Điều kiện tiên quyết:** Phụ xe "TX Bằng Lái Đã Hết" có `licenseExpiryDate < departureDate` (ví dụ hết hạn 2027-07-16, chuyến khởi hành 2027-08-01)
+- **Các bước thực hiện:**
+  1. `POST /admin/trip-management/trips/create` (hoặc `/update`, hoặc `/admin/trips/approve`) với `assistantId` của "TX Bằng Lái Đã Hết"
+- **Kết quả mong đợi:**
+  - `validateStaffForTrip`: `assistant.isLicenseValid(departure.toLocalDate())` → `licenseExpiryDate.isAfter(departureDate)` = FALSE
+  - `throw new IllegalArgumentException("Bằng lái của phụ xe TX Bằng Lái Đã Hết hết hạn ngày <licenseExpiryDate> — không còn hiệu lực vào ngày khởi hành <departureDate>!")`
+  - `flash[error]` chứa thông báo lỗi, DB không thay đổi
+  - **Đã sửa (Decision A):** `validateStaffForTrip` nay kiểm tra bằng lái (theo ngày khởi hành) cho CẢ phụ xe (assistant), không chỉ tài xế chính + coDriver — đồng nhất với `findBestAvailableDriver` (AI path) và `getAvailableAssistantsForTrip` (dropdown thủ công), vốn đã luôn lọc theo `isLicenseValid`. Trước đó phụ xe chỉ bị kiểm `isActive` + trùng lịch, nên một POST tự tạo hoặc dropdown cũ (bằng lái hết hạn sau khi tải trang) có thể lọt qua.
 
 ---
 
@@ -1168,7 +1183,7 @@
 - **Các bước thực hiện:**
   1. Gọi `autoAssignResources()`
 - **Kết quả mong đợi:**
-  - `.filter(Driver::isLicenseValid)`: `licenseExpiryDate.isAfter(now()) = false` → bị lọc ra
+  - `.filter(d -> d.isLicenseValid(departure.toLocalDate()))`: `licenseExpiryDate.isAfter(departureDate) = false` → bị lọc ra
   - `availableDrivers` rỗng
   - `findBestAvailableDriver` trả về `null`
   - `autoAssignResources` failure: `"Không có tài xế chính hợp lệ (cần bằng còn hạn, rảnh, và đủ định mức ngày)"`

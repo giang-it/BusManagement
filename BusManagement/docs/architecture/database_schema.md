@@ -63,7 +63,8 @@ Stores driver-specific profile data. Shares its primary key with `users` (shared
 - `OneToOne` → `users.id` via `@MapsId` + `@JoinColumn(name = "user_id")`
 
 **Business helper:**
-- `isLicenseValid()`: returns `true` if `licenseExpiryDate != null && licenseExpiryDate.isAfter(LocalDate.now())`
+- `isLicenseValid(LocalDate onDate)`: returns `true` if `licenseExpiryDate != null && licenseExpiryDate.isAfter(onDate)`. This is the form used by every trip-assignment check, which passes the trip's **departure date** — a licence must be valid on the day the driver actually drives, not merely on the day the assignment is made.
+- `isLicenseValid()`: delegates to `isLicenseValid(LocalDate.now())`. Kept for now-relative display only (e.g. the driver-list "Hết hạn" badge, which has no trip context).
 
 ---
 

@@ -103,6 +103,27 @@ class TripServiceValidationDryRunTest {
         return trip;
     }
 
+    /** Phụ xe (cũng là Driver) với ngày hết hạn bằng lái cho trước. */
+    private Driver assistantWithLicenseExpiry(LocalDate expiry) {
+        User user = new User();
+        user.setUsername("dryrun-assistant-" + expiry);
+        user.setFullName("Phụ Xe Dry Run");
+        user.setPassword("x");
+        user.setRole(Role.ROLE_DRIVER);
+
+        Driver assistant = new Driver();
+        assistant.setUser(user);
+        assistant.setLicenseNumber("AS-" + expiry);
+        assistant.setExperienceYears(3);
+        assistant.setTotalDrivingHours24h(0.0);
+        assistant.setIsActive(true);
+        assistant.setLicenseExpiryDate(expiry);
+        user.setDriver(assistant);
+
+        user = userRepository.save(user); // cascade = ALL → lưu luôn Driver
+        return user.getDriver();
+    }
+
     // =====================================================================
     // Đường đi hợp lệ
     // =====================================================================
@@ -180,6 +201,51 @@ class TripServiceValidationDryRunTest {
         assertFalse(result.isValid());
         assertEquals("Chuyến xe bắt buộc phải có tài xế chính!", result.getFailureReason(),
                 "Chỉ ràng buộc đầu tiên được báo — validator gốc throw ngay, không đi tiếp");
+    }
+
+    // =====================================================================
+    // Phụ xe (assistant) cũng phải còn bằng lái vào NGÀY KHỞI HÀNH (Decision A)
+    // =====================================================================
+
+    /**
+     * Phụ xe cũng là Driver, nên cũng phải còn bằng lái vào ngày khởi hành — cùng
+     * quy tắc như tài xế chính/phụ. Trước Decision A, validateStaffForTrip chỉ
+     * kiểm isActive + trùng lịch cho phụ xe, nên một phụ xe hết hạn bằng lái lọt
+     * qua tầng gate ở server (dù dropdown và AI đều đã lọc). Test khóa lỗ hổng đó.
+     */
+    @Test
+    void staffDryRun_expiredAssistantLicense_failsWithSameMessageAsThrowingPath() {
+        Driver assistant = assistantWithLicenseExpiry(departure.toLocalDate().minusDays(1));
+        Trip trip = validTrip();
+        trip.setAssistant(assistant);
+
+        ValidationResult result = tripService.validateStaffForTripDryRun(trip, null);
+
+        assertFalse(result.isValid(), "Phụ xe hết hạn bằng lái phải bị loại");
+        assertNotNull(result.getFailureReason());
+        assertTrue(result.getFailureReason().startsWith("Bằng lái của phụ xe"),
+                "Phải là lý do về bằng lái phụ xe, không phải ràng buộc khác");
+
+        // Cùng input → luồng throw (createManualTrip) phải ném ra ĐÚNG thông điệp đó
+        Trip sameInput = validTrip();
+        sameInput.setAssistant(assistant);
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                () -> tripService.createManualTrip(sameInput));
+        assertEquals(thrown.getMessage(), result.getFailureReason(),
+                "Dry-run phải phản chiếu nguyên văn thông điệp của validator gốc");
+    }
+
+    /** Không over-eager: phụ xe còn hạn bằng lái vào ngày khởi hành vẫn hợp lệ. */
+    @Test
+    void staffDryRun_validAssistantLicense_returnsPass() {
+        Driver assistant = assistantWithLicenseExpiry(departure.toLocalDate().plusYears(1));
+        Trip trip = validTrip();
+        trip.setAssistant(assistant);
+
+        ValidationResult result = tripService.validateStaffForTripDryRun(trip, null);
+
+        assertTrue(result.isValid(), "Phụ xe còn hạn bằng lái phải hợp lệ");
+        assertNull(result.getFailureReason());
     }
 
     // =====================================================================

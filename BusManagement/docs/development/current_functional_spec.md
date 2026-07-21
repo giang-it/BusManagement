@@ -113,7 +113,7 @@ During manual creation or modification, the backend enforces the following valid
     *   **Maintenance Block:** The bus cannot be assigned if it has already exceeded its maintenance threshold (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`) or if the distance of the trip will push the odometer into the warning threshold (`odometer + distance >= maintenanceThreshold * 0.9`).
 *   **Driver Availability Constraints:**
     *   The driver (main, co-driver, or assistant) must be active (`isActive = true`).
-    *   The driver must hold a driver licence that is still valid **on the trip's departure date** (`licenceExpiryDate > departureDate`) — not merely valid on the day the assignment is made. A trip departing after the licence expires is rejected even if the licence is still valid today.
+    *   The driver (main, co-driver, or assistant) must hold a driver licence that is still valid **on the trip's departure date** (`licenceExpiryDate > departureDate`) — not merely valid on the day the assignment is made. A trip departing after the licence expires is rejected even if the licence is still valid today.
     *   **Double-Booking Check:** The driver must not be busy on another trip overlapping with the window `[departure - 30 minutes, arrival + 30 minutes]` (minimum rest buffer).
     *   **Daily Driving Limit:** The accumulated driving hours for a driver on a single calendar day (including the duration of the new trip, split equally among assigned drivers) must not exceed 8 hours.
 *   **Long-Haul Crew Requirements:**

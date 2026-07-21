@@ -872,6 +872,14 @@ public class TripService {
                 throw new IllegalArgumentException(
                         "Phụ xe " + assistant.getUser().getFullName() + " đã bị khóa (ngừng hoạt động)!");
             }
+            // Phụ xe cũng là Driver nên cũng phải còn bằng lái hiệu lực VÀO NGÀY KHỞI
+            // HÀNH — cùng quy tắc, cùng mốc thời gian như tài xế chính/phụ ở trên, và
+            // khớp với bộ lọc ở findBestAvailableDriver()/getAvailableAssistantsForTrip().
+            if (!assistant.isLicenseValid(departure.toLocalDate())) {
+                throw new IllegalArgumentException(String.format(
+                        "Bằng lái của phụ xe %s hết hạn ngày %s — không còn hiệu lực vào ngày khởi hành %s!",
+                        assistant.getUser().getFullName(), assistant.getLicenseExpiryDate(), departure.toLocalDate()));
+            }
             if (isDriverBusyInWindow(assistant, windowStart, windowEnd, excludeTripId)) {
                 throw new IllegalArgumentException(
                         "Phụ xe " + assistant.getUser().getFullName() + " đang bận ở chuyến khác!");
