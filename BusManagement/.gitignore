@@ -38,3 +38,6 @@ build/
 
 ##repomix
 repomix-output.xml
+
+### Ad-hoc dated session/chat dump notes (not project files)
+/20??-??-??-*.txt
