@@ -110,7 +110,8 @@ Runs `HistoricalDataBackfill`, which generates **12 weeks of simulated historica
 
 - **Additive, never destructive.** This profile does **not** activate `demo`, so `DataInitializer` does not run and nothing is wiped. The default `ddl-auto=update` still applies.
 - **Safe to re-run.** Each row is a deterministic `(route, departureTime)` slot and is skipped if it already exists, so a second run inserts 0 rows.
-- **Deterministic.** A fixed random seed means the same dataset is produced on any machine.
+- **Deterministic — but only relative to the run date and the existing database.** The occupancy figures come from a fixed seed, so the *demand pattern* is reproducible. The departure dates are not: the window is computed as "the 84 days ending yesterday", so running the backfill on a different day shifts every date. Bus and driver assignment likewise depends on the rows already in that database. Re-running on the same database on the same day is a no-op; regenerating an identical dataset elsewhere is **not** guaranteed.
+- **Updates bus odometers, without disturbing maintenance state.** Completed trips add their route distance to `odometer` **and the same amount to `lastMaintenanceOdometer`**. Because `kmSinceLastMaintenance` is the difference of the two, it is mathematically unchanged — maintenance alerts, `needsMaintenance()`, and bus selection all behave exactly as before, while lifetime mileage becomes a real wear signal for Phase 7. Cancelled trips add nothing, matching the FSM. Re-running adds 0 km.
 - **Never combine with `demo`** — that profile uses `create-drop` and would wipe the schema before the backfill runs.
 
 The generated rows carry the **script's run date** in `created_at` (Hibernate `@CreationTimestamp` cannot be backdated, and the column is `updatable = false`). This is expected: the dataset's time axis is `departure_time`. Do not "fix" it with native SQL.

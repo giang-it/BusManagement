@@ -21,7 +21,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -67,6 +69,33 @@ import java.util.Random;
  * chuyến/ngày, cộng với việc chỉ chọn tuyến dài không quá 8h. Nhờ đó không có
  * chuyến nào trùng lịch xe/tài xế, và không tài xế nào vượt hạn mức 8h/ngày —
  * tức bộ dữ liệu không bịa ra những tình huống mà chính hệ thống coi là sai.
+ *
+ * ====================================================================
+ * ODOMETER: CỘNG CẢ HAI MỐC, GIỮ NGUYÊN kmSinceLastMaintenance
+ * ====================================================================
+ * Ở luồng thật, FSM cộng quãng đường tuyến vào Bus.odometer khi chuyến
+ * DEPARTED → COMPLETED. Nếu bỏ qua, 1.260 chuyến hoàn thành (~195.000 km) sẽ
+ * không để lại dấu vết nào trên odometer, và Phase 7 (Vehicle Replacement —
+ * xếp hạng theo odometer trọn đời) sẽ chấm điểm trên số liệu seed không liên
+ * quan gì tới bộ dữ liệu lịch sử.
+ *
+ * Nhưng cộng thẳng vào odometer thôi thì HỎNG HỆ THỐNG: ~10.300 km/xe trong
+ * khi maintenanceThreshold trung bình chỉ 5.000 km ⇒ needsMaintenance() đúng
+ * với TOÀN BỘ đội xe ⇒ findBestAvailableBus() từ chối mọi xe ⇒ điều phối và AI
+ * auto-assign đứng hình.
+ *
+ * Cách làm đúng, và là cách bean này dùng: cộng CÙNG một lượng km vào CẢ
+ * odometer LẪN lastMaintenanceOdometer. Vì
+ * kmSinceLastMaintenance = odometer - lastMaintenanceOdometer, hiệu số này
+ * KHÔNG ĐỔI — needsMaintenance(), isNearMaintenance(), cảnh báo bảo dưỡng trên
+ * Dashboard và thứ tự ưu tiên trong findBestAvailableBus() đều giữ nguyên hành
+ * vi cũ. Về mặt nghiệp vụ, điều này mô phỏng đúng chuyện xe có chạy nhiều thì
+ * cũng đã được bảo dưỡng định kỳ tương ứng trong 12 tuần đó.
+ *
+ * Chỉ chuyến COMPLETED mới cộng km — đúng như FSM; chuyến CANCELLED không chạy.
+ * Chỉ cộng km của những chuyến do LẦN CHẠY NÀY tạo ra, nên chạy lại (tạo 0
+ * chuyến) cũng cộng 0 km: tính idempotent của odometer đi kèm luôn với tính
+ * idempotent của dữ liệu, không cần cột đánh dấu riêng.
  *
  * ====================================================================
  * TRỤC THỜI GIAN LÀ departureTime — KHÔNG PHẢI createdAt
@@ -163,6 +192,9 @@ public class HistoricalDataBackfill implements CommandLineRunner {
         Random random = new Random(RANDOM_SEED);
         int created = 0;
         int skipped = 0;
+        // km cần cộng vào odometer, gom theo xe — CHỈ từ các chuyến do lần chạy này
+        // tạo ra, nên chạy lại sẽ cộng 0.
+        Map<Long, Double> kmByBusId = new HashMap<>();
 
         for (int dayIndex = 0; dayIndex < BACKFILL_DAYS; dayIndex++) {
             LocalDate day = firstDay.plusDays(dayIndex);
@@ -171,16 +203,76 @@ public class HistoricalDataBackfill implements CommandLineRunner {
             if (!batch.isEmpty()) {
                 tripRepository.saveAll(batch);
                 created += batch.size();
+                accumulateOdometerKm(batch, kmByBusId);
             }
         }
 
+        int busesUpdated = applyOdometer(kmByBusId);
+
         System.out.printf("[Backfill] XONG — đã tạo %d chuyến, bỏ qua %d ô đã có sẵn.%n", created, skipped);
+        System.out.printf("[Backfill] Odometer: cộng %.0f km cho %d xe (kèm lastMaintenanceOdometer, "
+                + "nên kmSinceLastMaintenance không đổi).%n",
+                kmByBusId.values().stream().mapToDouble(Double::doubleValue).sum(), busesUpdated);
         if (created == 0) {
             System.out.println("[Backfill] Không có gì mới: bộ dữ liệu đã được sinh trước đó (idempotent).");
         }
         System.out.println("[Backfill] LƯU Ý: createdAt của các dòng này là ngày chạy script, không phải ngày "
                 + "khởi hành — trục thời gian của dataset là departureTime.");
         System.out.println("========================================");
+    }
+
+    /**
+     * Gom quãng đường của các chuyến ĐÃ HOÀN THÀNH theo xe.
+     *
+     * Chỉ COMPLETED, đúng như FSM (updateTripStatus chỉ cộng odometer ở bước
+     * DEPARTED → COMPLETED) — chuyến CANCELLED không hề chạy nên không cộng km.
+     */
+    private void accumulateOdometerKm(List<Trip> batch, Map<Long, Double> kmByBusId) {
+        for (Trip trip : batch) {
+            if (trip.getStatus() != TripStatus.COMPLETED || trip.getBus() == null) {
+                continue;
+            }
+            Double km = trip.getRoute() != null ? trip.getRoute().getDistanceKm() : null;
+            if (km != null && km > 0) {
+                kmByBusId.merge(trip.getBus().getId(), km, Double::sum);
+            }
+        }
+    }
+
+    /**
+     * Cộng km đã gom vào odometer VÀ lastMaintenanceOdometer của từng xe.
+     *
+     * Cộng cùng một lượng vào cả hai là điểm mấu chốt: hiệu số
+     * kmSinceLastMaintenance giữ nguyên, nên mọi quy tắc bảo dưỡng hiện có
+     * (needsMaintenance, isNearMaintenance, cảnh báo Dashboard, thứ tự ưu tiên
+     * của findBestAvailableBus) hành xử y hệt trước — chỉ có quãng đường trọn
+     * đời là tăng lên thật.
+     *
+     * Xe nào thiếu một trong hai mốc (null) thì BỎ QUA: khi đó
+     * getKmSinceLastMaintenance() đang trả 0.0 theo quy ước của entity, và cộng
+     * vào chỉ một vế sẽ vô tình bịa ra một khoảng km kể từ lần bảo dưỡng cuối,
+     * tức là làm thay đổi hành vi bảo dưỡng — đúng thứ cần tránh.
+     *
+     * @return số xe thực sự được cập nhật
+     */
+    private int applyOdometer(Map<Long, Double> kmByBusId) {
+        if (kmByBusId.isEmpty()) {
+            return 0;
+        }
+        List<Bus> updated = new ArrayList<>();
+        for (Map.Entry<Long, Double> entry : kmByBusId.entrySet()) {
+            Bus bus = busRepository.findById(entry.getKey()).orElse(null);
+            if (bus == null || bus.getOdometer() == null || bus.getLastMaintenanceOdometer() == null) {
+                System.out.printf("[Backfill] Bỏ qua odometer của xe #%s (thiếu mốc odometer).%n", entry.getKey());
+                continue;
+            }
+            double km = entry.getValue();
+            bus.setOdometer(bus.getOdometer() + km);
+            bus.setLastMaintenanceOdometer(bus.getLastMaintenanceOdometer() + km);
+            updated.add(bus);
+        }
+        busRepository.saveAll(updated);
+        return updated.size();
     }
 
     /**
