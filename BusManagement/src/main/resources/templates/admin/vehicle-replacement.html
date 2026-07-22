@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Đề Xuất Thay Thế Phương Tiện - Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4" style="max-width:1400px;">
+
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div>
+                <h1 class="h2 mb-0"><i class="bi bi-bus-front"></i> Đề Xuất Thay Thế Phương Tiện</h1>
+                <small class="text-muted">
+                    Thứ tự ưu tiên xem xét, dựa trên số km trọn đời và tần suất sự cố của
+                    <span class="fw-semibold" th:text="${view.fleetSize}">0</span> xe trong đội
+                </small>
+            </div>
+            <div>
+                <a th:href="@{/admin/analytics}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Quay lại Analytics
+                </a>
+                <a th:href="@{/admin/dashboard}" class="btn btn-outline-secondary">
+                    <i class="bi bi-house"></i> Trang chủ
+                </a>
+            </div>
+        </div>
+
+        <!-- Đây là ĐỀ XUẤT XEM XÉT, không phải phán quyết -->
+        <div class="alert alert-info d-flex align-items-start" role="alert">
+            <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+            <div>
+                Đây là <strong>thứ tự ưu tiên xem xét</strong>, không phải kết luận "xe này phải thay".
+                Điểm số mang tính <strong>tương đối trong nội bộ đội xe hiện tại</strong> — chiếc đứng đầu luôn
+                có điểm cao nhất, kể cả khi cả đội đều còn mới. Hệ thống không có dữ liệu để dựng một ngưỡng
+                tuyệt đối, nên số liệu thô được hiển thị đầy đủ để Admin tự đối chiếu.
+                Màn hình không đổi trạng thái xe và không loại xe nào khỏi điều phối.
+            </div>
+        </div>
+
+        <!-- Cảnh báo khi tín hiệu sự cố quá mỏng để phân biệt -->
+        <div class="alert alert-warning d-flex align-items-start" role="alert" th:if="${view.incidentSignalThin}">
+            <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+            <div>
+                <strong>Tín hiệu sự cố hiện quá mỏng để phân biệt.</strong>
+                <span th:text="${view.busesWithoutIncidents}">0</span>/<span th:text="${view.fleetSize}">0</span>
+                xe chưa ghi nhận sự cố nào, nên phần lớn đội xe đang hòa nhau ở mức 0 và thứ tự xếp hạng
+                thực chất do <strong>số km trọn đời</strong> quyết định. Cột "Độ tin cậy" chỉ thực sự có tác
+                dụng phân biệt khi dữ liệu sự cố dày lên theo thời gian vận hành.
+            </div>
+        </div>
+
+        <!-- ============ TÓM TẮT ============ -->
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card border-0 bg-white h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Số xe trong đội</div>
+                        <div class="fs-3 fw-bold" th:text="${view.fleetSize}">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-0 bg-white h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Khoảng km trọn đời</div>
+                        <div class="fs-5 fw-bold">
+                            <span th:text="${#numbers.formatDecimal(view.minOdometer, 1, 'COMMA', 0, 'POINT')}">0</span>
+                            –
+                            <span th:text="${#numbers.formatDecimal(view.maxOdometer, 1, 'COMMA', 0, 'POINT')}">0</span>
+                        </div>
+                        <div class="small text-muted">km — hai mốc dùng để chuẩn hóa</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-0 bg-white h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Sự cố liên quan tới xe</div>
+                        <div class="fs-3 fw-bold" th:text="${view.totalVehicleIncidents}">0</div>
+                        <div class="small text-muted">hỏng hóc + tai nạn</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card border-0 h-100 shadow-sm"
+                    th:classappend="${view.incidentSignalThin} ? 'bg-warning bg-opacity-10' : 'bg-white'">
+                    <div class="card-body">
+                        <div class="small text-muted">Xe chưa có sự cố</div>
+                        <div class="fs-3 fw-bold" th:text="${view.busesWithoutIncidents}">0</div>
+                        <div class="small text-muted">trên tổng <span th:text="${view.fleetSize}">0</span> xe</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ CÔNG THỨC ============ -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Điểm Được Tính Thế Nào</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-semibold">Hao mòn — km trọn đời</span>
+                                <span class="badge bg-primary"
+                                    th:text="${view.wearWeightPercent} + '%'">70%</span>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Vị trí tương đối của xe giữa mốc thấp nhất và cao nhất của đội.
+                                Dùng <code>odometer</code> vì con số này <strong>không bao giờ reset</strong>.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="border rounded p-3 h-100">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-semibold">Độ tin cậy — số sự cố xe</span>
+                                <span class="badge bg-secondary"
+                                    th:text="${view.reliabilityWeightPercent} + '%'">30%</span>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Chỉ đếm <strong>hỏng hóc kỹ thuật</strong> và <strong>tai nạn</strong>.
+                                Kẹt xe, ngập đường hay tài xế ốm <strong>không</strong> được tính — chúng không
+                                nói gì về tình trạng chiếc xe.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-light border mt-3 mb-0 py-2 small">
+                    <i class="bi bi-question-circle"></i>
+                    <strong>Khác gì với "Cảnh báo bảo dưỡng" trên Dashboard?</strong>
+                    Cảnh báo bảo dưỡng trả lời <em>"xe nào sắp tới hạn bảo dưỡng?"</em> — dựa trên số km
+                    <em>kể từ lần bảo dưỡng gần nhất</em>, con số này <strong>reset sau mỗi lần bảo dưỡng</strong>.
+                    Màn hình này trả lời câu khác hẳn: <em>"xe nào đã cũ/kém tin cậy nhất?"</em> — nên nó dùng
+                    số km trọn đời, thứ không bao giờ reset. Một chiếc xe vừa bảo dưỡng xong vẫn có thể đứng
+                    đầu bảng này.
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ BẢNG XẾP HẠNG ============ -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ol"></i> Thứ Tự Ưu Tiên Xem Xét
+                    <span class="badge bg-light text-dark ms-2" th:text="${view.fleetSize}"></span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" th:if="${!#lists.isEmpty(view.ranking)}">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:3rem;">#</th>
+                                <th>Biển Số</th>
+                                <th>Loại Xe</th>
+                                <th>Trạng Thái</th>
+                                <th class="text-end">Km Trọn Đời</th>
+                                <th class="text-center">Sự Cố Xe</th>
+                                <th class="text-end">Hao Mòn</th>
+                                <th class="text-end">Độ Tin Cậy</th>
+                                <th style="width:11rem;">Điểm Ưu Tiên</th>
+                                <th>Lý Do</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="b, iter : ${view.ranking}"
+                                th:classappend="${iter.count <= 3} ? 'table-warning' : ''">
+                                <td class="text-muted fw-semibold" th:text="${iter.count}">1</td>
+                                <td class="fw-semibold">
+                                    <span th:text="${b.licensePlate}">51B-000.00</span>
+                                    <div class="small text-muted" th:if="${b.brand != null}" th:text="${b.brand}"></div>
+                                </td>
+                                <td class="small" th:text="${b.busTypeName != null} ? ${b.busTypeName} : '—'">—</td>
+                                <td>
+                                    <span class="badge"
+                                        th:classappend="${b.statusLabel == 'Đang sửa chữa'} ? 'bg-danger'
+                                            : (${b.statusLabel == 'Đang chạy'} ? 'bg-info text-dark' : 'bg-success')"
+                                        th:text="${b.statusLabel}">Sẵn sàng</span>
+                                </td>
+                                <td class="text-end fw-semibold"
+                                    th:text="${b.odometer != null}
+                                        ? ${#numbers.formatDecimal(b.odometer, 1, 'COMMA', 0, 'POINT')} + ' km'
+                                        : '—'">0 km</td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary" th:if="${b.vehicleIncidentCount == 0}">0</span>
+                                    <span class="badge bg-danger" th:if="${b.vehicleIncidentCount > 0}"
+                                        th:text="${b.vehicleIncidentCount}">0</span>
+                                    <div class="text-muted" style="font-size:.75rem;"
+                                        th:if="${b.vehicleIncidentCount > 0}">
+                                        <span th:if="${b.breakdownCount > 0}"
+                                            th:text="${b.breakdownCount} + ' hỏng'"></span>
+                                        <span th:if="${b.breakdownCount > 0 and b.accidentCount > 0}"> · </span>
+                                        <span th:if="${b.accidentCount > 0}"
+                                            th:text="${b.accidentCount} + ' tai nạn'"></span>
+                                    </div>
+                                </td>
+                                <td class="text-end small text-muted"
+                                    th:text="${#numbers.formatDecimal(b.wearScore * 100, 1, 0)} + '%'">0%</td>
+                                <td class="text-end small text-muted"
+                                    th:text="${#numbers.formatDecimal(b.reliabilityScore * 100, 1, 0)} + '%'">0%</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height:.5rem;">
+                                            <div class="progress-bar"
+                                                th:classappend="${iter.count <= 3} ? 'bg-danger' : 'bg-secondary'"
+                                                th:style="'width:' + ${b.replacementScore} + '%'"></div>
+                                        </div>
+                                        <span class="fw-bold small" style="min-width:2.5rem;"
+                                            th:text="${#numbers.formatDecimal(b.replacementScore, 1, 0)}">0</span>
+                                    </div>
+                                </td>
+                                <td class="small text-muted" th:text="${b.reason}"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="text-center text-muted py-5" th:if="${#lists.isEmpty(view.ranking)}">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                        Chưa có xe nào trong hệ thống để xếp hạng.
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-white small text-muted" th:if="${!#lists.isEmpty(view.ranking)}">
+                Ba dòng đầu được tô đậm chỉ để dễ nhìn — <strong>không</strong> có nghĩa là đúng ba xe đó cần thay.
+                Điểm 100 thuộc về xe đứng đầu theo cách chuẩn hóa tương đối, không phải mức "hỏng hoàn toàn".
+                Xe đang sửa chữa vẫn được xếp hạng bình thường: đang phải sửa là thông tin đáng cân nhắc khi
+                bàn chuyện thay xe, không phải lý do loại khỏi danh sách.
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

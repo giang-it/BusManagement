@@ -1877,6 +1877,61 @@ Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
 
 ---
 
+## MODULE 9 — ĐỀ XUẤT THAY THẾ PHƯƠNG TIỆN (Phase 7, bước 1)
+
+Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/vehicle-replacement`.
+
+### TC_VR_001 — Bảng xếp hạng dựng đúng và điểm khớp công thức
+
+- **Mã TC:** TC_VR_001
+- **Tên Kịch Bản:** Happy path — số trên trang phải khớp phép tính độc lập
+- **Điều kiện tiên quyết:** Đội xe có ít nhất 2 xe với odometer khác nhau
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/vehicle-replacement`
+  2. Với vài dòng đầu, tính lại bằng SQL: hao mòn = `(km - min)/(max - min)`, độ tin cậy = `số sự cố / số sự cố cao nhất`, điểm = `(0,7×hao mòn + 0,3×độ tin cậy)×100`
+- **Kết quả mong đợi:**
+  - HTTP 200, **mỗi xe trong đội là một dòng** (không lọc bớt xe nào)
+  - Xếp theo điểm **giảm dần**; hòa điểm thì xe nhiều km hơn đứng trước
+  - Ba cột hao mòn / độ tin cậy / điểm khớp phép tính độc lập
+  - Xe có sự cố hiển thị đúng cơ cấu "N hỏng · M tai nạn"
+
+### TC_VR_002 — Không được trùng với "Cảnh báo bảo dưỡng"
+
+- **Mã TC:** TC_VR_002
+- **Tên Kịch Bản:** Kiểm chứng đây là câu hỏi khác, không phải tính năng cũ đổi tên
+- **Các bước thực hiện:** Mở `/admin/analytics` xem dải "Cảnh báo bảo dưỡng", rồi mở màn đề xuất thay xe và so sánh
+- **Kết quả mong đợi:**
+  - Cảnh báo bảo dưỡng chỉ liệt kê xe **chạm ngưỡng bảo dưỡng**; màn thay xe xếp hạng **toàn đội**
+  - Hai danh sách **không trùng thứ tự**: một xe có thể cấp bách về bảo dưỡng nhưng xếp thấp về ưu tiên thay, và ngược lại
+  - Màn thay xe **không** hiển thị cột "km kể từ lần bảo dưỡng cuối"
+
+### TC_VR_003 — Chỉ đếm sự cố liên quan tới xe
+
+- **Mã TC:** TC_VR_003
+- **Tên Kịch Bản:** Sự cố kẹt xe / nhân sự không được làm giảm điểm của xe
+- **Các bước thực hiện:**
+  1. Ghi nhận cho một xe một sự cố loại **`ROAD_ISSUE`** (hoặc `STAFF_ISSUE`)
+  2. Mở lại màn đề xuất thay xe
+- **Kết quả mong đợi:**
+  - Cột "Sự cố xe" của xe đó **không tăng**, điểm và thứ hạng **không đổi**
+  - Chỉ `VEHICLE_BREAKDOWN` và `ACCIDENT` mới làm thay đổi con số
+  - ⚠️ Đây là quy tắc dễ bị "dọn dẹp" nhầm thành đếm tất cả các loại — nếu case này fail, bộ lọc loại đã bị gỡ
+
+### TC_VR_004 — Đội xe chưa có sự cố nào: trang vẫn sống
+
+- **Mã TC:** TC_VR_004
+- **Tên Kịch Bản:** Edge case — mẫu số bằng 0 khi chuẩn hóa độ tin cậy
+- **Điều kiện tiên quyết:** Không xe nào có sự cố loại liên quan tới xe
+- **Các bước thực hiện:** Mở `/admin/analytics/vehicle-replacement`
+- **Kết quả mong đợi:**
+  - **HTTP 200**, không ném `ArithmeticException` (chia cho 0 phải được chặn)
+  - Mọi ô "Độ tin cậy" hiển thị **0%**
+  - Điểm cao nhất đúng bằng **70** — tức chỉ còn phần hao mòn đóng góp
+  - Thứ hạng trở thành **thuần theo km giảm dần**
+  - Hiện cảnh báo "tín hiệu sự cố quá mỏng" với tỉ lệ đúng bằng *toàn bộ / toàn bộ* xe
+
+---
+
 ## PHỤ LỤC: MA TRẬN CHUYỂN TRẠNG THÁI FSM
 
 | Từ → Đến | ACTIVE | PENDING | DEPARTED | COMPLETED | CANCELLED |
@@ -1941,6 +1996,11 @@ Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
 > TC_INC_012/TC_INC_013. Phase 4 (Đề xuất tài xế khả dụng) cũng chưa có case nào. Đây là nợ
 > tài liệu, không phải nợ tính năng.
+
+> **Bổ sung 2026-07-22 (Phase 7 bước 1):** thêm Module 9 — Đề Xuất Thay Thế Phương Tiện, 4 case
+> `TC_VR_001`–`TC_VR_004` (1 happy path, 3 edge/regression case), tất cả chỉ đọc. `TC_VR_002` và
+> `TC_VR_003` là hai case **chống thoái hóa**: case đầu bắt lỗi nếu ai đó biến màn này thành bản
+> sao của Cảnh báo bảo dưỡng, case sau bắt lỗi nếu bộ lọc loại sự cố bị gỡ.
 
 > **Bổ sung 2026-07-22 (Phase 6):** thêm Module 8 — Dự Báo Nhu Cầu, 4 case `TC_FC_001`–`TC_FC_004`
 > (1 happy path, 3 edge case), tất cả đều chỉ đọc. Bảng thống kê phía trên **cố ý chưa được cộng

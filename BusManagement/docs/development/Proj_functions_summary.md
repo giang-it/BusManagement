@@ -322,6 +322,7 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 - **Bộ sinh dữ liệu lịch sử** (Phase 5) — `HistoricalDataBackfill`, `@Profile("backfill")`: sinh 12 tuần chuyến **mô phỏng** làm đầu vào cho Dự báo nhu cầu, vì dữ liệu vận hành thật không tích lũy kịp trong thời gian làm đồ án. Idempotent nhờ khóa `(tuyến, thời điểm khởi hành)` — chạy lại chỉ bù phần còn thiếu, không nhân đôi, và không cần thêm cột đánh dấu nào vào `Trip`. Km của chuyến hoàn thành được cộng vào **cả** `odometer` **lẫn** `lastMaintenanceOdometer`, nên `kmSinceLastMaintenance` — và do đó mọi quy tắc bảo dưỡng — không đổi.
 - **Đề xuất tài xế khả dụng** (Phase 4, đọc-only, xem mục 15) — deliverable trụ cột 2 đầu tiên: ai còn hạn mức giờ lái trong một ngày Admin chọn, lọc theo đúng ràng buộc mà `validateStaffForTrip()` sẽ áp.
 - **Dự báo nhu cầu** (Phase 6, đọc-only, xem mục 16) — module duy nhất có tính dự đoán: tỉ lệ lấp đầy theo tuyến × khung giờ cho 7 ngày tới, kèm tự chấm điểm sai số trên dữ liệu giữ lại.
+- **Đề xuất thay thế phương tiện** (Phase 7 bước 1, đọc-only, xem mục 17) — xếp hạng cả đội xe theo km trọn đời và tần suất sự cố. Đây cũng là **đường đọc đầu tiên** của dữ liệu sự cố: trước đó `incidents` chỉ được ghi vào chứ chưa nuôi quyết định nào.
 
 **Chưa làm (có trong spec nhưng không có code):**
 - Đặt vé, chọn ghế, thanh toán online (Client/User module — toàn bộ).
@@ -453,3 +454,45 @@ Giấu 14 ngày cuối, huấn luyện trên phần còn lại, dự báo lại 
 - Bộ dữ liệu có **ngày kết thúc cố định và cũ dần**; trang hiển thị nó đã cũ bao nhiêu ngày.
 - Đây là **thống kê, không phải máy học** — không có mô hình ML nào, chỉ hồi quy tuyến tính và trung bình theo nhóm.
 - Chỉ dự báo theo tuyến × khung giờ; không có chiều theo trạm, loại xe hay độ nhạy giá.
+
+---
+
+## 17. Module: Đề xuất thay thế phương tiện (Vehicle Replacement) — `VehicleReplacementController` (`/admin/analytics/vehicle-replacement`)
+
+Bước 1 của Phase 7. Trả lời *"chiếc nào trong đội đáng cân nhắc thay trước?"* — **khác hẳn** câu mà dải "Cảnh báo bảo dưỡng" trên Dashboard (mục 14.2) đang trả lời. Chỉ đọc: không đổi trạng thái xe, không loại xe nào khỏi điều phối.
+
+### 17.1. Cấu trúc
+- **Controller:** `VehicleReplacementController` — 1 `GET`, không tham số. Chỉ inject Service.
+- **Service:** `VehicleReplacementService` — `@Transactional(readOnly = true)`, inject `BusRepository` và `IncidentRepository`.
+- **DTO:** `VehicleReplacementDto` (một xe trong bảng xếp hạng), `VehicleReplacementViewDto` (toàn màn hình, kèm các số mô tả chất lượng tín hiệu).
+- **Template:** `admin/vehicle-replacement.html`.
+- Một truy vấn projection mới: `IncidentRepository.countIncidentsPerBusAndType(...)` trả `(busId, loại, số lượng)`.
+
+### 17.2. Vì sao KHÔNG chấm điểm trên `kmSinceLastMaintenance`
+Đây là chỗ dễ làm sai nhất. Trường đó là hiệu `odometer - lastMaintenanceOdometer` nên **reset sau mỗi lần bảo dưỡng**: xe chạy 800.000 km đã bảo dưỡng 50 lần vẫn đọc ra số nhỏ. Nó trả lời *"tới hạn bảo dưỡng chưa?"*, không phải *"đã cũ chưa?"*. Và câu hỏi thứ nhất **đã được trả lời rồi** bởi `DashboardService.buildMaintenanceAlerts()`. Dùng lại nó ở đây sẽ là giao lại một tính năng cũ dưới tên mới.
+
+Module này vì thế dùng `odometer` — con số **không bao giờ reset** — và cố ý **không hiển thị lại** cột `kmSinceLastMaintenance`, để hai câu hỏi không bị trộn vào nhau.
+
+*Bằng chứng hai màn khác nhau thật:* lúc kiểm chứng, Cảnh báo bảo dưỡng liệt kê đúng **2** xe, còn màn này xếp hạng cả **20**; hai xe hạng 2–3 ở đây không hề có mặt bên kia, và chiếc đứng thứ 2 về mức cấp bách bảo dưỡng chỉ đứng thứ **4** về ưu tiên thay thế.
+
+### 17.3. Chỉ đếm sự cố nói lên tình trạng chiếc xe
+Trong 5 giá trị `IncidentType`, chỉ **`VEHICLE_BREAKDOWN`** và **`ACCIDENT`** được tính. `ROAD_ISSUE` (kẹt xe, ngập, cấm đường) và `STAFF_ISSUE` (tài xế ốm) không nói gì về phương tiện — đếm chúng nghĩa là xe tốt bị trừ điểm vì hôm đó tắc đường.
+
+Danh sách loại nằm ở tầng service chứ không nhúng vào câu truy vấn, vì "loại nào nói lên tình trạng xe" là quy tắc nghiệp vụ.
+
+### 17.4. Công thức
+```
+hao mòn    = (odometer - min đội) / (max đội - min đội)      → 0..1
+độ tin cậy = số sự cố xe / số sự cố cao nhất đội             → 0..1
+điểm       = (0,7 × hao mòn + 0,3 × độ tin cậy) × 100
+```
+Trọng số 70/30 phản ánh **chất lượng tín hiệu**, không phải tầm quan trọng: odometer là số đo liên tục, có trên mọi xe và phân biệt được từng chiếc; số sự cố thì thưa và rời rạc. Cả hai mẫu số đều có lưới chặn chia cho 0.
+
+### 17.5. Tự khai báo chất lượng tín hiệu
+Service tự tính số xe chưa có sự cố nào; khi con số đó chiếm từ một nửa đội trở lên, giao diện hiện cảnh báo rằng nửa "độ tin cậy" không phân biệt được ai với ai và thứ hạng thực chất do số km quyết định. Đây là số liệu tính ra, không phải câu chữ viết cứng.
+
+### 17.6. Giới hạn có chủ đích
+- **Điểm là tương đối trong đội xe hiện tại**, nên xe đứng đầu luôn đạt điểm cao nhất kể cả khi cả đội còn mới. Đây là **thứ tự ưu tiên xem xét**, không phải phán quyết phải thay.
+- **Không có ngưỡng tuyệt đối** ("trên X km thì thay") vì hệ thống không có dữ liệu nào biện minh cho một con số như vậy — `Bus` không có năm sản xuất, ngày mua, hay lịch sử chi phí sửa chữa.
+- **Không tính được tổng chi phí sở hữu**: cần entity `MaintenanceRecord` (ngày, chi phí, hạng mục), là stretch goal cố ý để ngoài Phase 7 nhằm không phải đổi schema.
+- Xe đang sửa chữa **vẫn được xếp hạng**: đang phải sửa là thông tin đáng cân nhắc khi bàn thay xe, không phải lý do loại khỏi danh sách.
