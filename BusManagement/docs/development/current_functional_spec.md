@@ -99,6 +99,16 @@ Only the Administrator workflow is currently exposed through the application:
 *   **Reused Thresholds (not redefined):** "Hot trip" uses the same 90% occupancy threshold as `Trip.needsReinforcement()`; "license expiring soon" uses the same 7-day window already used by `TripService`'s driver auto-assignment.
 *   **Known Gaps (by design, not oversight):** No "Recent Activity" feed — no entity has creation/update timestamps, and adding one was explicitly declined for this feature to avoid a schema change. Fleet utilization and AI-suggestion outcome counts are point-in-time snapshots, not historical trends.
 
+### Driver Recommendation
+*   **Purpose:** Answer *"who still has capacity to take a trip on this date?"* — the inverse of the "busiest drivers today" ranking already on the Analytics Drivers tab. That ranking is monitoring; this is a staffing recommendation.
+*   **Implemented Functionality:**
+    *   Entry point: `GET /admin/analytics/driver-recommendation?date=yyyy-MM-dd` (`DriverRecommendationController`), backed by a read-only `DriverRecommendationService`. The date parameter is optional and defaults to today. Read-only — the screen recommends; it assigns nobody and creates nothing.
+    *   Lists active drivers who still have driving-hour budget left on the selected date, sorted by **assigned hours ascending** (most available first), with each driver's remaining capacity, licence expiry, experience and a plain-language reason for being listed.
+    *   **The filters mirror exactly what `validateStaffForTrip()` will enforce at assignment time** — active, licence valid **on the selected date**, and daily-hour budget remaining — so the list never recommends someone the system would then reject.
+    *   Reports three counts alongside the list (active drivers considered, excluded for no remaining hours, excluded for expired licence) so a short list is self-explaining rather than looking like a fault.
+*   **Reused Thresholds (not redefined):** all driving hours come from `TripService.getDrivingHoursForDate()` — the single implementation that already encodes co-driver hour-splitting, the "assistant counts as 0 hours" convention, and the mock `totalDrivingHours24h` baseline. No second workload calculation exists. The 8-hour daily limit is restated locally rather than extracted into a shared constant, because in `TripService` that literal carries three distinct business meanings that merely share a value.
+*   **Known Gaps (by design, not oversight):** Ranking is by workload only — experience and licence expiry are displayed for the Administrator to weigh, not scored. The screen performs no assignment, so acting on a recommendation is still a manual step through the normal trip forms.
+
 ### Demand Forecast
 *   **Purpose:** Predict how full each route/departure-slot will be over the coming week, so the Administrator can plan reinforcement before demand materialises. This is the system's only genuinely predictive component; every other module reports what has already happened.
 *   **Implemented Functionality:**
