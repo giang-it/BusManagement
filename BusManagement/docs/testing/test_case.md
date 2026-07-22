@@ -1824,6 +1824,59 @@
 
 ---
 
+## MODULE 8 — DỰ BÁO NHU CẦU (Phase 6)
+
+Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
+`GET /admin/analytics/forecast`.
+
+### TC_FC_001 — Trang dự báo dựng đúng chuỗi và số liệu lịch sử
+
+- **Mã TC:** TC_FC_001
+- **Tên Kịch Bản:** Happy path — số trên trang phải khớp với DB
+- **Điều kiện tiên quyết:** Đã chạy profile `backfill`; mỗi nhóm (tuyến × giờ khởi hành) có ≥ 28 chuyến `COMPLETED`
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/forecast`
+  2. Với từng dòng, đối chiếu 4 cột lịch sử (số chuyến, TB, mức nền, xu hướng) bằng truy vấn SQL độc lập
+- **Kết quả mong đợi:**
+  - HTTP 200, mỗi nhóm đủ điều kiện là **một dòng**, xếp theo mức đỉnh giảm dần
+  - Số chuyến và TB khớp `COUNT(*)` / `AVG(tickets_sold/total_seats)` trên `status='COMPLETED'`
+  - "Mức nền" khớp trung bình 7 **ngày lịch** cuối của chính chuỗi đó (không phải 7 quan sát cuối)
+  - Xu hướng khớp hệ số góc bình phương tối thiểu tính trên chuỗi đã khử mùa vụ
+
+### TC_FC_002 — Nhóm không đủ số quan sát bị loại và được đếm
+
+- **Mã TC:** TC_FC_002
+- **Tên Kịch Bản:** Edge case — chuyến giờ lẻ do Admin tự tạo không được dựng thành chuỗi
+- **Điều kiện tiên quyết:** Tồn tại vài chuyến `COMPLETED` ở khung giờ ngoài 06/12/18 (ví dụ 13:00, 21:00)
+- **Các bước thực hiện:** Mở `/admin/analytics/forecast`
+- **Kết quả mong đợi:**
+  - Các nhóm dưới 28 quan sát **không** xuất hiện thành dòng dự báo
+  - Thẻ tóm tắt hiển thị đúng số nhóm bị bỏ qua kèm lý do "thiếu dữ liệu"
+  - ⚠️ Không được xóa các chuyến giờ lẻ để bảng gọn hơn — đó là dữ liệu thật của Admin
+
+### TC_FC_003 — Chu kỳ cuối tuần được áp vào dự báo
+
+- **Mã TC:** TC_FC_003
+- **Tên Kịch Bản:** Kiểm chứng thành phần mùa vụ thực sự có tác dụng
+- **Các bước thực hiện:** Mở trang, so cột T7/CN với cột ngày thường trên **cùng một dòng**
+- **Kết quả mong đợi:**
+  - Ô cuối tuần cao hơn ô ngày thường trong mọi dòng, theo đúng tỉ lệ hệ số ở bảng "Chu kỳ theo thứ trong tuần"
+  - Bảng hệ số cho tổng số chuyến của 7 thứ đúng bằng tổng số quan sát đã dùng
+  - Ô vượt 90% được tô đỏ — cùng ngưỡng `Trip.needsReinforcement()`, không phải ngưỡng mới
+
+### TC_FC_004 — Không đủ dữ liệu lịch sử: trang vẫn sống
+
+- **Mã TC:** TC_FC_004
+- **Tên Kịch Bản:** Edge case — bản cài mới chưa chạy backfill
+- **Điều kiện tiên quyết:** Không nhóm nào đạt ngưỡng quan sát tối thiểu
+- **Các bước thực hiện:** Mở `/admin/analytics/forecast`
+- **Kết quả mong đợi:**
+  - **HTTP 200**, không ném `TemplateProcessingException` (phần đầu bảng tham chiếu `series[0]` phải được `th:if` chặn, không bao giờ được tính tới)
+  - Hiện thông báo "Chưa đủ dữ liệu lịch sử để dự báo" kèm ngưỡng và đúng lệnh chạy profile `backfill`
+  - Khối "Mô hình có thực sự tốt hơn không?" **tự ẩn** thay vì hiện 0%
+
+---
+
 ## PHỤ LỤC: MA TRẬN CHUYỂN TRẠNG THÁI FSM
 
 | Từ → Đến | ACTIVE | PENDING | DEPARTED | COMPLETED | CANCELLED |
@@ -1886,7 +1939,13 @@
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
-> TC_INC_012/TC_INC_013. Đây là nợ tài liệu, không phải nợ tính năng.
+> TC_INC_012/TC_INC_013. Phase 4 (Đề xuất tài xế khả dụng) cũng chưa có case nào. Đây là nợ
+> tài liệu, không phải nợ tính năng.
+
+> **Bổ sung 2026-07-22 (Phase 6):** thêm Module 8 — Dự Báo Nhu Cầu, 4 case `TC_FC_001`–`TC_FC_004`
+> (1 happy path, 3 edge case), tất cả đều chỉ đọc. Bảng thống kê phía trên **cố ý chưa được cộng
+> thêm**: nó đã lệch từ trước (xem cảnh báo ngay trên) và việc cộng thêm vào một tổng sai sẽ chỉ
+> làm sai lệch trông có vẻ chính xác hơn. Cần một lượt đối soát riêng cho cả bảng.
 
 ---
 

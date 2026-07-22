@@ -360,4 +360,27 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        @Query("SELECT DISTINCT t.route.id FROM Trip t")
        List<Long> findDistinctRouteIdsWithTrips();
+
+       /**
+        * PHASE 6 — chuỗi nhu cầu lịch sử cho Demand Forecast:
+        * (routeId, departureTime, ticketsSold, totalSeats) của các chuyến ở MỘT
+        * trạng thái, sắp theo thời gian khởi hành.
+        *
+        * Chỉ lấy 4 cột và không JOIN FETCH gì — cùng lý do đã ghi ở
+        * findSeatsAndSoldByStatus: đây là phép tính thuần số trên hàng nghìn dòng.
+        * Nạp hẳn entity Trip sẽ over-fetch đúng vào điểm yếu đã biết của hệ thống
+        * (THESIS_ROADMAP.md, Hidden Cost #4: aggregation in-memory trên entity
+        * trong DashboardService).
+        *
+        * totalSeats > 0 được lọc ngay ở DB để tầng service không phải phòng thủ
+        * phép chia cho 0 khi tính tỉ lệ lấp đầy. Chuyến đã soft-delete tự động bị
+        * loại nhờ @SQLRestriction trên Trip.
+        *
+        * Trục thời gian là departureTime, KHÔNG phải createdAt — xem
+        * THESIS_ROADMAP.md, Developer Notes ("Why Demand Forecast keys on
+        * Trip.departureTime").
+        */
+       @Query("SELECT t.route.id, t.departureTime, t.ticketsSold, t.totalSeats FROM Trip t " +
+                     "WHERE t.status = :status AND t.totalSeats > 0 ORDER BY t.departureTime")
+       List<Object[]> findDemandHistoryByStatus(@Param("status") TripStatus status);
 }

@@ -384,6 +384,16 @@
                         <div class="fs-4 fw-bold" th:text="${overview.strategic.occupancy.hotTripsCount}">0</div>
                     </div>
                 </div>
+                <div class="alert alert-light border d-flex justify-content-between align-items-center py-2">
+                    <span class="small text-muted">
+                        <i class="bi bi-lightbulb"></i>
+                        Các con số trên là <strong>hiện tại</strong>. Cần biết tuyến nào sẽ đông
+                        <strong>tuần tới</strong>?
+                    </span>
+                    <a th:href="@{/admin/analytics/forecast}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-graph-up-arrow"></i> Dự báo nhu cầu
+                    </a>
+                </div>
                 <div class="chart-box mb-2" style="max-width:600px;"><canvas id="occupancyBucketChart"></canvas>
                 </div>
             </div>
