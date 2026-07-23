@@ -323,6 +323,7 @@ Cả 4 hàm đều áp dụng cùng bộ điều kiện cốt lõi: `isActive`, 
 - **Đề xuất tài xế khả dụng** (Phase 4, đọc-only, xem mục 15) — deliverable trụ cột 2 đầu tiên: ai còn hạn mức giờ lái trong một ngày Admin chọn, lọc theo đúng ràng buộc mà `validateStaffForTrip()` sẽ áp.
 - **Dự báo nhu cầu** (Phase 6, đọc-only, xem mục 16) — module duy nhất có tính dự đoán: tỉ lệ lấp đầy theo tuyến × khung giờ cho 7 ngày tới, kèm tự chấm điểm sai số trên dữ liệu giữ lại.
 - **Đề xuất thay thế phương tiện** (Phase 7 bước 1, đọc-only, xem mục 17) — xếp hạng cả đội xe theo km trọn đời và tần suất sự cố. Đây cũng là **đường đọc đầu tiên** của dữ liệu sự cố: trước đó `incidents` chỉ được ghi vào chứ chưa nuôi quyết định nào.
+- **Đề xuất tăng cường** (Phase 7 bước 2, đọc-only, xem mục 18) — người điều phối ghép Dự báo + Chọn tài nguyên + Cổng ràng buộc: mỗi khung giờ được dự báo đông thành một thẻ kèm xe, tài xế và doanh thu ước tính (chỉ doanh thu; chi phí bị chặn). Tính lại mỗi lần xem, không tạo chuyến. Có `AvailabilityContext` nạp lịch một lần để chọn tài nguyên trên bộ nhớ (~19× nhanh hơn) mà luật vẫn nằm nguyên trong `TripService`.
 
 **Chưa làm (có trong spec nhưng không có code):**
 - Đặt vé, chọn ghế, thanh toán online (Client/User module — toàn bộ).
@@ -496,3 +497,44 @@ Service tự tính số xe chưa có sự cố nào; khi con số đó chiếm t
 - **Không có ngưỡng tuyệt đối** ("trên X km thì thay") vì hệ thống không có dữ liệu nào biện minh cho một con số như vậy — `Bus` không có năm sản xuất, ngày mua, hay lịch sử chi phí sửa chữa.
 - **Không tính được tổng chi phí sở hữu**: cần entity `MaintenanceRecord` (ngày, chi phí, hạng mục), là stretch goal cố ý để ngoài Phase 7 nhằm không phải đổi schema.
 - Xe đang sửa chữa **vẫn được xếp hạng**: đang phải sửa là thông tin đáng cân nhắc khi bàn thay xe, không phải lý do loại khỏi danh sách.
+
+---
+
+## 18. Module: Đề xuất tăng cường (Recommendation Engine) — `RecommendationController` (`/admin/analytics/recommendation`)
+
+Bước 2 của Phase 7 (chỉ doanh thu — phần chi phí bị chặn vì domain không có dữ liệu chi phí). Trả lời *"khung giờ nào sắp tới được dự báo đông, và ta có thể chạy chuyến tăng cường bằng xe + tài xế nào, thu về bao nhiêu?"*. Là **người điều phối**, không phải bộ dự báo hay bộ luật: nó ghép nối Dự báo (mục 16) + Chọn tài nguyên (`TripService`) + Cổng ràng buộc (Phase 3). Chỉ đọc: không tạo chuyến, không phân công ai.
+
+### 18.1. Cấu trúc
+- **Controller:** `RecommendationController` — 1 `GET`, không tham số. Chỉ inject Service.
+- **Service:** `RecommendationService` — `@Transactional(readOnly = true)`, inject `ForecastService`, `TripService`, `RouteRepository`, `TripRepository`.
+- **DTO:** `RecommendationCardDto` (một thẻ), `RecommendationViewDto` (toàn màn hình, kèm độ tươi dữ liệu forecast), `RecommendationStatus` (enum: `RECOMMENDED` / `STALE` / `NO_RESOURCE`).
+- **Template:** `admin/recommendation.html`.
+- Hai truy vấn projection mới trên `TripRepository`: `findPriceHistoryByStatus(...)` (giá vé lịch sử) và `findScheduleForAvailability(...)` (nạp lịch một lần cho preload).
+
+### 18.2. Dây chuyền (đúng thiết kế roadmap, không đổi)
+```
+buildForecast() [gọi ĐÚNG 1 lần]
+   → mỗi ForecastPointDto có needsReinforcement = true
+   → dựng Trip TẠM (tuyến + ngày + khung giờ, giống createExtraTrip())
+   → chọn xe (selectBestAvailableBus)  +  chọn tài xế (selectBestAvailableDriver)
+   → doanh thu = round(tỉ lệ dự báo × sức chứa xe được chọn) × giá vé lịch sử
+   → cổng Business Rule Validation (dry-run Phase 3)
+   → thẻ: RECOMMENDED / STALE / NO_RESOURCE
+```
+
+### 18.3. Chỉ đọc `needsReinforcement`, KHÔNG biết ngưỡng 0.90
+Quyết định "đông" đã được nướng sẵn vào `ForecastPointDto.needsReinforcement` (mục 16). Engine chỉ đọc cờ boolean đó ⇒ ngưỡng 0.90 vẫn nằm đúng ba chỗ cũ (`Trip`, `DashboardService`, `ForecastService`), không sinh chỗ thứ tư. Đây là cách "dùng lại ngưỡng" đúng nghĩa: tiêu thụ **quyết định**, không tiêu thụ **con số**.
+
+### 18.4. Doanh thu lấy giá từ đâu
+Chuyến ứng viên chưa có `Trip` nên chưa có giá. Giá = `Trip.price` của **chuyến COMPLETED gần nhất cùng (tuyến, giờ khởi hành)** — giá THẬT đã tồn tại, "consume as-is" đúng Non-Goal của Section 4, không bịa số. Lấy qua projection scalar (`findPriceHistoryByStatus`), không nạp entity `Trip`.
+
+### 18.5. Thẻ tính lại mỗi lần xem, không lưu DB (chốt của chủ dự án)
+Không entity mới, không ghi, không tạo chuyến — nhất quán với hai màn Decision Support kia. Hệ quả đã ghi rõ: `STALE` gần như không xuất hiện trong mô hình này (chọn và cổng chạy sát nhau trên cùng một ảnh chụp), nhưng vẫn giữ để trung thực khi cổng thật sự trượt và làm lưới an toàn nếu logic chọn/validate về sau lệch nhau. Cổng validation cuối chạy **SQL trực tiếp** (độc lập với dữ liệu preload) — tái xác nhận đúng khuôn `confirmAutoAssignedTrip`.
+
+### 18.6. Tối ưu hiệu năng bằng preload — luật vẫn một nguồn
+Tái dùng `findBestAvailableDriver` cho từng thẻ khiến trang mất ~18,7s (mỗi thẻ quét N tài xế × truy vấn giờ/bận). Thêm `AvailabilityContext` (class **chỉ chứa dữ liệu**) nạp toàn bộ lịch liên quan **một lần**, cùng các overload nhận `ctx` trên `findBestAvailableBus/Driver` và ba leaf (`isBusBusy`, `isDriverBusyInWindow`, `getDrivingHoursForDate`): `ctx == null` → SQL như cũ (đường phân công **không đụng tới**); `ctx != null` → xét trên dữ liệu preload. Kết quả **~0,97s (≈19×)**, nội dung **byte-identical**. Luật tính giờ tách vào `sumDrivingHours(...)` (một chỗ); predicate giao-khoảng/vai-trò là phép toán nền tảng, có test `TripServiceAvailabilityContextTest` chốt Java ≡ SQL ở các ca biên.
+
+### 18.7. Giới hạn có chủ đích
+- **Mỗi thẻ được đánh giá độc lập**, pool không "giữ chỗ" giữa các thẻ — hai thẻ cùng (ngày, giờ) có thể cùng đề xuất một xe/tài xế. Giao diện bật cảnh báo khi phát hiện trùng khung. Đây là **danh sách gợi ý**, không phải lịch phân công khả thi đồng thời.
+- **Chỉ doanh thu, chưa có chi phí** — domain không có trường chi phí nào; ước tính chi phí (bước 3) bị chặn chờ chủ dự án quyết.
+- **MVP một tài xế chính**: mọi tuyến vào được forecast đều ≤ 8h nên `requiredDrivers` luôn = 1; chuyến > 8h (cần tài xế phụ + phụ xe) nằm ngoài phạm vi bước 2.

@@ -274,6 +274,17 @@ public class TripService {
      * thất bại và Admin xử lý thủ công (đổi xe khác hoặc đưa xe đi bảo trì).
      */
     private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival) {
+        return findBestAvailableBus(trip, departure, arrival, null);
+    }
+
+    /**
+     * Bản nhận AvailabilityContext (Phase 7). ctx == null → hành vi y hệt bản cũ
+     * (mọi truy vấn bận qua DB); ctx != null → các phép kiểm tra "bận" đọc từ dữ
+     * liệu đã preload trong ctx thay vì truy vấn DB từng xe. Luật lọc/xếp hạng
+     * KHÔNG đổi — chỉ nguồn dữ liệu của isBusBusy đổi.
+     */
+    private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival,
+            AvailabilityContext ctx) {
         BusType requiredType = trip.getRoute().getSuitableBusType();
 
         // Lấy tất cả xe READY (và đúng loại nếu tuyến quy định)
@@ -288,7 +299,7 @@ public class TripService {
         double tripDistance = trip.getRoute().getDistanceKm() != null ? trip.getRoute().getDistanceKm() : 0.0;
 
         return candidates.stream()
-                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
+                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null, ctx))
                 .filter(bus -> !bus.needsMaintenance())
                 .filter(bus -> !bus.isNearMaintenance(tripDistance))
                 .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
@@ -300,12 +311,87 @@ public class TripService {
      * windowEnd] không.
      */
     private boolean isBusBusy(Bus bus, LocalDateTime windowStart, LocalDateTime windowEnd, Long excludeTripId) {
-        return tripRepository.existsOverlappingTripForBus(
-                bus,
-                List.of(TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.PENDING_APPROVAL),
-                windowStart,
-                windowEnd,
-                excludeTripId);
+        return isBusBusy(bus, windowStart, windowEnd, excludeTripId, null);
+    }
+
+    /**
+     * Bản nhận AvailabilityContext. ctx == null → truy vấn DB (đường cũ, giữ
+     * nguyên). ctx != null → xét trên các chuyến đã preload bằng predicate Java
+     * {@link #intervalsOverlap} — cùng vị từ giao khoảng với câu SQL
+     * {@code existsOverlappingTripForBus}; sự tương đương được chốt bằng test
+     * TripServiceAvailabilityContextTest. Package-private để test gọi được cả hai
+     * nhánh.
+     */
+    boolean isBusBusy(Bus bus, LocalDateTime windowStart, LocalDateTime windowEnd, Long excludeTripId,
+            AvailabilityContext ctx) {
+        List<TripStatus> busyStatuses = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED,
+                TripStatus.PENDING_APPROVAL);
+        if (ctx == null) {
+            return tripRepository.existsOverlappingTripForBus(
+                    bus, busyStatuses, windowStart, windowEnd, excludeTripId);
+        }
+        return ctx.trips().stream().anyMatch(t -> busyStatuses.contains(t.getStatus())
+                && t.getBus() != null && t.getBus().getId() != null
+                && t.getBus().getId().equals(bus.getId())
+                && notExcluded(t, excludeTripId)
+                && intervalsOverlap(t, windowStart, windowEnd));
+    }
+
+    // =========================================================================
+    // PREDICATE NỀN TẢNG dùng chung cho nhánh in-memory (Phase 7)
+    // =========================================================================
+    // Đây KHÔNG phải business rule riêng của Recommendation — chỉ là các phép
+    // toán nền tảng (giao khoảng thời gian, xác định vai trò, loại trừ chuyến)
+    // tái hiện đúng điều kiện đang nằm trong JPQL, để có thể đánh giá "bận / giờ
+    // lái" trên dữ liệu preload. Quyết định nghiệp vụ (trạng thái nào tính là
+    // bận, ngưỡng 8h, bảo trì, bằng lái...) vẫn nằm nguyên trong các method
+    // selection/validation của TripService. Test TripServiceAvailabilityContextTest
+    // đối chiếu các predicate này với điều kiện SQL ở những ca biên.
+
+    /**
+     * Hai chuyến "trùng lịch" khi khoảng thời gian thực sự giao nhau. Null-safe và
+     * khớp CHÍNH XÁC điều kiện SQL {@code departureTime < windowEnd AND
+     * arrivalTimeExpected > windowStart}: chạm đúng biên KHÔNG tính là trùng, và
+     * chuyến thiếu mốc thời gian (null) không thể trùng (mirror hành vi so sánh
+     * với NULL trong SQL trả về UNKNOWN → loại).
+     */
+    private static boolean intervalsOverlap(Trip t, LocalDateTime windowStart, LocalDateTime windowEnd) {
+        LocalDateTime dep = t.getDepartureTime();
+        LocalDateTime arr = t.getArrivalTimeExpected();
+        if (dep == null || arr == null) {
+            return false;
+        }
+        return dep.isBefore(windowEnd) && arr.isAfter(windowStart);
+    }
+
+    /**
+     * Tài xế tham gia chuyến ở BẤT KỲ vai trò nào — tài xế chính, tài xế phụ
+     * (coDrivers) hoặc phụ xe (assistant) — so theo userId. Hợp nhất đúng phạm vi
+     * của hai câu SQL {@code existsOverlappingTripForDriver} (driver OR coDriver)
+     * và {@code existsOverlappingTripForAssistant} (assistant), cũng là phạm vi mà
+     * {@code findTripsForDriverOnDate} dùng để tính giờ lái.
+     */
+    private static boolean tripInvolvesDriver(Trip t, Driver driver) {
+        Long id = driver.getUserId();
+        if (t.getDriver() != null && id.equals(t.getDriver().getUserId())) {
+            return true;
+        }
+        if (t.getAssistant() != null && id.equals(t.getAssistant().getUserId())) {
+            return true;
+        }
+        if (t.getCoDrivers() != null) {
+            for (Driver cd : t.getCoDrivers()) {
+                if (cd != null && id.equals(cd.getUserId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Mirror điều kiện SQL {@code (:excludeTripId IS NULL OR t.id <> :excludeTripId)}. */
+    private static boolean notExcluded(Trip t, Long excludeTripId) {
+        return excludeTripId == null || !excludeTripId.equals(t.getId());
     }
 
     // =========================================================================
@@ -335,6 +421,18 @@ public class TripService {
     private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
             double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
             boolean isAssistantRole) {
+        return findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount,
+                excludeDrivers, isAssistantRole, null);
+    }
+
+    /**
+     * Bản nhận AvailabilityContext (Phase 7). ctx == null → mọi phép tính giờ lái
+     * và kiểm tra bận đi qua DB (đường cũ, giữ nguyên hành vi); ctx != null → đọc
+     * từ dữ liệu đã preload. Luật lọc/ưu tiên KHÔNG đổi — chỉ nguồn dữ liệu đổi.
+     */
+    private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
+            double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
+            boolean isAssistantRole, AvailabilityContext ctx) {
         // Cửa sổ kiểm tra = thêm thời gian nghỉ bắt buộc ở cả hai đầu
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
@@ -357,16 +455,16 @@ public class TripService {
                 // CHỈ áp dụng cho tài xế chính/tài xế phụ (isAssistantRole=false) — phụ xe
                 // không lái nên bỏ qua ràng buộc này (Tính chính xác dựa trên CÁC CHUYẾN ĐÃ
                 // XẾP TRONG NGÀY với lượng giờ chia sẻ thực tế).
-                .filter(d -> isAssistantRole || getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
+                .filter(d -> isAssistantRole || getDrivingHoursForDate(d, departure, null, ctx) + effectiveHours <= 8.0)
                 // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
-                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
+                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null, ctx))
                 .collect(Collectors.toList());
 
         // Ưu tiên 1: Bằng lái còn hạn trên 7 ngày
         Driver best = availableDrivers.stream()
                 .filter(d -> d.getLicenseExpiryDate() != null
                         && d.getLicenseExpiryDate().isAfter(departure.toLocalDate().plusDays(7)))
-                .min(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
+                .min(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null, ctx)))
                 .orElse(null);
 
         if (best != null)
@@ -374,7 +472,7 @@ public class TripService {
 
         // Fallback: Bằng lái sắp hết hạn (< 7 ngày) nhưng vẫn còn hạn
         Driver fallback = availableDrivers.stream()
-                .min(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
+                .min(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null, ctx)))
                 .orElse(null);
 
         if (fallback != null) {
@@ -383,6 +481,55 @@ public class TripService {
         }
 
         return fallback;
+    }
+
+    // =========================================================================
+    // PUBLIC SELECTION ENTRY POINTS (Phase 7 — Recommendation Engine)
+    // =========================================================================
+
+    /**
+     * Điểm truy cập PUBLIC để chọn xe tốt nhất — dùng bởi RecommendationService
+     * (Phase 7), một service RIÊNG không gọi được findBestAvailableBus() vốn
+     * private. Nhận AvailabilityContext để chọn cho NHIỀU chuyến ứng viên mà chỉ
+     * truy vấn lịch MỘT lần (xem {@link #buildAvailabilityContext}); truyền null
+     * nếu muốn đọc "bận" trực tiếp từ DB.
+     *
+     * Ủy quyền nguyên vẹn cho findBestAvailableBus() private — KHÔNG nhân bản ràng
+     * buộc/thứ tự ưu tiên, và cố ý KHÔNG lật method private thành public để không
+     * mở rộng bề mặt của phần code nhạy cảm nhất. Xem THESIS_ROADMAP.md, Developer
+     * Notes ("Why Phase 7 needs additive public overloads on TripService").
+     */
+    public Bus selectBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival,
+            AvailabilityContext ctx) {
+        return findBestAvailableBus(trip, departure, arrival, ctx);
+    }
+
+    /** Cặp đôi với {@link #selectBestAvailableBus} ở trên, cùng mục đích và lý do. */
+    public Driver selectBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
+            double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
+            boolean isAssistantRole, AvailabilityContext ctx) {
+        return findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount,
+                excludeDrivers, isAssistantRole, ctx);
+    }
+
+    /**
+     * Nạp MỘT LẦN toàn bộ lịch có thể ảnh hưởng tới các chuyến ứng viên trong một
+     * khoảng thời gian, để {@code selectBest*} / {@code getDrivingHoursForDate}
+     * chạy trên bộ nhớ thay vì truy vấn DB từng xe/tài xế. Đây chỉ là bước CUNG
+     * CẤP DỮ LIỆU — không chứa luật nào; mọi luật vẫn ở các method selection.
+     *
+     * Phạm vi nạp là SIÊU TẬP an toàn: mọi chuyến chưa hủy mà khoảng thời gian có
+     * thể giao với [spanStart, spanEnd] (điều kiện arrivalTimeExpected > spanStart
+     * để loại các chuyến lịch sử đã kết thúc, kèm nhánh null cho chuyến thiếu giờ
+     * đến). Nhờ vậy chuyến COMPLETED trong quá khứ không lọt vào (không ảnh hưởng
+     * ứng viên tương lai), còn chuyến đang chạy dài vẫn được giữ.
+     */
+    @Transactional(readOnly = true)
+    public AvailabilityContext buildAvailabilityContext(LocalDateTime spanStart, LocalDateTime spanEnd) {
+        List<Trip> trips = tripRepository.findScheduleForAvailability(
+                List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.COMPLETED),
+                spanStart, spanEnd);
+        return new AvailabilityContext(trips);
     }
 
     // Quản lý Finite State Machine (FSM)
@@ -446,33 +593,86 @@ public class TripService {
      */
     private boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd,
             Long excludeTripId) {
+        return isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId, null);
+    }
+
+    /**
+     * Bản nhận AvailabilityContext. ctx == null → hai câu SQL exists cho vai trò
+     * tài xế/phụ xe (đường cũ, giữ nguyên). ctx != null → xét trên các chuyến đã
+     * preload: bận khi có chuyến ở trạng thái bận, dính tài xế ở BẤT KỲ vai trò
+     * nào ({@link #tripInvolvesDriver}) và giao khoảng thời gian
+     * ({@link #intervalsOverlap}). Package-private để test tương đương gọi được cả
+     * hai nhánh.
+     */
+    boolean isDriverBusyInWindow(Driver driver, LocalDateTime windowStart, LocalDateTime windowEnd,
+            Long excludeTripId, AvailabilityContext ctx) {
         List<TripStatus> busyStatuses = List.of(
                 TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
-        // Bận với tư cách tài xế chính?
-        boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
-                driver, busyStatuses, windowStart, windowEnd, excludeTripId);
-        if (busyAsDriver)
-            return true;
+        if (ctx == null) {
+            // Bận với tư cách tài xế chính (hoặc tài xế phụ)?
+            boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
+                    driver, busyStatuses, windowStart, windowEnd, excludeTripId);
+            if (busyAsDriver)
+                return true;
 
-        // Bận với tư cách phụ xe?
-        return tripRepository.existsOverlappingTripForAssistant(
-                driver, busyStatuses, windowStart, windowEnd, excludeTripId);
+            // Bận với tư cách phụ xe?
+            return tripRepository.existsOverlappingTripForAssistant(
+                    driver, busyStatuses, windowStart, windowEnd, excludeTripId);
+        }
+
+        return ctx.trips().stream().anyMatch(t -> busyStatuses.contains(t.getStatus())
+                && tripInvolvesDriver(t, driver)
+                && notExcluded(t, excludeTripId)
+                && intervalsOverlap(t, windowStart, windowEnd));
     }
 
     /**
      * Tính tổng số giờ lái xe của tài xế trong một ngày cụ thể.
      */
     private double getDrivingHoursForDate(Driver driver, LocalDateTime date, Long excludeTripId) {
+        return getDrivingHoursForDate(driver, date, excludeTripId, null);
+    }
+
+    /**
+     * Bản nhận AvailabilityContext. ctx == null → nạp chuyến của tài xế trong ngày
+     * qua DB (findTripsForDriverOnDate — đường cũ). ctx != null → lọc các chuyến đã
+     * preload theo đúng phạm vi câu SQL đó (dính tài xế, đúng ngày, đúng trạng
+     * thái, không bị loại trừ). Cả hai nhánh đưa danh sách chuyến cho
+     * {@link #sumDrivingHours} — luật tính giờ nằm MỘT CHỖ, không nhân bản.
+     * Package-private để test tương đương gọi được cả hai nhánh.
+     */
+    double getDrivingHoursForDate(Driver driver, LocalDateTime date, Long excludeTripId,
+            AvailabilityContext ctx) {
         LocalDateTime startOfDay = date.toLocalDate().atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
         List<TripStatus> busyStatuses = List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED,
                 TripStatus.COMPLETED);
 
-        List<Trip> trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay,
-                endOfDay,
-                excludeTripId);
+        List<Trip> trips;
+        if (ctx == null) {
+            trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay, endOfDay, excludeTripId);
+        } else {
+            trips = ctx.trips().stream()
+                    .filter(t -> busyStatuses.contains(t.getStatus()))
+                    .filter(t -> tripInvolvesDriver(t, driver))
+                    .filter(t -> notExcluded(t, excludeTripId))
+                    .filter(t -> t.getDepartureTime() != null
+                            && !t.getDepartureTime().isBefore(startOfDay)
+                            && t.getDepartureTime().isBefore(endOfDay))
+                    .collect(Collectors.toList());
+        }
+        return sumDrivingHours(driver, date, trips);
+    }
 
+    /**
+     * Cộng giờ lái của tài xế từ MỘT danh sách chuyến đã lọc sẵn (đúng tài xế,
+     * đúng ngày, đúng trạng thái). Đây là luật tính giờ DUY NHẤT của hệ thống: quy
+     * ước phụ xe = 0h, chia ca cho tài xế phụ, cắt trần 8h/chuyến, và cộng giờ nền
+     * mock (totalDrivingHours24h) chỉ khi date là hôm nay. Tách ra để nhánh DB lẫn
+     * nhánh in-memory dùng chung, không đẻ bộ luật thứ hai.
+     */
+    private double sumDrivingHours(Driver driver, LocalDateTime date, List<Trip> trips) {
         double hoursFromTrips = trips.stream()
                 .mapToDouble(t -> {
                     // Nếu tài xế làm phụ xe (conductor/assistant) ở chuyến này thì giờ lái = 0.0

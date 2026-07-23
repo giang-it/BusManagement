@@ -1932,6 +1932,68 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/vehicle-replacem
 
 ---
 
+## MODULE 10 — ĐỀ XUẤT TĂNG CƯỜNG (Phase 7, bước 2)
+
+Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`. Điều kiện chung: đã chạy `backfill` để Dự báo có dữ liệu.
+
+### TC_RC_001 — Thẻ dựng đúng và doanh thu khớp công thức
+
+- **Mã TC:** TC_RC_001
+- **Tên Kịch Bản:** Happy path — mỗi tín hiệu tăng cường thành một thẻ, doanh thu đúng
+- **Điều kiện tiên quyết:** Dự báo có ít nhất một ngày-khung vượt ngưỡng tăng cường; đội xe/tài xế còn tài nguyên rảnh cho các khung tương lai
+- **Các bước thực hiện:** Mở `/admin/analytics/recommendation`
+- **Kết quả mong đợi:**
+  - **HTTP 200**, không ném `TemplateProcessingException`/`SpelEvaluationException`/`LazyInitializationException`
+  - Số thẻ **đúng bằng** số ngày-khung `needsReinforcement = true` của Dự báo (không hơn, không kém)
+  - Với thẻ RECOMMENDED: `Số khách KV = round(tỉ lệ dự báo × sức chứa xe được chọn)`, và `Doanh thu = Số khách KV × giá vé`; giá vé = giá của chuyến COMPLETED gần nhất cùng (tuyến, giờ) — đối chiếu bằng SQL độc lập
+  - Thẻ xếp theo tỉ lệ dự báo **giảm dần**
+  - Trang **không** tạo chuyến/không phân công (DB không đổi trước và sau khi mở nhiều lần)
+
+### TC_RC_002 — Engine chỉ đọc `needsReinforcement`, không tự định nghĩa "hot"
+
+- **Mã TC:** TC_RC_002
+- **Tên Kịch Bản:** Regression — không sinh chỗ thứ tư cho ngưỡng 0.90
+- **Điều kiện tiên quyết:** Như TC_RC_001
+- **Các bước thực hiện:** Đối chiếu số thẻ với số ô đỏ ("cần tăng cường") trên trang Dự báo cùng thời điểm
+- **Kết quả mong đợi:**
+  - Số thẻ khớp chính xác số ô `needsReinforcement` bên Dự báo
+  - ⚠️ Nếu ai đó nhét lại việc so sánh với 0.90 vào `RecommendationService`, con số sẽ lệch khỏi Dự báo — case này bắt được
+
+### TC_RC_003 — Cảnh báo trùng khung (đánh giá độc lập)
+
+- **Mã TC:** TC_RC_003
+- **Tên Kịch Bản:** Trung thực — hai thẻ cùng (ngày, giờ) có thể trùng tài nguyên
+- **Điều kiện tiên quyết:** Có từ hai tuyến trở lên cùng được dự báo đông ở cùng một ngày + giờ khởi hành
+- **Các bước thực hiện:** Mở trang, quan sát khối cảnh báo
+- **Kết quả mong đợi:**
+  - Hiện cảnh báo "danh sách gợi ý, không phải lịch phân công khả thi đồng thời" khi `sharedSlotContention = true`
+  - Cảnh báo **không** hiện khi không có khung nào trùng (tính từ dữ liệu, không viết cứng)
+
+### TC_RC_004 — Thiếu tài nguyên: thẻ vẫn hiện, không doanh thu
+
+- **Mã TC:** TC_RC_004
+- **Tên Kịch Bản:** Edge case — không có xe/tài xế hợp lệ rảnh cho khung
+- **Điều kiện tiên quyết:** Một khung được dự báo đông nhưng mọi xe (đúng loại, chưa quá hạn bảo trì) hoặc mọi tài xế đều bận/không hợp lệ trong cửa sổ đó
+- **Các bước thực hiện:** Mở trang
+- **Kết quả mong đợi:**
+  - Thẻ mang trạng thái **NO_RESOURCE**, nêu rõ thiếu xe hay thiếu tài xế
+  - **Không** hiển thị doanh thu (không có xe ⇒ không có sức chứa để quy ra số khách)
+  - Trang vẫn **HTTP 200**, không crash
+
+### TC_RC_005 — Predicate in-memory ≡ điều kiện SQL (test tự động)
+
+- **Mã TC:** TC_RC_005
+- **Tên Kịch Bản:** Tương đương — tối ưu preload không đổi hành vi
+- **Điều kiện tiên quyết:** Chạy `mvnw test` (integration test `TripServiceAvailabilityContextTest`, DB `busmanagement_test`)
+- **Các bước thực hiện:** `./mvnw test`
+- **Kết quả mong đợi:**
+  - `isBusBusy` / `isDriverBusyInWindow` / `getDrivingHoursForDate` cho **đúng cùng kết quả** ở nhánh SQL (`ctx = null`) và nhánh preload (`ctx != null`) qua mọi ca biên: chạm/vượt biên khoảng thời gian, loại trừ chuyến, CANCELLED/COMPLETED, thiếu giờ đến (null), và ba vai trò tài xế chính/phụ/phụ xe
+  - Có "neo" khẳng định ca dương thật-sự-dương để test không pass rỗng nghĩa
+  - ⚠️ Nếu ai sửa một nhánh mà quên nhánh kia, hoặc thu hẹp phạm vi preload sai, case này vỡ
+  - **Bảo toàn hành vi (kiểm bằng tay):** bật/tắt tối ưu preload cho ra trang recommendation **byte-identical** (đã xác minh khi ship: ~18,7s → ~0,97s, nội dung không đổi)
+
+---
+
 ## PHỤ LỤC: MA TRẬN CHUYỂN TRẠNG THÁI FSM
 
 | Từ → Đến | ACTIVE | PENDING | DEPARTED | COMPLETED | CANCELLED |
@@ -1996,6 +2058,13 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/vehicle-replacem
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
 > TC_INC_012/TC_INC_013. Phase 4 (Đề xuất tài xế khả dụng) cũng chưa có case nào. Đây là nợ
 > tài liệu, không phải nợ tính năng.
+
+> **Bổ sung 2026-07-23 (Phase 7 bước 2):** thêm Module 10 — Đề Xuất Tăng Cường, 5 case
+> `TC_RC_001`–`TC_RC_005` (1 happy path, 4 edge/regression/tương-đương), tất cả chỉ đọc. `TC_RC_002`
+> chống thoái hóa (ngưỡng 0.90 không được sinh chỗ thứ tư); `TC_RC_005` là case **tương đương
+> tự động** (`TripServiceAvailabilityContextTest`) khóa việc predicate Java in-memory luôn khớp
+> điều kiện SQL sau khi thêm tối ưu preload. Bảng thống kê phía trên **cố ý chưa cộng thêm** (đã
+> lệch từ trước).
 
 > **Bổ sung 2026-07-22 (Phase 7 bước 1):** thêm Module 9 — Đề Xuất Thay Thế Phương Tiện, 4 case
 > `TC_VR_001`–`TC_VR_004` (1 happy path, 3 edge/regression case), tất cả chỉ đọc. `TC_VR_002` và

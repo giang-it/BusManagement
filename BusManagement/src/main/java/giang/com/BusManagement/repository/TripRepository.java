@@ -383,4 +383,55 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        @Query("SELECT t.route.id, t.departureTime, t.ticketsSold, t.totalSeats FROM Trip t " +
                      "WHERE t.status = :status AND t.totalSeats > 0 ORDER BY t.departureTime")
        List<Object[]> findDemandHistoryByStatus(@Param("status") TripStatus status);
+
+       /**
+        * PHASE 7 (bước 2) — giá vé lịch sử theo (tuyến, khung giờ) cho ước tính
+        * doanh thu của Recommendation Engine.
+        *
+        * Trả về 3 cột (routeId, departureTime, price) của các chuyến ở MỘT trạng
+        * thái, sắp theo thời gian khởi hành GIẢM DẦN — nên khi tầng service gom
+        * theo (routeId, HOUR(departureTime)), dòng ĐẦU TIÊN gặp mỗi khung chính là
+        * giá của chuyến gần nhất. Chỉ 3 scalar, không nạp entity Trip: một chuyến
+        * ứng viên chỉ cần con số giá, không cần cả đối tượng — cùng lý do (Hidden
+        * Cost #4) và cùng khuôn với findDemandHistoryByStatus ngay trên.
+        *
+        * Lọc price IS NOT NULL tại DB để tầng service không phải phòng thủ null khi
+        * nhân ra doanh thu. Chuyến soft-delete tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t.route.id, t.departureTime, t.price FROM Trip t " +
+                     "WHERE t.status = :status AND t.price IS NOT NULL ORDER BY t.departureTime DESC")
+       List<Object[]> findPriceHistoryByStatus(@Param("status") TripStatus status);
+
+       /**
+        * PHASE 7 (bước 2) — nạp MỘT LẦN lịch có thể ảnh hưởng tới các chuyến ứng
+        * viên trong một khoảng, để Recommendation Engine chọn tài nguyên trên bộ
+        * nhớ thay vì truy vấn từng xe/tài xế. Xem
+        * TripService.buildAvailabilityContext.
+        *
+        * Điều kiện là phép giao khoảng với [spanStart, spanEnd]:
+        * departureTime < spanEnd (chuyến khởi hành sau khoảng thì vô can) VÀ
+        * (arrivalTimeExpected > spanStart HOẶC arrivalTimeExpected IS NULL). Nhánh
+        * arrival > spanStart loại các chuyến LỊCH SỬ đã kết thúc trước khoảng (nên
+        * hàng nghìn chuyến COMPLETED quá khứ không lọt vào), nhưng vẫn giữ chuyến
+        * đang chạy dài. Nhánh NULL giữ chuyến chưa có giờ đến để nhánh tính giờ
+        * lái không bỏ sót (khớp findTripsForDriverOnDate vốn không lọc theo arrival).
+        *
+        * CHỈ JOIN FETCH các quan hệ ManyToOne (driver/assistant/bus) — chúng không
+        * nhân bản dòng nên KHÔNG cần DISTINCT. Cố ý KHÔNG fetch collection coDrivers
+        * ở đây: fetch một bag kèm DISTINCT buộc Hibernate dedup kết quả bằng
+        * hashCode, mà @Data trên Trip/Driver/User sinh hashCode đệ quy hai chiều
+        * (Driver↔User) → StackOverflow. coDrivers được để LAZY và nạp trong cùng
+        * transaction khi tầng service duyệt vai trò (cửa sổ tương lai nhỏ nên chi
+        * phí không đáng kể). Chuyến soft-delete tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t FROM Trip t " +
+                     "LEFT JOIN FETCH t.driver " +
+                     "LEFT JOIN FETCH t.assistant " +
+                     "LEFT JOIN FETCH t.bus " +
+                     "WHERE t.status IN :statuses " +
+                     "AND t.departureTime < :spanEnd " +
+                     "AND (t.arrivalTimeExpected IS NULL OR t.arrivalTimeExpected > :spanStart)")
+       List<Trip> findScheduleForAvailability(@Param("statuses") Collection<TripStatus> statuses,
+                     @Param("spanStart") LocalDateTime spanStart,
+                     @Param("spanEnd") LocalDateTime spanEnd);
 }
