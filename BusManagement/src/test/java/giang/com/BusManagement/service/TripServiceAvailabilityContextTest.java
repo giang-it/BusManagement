@@ -99,12 +99,16 @@ class TripServiceAvailabilityContextTest {
         tripRepository.flush(); // đẩy các chuyến xuống DB trước khi chèn hàng bảng nối
 
         // Gắn D1 làm TÀI XẾ PHỤ (co-driver) của coTrip bằng SQL trực tiếp vào bảng
-        // nối, KHÔNG qua @ManyToMany của ORM. Lý do: flush một collection coDrivers
-        // qua ORM sẽ chạm hashCode đệ quy do @Data sinh ra (Driver.hashCode ↔
-        // User.hashCode) — bug TIỀM ẨN của domain, không liên quan Step 2 (mọi tuyến
-        // production đều ≤ 8h nên chưa từng có tài xế phụ để lộ nó ra). Chèn thẳng để
-        // cả hai nhánh đều thấy quan hệ này: SQL existsOverlappingTripForDriver JOIN
-        // coDrivers, và nhánh preload lazy-load coDrivers khi duyệt vai trò.
+        // nối, KHÔNG qua @ManyToMany của ORM. Chèn thẳng để cả hai nhánh đều thấy
+        // quan hệ này: SQL existsOverlappingTripForDriver JOIN coDrivers, và nhánh
+        // preload lazy-load coDrivers khi duyệt vai trò.
+        //
+        // LƯU Ý (cập nhật 2026-07-24): ban đầu cách này là BẮT BUỘC, vì flush một
+        // collection coDrivers qua ORM sẽ chạm hashCode đệ quy do @Data sinh ra
+        // (Driver.hashCode ↔ User.hashCode). Bug đó ĐÃ ĐƯỢC SỬA (Hidden Cost #9 —
+        // xem EntityEqualsHashCodeCycleTest), nên đường ORM giờ cũng chạy được.
+        // Vẫn giữ nguyên cách chèn thẳng: test này đang xanh và mục tiêu của nó là
+        // đối chiếu predicate Java ≡ SQL, không phải trình diễn cách lưu co-driver.
         em.createNativeQuery("INSERT INTO trip_co_drivers (trip_id, user_id) VALUES (?, ?)")
                 .setParameter(1, coTrip.getId())
                 .setParameter(2, driver.getUserId())

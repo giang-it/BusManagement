@@ -14,6 +14,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.hibernate.annotations.BatchSize;
 
 @Entity
@@ -33,6 +35,18 @@ public class Route {
     private Double distanceKm;
     private Integer estimatedDuration;
 
+    /**
+     * BỊ LOẠI khỏi equals/hashCode/toString — cùng lý do và cùng quy ước với
+     * User.driver (xem javadoc đầy đủ ở đó): Route và RouteStation tham chiếu lẫn
+     * nhau, nên nếu giữ lại thì Route.hashCode() → RouteStation.hashCode() →
+     * Route.hashCode()... vô tận. Cắt ở phía nghịch đảo (mappedBy).
+     *
+     * Riêng ở đây còn một lợi ích thứ hai: routeStations là LAZY, nên một
+     * hashCode/toString "vô tình" trên Route sẽ không còn kéo theo việc nạp cả
+     * danh sách trạm dừng.
+     */
+    @EqualsAndHashCode.Exclude
+    @ToString.Exclude
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL)
     @BatchSize(size = 20)
     private List<RouteStation> routeStations;
