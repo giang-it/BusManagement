@@ -8,8 +8,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * PHASE 7 (bước 2) — MỘT thẻ đề xuất: "khung (tuyến × ngày × giờ) này được dự
- * báo đông, đây là xe + tài xế có thể chạy và doanh thu ước tính".
+ * PHASE 7 — MỘT thẻ đề xuất: "khung (tuyến × ngày × giờ) này được dự báo đông,
+ * đây là xe + tài xế có thể chạy, và ước tính doanh thu / chi phí / lợi nhuận"
+ * (chi phí & lợi nhuận thêm ở bước 3, theo tham số CostParameters).
  *
  * Thẻ được TÍNH LẠI mỗi lần mở trang (chốt của chủ dự án: chỉ đọc, không lưu
  * DB, không tạo chuyến). Vì vậy thẻ không mang id hay vòng đời — nó là ảnh chụp
@@ -17,9 +18,11 @@ import java.time.LocalDate;
  *
  * Ước tính doanh thu tuân đúng thiết kế Phase 6: dự báo là TỈ LỆ lấp đầy, nên
  * số khách = tỉ lệ × sức chứa của CHÍNH chiếc xe được chọn, và doanh thu = số
- * khách × giá vé lịch sử của khung. Các trường tài nguyên/doanh thu chỉ có giá
- * trị khi status = RECOMMENDED (đã chọn được xe); ở NO_RESOURCE chúng để null
- * và giao diện hiển thị tín hiệu nhu cầu kèm lời nhắc thiếu tài nguyên.
+ * khách × giá vé lịch sử của khung. Chi phí (bước 3) = nhiên liệu × quãng đường
+ * + lương × giờ × số tài xế, theo tham số Admin; lợi nhuận = doanh thu − chi phí
+ * (chỉ khi có giá vé). Các trường tài nguyên/doanh thu/chi phí chỉ có giá trị khi
+ * đã chọn được xe + tài xế (status RECOMMENDED/STALE); ở NO_RESOURCE chúng để
+ * null và giao diện hiển thị tín hiệu nhu cầu kèm lời nhắc thiếu tài nguyên.
  */
 @Data
 @NoArgsConstructor
@@ -68,6 +71,13 @@ public class RecommendationCardDto {
 
     /** Doanh thu ước tính = expectedPassengers × ticketPrice. */
     private BigDecimal estimatedRevenue;
+
+    // --- Ước tính chi phí & lợi nhuận (Phase 7 bước 3; theo tham số CostParameters) ---
+    /** Chi phí vận hành ước tính = nhiên liệu/km × quãng đường + lương/giờ × giờ × số tài xế. */
+    private BigDecimal estimatedCost;
+
+    /** Lợi nhuận ước tính = doanh thu − chi phí. CÓ THỂ ÂM (chi phí vượt doanh thu). */
+    private BigDecimal estimatedProfit;
 
     /** Câu giải thích kết cục (vì sao đề xuất / vì sao thiếu tài nguyên). */
     private String note;

@@ -39,9 +39,17 @@
             <div>
                 Đây là <strong>đề xuất hỗ trợ quyết định</strong>, không phải phân công tự động. Màn hình
                 <strong>không tạo chuyến và không phân công ai</strong> — mỗi lần mở, hệ thống tính lại từ dự báo,
-                chọn thử xe + tài xế và ước tính doanh thu để Admin tự quyết. Doanh thu là <strong>ước tính</strong>
-                (tỉ lệ lấp đầy dự báo × sức chứa xe được chọn × giá vé lịch sử của khung); phần <strong>chi phí
-                chưa được tính</strong> vì hệ thống chưa có dữ liệu chi phí.
+                chọn thử xe + tài xế và ước tính doanh thu/chi phí/lợi nhuận để Admin tự quyết. Doanh thu là
+                <strong>ước tính</strong> (tỉ lệ lấp đầy dự báo × sức chứa xe được chọn × giá vé lịch sử của khung).
+                Chi phí là <strong>ước tính theo tham số cấu hình</strong> (nhiên liệu/km × quãng đường + lương/giờ ×
+                thời lượng × số tài xế), <strong>không phải chi phí thật</strong> —
+                <a th:href="@{/admin/cost-parameters}">chỉnh tham số chi phí</a>.
+                <span th:if="${view.costFuelPerKm != null and view.costWagePerHour != null}" class="d-block mt-1">
+                    Đang áp dụng: nhiên liệu
+                    <strong th:text="${#numbers.formatDecimal(view.costFuelPerKm, 1, 'COMMA', 0, 'POINT')} + 'đ/km'">—</strong>,
+                    lương
+                    <strong th:text="${#numbers.formatDecimal(view.costWagePerHour, 1, 'COMMA', 0, 'POINT')} + 'đ/giờ'">—</strong>.
+                </span>
             </div>
         </div>
 
@@ -132,6 +140,8 @@
                                 <th class="text-end">Số Khách KV</th>
                                 <th class="text-end">Giá Vé</th>
                                 <th class="text-end">Doanh Thu Ước Tính</th>
+                                <th class="text-end">Chi Phí Ước Tính</th>
+                                <th class="text-end">Lợi Nhuận Ước Tính</th>
                                 <th>Ghi Chú</th>
                             </tr>
                         </thead>
@@ -180,6 +190,15 @@
                                 <td class="text-end fw-semibold"
                                     th:text="${c.estimatedRevenue != null}
                                         ? ${#numbers.formatDecimal(c.estimatedRevenue, 1, 'COMMA', 0, 'POINT')} + 'đ'
+                                        : '—'">—</td>
+                                <td class="text-end small"
+                                    th:text="${c.estimatedCost != null}
+                                        ? ${#numbers.formatDecimal(c.estimatedCost, 1, 'COMMA', 0, 'POINT')} + 'đ'
+                                        : '—'">—</td>
+                                <td class="text-end fw-semibold"
+                                    th:classappend="${c.estimatedProfit == null} ? '' : (${c.estimatedProfit.signum() >= 0} ? 'text-success' : 'text-danger')"
+                                    th:text="${c.estimatedProfit != null}
+                                        ? ${#numbers.formatDecimal(c.estimatedProfit, 1, 'COMMA', 0, 'POINT')} + 'đ'
                                         : '—'">—</td>
                                 <td class="small text-muted" th:text="${c.note}"></td>
                             </tr>

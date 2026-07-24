@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tham Số Chi Phí Vận Hành</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+
+                <div class="alert alert-success" th:if="${success}" th:text="${success}"></div>
+                <div class="alert alert-danger" th:if="${error}" th:text="${error}"></div>
+
+                <div class="card shadow border-0">
+                    <div class="card-header bg-dark text-white py-3">
+                        <h4 class="card-title mb-0"><i class="bi bi-cash-coin"></i> Tham Số Chi Phí Vận Hành</h4>
+                    </div>
+                    <div class="card-body p-4">
+
+                        <!-- Nói rõ bản chất: đây là THAM SỐ do đơn vị nhập, không phải số hệ thống tự biết -->
+                        <div class="alert alert-info d-flex align-items-start" role="alert">
+                            <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+                            <div class="small">
+                                Hệ thống <strong>không có sẵn</strong> dữ liệu chi phí — các số dưới đây là
+                                <strong>tham số do đơn vị vận hành nhập</strong>, dùng để ước tính chi phí và lợi nhuận
+                                cho màn hình <a th:href="@{/admin/analytics/recommendation}">Đề Xuất Tăng Cường</a>.
+                                Giá trị mặc định chỉ là <strong>tham chiếu thị trường xấp xỉ</strong>; hãy chỉnh theo
+                                chi phí thực tế của đơn vị.
+                            </div>
+                        </div>
+
+                        <form th:action="@{/admin/cost-parameters}" th:object="${params}" method="post"
+                            class="needs-validation" novalidate>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Chi Phí Nhiên Liệu (đồng / km)
+                                        <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="1" min="0" class="form-control"
+                                            th:field="*{fuelCostPerKm}" required placeholder="Ví dụ: 6000">
+                                        <span class="input-group-text">đ/km</span>
+                                    </div>
+                                    <div class="form-text text-muted">
+                                        Nhân với quãng đường tuyến (km). Mặc định ~6.000đ/km
+                                        (diesel ~22.000đ/L × ~0,27 L/km).
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Lương Tài Xế (đồng / giờ)
+                                        <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="1" min="0" class="form-control"
+                                            th:field="*{driverWagePerHour}" required placeholder="Ví dụ: 50000">
+                                        <span class="input-group-text">đ/giờ</span>
+                                    </div>
+                                    <div class="form-text text-muted">
+                                        Nhân với thời lượng chuyến × số tài xế cần. Mặc định ~50.000đ/giờ
+                                        (~10 triệu/tháng ÷ ~200 giờ).
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="small text-muted mt-3" th:if="${params.updatedAt != null}">
+                                <i class="bi bi-clock-history"></i> Cập nhật gần nhất:
+                                <span th:text="${#temporals.format(params.updatedAt, 'dd/MM/yyyy HH:mm')}">—</span>
+                            </div>
+
+                            <div class="d-flex justify-content-end mt-4">
+                                <a th:href="@{/admin/analytics/recommendation}"
+                                    class="btn btn-outline-secondary me-2">Quay lại Đề Xuất</a>
+                                <button type="submit" class="btn btn-dark px-4"><i class="bi bi-save"></i>
+                                    Lưu Tham Số</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        (() => {
+            'use strict';
+            const forms = document.querySelectorAll('.needs-validation');
+            Array.from(forms).forEach(form => {
+                form.addEventListener('submit', event => {
+                    if (!form.checkValidity()) { event.preventDefault(); event.stopPropagation(); }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        })();
+    </script>
+</body>
+
+</html>

@@ -8,12 +8,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Đề Xuất Tăng Cường (Phase 7, bước 2) — Recommendation Engine.
+ * Đề Xuất Tăng Cường (Phase 7) — Recommendation Engine.
  *
  * Chỉ đọc: mỗi lần mở trang, engine tính lại từ dự báo (Phase 6) ra các khung
- * giờ được dự báo đông, ghép với xe + tài xế chọn được và doanh thu ước tính,
- * rồi qua cổng Business Rule Validation (Phase 3). KHÔNG lưu DB, KHÔNG tạo
- * chuyến, KHÔNG phân công ai — Admin tự quyết.
+ * giờ được dự báo đông, ghép với xe + tài xế chọn được và ước tính doanh thu /
+ * chi phí / lợi nhuận (chi phí theo tham số Admin cấu hình — bước 3), rồi qua
+ * cổng Business Rule Validation (Phase 3). KHÔNG lưu DB, KHÔNG tạo chuyến,
+ * KHÔNG phân công ai — Admin tự quyết.
  *
  * Nằm dưới /admin/analytics/ và chỉ inject Service (mẫu AdminBusController),
  * cùng khuôn với ba màn Decision Support đã có (Đề xuất tài xế, Dự báo nhu cầu,

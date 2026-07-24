@@ -1,6 +1,7 @@
 package giang.com.BusManagement.service;
 
 import giang.com.BusManagement.domain.Bus;
+import giang.com.BusManagement.domain.CostParameters;
 import giang.com.BusManagement.domain.Driver;
 import giang.com.BusManagement.domain.Route;
 import giang.com.BusManagement.domain.Trip;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -31,10 +33,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * PHASE 7 (bước 2) — Recommendation Engine (chỉ doanh thu).
+ * PHASE 7 — Recommendation Engine (bước 2: doanh thu; bước 3: + chi phí & lợi nhuận).
  *
  * Trả lời câu hỏi: <b>"khung giờ nào sắp tới được dự báo đông, và ta có thể chạy
- * chuyến tăng cường bằng xe + tài xế nào, thu về bao nhiêu?"</b>
+ * chuyến tăng cường bằng xe + tài xế nào, thu về bao nhiêu, lãi bao nhiêu?"</b>
  *
  * ====================================================================
  * LÀ NGƯỜI ĐIỀU PHỐI, KHÔNG PHẢI BỘ DỰ BÁO HAY BỘ LUẬT
@@ -66,12 +68,13 @@ import java.util.stream.Collectors;
  * an toàn nếu logic chọn và logic validate về sau lệch nhau.
  *
  * ====================================================================
- * CHỈ DOANH THU — CHI PHÍ BỊ CHẶN
+ * DOANH THU + CHI PHÍ + LỢI NHUẬN (bước 3, 2026-07-24)
  * ====================================================================
  * Doanh thu tính được ngay: tỉ lệ dự báo × sức chứa xe được chọn × giá vé lịch
- * sử của khung. Chi phí thì KHÔNG có dữ liệu trong domain (không nhiên liệu,
- * lương, phí/km) nên bước 3 bị chặn chờ chủ dự án quyết — service này cố ý không
- * bịa mô hình chi phí.
+ * sử của khung. Chi phí KHÔNG có sẵn trong domain, nên nó là THAM SỐ do Admin
+ * cấu hình (CostParameters): chi phí = nhiên liệu/km × quãng đường + lương/giờ ×
+ * thời lượng × số tài xế. Lợi nhuận = doanh thu − chi phí. Engine chỉ ĐỌC tham
+ * số qua CostParameterService, không tự bịa hằng số — xem CostParameters.
  */
 @Service
 @RequiredArgsConstructor
@@ -81,6 +84,7 @@ public class RecommendationService {
     private final TripService tripService;
     private final RouteRepository routeRepository;
     private final TripRepository tripRepository;
+    private final CostParameterService costParameterService;
 
     /** Hạn mức giờ lái/ngày để suy ra số tài xế cần cho một chuyến. */
     private static final double MAX_DAILY_DRIVING_HOURS = 8.0;
@@ -98,6 +102,10 @@ public class RecommendationService {
         Map<Long, Route> routesById = routeRepository.findAllWithStations().stream()
                 .collect(Collectors.toMap(Route::getId, Function.identity(), (a, b) -> a));
         Map<Long, Map<Integer, BigDecimal>> priceByRouteAndHour = loadLatestPrices();
+
+        // Tham số chi phí do Admin cấu hình (hoặc mặc định nếu chưa đặt). Nạp MỘT
+        // LẦN cho cả request — một dòng cấu hình duy nhất, không phụ thuộc thẻ.
+        CostParameters cost = costParameterService.getOrDefault();
 
         // Nạp lịch MỘT LẦN cho toàn chân trời dự báo, rồi chọn xe/tài xế trên bộ
         // nhớ thay vì truy vấn DB từng xe/tài xế cho mỗi thẻ. Luật chọn vẫn nằm
@@ -118,7 +126,7 @@ public class RecommendationService {
             BigDecimal slotPrice = priceOf(priceByRouteAndHour, series.getRouteId(), series.getDepartureHour());
             for (ForecastPointDto point : series.getPoints()) {
                 if (point.isNeedsReinforcement()) {
-                    cards.add(buildCard(series, point, route, slotPrice, availability));
+                    cards.add(buildCard(series, point, route, slotPrice, availability, cost));
                 }
             }
         }
@@ -144,7 +152,9 @@ public class RecommendationService {
                 cards.size(),
                 recommended,
                 noResource,
-                hasSharedSlotContention(cards));
+                hasSharedSlotContention(cards),
+                cost.getFuelCostPerKm(),
+                cost.getDriverWagePerHour());
     }
 
     /**
@@ -155,7 +165,7 @@ public class RecommendationService {
      * chạy qua bộ chọn tài nguyên và cổng validation.
      */
     private RecommendationCardDto buildCard(ForecastSeriesDto series, ForecastPointDto point,
-            Route route, BigDecimal slotPrice, AvailabilityContext availability) {
+            Route route, BigDecimal slotPrice, AvailabilityContext availability, CostParameters cost) {
 
         LocalDateTime departure = point.getDate().atTime(series.getDepartureHour(), 0);
         int durationMinutes = route.getEstimatedDuration() != null && route.getEstimatedDuration() > 0
@@ -207,6 +217,16 @@ public class RecommendationService {
             if (slotPrice != null) {
                 card.setEstimatedRevenue(slotPrice.multiply(BigDecimal.valueOf(passengers)));
             }
+        }
+
+        // ── Ước tính chi phí & lợi nhuận (bước 3 — theo tham số CostParameters) ──
+        // Chi phí không phụ thuộc sức chứa: nhiên liệu theo quãng đường, lương theo
+        // thời lượng × số tài xế. Lợi nhuận chỉ tính được khi có doanh thu (cần giá
+        // vé lịch sử); có thể ÂM khi chi phí vượt doanh thu — hiển thị trung thực.
+        BigDecimal estimatedCost = estimateCost(route, durationHours, requiredDrivers, cost);
+        card.setEstimatedCost(estimatedCost);
+        if (card.getEstimatedRevenue() != null && estimatedCost != null) {
+            card.setEstimatedProfit(card.getEstimatedRevenue().subtract(estimatedCost));
         }
 
         // ── Cổng Business Rule Validation (Phase 3) — xác nhận lần cuối ──────────
@@ -266,6 +286,27 @@ public class RecommendationService {
 
     private int capacityOf(Bus bus) {
         return bus.getBusType() != null ? bus.getBusType().getCapacity() : 0;
+    }
+
+    /**
+     * Chi phí vận hành ước tính cho một chuyến ứng viên, theo tham số Admin:
+     *   nhiên liệu = fuelCostPerKm × Route.distanceKm
+     *   lương      = driverWagePerHour × thời lượng (giờ) × số tài xế cần
+     * Bỏ qua thành phần nào thiếu dữ liệu (quãng đường null / tham số null) thay
+     * vì đoán. Làm tròn về đồng (0 chữ số thập phân) cho khớp cách hiển thị tiền.
+     */
+    private BigDecimal estimateCost(Route route, double durationHours, int requiredDrivers, CostParameters cost) {
+        BigDecimal fuel = BigDecimal.ZERO;
+        if (route.getDistanceKm() != null && cost.getFuelCostPerKm() != null) {
+            fuel = cost.getFuelCostPerKm().multiply(BigDecimal.valueOf(route.getDistanceKm()));
+        }
+        BigDecimal wage = BigDecimal.ZERO;
+        if (cost.getDriverWagePerHour() != null) {
+            wage = cost.getDriverWagePerHour()
+                    .multiply(BigDecimal.valueOf(durationHours))
+                    .multiply(BigDecimal.valueOf(requiredDrivers));
+        }
+        return fuel.add(wage).setScale(0, RoundingMode.HALF_UP);
     }
 
     private String driverName(Driver driver) {
