@@ -2,6 +2,8 @@ package giang.com.BusManagement.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
@@ -20,32 +22,44 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "trips")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo id — xem quy ước ở User.driver
 public class Trip {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
+    // Các association bên dưới đều LAZY và được @ToString.Exclude: log một Trip
+    // không kéo cả route/bus/driver/coDrivers... và không lazy-load. Chúng cũng
+    // không nằm trong equals/hashCode (chỉ id được Include). Xem quy ước ở
+    // User.driver.
+
     // Liên kết với Route
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
     private Route route;
 
     // Xe được gán
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bus_id")
     private Bus bus;
 
     // Tài xế chính
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "driver_id")
     private Driver driver;
 
     // === PHỤ XE (mới thêm) ===
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assistant_id")
     private Driver assistant; // Phụ xe/Conductor (cũng là Driver nhưng vai trò khác)
 
     // === TÀI XẾ PHỤ (mới thêm để hỗ trợ chuyến đi > 8h) ===
+    @ToString.Exclude
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "trip_co_drivers", joinColumns = @JoinColumn(name = "trip_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
     private java.util.List<Driver> coDrivers = new java.util.ArrayList<>();
@@ -70,6 +84,7 @@ public class Trip {
     private TripStatus status = TripStatus.PENDING_APPROVAL;
 
     // Self-reference: Chuyến gốc (nếu đây là chuyến tăng cường)
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "original_trip_id")
     private Trip originalTrip;

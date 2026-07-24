@@ -2,6 +2,8 @@ package giang.com.BusManagement.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -20,16 +22,22 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "incidents")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo id — xem quy ước ở User.driver
 public class Incident {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
+
+    // Ba association bên dưới đều LAZY và @ToString.Exclude (không kéo đồ thị khi
+    // log, không nằm trong equals/hashCode) — xem quy ước ở User.driver.
 
     /**
      * Xe liên quan — BẮT BUỘC. Mọi sự cố đều qui về một chiếc xe cụ thể, nhờ đó
      * thống kê được "xe nào hay gặp sự cố nhất".
      */
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "bus_id", nullable = false)
     private Bus bus;
@@ -38,6 +46,7 @@ public class Incident {
      * Chuyến đang chạy khi sự cố xảy ra — tùy chọn (null nếu xe gặp sự cố lúc
      * không thuộc chuyến nào, ví dụ hỏng trong bãi).
      */
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trip_id")
     private Trip trip;
@@ -47,6 +56,7 @@ public class Incident {
      * Hệ thống chưa có authentication (SecurityConfig đang permit-all) nên không
      * thể tự suy ra người báo cáo từ phiên đăng nhập; Admin chọn tay.
      */
+    @ToString.Exclude
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "driver_id")
     private Driver driver;

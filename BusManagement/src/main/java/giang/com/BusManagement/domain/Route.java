@@ -21,9 +21,11 @@ import org.hibernate.annotations.BatchSize;
 @Entity
 @Table(name = "routes")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo id — xem quy ước ở User.driver
 public class Route {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     // ĐÃ XÓA: private String departurePoint;
@@ -35,22 +37,15 @@ public class Route {
     private Double distanceKm;
     private Integer estimatedDuration;
 
-    /**
-     * BỊ LOẠI khỏi equals/hashCode/toString — cùng lý do và cùng quy ước với
-     * User.driver (xem javadoc đầy đủ ở đó): Route và RouteStation tham chiếu lẫn
-     * nhau, nên nếu giữ lại thì Route.hashCode() → RouteStation.hashCode() →
-     * Route.hashCode()... vô tận. Cắt ở phía nghịch đảo (mappedBy).
-     *
-     * Riêng ở đây còn một lợi ích thứ hai: routeStations là LAZY, nên một
-     * hashCode/toString "vô tình" trên Route sẽ không còn kéo theo việc nạp cả
-     * danh sách trạm dừng.
-     */
-    @EqualsAndHashCode.Exclude
+    // @ToString.Exclude: routeStations là LAZY — không kéo cả danh sách trạm dừng
+    // mỗi lần log Route (và không nằm trong equals/hashCode vì chỉ id được Include).
+    // Xem quy ước ở User.driver.
     @ToString.Exclude
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL)
     @BatchSize(size = 20)
     private List<RouteStation> routeStations;
 
+    @ToString.Exclude // association LAZY — xem quy ước ở User.driver
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "suitable_bus_type_id")
     private BusType suitableBusType;

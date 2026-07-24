@@ -15,9 +15,11 @@ import lombok.ToString;
 @Entity
 @Table(name = "users")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo id — xem javadoc field driver
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(unique = true, nullable = false)
@@ -39,23 +41,33 @@ public class User {
     /**
      * Quan hệ NGƯỢC tới Driver (phía mappedBy).
      *
-     * BỊ LOẠI khỏi equals/hashCode/toString. Lý do: User và Driver tham chiếu lẫn
-     * nhau, mà @Data sinh ba hàm đó dựa trên MỌI field — giữ lại thì
-     * User.hashCode() gọi Driver.hashCode() rồi lại gọi User.hashCode()... vô tận
-     * và ném StackOverflowError. Vòng lặp này có thật ngay sau một findById bình
-     * thường: Hibernate gán lại chính đối tượng Driver đang nằm trong persistence
-     * context vào đây, nên hai bên trỏ vòng vào nhau trong bộ nhớ.
+     * ================================================================
+     * QUY ƯỚC equals/hashCode/toString CHO MỌI ENTITY (áp dụng đồng nhất)
+     * ================================================================
+     * Mọi entity mang @Data, vốn sinh ba hàm đó dựa trên MỌI field. Với entity
+     * JPA điều đó sai: chuẩn là so theo ĐỊNH DANH (id), không theo association
+     * hay field hay đổi. Quy ước đã chốt:
      *
-     * Cắt MỘT phía là đủ để đứt vòng; cắt ở phía nghịch đảo (mappedBy) là quy ước
-     * được áp dụng ĐỒNG NHẤT cho cả ba quan hệ hai chiều của domain — xem
-     * Route.routeStations và Station.routeStations.
+     * 1) equals/hashCode CHỈ theo id — @EqualsAndHashCode(onlyExplicitlyIncluded
+     *    = true) ở class + @EqualsAndHashCode.Include trên đúng field id. Hai bản
+     *    ghi bằng nhau khi và chỉ khi cùng một dòng DB. Nhờ đó:
+     *      - KHÔNG đệ quy: id là Long, không kéo entity khác. (Trước đây User và
+     *        Driver tham chiếu vòng làm hashCode chạy vô tận → StackOverflowError.)
+     *      - KHÔNG lazy-load: hashCode không chạm association nên không bắn query
+     *        phụ, và không ném LazyInitializationException trên entity detached.
+     *      - hashCode ỔN ĐỊNH khi field đổi: bỏ một Trip vào HashSet rồi bán thêm
+     *        vé (ticketsSold đổi) vẫn tìm lại được.
      *
-     * Hệ quả ngữ nghĩa duy nhất: hai User chỉ khác nhau ở hồ sơ Driver nay được
-     * coi là bằng nhau. Không đáng kể, vì id và username đều unique và được so
-     * sánh TRƯỚC field này. Trước khi sửa, hashCode() luôn luôn ném exception nên
-     * không có code nào có thể đang phụ thuộc vào hành vi cũ.
+     * 2) toString: mọi association được @ToString.Exclude, để log một entity không
+     *    kéo cả đồ thị quan hệ và không lazy-load.
+     *
+     * Lưu ý duy nhất (không xảy ra trong codebase này): hai entity CHƯA save đều
+     * có id null nên coi là bằng nhau — đừng bỏ entity chưa save vào HashSet.
+     *
+     * NGƯỜI THÊM ENTITY MỚI (vd Booking ở Phase 9): thêm @EqualsAndHashCode.Include
+     * lên id, @ToString.Exclude lên mọi association, và bổ sung vào
+     * EntityEqualsHashCodeCycleTest — test đó canh đúng quy ước này.
      */
-    @EqualsAndHashCode.Exclude
     @ToString.Exclude
     @jakarta.persistence.OneToOne(mappedBy = "user", fetch = jakarta.persistence.FetchType.LAZY, cascade = jakarta.persistence.CascadeType.ALL)
     private Driver driver;

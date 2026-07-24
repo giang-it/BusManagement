@@ -11,12 +11,14 @@ import java.util.List;
 @Entity
 @Table(name = "stations")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo id — xem quy ước ở User.driver
 @NoArgsConstructor
 @AllArgsConstructor
 public class Station {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(nullable = false, length = 100)
@@ -28,11 +30,8 @@ public class Station {
     // Liên kết ngược lại với RouteStation (Tùy chọn)
     // Giúp bạn biết trạm này nằm trên những lộ trình nào
     //
-    // BỊ LOẠI khỏi equals/hashCode/toString — cùng lý do và cùng quy ước với
-    // User.driver (xem javadoc đầy đủ ở đó): Station và RouteStation tham chiếu
-    // lẫn nhau, nên nếu giữ lại thì Station.hashCode() → RouteStation.hashCode()
-    // → Station.hashCode()... vô tận. Cắt ở phía nghịch đảo (mappedBy).
-    @EqualsAndHashCode.Exclude
+    // @ToString.Exclude: association LAZY, không kéo đồ thị khi log (và không nằm
+    // trong equals/hashCode vì chỉ id được Include) — xem quy ước ở User.driver.
     @ToString.Exclude
     @OneToMany(mappedBy = "station", cascade = CascadeType.ALL)
     private List<RouteStation> routeStations;

@@ -11,17 +11,22 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 @Entity
 @Table(name = "buses")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo id — xem quy ước ở User.driver
 public class Bus {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     private String licensePlate;
 
+    @ToString.Exclude // association LAZY — xem quy ước ở User.driver
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bus_type_id")
     private BusType busType;

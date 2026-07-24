@@ -7,14 +7,21 @@ import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 @Entity
 @Table(name = "drivers")
 @Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // equals/hashCode CHỈ theo userId — xem quy ước ở User.driver
 public class Driver {
     @Id
+    @EqualsAndHashCode.Include
     private Long userId;
 
+    // @ToString.Exclude: association bị loại khỏi toString (không kéo đồ thị/lazy-load,
+    // và tránh in cả User kèm password) — xem quy ước ở User.driver
+    @ToString.Exclude
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")
