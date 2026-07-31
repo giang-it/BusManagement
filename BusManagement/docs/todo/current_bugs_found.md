@@ -453,3 +453,72 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
   được dùng làm sức chứa doanh thu. **Phán đoán ban đầu sai.**
 - **`bottleneck` báo NONE khi `hotSlots = 0`:** là hệ quả trực tiếp của mục
   "nhu cầu ≤90%" ở trên, không phải lỗi riêng.
+
+---
+
+# Lỗi phát hiện khi kiểm chứng commit sửa lỗi render UI (2026-07-31)
+
+Phát hiện khi drive nhánh MANUAL MODE của màn phê duyệt, trong lúc kiểm chứng một
+commit **chỉ đụng tầng view** (viewport/charset/icon/table-responsive/empty-state).
+Lỗi này **không do commit đó gây ra** — đã đối chứng A/B trực tiếp với code gốc,
+xem phần bằng chứng. Chưa sửa. Chờ quyết định của chủ dự án.
+
+## 9. Màn phê duyệt ở MANUAL MODE vỡ giữa chừng vì inline entity `Driver` vào JavaScript
+
+- **Mức độ:** kỹ thuật, **hỏng hẳn một màn chức năng**. Trang trả HTTP 200 nhưng
+  response bị cắt cụt và JS không bao giờ chạy — nên nhìn qua tưởng bình thường.
+- **Ở đâu:** `templates/admin/approve-form.html:341` —
+  `const approveDriversForJs = /*[[${availableDrivers}]]*/[];` nhét thẳng
+  `List<Driver>` (entity JPA) vào khối `th:inline="javascript"`. Thymeleaf
+  `StandardJavaScriptSerializer` duyệt đồ thị đối tượng và rơi vào vòng vô hạn:
+  `Driver.user` (`domain/Driver.java:25-28`, `@OneToOne @MapsId`) →
+  `User.driver` (`domain/User.java:72-73`, `@OneToOne(mappedBy = "user")`) →
+  `Driver.user` → … **Không bên nào có `@JsonIgnore`.**
+- **Chỉ xảy ra ở MANUAL MODE:** `availableDrivers` chỉ được nạp khi
+  `!isAutoAssigned` (`controller/admin/AdminTripController.java:63-66`), với
+  `isAutoAssigned = (trip.getBus() != null && trip.getDriver() != null)` (dòng 60).
+  Nhánh AUTO không nạp biến này nên không đụng tới serializer.
+- **Vì sao chưa ai gặp:** **cả 1380 chuyến trong DB đều có đủ `bus_id` và
+  `driver_id`** (query `WHERE bus_id IS NULL OR driver_id IS NULL` → 0 dòng), nên
+  MANUAL MODE hiện **không thể chạm tới bằng bất kỳ URL nào**. Nó chỉ hiện ra khi
+  auto-assign thất bại — đúng lúc Admin cần nó nhất.
+- **Hậu quả:** `java.lang.StackOverflowError` ngay giữa lúc ghi response. Thân
+  trang HTML render đủ (dropdown xe/tài xế có 71 `<option>` thật), nhưng response
+  **thiếu cả `</body>` lẫn `</html>`**, cắt ngang giữa chuỗi JSON.
+  `approveDriversForJs` không bao giờ được gán ⇒ toàn bộ JS tài xế phụ chết: nút
+  "Thêm tài xế phụ" (`onclick="addCoDriverSlotApprove(null)"`, dòng 283) bấm sẽ
+  `ReferenceError`, vòng `approveDriversForJs.forEach` (dòng 382) không chạy.
+  Tomcat log thêm `HttpMessageNotWritableException: ... response committed already`.
+- **Đã tái hiện trên app thật (2026-07-31, default profile, DB đã hoàn nguyên):**
+  vì không có chuyến MANUAL nào, phải tạo tạm `trips` id **2642** (`route_id=2`,
+  `PENDING_APPROVAL`, `bus_id`/`driver_id` = NULL) rồi mở
+  `GET /admin/trips/approve/2642`. 200 ký tự cuối của response lộ nguyên vòng lặp:
+  `..."user":{"driver":{"experienceYears":5,..."user":{"driver":{...`. Đã `DELETE`
+  đúng dòng đó (`ROW_COUNT()=1`); snapshot DB trước/sau giống hệt (trips 1380,
+  buses 20, drivers 36, stations 11, routes 8, incidents 8, pending 2).
+- **Bằng chứng đây là lỗi CÓ SẴN, không do commit sửa render:** chạy đối chứng A/B
+  cùng lúc, cùng một URL — code gốc (`git worktree --detach temp` = 355917b, working
+  tree **sạch**, port 8098) và bản đã sửa (port 8099) **đều StackOverflowError**.
+  Thêm nữa, `git show temp:...approve-form.html` cho thấy dòng 341 **giống hệt từng
+  ký tự**; diff của commit render trong file này chỉ có 5 dòng (2 thẻ `<meta>`, 1
+  `<link>` bootstrap-icons, 3 lần đổi tên class trên thẻ `<i>`), không chạm khối
+  `<script>`.
+- **Bằng chứng nội tại mạnh nhất — trang anh em đã làm ĐÚNG:**
+  `AdminTripManagementController.java:174-181` (màn sửa chuyến, cùng nhiệm vụ chọn
+  tài xế) **không** đẩy entity sang view mà dựng `List<Map<String, Object>>` phẳng
+  chỉ gồm `userId` + `fullName`, kèm comment sẵn *"Đẩy danh sách rút gọn này sang
+  View"*. `trip-edit-form.html:238` inline bản rút gọn đó và **chạy bình thường**
+  (đã drive `GET /admin/trip-management/trips/edit/1` → 200, không lỗi). Tức
+  codebase đã có sẵn quy ước đúng; `approve-form` chỉ là **sót**.
+  Khối inline còn lại — `dashboard-analytics.html:505-518` — chỉ inline
+  `.labels`/`.values` (List<String>/List<Number>), an toàn.
+- **Cách sửa:** trong `AdminTripController.showApproveForm()`, thay
+  `model.addAttribute("availableDrivers", ...)` bằng một danh sách rút gọn theo
+  đúng khuôn của `AdminTripManagementController`. JS chỉ dùng **3 trường**:
+  `userId`, `user.fullName`, `totalDrivingHours24h` (`approve-form.html:383-385`),
+  nên map phẳng 3 khoá là đủ. Lưu ý: biến này còn được dùng bởi `th:each` HTML ở
+  phần dropdown chính, nên hoặc đặt tên biến JS riêng (khuyến nghị, giống
+  `driversForJs`), hoặc sửa cả hai chỗ dùng.
+- **Vì sao chưa sửa:** commit đang làm **chỉ đụng tầng view**, không một dòng Java;
+  fix đúng phải sửa controller. Trộn vào là gộp việc không liên quan
+  (`CLAUDE.md` — "Do not combine unrelated work").
