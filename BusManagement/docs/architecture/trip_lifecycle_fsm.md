@@ -49,7 +49,21 @@ Every `Trip` holds a `TripStatus` field that progresses through a defined set of
 | `ACTIVE`           | Admin marks departed             | `DEPARTED`  | Whitelist only                         |
 | `ACTIVE`           | Admin cancels                    | `CANCELLED` | Whitelist only                         |
 | `DEPARTED`         | Admin marks completed            | `COMPLETED` | Whitelist only                         |
-| *(any)*            | Same state set again             | *(same)*    | Always allowed (`from == to` guard)    |
+| *(any)*            | Same state set again             | *(same)*    | Always allowed (`from == to` guard) — **no-op, no side effects** |
+
+> **Setting the same state again is a no-op, not a re-entry.** It is accepted (no
+> exception), but `updateTripStatus()` returns immediately without running any of
+> the "Side effects on entry" listed in Section 2 — the side effects belong to
+> *entering* a state, and the state diagram has no self-loops.
+>
+> This is load-bearing, not a detail: without that guard, re-sending `COMPLETED`
+> for an already-completed trip would append `route.distanceKm` to
+> `bus.odometer` **again** (the bus-sync block keys off the *new* status alone),
+> silently corrupting `kmSinceLastMaintenance` and therefore the maintenance
+> filters in `findBestAvailableBus()`, the maintenance alerts, and the
+> odometer-weighted Vehicle Replacement ranking. Reproduced by double-clicking
+> "Hoàn thành" on the dispatch board; fixed 2026-07-30 and pinned by
+> `TripServiceStatusTransitionTest`. See `docs/todo/current_bugs_found.md` #6.
 
 ---
 

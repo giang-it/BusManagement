@@ -557,6 +557,25 @@ public class TripService {
                             trip.getStatus(), newStatus));
         }
 
+        // Set lại ĐÚNG trạng thái đang có: hợp lệ (canTransition cho from == to qua,
+        // xem bảng "Allowed Transitions" — dòng "Same state set again"), nhưng KHÔNG
+        // phải một lần VÀO trạng thái, nên không tác dụng phụ nào được chạy. Đây
+        // chính là hợp đồng mà docs/architecture/trip_lifecycle_fsm.md quy định: mọi
+        // tác dụng phụ đều ghi là "Side effects on ENTRY", và state diagram không có
+        // self-loop nào.
+        //
+        // KHÔNG BỎ GUARD NÀY. Khối đồng bộ Bus bên dưới chỉ xét newStatus, không xét
+        // trạng thái cũ — thiếu guard thì gọi lại với COMPLETED sẽ cộng
+        // route.distanceKm vào Bus.odometer LẦN NỮA. Lỗi thật, đã tái hiện được chỉ
+        // bằng double-click nút "Hoàn thành" ở bảng điều hành; odometer sai kéo theo
+        // kmSinceLastMaintenance sai → xe tốt bị needsMaintenance()/isNearMaintenance()
+        // loại khỏi findBestAvailableBus(), cảnh báo bảo trì sai, và màn Đề Xuất Thay
+        // Xe (70% điểm theo odometer) xếp sai thứ tự. Xem
+        // docs/todo/current_bugs_found.md mục #6.
+        if (trip.getStatus() == newStatus) {
+            return;
+        }
+
         if (newStatus == TripStatus.ACTIVE) {
             changeStatusToActive(trip);
         } else {
