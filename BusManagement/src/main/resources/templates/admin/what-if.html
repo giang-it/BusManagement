@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mô Phỏng Kịch Bản (What-if) - Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4" style="max-width:1400px;">
+
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div>
+                <h1 class="h2 mb-0"><i class="bi bi-sliders"></i> Mô Phỏng Kịch Bản (What-if)</h1>
+                <small class="text-muted">
+                    Thử "nếu... thì..." trên năng lực đội xe và độ phủ nhu cầu dự báo —
+                    không tạo chuyến, không đổi dữ liệu thật
+                </small>
+            </div>
+            <div>
+                <a th:href="@{/admin/analytics/recommendation}" class="btn btn-outline-primary">
+                    <i class="bi bi-lightbulb"></i> Đề xuất tăng cường
+                </a>
+                <a th:href="@{/admin/analytics}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Quay lại Analytics
+                </a>
+                <a th:href="@{/admin/dashboard}" class="btn btn-outline-secondary">
+                    <i class="bi bi-house"></i> Trang chủ
+                </a>
+            </div>
+        </div>
+
+        <!-- ============ HONESTY BANNER (bắt buộc, nổi bật) ============ -->
+        <div class="alert alert-warning d-flex align-items-start" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+            <div>
+                Đây là <strong>mô phỏng năng lực ở mức tổng hợp</strong>. Hệ thống
+                <strong>không chạy lại Recommendation Engine</strong> và không kiểm tra các ràng buộc phân công cụ
+                thể như trùng lịch, loại xe, bằng lái hay tình trạng bảo trì. Khả năng triển khai thực tế phải được
+                xác nhận tại màn <a th:href="@{/admin/analytics/recommendation}">Đề Xuất Tăng Cường</a>.
+                Chỉ số <em>servable</em> là <strong>tổng năng lực</strong> đội xe, <strong>chưa trừ</strong> phần
+                công suất đã dùng cho lịch chạy thường xuyên — nên là ước lượng lạc quan.
+            </div>
+        </div>
+
+        <!-- ============ KHÔNG CÓ DỮ LIỆU ============ -->
+        <div th:unless="${view.dataAvailable}" class="alert alert-secondary d-flex align-items-center" role="alert">
+            <i class="bi bi-database-exclamation me-2"></i>
+            <div>
+                Chưa có dữ liệu lịch sử để dựng dự báo — hãy chạy profile <code>backfill</code> trước
+                (<code>./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill</code>), rồi mở lại trang này.
+            </div>
+        </div>
+
+        <div th:if="${view.dataAvailable}">
+
+            <!-- ============ ĐỘ TƯƠI DỮ LIỆU ============ -->
+            <div class="alert alert-secondary d-flex align-items-start py-2 small" role="alert">
+                <i class="bi bi-clock-history me-2 mt-1"></i>
+                <div>
+                    Nhu cầu lấy từ dự báo dựa trên dữ liệu lịch sử <strong>MÔ PHỎNG</strong> tới ngày
+                    <span class="fw-semibold" th:text="${#temporals.format(view.historyEnd, 'dd/MM/yyyy')}">—</span>
+                    (<span th:text="${view.historyStaleDays}">0</span> ngày trước), dự báo cho
+                    <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày kể từ
+                    <span class="fw-semibold" th:text="${#temporals.format(view.forecastFrom, 'dd/MM/yyyy')}">—</span>.
+                    Dữ liệu càng cũ, dự báo càng kém tin cậy — chạy lại profile <code>backfill</code> để cập nhật.
+                </div>
+            </div>
+
+            <!-- ============ CẦN GẠT ============ -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white fw-semibold"><i class="bi bi-sliders2"></i> Cần gạt kịch bản</div>
+                <div class="card-body">
+                    <form method="get" th:action="@{/admin/analytics/what-if}" class="row g-3 align-items-end">
+                        <div class="col-6 col-md-2">
+                            <label for="deltaBuses" class="form-label small text-muted mb-1">Δ Số xe</label>
+                            <input type="number" step="1" id="deltaBuses" name="deltaBuses" class="form-control"
+                                th:value="${view.scenario.deltaBuses}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label for="deltaDrivers" class="form-label small text-muted mb-1">Δ Số tài xế</label>
+                            <input type="number" step="1" id="deltaDrivers" name="deltaDrivers" class="form-control"
+                                th:value="${view.scenario.deltaDrivers}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label for="demandFactorPercent" class="form-label small text-muted mb-1">Nhu cầu (%)</label>
+                            <input type="number" step="1" min="50" max="300" id="demandFactorPercent"
+                                name="demandFactorPercent" class="form-control"
+                                th:value="${view.scenario.demandFactorPercent}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label for="fuelCostPerKm" class="form-label small text-muted mb-1">Giá nhiên liệu/km</label>
+                            <input type="number" step="100" min="0" id="fuelCostPerKm" name="fuelCostPerKm"
+                                class="form-control" th:value="${view.scenario.fuelCostPerKm}"
+                                th:placeholder="${view.defaultFuelCostPerKm}">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label for="driverWagePerHour" class="form-label small text-muted mb-1">Lương/giờ</label>
+                            <input type="number" step="1000" min="0" id="driverWagePerHour" name="driverWagePerHour"
+                                class="form-control" th:value="${view.scenario.driverWagePerHour}"
+                                th:placeholder="${view.defaultDriverWagePerHour}">
+                        </div>
+                        <div class="col-6 col-md-2 d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-play-fill"></i> Chạy mô phỏng
+                            </button>
+                        </div>
+                    </form>
+                    <div class="small text-muted mt-2">
+                        Chi phí trống = dùng giá đang cấu hình (nhiên liệu
+                        <strong th:text="${view.defaultFuelCostPerKm != null}
+                            ? ${#numbers.formatDecimal(view.defaultFuelCostPerKm, 1, 'COMMA', 0, 'POINT')} + 'đ/km' : '—'">—</strong>,
+                        lương
+                        <strong th:text="${view.defaultDriverWagePerHour != null}
+                            ? ${#numbers.formatDecimal(view.defaultDriverWagePerHour, 1, 'COMMA', 0, 'POINT')} + 'đ/giờ' : '—'">—</strong>).
+                        Ghi đè ở đây <strong>không lưu</strong> — muốn đổi cấu hình thật, dùng
+                        <a th:href="@{/admin/cost-parameters}">màn tham số chi phí</a>.
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ FORECAST COVERAGE (chỉ số nổi bật) ============ -->
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="small text-muted">Độ phủ nhu cầu — HIỆN TẠI</div>
+                            <div class="fs-2 fw-bold"
+                                th:text="${view.baseline.coveragePct != null}
+                                    ? ${#numbers.formatDecimal(view.baseline.coveragePct, 1, 1)} + '%' : '—'">—</div>
+                            <div class="small text-muted">
+                                phủ <span th:text="${view.baseline.coverable}">0</span>/<span
+                                    th:text="${view.baseline.hotSlots}">0</span> khung dự báo đông
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="card border-0 shadow-sm h-100"
+                        th:classappend="${view.scenarioOutcome.gap > 0} ? 'bg-warning bg-opacity-10' : 'bg-success bg-opacity-10'">
+                        <div class="card-body">
+                            <div class="small text-muted">Độ phủ nhu cầu — KỊCH BẢN</div>
+                            <div class="fs-2 fw-bold"
+                                th:text="${view.scenarioOutcome.coveragePct != null}
+                                    ? ${#numbers.formatDecimal(view.scenarioOutcome.coveragePct, 1, 1)} + '%' : '—'">—</div>
+                            <div class="small text-muted">
+                                phủ <span th:text="${view.scenarioOutcome.coverable}">0</span>/<span
+                                    th:text="${view.scenarioOutcome.hotSlots}">0</span> khung ·
+                                thiếu <span class="fw-semibold" th:text="${view.scenarioOutcome.gap}">0</span> khung
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ BẢNG SO SÁNH HIỆN TẠI vs KỊCH BẢN ============ -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0"><i class="bi bi-table"></i> Hiện Trạng vs Kịch Bản</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Chỉ số</th>
+                                    <th class="text-end">Hiện tại</th>
+                                    <th class="text-end">Kịch bản</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Xe khả dụng</td>
+                                    <td class="text-end" th:text="${view.baseline.availableBuses}">0</td>
+                                    <td class="text-end fw-semibold" th:text="${view.scenarioOutcome.availableBuses}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Tài xế hoạt động</td>
+                                    <td class="text-end" th:text="${view.baseline.activeDrivers}">0</td>
+                                    <td class="text-end fw-semibold" th:text="${view.scenarioOutcome.activeDrivers}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Tổng ghế đội xe</td>
+                                    <td class="text-end" th:text="${view.baseline.totalSeats}">0</td>
+                                    <td class="text-end fw-semibold" th:text="${view.scenarioOutcome.totalSeats}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Trần theo xe (chuyến/ngày)</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(view.baseline.busThroughputPerDay, 1, 1)}">0</td>
+                                    <td class="text-end fw-semibold"
+                                        th:text="${#numbers.formatDecimal(view.scenarioOutcome.busThroughputPerDay, 1, 1)}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Trần theo tài xế (chuyến/ngày)</td>
+                                    <td class="text-end"
+                                        th:text="${#numbers.formatDecimal(view.baseline.driverThroughputPerDay, 1, 1)}">0</td>
+                                    <td class="text-end fw-semibold"
+                                        th:text="${#numbers.formatDecimal(view.scenarioOutcome.driverThroughputPerDay, 1, 1)}">0</td>
+                                </tr>
+                                <tr class="table-light">
+                                    <td>Phục vụ được (chuyến/ngày)</td>
+                                    <td class="text-end fw-semibold"
+                                        th:text="${#numbers.formatDecimal(view.baseline.servablePerDay, 1, 1)}">0</td>
+                                    <td class="text-end fw-bold"
+                                        th:text="${#numbers.formatDecimal(view.scenarioOutcome.servablePerDay, 1, 1)}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Khung dự báo đông (cả chân trời)</td>
+                                    <td class="text-end" th:text="${view.baseline.hotSlots}">0</td>
+                                    <td class="text-end fw-semibold" th:text="${view.scenarioOutcome.hotSlots}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Phủ được / Thiếu</td>
+                                    <td class="text-end">
+                                        <span th:text="${view.baseline.coverable}">0</span> /
+                                        <span th:text="${view.baseline.gap}">0</span>
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        <span th:text="${view.scenarioOutcome.coverable}">0</span> /
+                                        <span th:classappend="${view.scenarioOutcome.gap > 0} ? 'text-danger' : 'text-success'"
+                                            th:text="${view.scenarioOutcome.gap}">0</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Nút thắt</td>
+                                    <td>
+                                        <span class="badge"
+                                            th:classappend="${view.baseline.bottleneck.name() == 'NONE'} ? 'bg-success'
+                                                : (${view.baseline.bottleneck.name() == 'BALANCED'} ? 'bg-secondary' : 'bg-warning text-dark')"
+                                            th:text="${view.baseline.bottleneck.label}">—</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge"
+                                            th:classappend="${view.scenarioOutcome.bottleneck.name() == 'NONE'} ? 'bg-success'
+                                                : (${view.scenarioOutcome.bottleneck.name() == 'BALANCED'} ? 'bg-secondary' : 'bg-warning text-dark')"
+                                            th:text="${view.scenarioOutcome.bottleneck.label}">—</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Chi phí kế hoạch phủ được</td>
+                                    <td class="text-end small"
+                                        th:text="${view.baseline.estimatedCost != null}
+                                            ? ${#numbers.formatDecimal(view.baseline.estimatedCost, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
+                                    <td class="text-end small"
+                                        th:text="${view.scenarioOutcome.estimatedCost != null}
+                                            ? ${#numbers.formatDecimal(view.scenarioOutcome.estimatedCost, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
+                                </tr>
+                                <tr>
+                                    <td>Doanh thu ước tính</td>
+                                    <td class="text-end small"
+                                        th:text="${view.baseline.estimatedRevenue != null}
+                                            ? ${#numbers.formatDecimal(view.baseline.estimatedRevenue, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
+                                    <td class="text-end small"
+                                        th:text="${view.scenarioOutcome.estimatedRevenue != null}
+                                            ? ${#numbers.formatDecimal(view.scenarioOutcome.estimatedRevenue, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
+                                </tr>
+                                <tr>
+                                    <td>Lợi nhuận ước tính</td>
+                                    <td class="text-end fw-semibold"
+                                        th:classappend="${view.baseline.estimatedProfit == null} ? ''
+                                            : (${view.baseline.estimatedProfit.signum() >= 0} ? 'text-success' : 'text-danger')"
+                                        th:text="${view.baseline.estimatedProfit != null}
+                                            ? ${#numbers.formatDecimal(view.baseline.estimatedProfit, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
+                                    <td class="text-end fw-bold"
+                                        th:classappend="${view.scenarioOutcome.estimatedProfit == null} ? ''
+                                            : (${view.scenarioOutcome.estimatedProfit.signum() >= 0} ? 'text-success' : 'text-danger')"
+                                        th:text="${view.scenarioOutcome.estimatedProfit != null}
+                                            ? ${#numbers.formatDecimal(view.scenarioOutcome.estimatedProfit, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ CÁCH SUY THROUGHPUT (minh bạch) ============ -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-calculator"></i> Throughput được suy từ dữ liệu (không hardcode)
+                </div>
+                <div class="card-body small">
+                    <p class="mb-2">
+                        Số chuyến một xe kham được mỗi ngày = cửa sổ vận hành ÷ (thời lượng chuyến TB + buffer chuẩn bị):
+                    </p>
+                    <p class="mb-2 font-monospace">
+                        <span th:text="${#numbers.formatDecimal(view.operatingWindowHours, 1, 1)}">0</span>h
+                        ÷ (<span th:text="${#numbers.formatDecimal(view.avgTripDurationHours, 1, 1)}">0</span>h
+                        + <span th:text="${#numbers.formatDecimal(view.prepBufferHours, 1, 1)}">0</span>h)
+                        = <strong th:text="${#numbers.formatDecimal(view.tripsPerBusPerDay, 1, 2)}">0</strong> chuyến/xe/ngày
+                    </p>
+                    <ul class="mb-0 text-muted">
+                        <li>Cửa sổ vận hành và thời lượng chuyến TB lấy từ chính các tuyến trong dự báo.</li>
+                        <li>Buffer chuẩn bị tái dùng hằng số <code>BUS_PREP_BUFFER_HOURS</code> của hệ thống.</li>
+                        <li>Trần theo tài xế = số tài xế × 8h ÷ thời lượng chuyến TB.</li>
+                        <li><strong>Độ phủ đối chiếu theo TỪNG NGÀY</strong>, không gộp cả chân trời: mỗi ngày chỉ
+                            phủ được tối đa <em>năng lực một ngày</em>, phần nhàn rỗi của ngày vắng
+                            <strong>không</strong> chuyển sang ngày cao điểm được — một xe rảnh hôm thứ Ba không chạy
+                            hộ chuyến thứ Bảy. Điều này quan trọng vì nhu cầu dự báo dồn về cuối tuần.</li>
+                        <li>Sức chứa TB đội xe (quy Δxe ra ghế):
+                            <strong th:text="${#numbers.formatDecimal(view.avgFleetCapacity, 1, 1)}">0</strong> ghế/xe.</li>
+                        <li><em>Cố ý KHÔNG</em> dùng "trung bình chuyến/xe/ngày trong lịch sử" — đó là mức
+                            <em>sử dụng</em>, không phải <em>năng lực</em>.</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
