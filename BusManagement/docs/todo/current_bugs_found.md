@@ -465,6 +465,82 @@ xem phần bằng chứng. Chưa sửa. Chờ quyết định của chủ dự �
 
 ## 9. Màn phê duyệt ở MANUAL MODE vỡ giữa chừng vì inline entity `Driver` vào JavaScript
 
+> **✅ ĐÃ SỬA (2026-08-03).** Controller không đẩy entity sang JS nữa: thêm
+> `AdminTripController.toDriverOptionsForJs()` dựng `List<Map<String, Object>>`
+> phẳng gồm đúng 3 khoá JS đọc (`userId`, `fullName`, `totalDrivingHours24h`),
+> đưa sang view dưới tên **mới** `approveDriversForJs`. `availableDrivers` giữ
+> nguyên cho các dropdown `th:each` phía HTML — chúng chỉ đọc thuộc tính phía
+> server, không serialize, nên vốn không dính lỗi. Template đổi 2 dòng:
+> dòng 341 bind sang `${approveDriversForJs}`, dòng 383 đọc `d.fullName` thay cho
+> `d.user.fullName`. Đúng khuôn `driversForJs` mà
+> `AdminTripManagementController.showEditTripForm()` đã dùng từ trước.
+>
+> **Giữ nguyên khoá `totalDrivingHours24h` và giá trị thô của nó** (không đổi tên,
+> không ép về 0) để dropdown tài xế phụ hiển thị **cùng con số** với dropdown tài
+> xế chính ngay phía trên — cả hai cùng đọc trường mock-seed trên entity.
+> **Đã cân nhắc và loại `DriverWorkloadDto`** dù nó cũng có đúng 3 trường
+> (`userId`/`fullName`/`drivingHoursToday`): trường giờ của nó được
+> `DashboardService:238-245` tính bằng `getDrivingHoursForDate()` (giờ **tính từ
+> chuyến**), khác hẳn `Driver.totalDrivingHours24h` (**mock seed**, xem
+> `TripService:728-741`). Tái dùng sẽ khiến hai dropdown trên cùng một màn hiện
+> hai con số khác nhau cho cùng một tài xế — đúng cái bẫy Phase 4 đã ghi ở §9
+> roadmap.
+>
+> **Kiểm chứng trên app thật** (default profile, JVM PID 1192, port 8099): tạo
+> chuyến tạm id **2643** (`route_id=2`, `bus_id`/`driver_id` = NULL) để ép vào
+> MANUAL MODE — cần thiết vì cả 1380 chuyến đang có đều đủ xe + tài xế.
+> Response giờ **hoàn chỉnh**: có cả `</body>` lẫn `</html>` (trước đây thiếu cả
+> hai), 23.459 byte, kết thúc sạch. Payload JS parse được bằng `json.loads`:
+> **31 phần tử, mỗi phần tử đúng 3 khoá, 0 object lồng nhau**; chuỗi `"user"`,
+> `"driver"`, `"password"` xuất hiện **0 lần** trong toàn trang. Đối chiếu từng
+> dòng với SQL độc lập: **0 sai lệch** tên lẫn giờ. Hai dropdown khớp nhau: cả
+> hai badge đều báo *31 người hợp lệ*, và số giờ trong payload JS **khớp 31/31**
+> với số giờ dropdown chính in ra. Log: `StackOverflowError` **0**,
+> `HttpMessageNotWritableException` **0**, tổng exception **0**.
+> **Hồi quy AUTO MODE:** trip 7 và 8 vẫn 200 và render đủ thẻ đóng; ở nhánh này
+> biến JS ra `null` — **giống hệt trước khi sửa** (bản cũ cũng chỉ set
+> `availableDrivers` trong nhánh MANUAL), và vô hại vì thẻ
+> `id="coDriverRequirementInfo"` không tồn tại ở AUTO MODE (đếm được: 0 thẻ HTML,
+> 1 chuỗi trong JS) nên guard `neededCoDrivers > 0 && infoDiv` chặn, `forEach`
+> không bao giờ chạy. Đã xoá chuyến 2643 (`ROW_COUNT()=1`); snapshot DB trước/sau
+> **giống hệt** (trips 1380, buses 20, drivers 36, stations 11, routes 8,
+> incidents 8, users 37, pending 2). `mvnw test` **36/36 BUILD SUCCESS**.
+>
+> **Đối chứng A/B với code gốc (2026-08-03, cùng URL, cùng lúc, 2 JVM riêng —
+> PID 9260 bản sửa ở cổng 8099, PID 14356 bản gốc `c044276` ở cổng 8098):**
+> bản gốc trả **257.617 byte, thiếu cả `</body>` lẫn `</html>`, 2
+> `StackOverflowError`**; bản sửa **23.459 byte, đủ thẻ đóng, 0 lỗi**. Quan
+> trọng nhất: hai response **giống hệt nhau 17.490 byte đầu** — tức toàn bộ phần
+> HTML, mọi dropdown, mọi nhãn — rồi lệch **đúng tại ký tự đầu tiên bên trong
+> `const approveDriversForJs = [{"`**, không sớm hơn một byte nào. Đây là bằng
+> chứng máy móc rằng thay đổi **chỉ** chạm vào payload JS.
+>
+> *Ghi chú đính chính (viết sau khi kiểm lại):* thoạt đầu ghi rằng bản cũ **rò
+> `User.password`** ra HTML. **Sai — đã kiểm và bác bỏ:** chuỗi `"password"`
+> xuất hiện **0 lần** trong cả 257.617 byte của bản gốc. Lý do: Thymeleaf
+> serialize thuộc tính theo thứ tự chữ cái, nên vào `user` là gặp ngay `driver`
+> (đứng trước `password`) và tái nhập vòng lặp — stack vỡ ở độ sâu 690 vòng
+> **trước khi** kịp chạm tới `password`. Đúng bản chất: `User.password`
+> (`User.java:28`, không `@JsonIgnore`) **nằm trong đồ thị có thể bị serialize**,
+> nhưng thực tế chưa bao giờ bị in ra. Bản sửa loại bỏ nguy cơ tiềm ẩn đó, không
+> phải một vụ rò rỉ đã xảy ra.
+>
+> **Đã drive luồng ghi thật (không chỉ GET):** dùng chuyến tạm **2644** dài 10h
+> (nên bắt buộc có tài xế phụ, ép đúng vào khối JS từng hỏng).
+> (a) *Nhánh lỗi:* submit thiếu phụ xe → 302 quay lại trang approve, flash
+> `⛔ Vi phạm ràng buộc: Chuyến xe kéo dài trên 8 tiếng bắt buộc phải có phụ xe!`,
+> DB **không đổi** (`bus_id`/`driver_id` vẫn NULL). (b) *Nhánh thành công:*
+> submit đủ (bus 23, tài xế 2, tài xế phụ 3, phụ xe 5) → 302 về
+> `/admin/trips/pending`, flash `✅ Chuyến xe #2644 đã được phân công và kích
+> hoạt thành công!`, DB ghi đúng **bus 23 / driver 2 / assistant 5 / ACTIVE /
+> `sale_opened_at` được đóng dấu**, và bảng `trip_co_drivers` có đúng dòng
+> `(2644, 3)`. Tức màn hình này giờ **dùng được thật**, không chỉ render đẹp.
+> Đã xoá cả dòng join lẫn chuyến (mỗi lệnh `ROW_COUNT()=1`); snapshot DB
+> trước/sau khớp tuyệt đối (thêm `trip_co_drivers` 3/3), và đội xe không bị đụng
+> — bus 16 vẫn 4.995 km NEAR, bus 17 vẫn 6.000 km OVERDUE đúng như Hidden Cost
+> #7 ghi (phê duyệt chỉ đưa chuyến sang ACTIVE, odometer chỉ đổi ở
+> DEPARTED→COMPLETED).
+
 - **Mức độ:** kỹ thuật, **hỏng hẳn một màn chức năng**. Trang trả HTTP 200 nhưng
   response bị cắt cụt và JS không bao giờ chạy — nên nhìn qua tưởng bình thường.
 - **Ở đâu:** `templates/admin/approve-form.html:341` —

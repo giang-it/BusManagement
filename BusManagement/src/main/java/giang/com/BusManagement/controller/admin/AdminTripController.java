@@ -1,5 +1,6 @@
 package giang.com.BusManagement.controller.admin;
 
+import giang.com.BusManagement.domain.Driver;
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.service.TripService;
 import lombok.RequiredArgsConstructor;
@@ -7,7 +8,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -62,14 +65,42 @@ public class AdminTripController {
 
         if (!isAutoAssigned) {
             // MANUAL MODE: Chỉ load danh sách khi AI không tự phân công được
+            List<Driver> availableDrivers = tripService.getAvailableDriversForTrip(id);
             model.addAttribute("availableBuses", tripService.getAvailableBusesForTrip(id));
-            model.addAttribute("availableDrivers", tripService.getAvailableDriversForTrip(id));
+            model.addAttribute("availableDrivers", availableDrivers);
             // Phụ xe không trực tiếp lái xe nên dùng danh sách riêng, không áp ràng buộc
             // giờ lái tối đa 8h/ngày (xem TripService.getAvailableAssistantsForTrip)
             model.addAttribute("availableAssistants", tripService.getAvailableAssistantsForTrip(id));
+            model.addAttribute("approveDriversForJs", toDriverOptionsForJs(availableDrivers));
         }
 
         return "admin/approve-form";
+    }
+
+    /**
+     * Rút gọn danh sách tài xế thành map phẳng để đẩy sang khối
+     * {@code <script th:inline="javascript">} dựng dropdown tài xế phụ.
+     *
+     * KHÔNG được inline thẳng entity Driver vào JavaScript: Thymeleaf serialize cả
+     * đồ thị đối tượng và rơi vào vòng vô hạn Driver.user → User.driver → … →
+     * StackOverflowError, cắt cụt response ngay giữa lúc ghi (trang vẫn trả 200
+     * nhưng thiếu cả thẻ đóng, và toàn bộ JS tài xế phụ chết).
+     *
+     * Cùng khuôn với driversForJs ở AdminTripManagementController.showEditTripForm()
+     * — màn sửa chuyến làm đúng nhiệm vụ này từ đầu, approve-form chỉ bị sót.
+     *
+     * Ba khoá dưới đây là đúng những gì JS đọc (approve-form.html); giữ nguyên tên
+     * khoá totalDrivingHours24h và giá trị thô của nó để dropdown tài xế phụ hiển
+     * thị cùng số giờ với dropdown tài xế chính ngay phía trên.
+     */
+    private List<Map<String, Object>> toDriverOptionsForJs(List<Driver> drivers) {
+        return drivers.stream().map(d -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("userId", d.getUserId());
+            map.put("fullName", d.getUser() != null ? d.getUser().getFullName() : "ID: " + d.getUserId());
+            map.put("totalDrivingHours24h", d.getTotalDrivingHours24h());
+            return map;
+        }).toList();
     }
 
     // =========================================================================
