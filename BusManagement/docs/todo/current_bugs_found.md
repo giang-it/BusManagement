@@ -598,3 +598,661 @@ xem phần bằng chứng. Chưa sửa. Chờ quyết định của chủ dự �
 - **Vì sao chưa sửa:** commit đang làm **chỉ đụng tầng view**, không một dòng Java;
   fix đúng phải sửa controller. Trộn vào là gộp việc không liên quan
   (`CLAUDE.md` — "Do not combine unrelated work").
+
+---
+
+# Lỗi phát hiện khi rà soát toàn dự án lần hai (2026-08-04)
+
+Rà theo yêu cầu chủ dự án ("đọc project xem còn lỗi nào không"), chạy ngay sau khi
+profile `backfill` được chạy lại cùng ngày. Trạng thái nền khi rà: `mvnw test`
+**36/36 PASS** (exit 0); các lỗi **#1 / #6 / #7 / #8 / #9 đều đã đóng** đúng như ghi
+nhận; #2, #3, #4, #5 vẫn mở nguyên trạng.
+
+## Phương pháp — điểm khác biệt của lần rà này
+
+Bản nháp đầu tiên báo **4 lỗi + 6 ghi chú nhỏ**. Chủ dự án yêu cầu soi lại từng mục
+để chắc chắn *"đúng là lỗi cần sửa, chứ không phải một tính năng chưa soi kỹ"*, đồng
+thời nói rõ rằng **một quyết định thiết kế vẫn có thể sai, đã lỗi thời, hoặc không
+còn nhất quán với project hiện tại** — loại đó vẫn là phát hiện hợp lệ. Nên mỗi mục
+được phân loại theo **BA nhánh**, không phải hai:
+
+1. **Không phải lỗi — rút lại.** Có chủ đích, và ý định đó **vẫn đúng, vẫn nhất
+   quán** với project hôm nay. Người rà đọc chưa kỹ.
+2. **Là lỗi — quyết định đã hết hiệu lực.** Có chủ đích, **nhưng** ý định đó nay mâu
+   thuẫn với chỗ khác trong project, hoặc tiền đề của nó không còn đúng. Phải chỉ ra
+   **mâu thuẫn với cái gì, ở đâu**.
+3. **Là lỗi — sai thuần túy.** Không có ý định nào đứng sau; code mâu thuẫn với chính
+   comment/javadoc hoặc method anh em của nó.
+
+Kèm theo, mỗi mục giữ lại phải trả lời được: **có chạm tới được không, trên dữ liệu
+và luồng hiện tại** — không chỉ đúng trên lý thuyết. Mục nào sai lệch bằng 0 phải
+được ghi thẳng là *tiềm ẩn*, không tô thành nghiêm trọng.
+
+**Kết quả: 3/10 mục sống sót.** Bảy mục bị rút nằm ở phần "ĐÃ LOẠI" cuối tài liệu,
+kèm lý do, để không ai nêu lại. **Chưa sửa gì. Chờ quyết định của chủ dự án.**
+
+---
+
+## 10. Dispatch kích hoạt chuyến (`→ ACTIVE`) mà bỏ qua TOÀN BỘ Business Rule Validation
+
+> **✅ ĐÃ SỬA (2026-08-04) — theo phương án (a), chủ dự án duyệt.** Thêm allow-list
+> `DispatchController.BOARD_ACTIONS = {DEPARTED, CANCELLED, COMPLETED}` — đúng ba nút
+> mà `dispatch-board.html` thực sự render — và chặn ngay đầu `changeStatus()` bằng
+> flash error + redirect. **`TripService` không bị sửa một dòng logic nào.**
+>
+> **Vì sao (a) chứ không phải (b) (validate trong `updateTripStatus`):** lỗi không nằm
+> ở chỗ FSM thiếu validation, mà ở chỗ endpoint phơi ra một transition nó không bao
+> giờ định phơi. `updateTripStatus()` là **bộ thực thi FSM** ("transition có hợp lệ
+> không"); `confirmAutoAssignedTrip()` mới là **cổng phê duyệt** ("ràng buộc nghiệp vụ
+> có thỏa không"). Nhét validate vào FSM sẽ trộn hai trách nhiệm mà codebase đang tách,
+> **và** vấp NPE ngay khi `bus == null` (javadoc `validateBusForTripDryRun` đã ghi rõ),
+> **và** khiến `AdminTripManagementController.updateTrip` validate hai lần.
+>
+> **Kèm một tripwire bù cho điểm yếu của (a).** Điểm yếu duy nhất của allow-list là nó
+> theo màn hình, không theo domain — một controller tương lai vẫn có thể gọi
+> `updateTripStatus(id, ACTIVE)`. Nên javadoc của `updateTripStatus()` nay nói thẳng
+> **"METHOD NÀY KHÔNG KIỂM TRA RÀNG BUỘC NGHIỆP VỤ"**, liệt kê cách từng lối gọi hiện
+> tại tự lo, và yêu cầu lối gọi mới phải validate trước. Chính việc method này *không*
+> nói điều đó là lý do dispatch bị sót ngay từ đầu.
+>
+> **Kiểm chứng trên app thật** (default profile, port 8099, PID 14236), thiết kế để
+> **không mutate một dòng nào** — tận dụng chính FSM làm chốt chặn:
+> | Request | Kết quả |
+> |---|---|
+> | trip 8 `PENDING_APPROVAL → ACTIVE` | **bị allow-list chặn** — *"Bảng điều hành không hỗ trợ chuyển chuyến #8 sang trạng thái ACTIVE…"* |
+> | trip 8 `→ PENDING_APPROVAL` | **bị allow-list chặn** (cũng ngoài tập) |
+> | trip 7 `ACTIVE → COMPLETED` | **qua** allow-list, FSM chặn: *"Lỗi luồng vận hành…"* ⇒ chứng minh COMPLETED không bị chặn nhầm |
+> | trip 3 `DEPARTED → CANCELLED` | **qua** allow-list, FSM chặn ⇒ chứng minh CANCELLED không bị chặn nhầm |
+> | trip 3 `DEPARTED → DEPARTED` | **qua** allow-list, same-status no-op (guard lỗi #6 vẫn chạy) ⇒ chứng minh DEPARTED không bị chặn nhầm |
+>
+> Cả 4 trạng thái đều được phủ mà **không đổi một dòng dữ liệu nào**. Snapshot DB
+> trước/sau **giống hệt** (`trips 1500 / buses 20 / drivers 36 / SUM(odometer) 246145 /
+> SUM(last_maintenance_odometer) 227790`), chuyến 3/7/8 giữ nguyên trạng thái,
+> **16/16 trang admin HTTP 200**, log **0** exception.
+>
+> **Không viết test:** test cho việc này sẽ chỉ kiểm `EnumSet.contains`, và project chưa
+> có harness MockMvc (đã ghi ở bản sửa lỗi #9). Bằng chứng là lần drive app ở trên.
+
+- **Mức độ:** nghiệp vụ — **nặng nhất lần rà này**. Một chuyến có thể lên ACTIVE (mở
+  bán vé) mà không một ràng buộc nào được kiểm.
+- **Phân loại:** nhánh **3 — sai thuần túy** (endpoint phơi ra toàn bộ FSM trong khi
+  màn hình chỉ cần 3 transition; lối gọi anh em đã chặn đúng).
+- **Ở đâu:** `controller/admin/DispatchController.java:83-97` — `changeStatus()` nhận
+  `@RequestParam TripStatus newStatus` **không giới hạn giá trị**, ủy quyền thẳng cho
+  `TripService.updateTripStatus()` (`service/TripService.java:549-607`).
+- **Chuỗi thực thi khi gửi `newStatus=ACTIVE` cho một chuyến `PENDING_APPROVAL`:**
+  1. `canTransition(PENDING_APPROVAL, ACTIVE)` → `true` (`TripService:541`) — **đúng**,
+     đây chính là transition phê duyệt.
+  2. Guard same-status (`:575-577`) không chặn vì trạng thái có đổi.
+  3. `newStatus == ACTIVE` → `changeStatusToActive(trip)` (`:579-580` → `:1460-1465`):
+     set `ACTIVE` + đóng dấu `saleOpenedAt`.
+  4. Khối đồng bộ `Bus` (`:588-605`) chỉ chạy cho `DEPARTED`/`COMPLETED` nên không
+     đụng gì.
+  5. **Không một lần gọi `validateBusForTrip()` hay `validateStaffForTrip()`.**
+- **Đối chiếu lối đi ĐÚNG:** `TripService.confirmAutoAssignedTrip()` (`:768-795`) bắt
+  buộc `bus != null` (`:772`), `driver != null` (`:775`), rồi chạy **cả hai** validator
+  (`:781-782`) **trước** `changeStatusToActive()`. Hai đường vào cùng một trạng thái,
+  một đường có cổng, một đường không.
+- **Hậu quả:** chuyến lên ACTIVE với xe **quá hạn bảo trì**, tài xế **hết bằng vào ngày
+  khởi hành**, **trùng lịch** xe/người, **thiếu tài xế phụ** cho chuyến > 8h, hoặc
+  **không có cả xe lẫn tài xế** (khối bus-sync có null-check nên không ném lỗi — chuyến
+  ACTIVE rỗng người trôi thẳng vào bảng điều hành và Dashboard).
+- **Vì sao đây là lỗi, không phải tính năng — ba lớp bằng chứng:**
+  1. **Tiền lệ đã được chủ dự án duyệt.** `THESIS_ROADMAP.md` §8 (2026-07-21, bằng lái
+     phụ xe) ghi: *"the trip controllers load the assistant straight from the request's
+     `assistantId` … **a stale page or a crafted POST** could assign an assistant whose
+     licence had already expired by the departure date. The owner confirmed the business
+     rule … and **approved Decision A**."* ⇒ trong project này, "crafted POST vượt qua
+     ràng buộc nghiệp vụ" **đã được công nhận là lỗi thật đáng sửa**, không bị bác vì lý
+     do "không tới được từ UI".
+  2. **Cùng khuôn với lỗi #6 đã đóng** — *lối gọi kia đã chặn đúng, dispatch chỉ là sót*.
+     `AdminTripManagementController.updateTrip:256-263` gọi `updateManualTrip()` (validate
+     đầy đủ) **trước** rồi mới `updateTripStatus()`. `DispatchController` gọi thẳng.
+  3. **Lỗi KHÔNG nằm ở `canTransition()`.** Quy tắc `PENDING_APPROVAL → ACTIVE` là đúng và
+     phải giữ (đó là transition phê duyệt). Sai nằm ở việc endpoint không giới hạn tập
+     transition mà màn hình thực sự dùng.
+- **Khả năng chạm — nói rõ để không thổi phồng:** **không tới được từ giao diện.**
+  `dispatch-board.html` chỉ render hidden input `DEPARTED` (`:81`, `:201`), `CANCELLED`
+  (`:88`, `:208`), `COMPLETED` (`:146`) — không có nút nào gửi `ACTIVE`. Phải tự chế
+  request. Không có rào nào khác chặn: `SecurityConfig:15` permit-all, `:17` tắt CSRF.
+  Khác với lỗi #6 (chỉ cần double-click là tái hiện), mục này **chưa từng xảy ra tự
+  nhiên**.
+- **Hai cách sửa, chọn một:**
+  - **(a) Giới hạn ở controller** — chỉ nhận `newStatus ∈ BOARD_STATUSES ∪ {COMPLETED}`,
+    đúng phạm vi màn hình. **Không đụng `TripService`.** *Khuyến nghị:* nhỏ nhất, hợp
+    nguyên tắc §3 "Minimize refactoring", và đặt luật đúng chỗ (controller quyết định
+    màn hình mình phơi ra cái gì).
+  - **(b) Bắt buộc validate khi vào ACTIVE trong `updateTripStatus()`** — sửa tận gốc,
+    nhưng đụng `TripService` và khiến `AdminTripManagementController.updateTrip` validate
+    **hai lần** (nó đã validate ở `updateManualTrip()` ngay trước đó).
+- **Vì sao chưa sửa:** chờ chủ dự án chọn (a) hay (b).
+
+---
+
+## 11. `CostParameterService.save()` — service DUY NHẤT không validate đầu vào
+
+> **✅ ĐÃ SỬA (2026-08-04).** `save()` gọi `validate(form)` trước khi ghi; cả hai suất
+> phí bắt buộc **> 0**, ném `IllegalArgumentException` với thông điệp đúng khuôn
+> `RouteService` (*"… phải lớn hơn 0!"*). Form đổi `min="0"` → `min="1"` ở cả hai ô.
+> **Controller không phải sửa** — `CostParameterController` đã có sẵn
+> `catch → flash "Lỗi: " → redirect`.
+>
+> **CHỐT CỦA CHỦ DỰ ÁN: số 0 KHÔNG phải đầu vào hợp lệ.** Bốn lý do, xếp theo sức nặng:
+> 1. **Chặn một thừa số mà thả thừa số kia thì vô nghĩa.** Chi phí nhiên liệu =
+>    `fuelCostPerKm × Route.distanceKm`, mà `RouteService.validateRoute():131-133` **đã**
+>    từ chối `distanceKm <= 0`. Project đã quyết tích này không được bằng 0 nhưng mới
+>    canh **một** thừa số; chặn nốt thừa số kia là **hoàn tất một quyết định đã có**,
+>    không phải đặt luật mới.
+> 2. **Số 0 khôi phục đúng trạng thái mà `CostParameters` sinh ra để xoá bỏ.** §9 ghi lý
+>    do tồn tại của entity: domain không có dữ liệu chi phí nào để suy, nên nó **phải**
+>    là tham số do operator nhập. Nhập 0 đưa hệ thống về đúng tình trạng "không có thông
+>    tin chi phí" nhưng **nguỵ trang thành một con số đã tính**, rồi biến "lợi nhuận"
+>    thành "doanh thu" trên hai màn Decision Support mà không một cảnh báo nào.
+> 3. **Đã grep toàn `src/main/java`: 0 không được xử lý đặc biệt ở đâu cả** — nó chỉ âm
+>    thầm bị nuốt thành 0đ trong phép nhân.
+> 4. **Phase 8 đã tuyên bố lập trường này rồi** — `WhatIfSimulationService.positiveOrNull()`
+>    loại 0/âm *"để tránh chi phí âm"*. Đây chỉ là áp cùng lập trường cho nguồn cấu hình
+>    **được lưu**, thay vì chỉ cho ô ghi đè tạm thời.
+>
+> *Phản biện đã cân nhắc và bác:* "chặn 0 là bịa luật nghiệp vụ, §4 cấm module định giá".
+> Không — đây là ràng buộc **tính hợp lệ của đầu vào**, cùng hạng với "quãng đường > 0".
+> Nó không quyết định suất phí **là bao nhiêu** (operator vẫn nhập), chỉ từ chối một giá
+> trị không mang thông tin. *Hệ quả được chấp nhận:* sau bản sửa, "chi phí = 0" không
+> biểu diễn được ở bất cứ đâu trong hệ thống — chi phí vận hành bằng 0 không phải kịch
+> bản vận tải có thật.
+>
+> **Pin bằng test:** `CostParameterServiceTest` +4 test (chặn 0 / chặn âm / chặn null /
+> **đối trọng** "giá trị dương vẫn lưu bình thường", gồm cả biên 1đ) → 2 thành **6**.
+> Test đối trọng theo đúng cặp test của bản sửa lỗi #6, để bản sửa không chặn quá tay.
+> **Non-vacuous:** tạm bỏ `validate(form)` → **đúng 3 test chặn đỏ**, 3 test cũ + đối
+> trọng vẫn xanh.
+>
+> **Kiểm chứng trên app thật** (POST trực tiếp, bỏ qua validation client — đúng đường mà
+> lỗi này đi được): `fuel=0` → *"Chi phí nhiên liệu mỗi km phải lớn hơn 0!"*; `wage=0` →
+> *"Lương tài xế mỗi giờ phải lớn hơn 0!"*; `fuel=-5000` → chặn; `fuel=` (rỗng) → chặn;
+> cả hai rỗng → chặn. Dòng `cost_parameters` giữ nguyên **`6000 / 50000`, `updated_at`
+> vẫn là 2026-07-24** — chứng minh không request nào lọt qua.
+
+- **Mức độ:** nghiệp vụ — làm sai con số tiền trên **hai** màn Decision Support.
+- **Phân loại:** nhánh **3 — sai thuần túy** (khoảng trống, không có quyết định nào
+  đứng sau).
+- **Ở đâu:** `service/CostParameterService.java:57-62` chép thẳng object của form xuống
+  DB: **không kiểm null, không kiểm âm, không kiểm 0**.
+  `controller/admin/CostParameterController.java:36-44` cũng không kiểm. Guard duy nhất
+  của toàn hệ thống là `required min="0"` **phía client**
+  (`templates/admin/cost-parameters.html:45,58`).
+- **Hậu quả:**
+  - **Đi được bằng UI bình thường:** `min="0"` cho phép **chính số 0**. Nhập 0 vào cả hai
+    ô → chi phí = 0 ở **mọi** thẻ màn Đề Xuất Tăng Cường và ở **cột hiện trạng** màn
+    What-if → **lợi nhuận = doanh thu**, tô xanh, không một cảnh báo nào.
+  - **Crafted POST** (bỏ qua validation client) → null hoặc số âm được lưu → chi phí âm →
+    lợi nhuận thổi phồng.
+  - **Nguy hiểm dai dẳng nhất:** nếu một dòng NULL lọt vào bảng, `getOrDefault():43`
+    (`findAll().stream().findFirst()`) trả về **chính dòng đó**, không trả mặc định ⇒
+    `DEFAULT_FUEL_COST_PER_KM` / `DEFAULT_DRIVER_WAGE_PER_HOUR` bị vô hiệu **vĩnh viễn**
+    cho tới khi Admin lưu lại tay.
+- **Vì sao đây là lỗi, không phải "tôn trọng đầu vào của operator" — mâu thuẫn NỘI BỘ,
+  không phải best-practice nhập khẩu:** `RouteService.validateRoute():131-136` là ca song
+  song gần nhất và nó **validate đúng loại số này ở tầng service**:
+  ```java
+  if (route.getDistanceKm() == null || route.getDistanceKm() <= 0)
+      throw new IllegalArgumentException("Quãng đường phải lớn hơn 0 km!");
+  if (route.getEstimatedDuration() == null || route.getEstimatedDuration() <= 0)
+      throw new IllegalArgumentException("Thời gian di chuyển dự kiến phải lớn hơn 0 phút!");
+  ```
+  `IncidentService.validate():97-107`, `DriverService.validateUsernameAvailable():168-174`,
+  `TripService.validateBusForTrip()/validateStaffForTrip()` — **tất cả** đều validate ở
+  service. `CostParameterService` là ngoại lệ duy nhất.
+- **Bằng chứng tự tố cáo mạnh nhất:** `WhatIfSimulationService.positiveOrNull():438-440`
+  **đã** loại 0 và số âm, kèm comment *"giá trị âm/0 bị coi là 'không ghi đè' để tránh chi
+  phí âm"*. Tức màn **mô phỏng tạm thời** thì phòng thủ đầu vào, còn **nguồn cấu hình chính
+  thức được lưu xuống DB** thì không. Hai màn hiểu số 0 theo hai nghĩa khác nhau.
+- **Roadmap không đứng về phía nào:** §9 ghi chú *"Why cost is a parameter, not a
+  derivation"* chỉ nói rate là *"a business input the operator supplies"* và *"profit may
+  be negative — show it, do not clamp"*; **không nói gì về validation đầu vào**. Nên đây
+  là khoảng trống, không phải quyết định đã cân nhắc.
+- **Test không canh:** `CostParameterServiceTest` chỉ ghim (1) mặc định không null khi bảng
+  rỗng, (2) `save()` giữ đúng một dòng. Không có test nào về giá trị hợp lệ.
+- **Cách sửa:** guard trong `save()` theo đúng khuôn `validateRoute()` — ném
+  `IllegalArgumentException` khi `null` hoặc `signum() <= 0`; đổi `min="0"` → `min="1"`
+  trên form. **Cần chủ dự án chốt một điểm:** nếu coi 0 là đầu vào hợp lệ (kịch bản "giả
+  định miễn phí nhiên liệu") thì chỉ chặn null/âm và giữ 0.
+- **Vì sao chưa sửa:** chờ chủ dự án chốt 0 có hợp lệ hay không.
+
+---
+
+## 12. Dropdown tài xế dùng TOÀN BỘ thời lượng chuyến thay vì phần chia ca — **sai lệch hiện tại bằng 0**
+
+> **✅ ĐÃ SỬA (2026-08-04).** Cả hai dropdown nay gọi hàm thuần package-private
+> `TripService.driverShareHours(durationHours)` =
+> `min(duration / ceil(duration/8h), 8h)` — phần chia ở **mức nhân sự tối thiểu mà
+> `validateStaffForTrip()` sẽ đòi hỏi**.
+>
+> **Ba quyết định làm nên tính đúng đắn của bản sửa:**
+> 1. **Bất biến một chiều được BẢO TOÀN, và có test canh.** Vì
+>    `assignedDriversCount >= requiredDrivers`, phần chia của validator **luôn ≤** phần
+>    chia ở đây ⇒ dropdown vẫn là **tập con** của "người validator chấp nhận", đúng quy
+>    tắc §8 (*"the dropdowns no longer offer drivers the validator would then reject"*).
+>    Test `dropdownNeverOffersWhatTheValidatorWouldReject` quét 9 thời lượng × 6 mức nhân
+>    sự để chốt điều này.
+> 2. **KHÔNG gom chung với `findBestAvailableDriver()`/`validateStaffForTrip()`.** Hai chỗ
+>    đó chia cho số tài xế chúng **đã biết** (`totalDriversCount` / `assignedDriversCount`);
+>    dropdown phải **suy ra** mức tối thiểu vì chạy trước khi có phân công. Cùng trần 8h
+>    nhưng khác đầu vào — tôn trọng ghi chú §9 về việc hằng số `8.0` mang ba nghĩa.
+> 3. **Package-private để test chốt trực tiếp trên số học**, cùng lý do
+>    `WhatIfSimulationService.coverableSlots` và `TripService.isBusBusy`.
+>
+> **Pin bằng test:** `service/TripServiceDriverShareTest` (**9 test**, JUnit thuần — hàm
+> thuần nên không cần Spring context). Fixture là số **đo được**: 8 thời lượng tuyến thật
+> và phân bố giờ nền `{0×21, 1, 2×2, 3, 5, 6, 7, 7.9, 8, 9, 10, 11}` (tổng 33 = số tài xế
+> hoạt động). **Chính test này đã bắt lỗi trong fixture bản nháp của nó** — bản đầu làm
+> phẳng mức 2h thành một người và ra 24 thay vì 25; SQL độc lập
+> (`WHERE total_driving_hours24h <= 3.5` = **25**) xác nhận con số 25 mới đúng. Đúng kiểu
+> sai mà fixture bịa sẽ mắc còn fixture đo được thì không.
+> **Non-vacuous:** quay `driverShareHours` về `min(duration, 8.0)` → **đúng 4 test đỏ**
+> (3 tuyến dài + mìn 9h), **5 test control xanh** (5 tuyến ngắn không đổi, biên 8h, bất
+> biến một chiều, và test "vì sao #12 chưa cắn").
+>
+> **Bán kính đã chứng minh là nhỏ nhất có thể:** với mọi tuyến ≤ 8h thì
+> `requiredDrivers = 1` nên công thức mới **trùng khít** công thức cũ — 5/8 tuyến hiện tại
+> **không đổi một chút nào**. Test `onCurrentRoutes_bothFormulasSelectTheSameDrivers` còn
+> chốt rằng trên **cả 3 tuyến dài**, hai công thức vẫn chọn **cùng tập tài xế** trên dữ
+> liệu hôm nay — tức bản sửa **không đổi hành vi quan sát được**, đúng tinh thần bản sửa
+> lỗi #7 (mọi số đã ghi nhận giữ nguyên). Nếu sau này test đó đỏ, nghĩa là lỗi #12 đã bắt
+> đầu cắn thật, **không phải test hỏng**.
+>
+> `mvnw clean test` → **49/49 PASS** (36 + 4 của #11 + 9 của #12). Báo cáo surefire cũ
+> `TempHashCodeProbeTest` cũng biến mất sau `clean` — xong luôn mục dọn dẹp ở cuối tài liệu.
+
+- **Mức độ:** nhất quán code ↔ tài liệu. **Tiềm ẩn — chưa cắn.**
+- **Phân loại:** nhánh **3 — sai thuần túy** (code mâu thuẫn với chính comment của nó),
+  nhưng **không** vi phạm bất biến nào project đã tuyên bố (xem dưới).
+- **Ở đâu:** `TripService.getAvailableDriversForTimeRange:1342-1344` và
+  `getAvailableDriversForTrip:1247-1248` tính `effectiveHours = Math.min(durationHours, 8.0)`
+  — **không chia cho số tài xế**.
+- **Trái với chính nó:** comment `:1343` ghi *"effectiveHours: phần giờ mà **mỗi** tài xế
+  phải lái (cắt tối đa 8h/người)"*; javadoc `:1334` ghi *"Tổng giờ lái hôm nay + **phần
+  chia** của chuyến này ≤ 8h"*.
+- **Trái với hai method anh em:** `findBestAvailableDriver:440-441` và
+  `validateStaffForTrip:1038-1039` đều dùng `Math.min(duration / driverCount, 8.0)`.
+- **Roadmap xếp cả năm vị trí này vào cùng một nghĩa:** §9 (*"Why Phase 4 redeclares the
+  8-hour daily limit"*) gọi chúng là *"the **per-trip share cap** applied when splitting a
+  long trip across co-drivers"*.
+- **HAI điều bắt buộc phải ghi kèm, để không ai thổi phồng mục này:**
+  1. **KHÔNG vi phạm bất biến nào project đã tuyên bố.** Roadmap §8 (2026-07-20, licence
+     fix) chỉ phát biểu **một chiều**: *"the dropdowns no longer offer drivers **the
+     validator would then reject**"*. Dropdown **chặt hơn** validator không phá quy tắc đó.
+     Không chỗ nào trong project đòi dropdown phải hiện **đủ** người hợp lệ.
+  2. **Sai lệch hiện tại = 0, đã đo.** Giờ đến ở form tạo chuyến là `readonly`, do JS tính
+     từ `estimatedDuration` (`trip-create-form.html:181-182`) ⇒ thời lượng chỉ nhận 7 giá
+     trị của 8 tuyến. Ba tuyến > 8h (`id 6` = 1800′, `id 8` = 3000′, `id 9` = 4500′) cho
+     khoảng lệch **0,5 / 0,857 / 0,5 h**. Phân bố giờ nền thật của 36 tài xế:
+     `0(×21), 1, 2, 3, 5, 6, 7, 7.9, 8, 9, 10, 11` — **không ai rơi vào khoảng (0; 0,857]**
+     ⇒ dropdown và validator cho ra **cùng một tập người**. Lối gọi còn lại
+     (`getAvailableDriversForTrip`, MANUAL MODE màn approve) vẫn **không chạm tới được**:
+     đo được **0/1.499** chuyến thiếu `bus_id` hoặc `driver_id`.
+- **Vì sao vẫn ghi lại — ngòi nổ nằm trong tay Admin:** `RouteService.saveRoute()` cho nhập
+  `estimatedDuration` tự do (chỉ đòi `> 0`). Thêm **một tuyến 9h** ⇒ `requiredDrivers = 2`
+  ⇒ validator dùng **4,5h** còn dropdown dùng **8,0h** ⇒ lệch **3,5h** ⇒ validator nhận tài
+  xế có ≤ 3,5h (**25 người** trên dữ liệu hiện tại) trong khi dropdown chỉ hiện người có
+  **đúng 0h** (**21 người**) ⇒ **4 tài xế hợp lệ bị giấu khỏi Admin**.
+- **Cách sửa:** hai dòng ở mỗi method, đưa về đúng công thức validator:
+  ```java
+  int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / 8.0));
+  double effectiveHours = Math.min(durationHours / requiredDrivers, 8.0);
+  ```
+- **Vì sao chưa sửa:** **ưu tiên thấp nhất** trong ba mục — đụng `TripService` (§3
+  "Minimize refactoring") để sửa một sai lệch hiện đang bằng 0. Hợp lý nhất là gộp vào lần
+  nào đó đã phải mở `TripService` vì việc khác.
+
+---
+
+## ĐÃ LOẠI ở lần rà 2026-08-04 — không phải lỗi, đừng nêu lại
+
+Bảy mục dưới đây **đã bị chính người rà rút lại** sau khi đối chiếu. Ghi đủ lý do để phiên
+sau không tốn công nêu lần nữa.
+
+- **Màn Đề Xuất Tài Xế "đề xuất người mà validator sẽ từ chối"** (bộ lọc
+  `DriverRecommendationService:98` là `remainingHours > 0`, trong khi validator cần
+  `hours + thờiLượngChuyến ≤ 8`). **RÚT — hành vi đã được kiểm chứng và duyệt.**
+  `THESIS_ROADMAP.md` §8, mục kiểm chứng Phase 4, **điểm 4** ghi nguyên văn: *"**Both
+  boundary cases correct.** `TX Đã lái 8h` (exactly at the limit, remaining 0.0) is
+  **excluded**; `TX Sát 8h (7.9h)` (remaining 0.1) is **included** as the last row. ✓"* —
+  đúng chính xác ca bị đem ra tố cáo. Điểm 2 còn ghi công thức chủ ý
+  (`27 = 33 hoạt động − 4 (giờ ≥ 8) − 2 (hết bằng)`). Ngữ nghĩa màn hình là *"ai còn dư hạn
+  mức trong ngày"*, **không phải** *"ai nhận được một chuyến cụ thể"*. Dữ liệu seed còn được
+  đặt tên `TX Sát 8h (7.9h)` — fixture **cố ý** dựng để nằm sát ngưỡng. *(Câu javadoc "không
+  bao giờ đề xuất một tài xế mà hệ thống sẽ từ chối" có hơi quá lời, nhưng ba ràng buộc nó
+  liệt kê đều đã cài đủ và hành vi đã được duyệt — **không** nâng chuyện chữ nghĩa này thành
+  lỗi.)*
+- **5/6 endpoint xóa dùng GET** (`AdminBusController:71`, `AdminDriverController:83`,
+  `AdminIncidentController:86`, `AdminRouteController:93`, `AdminStationController:67`;
+  chỉ trip dùng POST). **RÚT — là best-practice nhập khẩu, không phải chuẩn của project.**
+  Ba lý do: (1) `docs/testing/test_case.md` **ghi `GET /admin/buses/delete/1`,
+  `GET /admin/stations/delete/1`… làm quy trình test chính thức** ở nhiều chỗ ⇒ đây là giao
+  diện đã tài liệu hoá, không phải chỗ bị sót; (2) `SecurityConfig.java:17` **tắt CSRF có
+  chủ đích** (*"Tắt bảo vệ CSRF để không bị lỗi khi làm Form"*), `:15` permit-all, `:18-19`
+  tắt login — §4 Non-Goals xác nhận không RBAC/login trong roadmap; (3) **hệ quả then chốt:
+  đổi sang POST KHÔNG tăng an toàn** vì CSRF đã tắt nên POST cũng giả mạo được y hệt — lợi
+  ích duy nhất còn lại là chống prefetch/lịch sử/dán URL. Không tài liệu nào tuyên bố
+  "delete phải là POST", nên trip-delete dùng POST **không** chứng minh được là một tuyên bố
+  đổi quy ước. *Rủi ro còn lại là thật nhưng không phải bảo mật, và bán kính đã đo: **0 xe**
+  (guard chặn hết), **3 tài xế**, **2 tuyến** đang xoá cứng được. Siết lại là **lựa chọn**
+  của chủ dự án, không phải lỗi phải sửa.*
+- **Thêm tài xế phụ làm loãng hạn mức 8h/ngày** (`validateStaffForTrip:1038` chia cho số
+  người Admin thực chọn, không có trần trên). **RÚT — chia ca LÀ luật được thiết kế.**
+  `TripService.sumDrivingHours()` javadoc (`:687-693`) gọi đích danh: *"luật tính giờ **DUY
+  NHẤT** của hệ thống: quy ước phụ xe = 0h, **chia ca cho tài xế phụ**, cắt trần 8h/chuyến"*.
+- **Hai query chết trong `TripRepository`** — `countBusyTripsAnyRole:199` và
+  `findAllTripsByDriverOnDate:214`, **0 nơi gọi**. **KHÔNG phải lỗi** (không hành vi nào
+  sai) — là **rác cần dọn**. Đáng dọn vì chúng nhân bản logic "bận / giờ lái" với tập trạng
+  thái **khác** (`status <> 'CANCELLED'` thay vì whitelist), nên người sau dễ dùng nhầm bản
+  sai.
+- **Soft-delete che chuyến khỏi các guard chống xoá cứng** (`@SQLRestriction` khiến
+  `existsAnyTripForDriver` / `existsByBusId` / `existsByRouteId` không thấy chuyến đã xoá
+  mềm ⇒ có thể xoá cứng thực thể chỉ còn dấu vết ở đó, để lại FK treo vì
+  `foreign_key_checks=0`). **RÚT — bán kính = 0, đã đo:** chuyến soft-delete duy nhất
+  (`id 10`) dùng `bus 2`, mà `bus 2` còn **78 chuyến sống**. Cùng loại với ghi chú
+  soft-delete ↔ Incident mà roadmap §9 đã **chấp nhận không sửa**.
+- **`getAvailableBusesForTrip:1211` deref `trip.getRoute()` không null-check** trong khi
+  `:1220` ngay dưới lại có check. **RÚT — thuần mỹ quan;** `route_id` thực tế không bao giờ
+  null (form tạo chuyến bắt buộc `routeId`).
+- **Báo cáo surefire cũ** `TEST-…TempHashCodeProbeTest.xml` (2026-07-24) cho một class không
+  còn trong `src/test`. **KHÔNG phải lỗi** — rác build; đọc số test từ `target/` sẽ ra 37
+  thay vì 36. `mvnw clean` là xong.
+
+*(Quan sát phụ, chưa truy: lúc bootstrap test có một câu lệnh schema-update của Hibernate ném
+ERROR vào log rồi build vẫn SUCCESS. Cờ `-q` đã cắt mất đầu stack trace nên chưa biết câu lệnh
+nào; không ảnh hưởng kết quả test.)*
+
+> **✅ ĐÃ TRUY RA (2026-08-05) — KHÔNG phải lỗi, đóng mục này.** Ngoại lệ là
+> `java.sql.SQLSyntaxErrorException: Table 'busmanagement_test.trips' doesn't exist`, ném từ
+> `GenerationTargetToDatabase.accept()`. Nguyên nhân: `src/test/resources/application.properties`
+> đặt `spring.jpa.hibernate.ddl-auto=create-drop`, nên **pha DROP chạy trước pha CREATE lúc khởi
+> động** — mà lần chạy test trước đó đã drop sạch bảng khi tắt. Hibernate log ERROR rồi đi tiếp,
+> đúng thiết kế. Xuất hiện ở **mọi** lần chạy trên DB test sạch, không liên quan đến bản sửa nào
+> và không ảnh hưởng kết quả (`mvnw clean test` vẫn exit 0, 49/49).
+
+---
+
+# Kiểm chứng lại ba bản sửa #10/#11/#12 (2026-08-05) — cả ba đứng vững, phát hiện thêm #13
+
+Rà theo yêu cầu chủ dự án (*"kiểm tra lại các lỗi mới fix hôm qua ổn cả chưa, đảm bảo mọi thứ
+logic và nhất quán"*). **Kết luận: cả ba bản sửa đứng vững**, không sửa lại dòng code nào của
+chúng. Bằng chứng kiểm chứng độc lập (chạy lại test, đối chiếu allow-list với template, đếm lại
+call site, truy vấn read-only trên DB thật) ghi ở `THESIS_ROADMAP.md` §8 mục 2026-08-05.
+
+Ba việc tài liệu/chú thích được làm trong cùng phiên: bổ sung bullet §7 cho #10–#12 (Rule 3/4),
+sửa javadoc tripwire của `updateTripStatus()` cho đủ 4 call site, và ghi mục #13 dưới đây.
+
+Mục #13 phát hiện **trong lúc đo lại bán kính của #12** — không do bản sửa hôm qua gây ra; bản
+sửa #12 thậm chí **thu hẹp** khoảng lệch này (trên tuyến 30h: 8,0h → 7,5h).
+
+---
+
+## 13. Dropdown "Phụ xe" ở form TẠO chuyến bị lọc bằng luật 8h — màn Phê Duyệt thì không
+
+- **Mức độ:** nhất quán code ↔ code ↔ tài liệu. **Tiềm ẩn — chỉ chạm được ở 3 tuyến > 8h.**
+- **Phân loại:** nhánh **3 — sai thuần túy** (một màn áp lên vai trò phụ xe đúng cái ràng buộc mà
+  project tuyên bố **không** áp cho vai trò đó; màn anh em cùng nhiệm vụ đã làm đúng).
+- **Ở đâu:** `TripRestController:58-62` trả về **một** danh sách `drivers` duy nhất, lấy từ
+  `TripService.getAvailableDriversForTimeRange()` — vốn có bộ lọc giờ lái
+  (`:1369`, `getDrivingHoursForDate(...) + effectiveHours <= 8.0`). `trip-create-form.html:546-551`
+  đổ **chính danh sách đó** vào `assistantSelect` (dropdown Phụ xe), y hệt dropdown Tài xế chính.
+- **Trái với bốn chỗ khác trong chính project:**
+  1. `TripService.getAvailableAssistantsForTrip():1289-1305` — cùng nhiệm vụ chọn phụ xe, nhưng ở
+     màn Phê Duyệt — **cố ý bỏ** bộ lọc giờ lái, và javadoc `:1283-1287` giải thích rõ vì sao.
+  2. `findBestAvailableDriver():458` — `isAssistantRole ||` cho phụ xe đi vòng qua đúng bộ lọc đó.
+  3. `validateStaffForTrip():1051-1104` — trần 8h chỉ áp cho tài xế chính và tài xế phụ, **không**
+     áp cho phụ xe.
+  4. `sumDrivingHours()` javadoc (`:687-693`) gọi *"quy ước phụ xe = 0h"* là luật tính giờ **DUY
+     NHẤT** của hệ thống.
+- **Bán kính, đo trên DB thật ngày 2026-08-05 (read-only):** 8 tuyến, phân bố giờ lái nền của 33
+  tài xế hoạt động là `0(×21), 1, 2(×2), 3, 5, 6, 7, 7.9, 8, 9, 10, 11`.
+  - 5 tuyến ≤ 8h (`90/120/120/210/360` phút): **không bị** — phụ xe không bắt buộc, và phần chia
+    bằng đúng thời lượng như cũ.
+  - 3 tuyến > 8h: `1800′` → phần chia 7,5h; `3000′` → 7,143h; `4500′` → 7,5h ⇒ cả ba trường hợp
+    dropdown chỉ mời **21/33** người (những ai có ≤ 0,5h). **12 người hợp lệ bị giấu.**
+- **Vì sao vẫn đáng ghi dù chưa cắn nặng:** chuyến > 8h **bắt buộc** phải có phụ xe
+  (`validateStaffForTrip:1014`). Tức đúng lúc phụ xe là ràng buộc cứng thì danh sách bị co lại
+  mạnh nhất. Nếu 21 người đó đều bận, form sẽ báo hết người trong khi vẫn còn 12 người hợp lệ.
+- **KHÔNG vi phạm bất biến nào project đã tuyên bố** — giống hệt #12: quy tắc §8 chỉ một chiều
+  (*"dropdown không được mời người validator sẽ từ chối"*), chặt hơn thì không phá. Nhưng nó khiến
+  **hai màn cùng chọn phụ xe trả lời khác nhau**, đúng loại mâu thuẫn đã được công nhận ở #12.
+- **Cách sửa:** thêm `getAvailableAssistantsForTimeRange(departure, arrival)` — song sinh của
+  `getAvailableAssistantsForTrip()`, tức bộ lọc của `getAvailableDriversForTimeRange()` **trừ**
+  filter giờ lái; `TripRestController` trả thêm khoá `assistants`; `trip-create-form.html` đổ
+  `assistants` vào `assistantSelect` thay vì `drivers`. Vì đây là **mở rộng** tập, phải giữ nguyên
+  hai filter còn lại (bằng lái còn hạn vào ngày khởi hành, không trùng lịch) để quy tắc một chiều
+  không bị phá theo hướng ngược lại.
+- **Vì sao chưa sửa:** đụng `TripService` + `TripRestController` + template cho một sai lệch chỉ
+  chạm tới được ở 3 tuyến dài, và đây là khoảng trống **thứ hai cùng loại với #12** ⇒ chủ dự án
+  nên quyết một lần: gộp cả hai vào cùng một lần mở `TripService`, hay để riêng.
+
+## Mục nhỏ (2026-08-05)
+
+- **Biến chết trong `trip-create-form.html:546`:**
+  `const assistantOptionsHtml = buildDriverOptions(drivers, '-- Không có --', false);` được tính
+  rồi **không dùng ở đâu** — ba dòng ngay dưới (`:547-550`) dựng lại chuỗi **y hệt** bằng
+  `drivers.map(...)` inline. Biến chết, **0 ảnh hưởng hành vi**. Không xoá kèm vì không thuộc bản
+  sửa nào đang mở; xoá được cùng lúc với #13 (cùng file, cùng khối `renderResources`).
+
+---
+
+# Lỗi phát hiện khi rà soát toàn dự án lần ba (2026-08-05)
+
+Rà theo yêu cầu chủ dự án (*"rà soát lại xem còn lỗi gì chưa sửa không"*), chạy ngay sau khi ba bản
+sửa #10/#11/#12 được kiểm chứng lại và giữ nguyên. Trạng thái nền khi rà: `mvnw clean test`
+**49/49 PASS**; #1, #6–#12 đã đóng; #2, #3, #4, #5, #13 vẫn mở nguyên trạng.
+
+## Phương pháp — hai vòng, và một mục do chính người rà rút
+
+Bản nháp đầu báo **4 lỗi**. Chủ dự án yêu cầu soi lại từng mục để chắc chắn *"đúng là lỗi chứ
+không phải tính năng hay chức năng nào đó chưa tìm hiểu kỹ"*. Vòng hai:
+
+- **#17 bị RÚT** (chi tiết ở "ĐÃ LOẠI" cuối mục này) — không vi phạm bất biến nào project tuyên bố.
+- **#15 bị PHÁT BIỂU LẠI.** Bản đầu tố *"`COMPLETED` đặt xe về `READY` vô điều kiện"* là lỗi. **Sai**
+  — đó là hành vi đã tài liệu hoá (`trip_lifecycle_fsm.md` §2), đúng loại "tính năng chưa đọc kỹ" mà
+  chủ dự án cảnh báo. Lỗi thật nằm ở guard thiếu `DEPARTED`, xem dưới.
+- **#14 và #16 giữ nguyên**, và cả ba mục còn lại đều được **tái hiện trên app thật** trước khi ghi
+  vào đây.
+
+Toàn bộ phần tái hiện dùng **hàng tạm do chính lần verify tạo ra** (xe 25/26/27, chuyến 2765), nên
+**không một dòng dữ liệu có sẵn nào bị đụng**. Snapshot DB trước/sau **giống hệt** ở cả hai lần
+chạy: `buses 20 / drivers 36 / trips 1500 / incidents 8 / users 37 / routes 8 / trip_co_drivers 3`,
+`SUM(odometer) 246145`, `SUM(last_maintenance_odometer) 227790`; bảng `buses` khớp **từng dòng**;
+0 exception trong log.
+
+**Chưa sửa gì. Chờ quyết định của chủ dự án.**
+
+---
+
+## 14. Đổi xe cho một chuyến ĐANG CHẠY làm xe cũ kẹt `TRAVELING` vĩnh viễn
+
+- **Mức độ:** nghiệp vụ — **làm sai trạng thái bền trong DB** và **mất một xe khỏi đội**. Nặng nhất
+  lần rà này.
+- **Phân loại:** nhánh **3 — sai thuần túy** (code mâu thuẫn chính javadoc của nó, và phá một cặp
+  bất biến đã được tài liệu hoá).
+- **Ở đâu:** `controller/admin/AdminTripManagementController.java:261-263` — `updateTrip()` chỉ gọi
+  `tripService.updateTripStatus()` **khi trạng thái đổi**:
+  ```java
+  if (existingTrip.getStatus() != newStatus) {
+      tripService.updateTripStatus(existingTrip.getId(), newStatus);
+  }
+  ```
+  Sửa một chuyến `DEPARTED` mà chỉ đổi **xe** (không đổi trạng thái) ⇒ **không lần đồng bộ
+  `BusStatus` nào chạy**. `updateManualTrip()` chỉ validate và `save()`, nó không đụng `Bus.status`.
+- **Trái với chính javadoc của method (`:199-202`):** *"updateTripStatus() re-fetch trip từ DB và
+  apply FSM transition… **đảm bảo BusStatus synchronization cũng chạy đúng trên bus mới (nếu bus bị
+  thay)**"*. Câu này mô tả một hành vi mà điều kiện ở `:261` không cho xảy ra.
+- **Trái với cặp bất biến trong `docs/architecture/trip_lifecycle_fsm.md` §2:** *"`DEPARTED` — Side
+  effects on entry: `bus.status = TRAVELING`"* và *"`COMPLETED` — Side effects on entry:
+  `bus.status = READY`"*. Tức **xe được đặt `TRAVELING` lúc vào `DEPARTED` phải là xe được trả về
+  `READY` lúc vào `COMPLETED`**. Đổi xe giữa chừng làm vỡ đúng cặp đó: xe A nhận `TRAVELING`, xe B
+  nhận `READY`. Không tài liệu nào cho ngoại lệ.
+- **Không có lối tự phục hồi:** toàn dự án chỉ có **hai** nơi ghi `Bus.status` là
+  `TripService.java:615` (`TRAVELING`) và `:618` (`READY`) — cả hai đều tác động lên
+  `trip.getBus()`, tức xe **mới**. Xe cũ không còn chuyến nào trỏ tới nên vĩnh viễn không ai gỡ.
+  Lối chữa duy nhất là vào form Quản Lý Xe sửa tay.
+
+> **Đã tái hiện trên app thật (2026-08-05, default profile, PID 28352, port 8099):**
+>
+> | Bước | Kết quả |
+> |---|---|
+> | Chuyến tạm 2765 (tuyến 4, xe 25) → bấm Xuất phát | xe 25 `READY` → **`TRAVELING`** ✓ đúng FSM |
+> | Mở `GET /admin/trip-management/trips/edit/2765` | dropdown xe có **4 option**: 26, 4, 3 và xe hiện tại 25 (`selected`) ⇒ Admin **được mời 3 xe khác** |
+> | POST update `busId=25→26`, **giữ nguyên** `status=DEPARTED` | flash **"Cập nhật chuyến xe thành công!"** — không một cảnh báo |
+> | DB ngay sau đó | `trips.bus_id=26`; **xe 25 vẫn `TRAVELING`**; xe 26 (đang thật sự chạy) vẫn `READY` |
+> | `GET /api/admin/trips/available-resources` cho khung giờ trống hoàn toàn | xe 25 **0 lần xuất hiện**; xe 26 **được mời** |
+> | Gán tay xe 25 vào chuyến mới | *"Xe 99T-TMP.01 đang trên đường (TRAVELING), không thể gán vào chuyến mới **cho đến khi hoàn thành chuyến hiện tại**!"* — chuyến ấy **không còn tồn tại** |
+> | Đưa chuyến 2765 sang `COMPLETED` (trạng thái cuối) | xe 25 **vẫn `TRAVELING`** ⇒ vĩnh viễn |
+
+- **Hậu quả:** xe cũ bị loại khỏi `findBestAvailableBus()` (ứng viên lấy từ `findByStatus(READY)`),
+  khỏi `getAvailableBusesForTrip/ForTimeRange`, và bị `validateBusForTrip:936-943` từ chối — **đội xe
+  mất hẳn một chiếc mà không ai được báo**. Đồng thời xe mới ở `READY` trong khi đang trên đường, nên
+  biểu đồ trạng thái đội xe ở Dashboard đếm sai (`DashboardService:157`).
+- **Chạm được bằng UI, đã đo:** nút Sửa render cho **mọi** chuyến (`trip-list.html:446`, không guard
+  theo trạng thái), `showEditTripForm:151` không guard, select trạng thái liệt kê đủ
+  `TripStatus.values()` (`trip-edit-form.html:185-187`). Hiện có **5 chuyến `DEPARTED`**; mô phỏng
+  lại bộ lọc của `getAvailableBusesForTrip` bằng SQL cho từng chuyến → **6 / 6 / 2 / 2 / 6** xe thay
+  thế hợp lệ trong dropdown.
+- **Cách sửa — hai hướng, cần chủ dự án chọn:**
+  - **(a) Chặn ở controller:** không cho đổi `busId` khi chuyến đang `DEPARTED` (xe đã lăn bánh thì
+    việc đổi xe là chuyện của nghiệp vụ ngoài hệ thống). Nhỏ nhất, và trùng tinh thần bản sửa #10:
+    controller quyết định màn hình mình phơi ra cái gì.
+  - **(b) Đồng bộ khi đổi xe:** nếu chuyến đang `DEPARTED` và xe bị thay, trả xe cũ về `READY` và
+    đặt xe mới `TRAVELING`. Đúng với câu javadoc hiện có, nhưng đưa logic vòng đời `Bus` vào một
+    method không thuộc FSM — cần cân nhắc với ghi chú §9 về việc tách FSM khỏi cổng nghiệp vụ.
+- **Vì sao chưa sửa:** chờ chủ dự án chọn (a) hay (b).
+
+---
+
+## 15. Xe có chuyến ĐANG CHẠY vẫn đặt được `REPAIRING`, rồi dấu đó bị `COMPLETED` xoá âm thầm
+
+- **Mức độ:** nghiệp vụ — một quyết định an toàn của Admin bị hoàn tác không thông báo.
+- **Phân loại:** nhánh **3 — sai thuần túy**, nhưng **chỉ sau khi phát biểu lại**: chỗ sai là
+  guard, **không phải** side-effect `COMPLETED → READY` (xem ghi chú phương pháp ở đầu mục).
+- **Ở đâu:** `service/BusService.java:55-63` chỉ chặn chuyển sang `REPAIRING` khi xe có chuyến
+  `ACTIVE` hoặc `PENDING_APPROVAL`:
+  ```java
+  boolean hasActiveTrips = tripRepository.existsByBusIdAndStatusIn(
+          bus.getId(), Arrays.asList(TripStatus.ACTIVE, TripStatus.PENDING_APPROVAL));
+  ```
+  **`DEPARTED` không có trong danh sách** — mà `DEPARTED` là ràng buộc mạnh nhất: xe đang lăn bánh.
+- **Trái với functional spec:** `docs/development/current_functional_spec.md:74` phát biểu luật là
+  *"the existing rule 'a bus with **unfinished** trips cannot be moved to `REPAIRING`' still
+  applies"*. Một chuyến `DEPARTED` là **chưa** kết thúc. Code khớp bản hẹp hơn ở
+  `docs/architecture/database_schema.md:106` (*"active or pending trips"*) ⇒ **hai tài liệu đang
+  mâu thuẫn nhau**, sửa xong phải chỉnh một trong hai.
+- **Hệ quả của khoảng trống:** side-effect `COMPLETED` (`TripService:617-618`, **đúng và đã tài liệu
+  hoá**) đặt `bus.status = READY` không xét trạng thái hiện tại, nên dấu `REPAIRING` mà Admin đặt
+  giữa chuyến bị xoá. Đây đúng là kịch bản mà tài liệu mô tả là quy trình chuẩn: ghi nhận sự cố
+  **không** tự đổi trạng thái xe (`Proj_functions_summary.md:320`), *"chuyển xe sang `REPAIRING` vẫn
+  là thao tác tay có chủ đích"*.
+
+> **Đã tái hiện trên app thật (2026-08-05, cùng phiên PID 28352):**
+>
+> | Bước | Kết quả |
+> |---|---|
+> | Xe 26 đang có chuyến 2765 `DEPARTED`, 0 chuyến `ACTIVE`/`PENDING` → POST đặt `status=REPAIRING` | **"Cập nhật thông tin xe thành công!"** — guard cho qua |
+> | Bấm Hoàn thành chuyến 2765 | flash chỉ có *"Đã cập nhật chuyến #2765 sang trạng thái COMPLETED."* |
+> | DB | xe 26 `REPAIRING` → **`READY`**; odometer 1000 → **1120** (+120 km, đúng tuyến 4 — phần này ĐÚNG) |
+> | `GET /api/admin/trips/available-resources` | xe 26 **quay lại ngay** danh sách điều phối |
+>
+> Tức chiếc xe Admin vừa đánh dấu hỏng được mời chạy lại, không một dòng cảnh báo.
+
+- **Bán kính trên dữ liệu hiện tại:** trong **5** xe đang `TRAVELING` vì có chuyến `DEPARTED`, có
+  **3 xe (id 6, 14, 15)** không có chuyến `ACTIVE`/`PENDING` nào ⇒ guard hiện **cho phép** đặt
+  `REPAIRING` cho cả ba ngay bây giờ.
+- **Cách sửa:** thêm `TripStatus.DEPARTED` vào danh sách ở `BusService:56-58` (1 dòng) — vừa khớp
+  functional spec, vừa làm đường xoá âm thầm biến mất, vì không còn cách nào để xe ở `REPAIRING`
+  trong lúc có chuyến chưa kết thúc. Kèm theo phải sửa `database_schema.md:106` cho khớp.
+  *Đã cân nhắc và loại hướng ngược lại* (cho `COMPLETED` không ghi đè `REPAIRING`): nó sửa một
+  side-effect đang đúng-như-tài-liệu, và sẽ đẻ ra câu hỏi mới "xe kết thúc chuyến trong trạng thái
+  nào" mà FSM không trả lời được.
+- **Vì sao chưa sửa:** đụng `BusService` + một tài liệu kiến trúc; chờ chủ dự án duyệt.
+
+---
+
+## 16. `BusService.saveBus()` không kiểm tra ba con số odometer — xoá trắng một ô là mất dữ liệu
+
+- **Mức độ:** nghiệp vụ — **mất dữ liệu bền** (số km trọn đời) và **khoá xe vĩnh viễn**. Cùng họ với
+  **#11** đã được chủ dự án chốt là lỗi thật.
+- **Phân loại:** nhánh **3 — sai thuần túy** (mặc-định-lúc-tạo bị áp cả cho luồng sửa; project đã
+  nhận diện và phòng đúng khuôn lỗi này ở chỗ khác).
+- **Ở đâu:** `service/BusService.java:41-51` điền mặc định khi null rồi lưu thẳng:
+  ```java
+  if (bus.getMaintenanceThreshold() == null) bus.setMaintenanceThreshold(5000.0);
+  if (bus.getLastMaintenanceOdometer() == null) bus.setLastMaintenanceOdometer(0.0);
+  if (bus.getOdometer() == null) bus.setOdometer(0.0);
+  ```
+  Không kiểm âm, không kiểm `odometer >= lastMaintenanceOdometer`, không kiểm `threshold > 0`.
+  `AdminBusController.updateBus:60-63` dựng `Bus` **mới** từ form rồi `setId(id)`, nên field vắng
+  mặt = null = **bị mặc định đè**, không phải "giữ nguyên".
+  Ba ô ở `templates/admin/bus/bus-form.html:60, 64-65, 69-70` **không có `required`, cũng không có
+  `min`**.
+- **Trái với chính quy ước của project — hai chứng cứ nội bộ:**
+  1. `IncidentService.updateIncident:50-55` javadoc ghi thẳng lý do phải chép từng field:
+     *"form không gửi reportedAt/resolvedAt, nên lưu thẳng sẽ ghi đè 2 mốc thời gian đó thành
+     null"*. Tức **project đã nhận diện đúng khuôn lỗi này** và phòng ở đó; `BusService` làm ngược
+     lại trên cùng loại luồng.
+  2. `RouteService.validateRoute:131-136` validate đúng loại số này ở tầng service — cùng lý lẽ đã
+     dùng để chốt #11.
+- **Trái với mức độ quan trọng mà roadmap gán cho odometer:** Hidden Cost #7 yêu cầu *"do not
+  'simplify' it to a single-column update"*, và lỗi #6 (cộng odometer hai lần) từng được xếp là lỗi
+  nặng nhất của lần rà đầu. Cùng một con số, ở đây bị xoá về 0 chỉ bằng một ô để trống.
+
+> **Đã tái hiện trên app thật (2026-08-05, default profile, PID 22452, port 8099).** Xe tạm 27 xuất
+> phát: odo **8000**, bảo trì cuối **4000** (đã chạy 4000 km), ngưỡng **5000**.
+>
+> | Thao tác qua form | Flash | DB sau đó |
+> |---|---|---|
+> | Xoá trắng ô "Odometer Hiện Tại" rồi Lưu | *"Cập nhật thông tin xe thành công!"* | odo **8000 → 0**, `km_since` = **−4000** |
+> | `odometer = -500` | *"…thành công!"* | lưu nguyên **−500** |
+> | `maintenanceThreshold = 0` | *"…thành công!"* | lưu nguyên **0** |
+>
+> **Hai hệ quả đã đo:**
+> 1. **Mất lịch bảo trì.** `km_since = −4000` ⇒ `needsMaintenance()` và `isNearMaintenance()` đều
+>    false; xe phải chạy thêm **9.000 km** mới chạm ngưỡng. Con số 8.000 km trọn đời — đầu vào 70%
+>    điểm của màn Đề Xuất Thay Xe — biến mất, phục hồi phải sửa tay trong DB.
+> 2. **Ngưỡng 0 = khoá xe vĩnh viễn.** Gán xe vào chuyến →
+>    *"(Odo: 4000km) đã QUÁ HẠN bảo trì (ngưỡng: 0km)"*. Thử đúng lối thoát nghiệp vụ là "cho xe đi
+>    bảo trì" (`lastMaintenanceOdometer = odometer` ⇒ `km_since = 0`) → **vẫn bị chặn**:
+>    *"(Odo: 0km) đã QUÁ HẠN bảo trì (ngưỡng: 0km)"*. Vì `needsMaintenance()` là
+>    `km_since >= threshold` mà `0 >= 0` luôn đúng ⇒ **không thao tác nghiệp vụ nào gỡ được**, chỉ
+>    sửa lại chính ô ngưỡng.
+
+- **Bán kính trên dữ liệu hiện tại: 0** — đo được `odometer < last_maintenance_odometer` hoặc âm:
+  **0 dòng**; `maintenance_threshold IS NULL OR <= 0`: **0 dòng**. Tiềm ẩn, nhưng đi được bằng
+  **một cú xoá ô** trên UI bình thường, không cần crafted POST.
+- **Cách sửa:** tách hai trách nhiệm đang bị gộp trong `saveBus()` — (1) chỉ điền mặc định khi
+  **tạo mới** (`bus.getId() == null`), còn khi **sửa** thì field vắng mặt phải giữ giá trị cũ
+  (chép từng field từ bản ghi trong DB, đúng khuôn `IncidentService.updateIncident`); (2) thêm
+  `validate()` theo khuôn `RouteService.validateRoute()`: `odometer >= 0`,
+  `lastMaintenanceOdometer >= 0`, `odometer >= lastMaintenanceOdometer`, `maintenanceThreshold > 0`.
+  Kèm `min="0"`/`min="1"` trên form cho khớp — nhưng guard phải ở service, đúng bài học #11.
+- **Vì sao chưa sửa:** đụng `BusService` + controller + template; và điểm (1) là thay đổi ngữ nghĩa
+  của một method đang được cả tạo lẫn sửa dùng chung ⇒ cần chủ dự án duyệt phạm vi.
+
+---
+
+## ĐÃ LOẠI ở lần rà 2026-08-05 — không phải lỗi, đừng nêu lại
+
+- **#17 (bị rút): "Sửa hạn bằng lái không kiểm lại các chuyến đã phân công".** `DriverService.updateDriver:104-105`
+  ghi thẳng `licenseExpiryDate` mới, nên rút ngắn hạn bằng lái có thể để lại chuyến `ACTIVE` với tài
+  xế hết hạn. **RÚT — không có bất biến nào bị vi phạm.** Bất biến project **thực sự** tuyên bố là
+  bằng lái hợp lệ **tại thời điểm phân công**: mục `THESIS_ROADMAP.md` §8 ngày 2026-07-21 nói về
+  *"a stale page or a crafted POST"* lúc **gán** phụ xe, không nói gì về việc giữ bất biến đó theo
+  thời gian. Bán kính đo được **0/0/0** (tài xế chính / tài xế phụ / phụ xe). Và bản sửa hiển nhiên
+  nhất — chặn edit — sẽ **sai**, vì bằng lái hết hạn là sự kiện có thật phải ghi nhận được. Nếu sau
+  này muốn làm, hình dạng đúng là **cảnh báo kèm danh sách chuyến bị ảnh hưởng**, không phải chặn —
+  và đó là quyết định của chủ dự án, không phải lỗi phải sửa.
+- **Xe 19 (`51B-DAG.CH`) ở `TRAVELING` mà không có chuyến `DEPARTED` nào.** SQL bắt được ngay và
+  trông hệt một xe kẹt như #14. **KHÔNG phải lỗi:** `config/DataInitializer.java:158` seed đúng
+  chiếc này với `BusStatus.TRAVELING`, tên nó là **"Xe Đang Chạy"**. Fixture cố ý.
+- **Xe 17 (`51B-QUA.BT`) quá hạn bảo trì 6.000/5.000 mà vẫn `READY`.** Fixture đã ghi trong roadmap
+  (Hidden Cost #7). Và `active_trips_on_overdue_bus` đo được = **0**, tức không chuyến sống nào đang
+  chạy trên xe quá hạn.
+- **`#numbers.formatDecimal(avgExperienceYears, 0, 1)`** (`dashboard-analytics.html:345`) — cùng
+  khuôn lỗi #2 nhưng chỉ lộ khi trung bình số năm kinh nghiệm toàn đội < 1. Không nâng thành mục
+  riêng; sửa kèm khi nào sửa #2.
