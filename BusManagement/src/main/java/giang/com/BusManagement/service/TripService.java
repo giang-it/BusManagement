@@ -1270,7 +1270,7 @@ public class TripService {
                 ? trip.getArrivalTimeExpected()
                 : departure.plusHours(5);
         double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
-        double effectiveHours = Math.min(durationHours, 8.0);
+        double effectiveHours = driverShareHours(durationHours);
 
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
@@ -1366,7 +1366,7 @@ public class TripService {
     public List<Driver> getAvailableDriversForTimeRange(LocalDateTime departure, LocalDateTime arrival) {
         double durationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
         // effectiveHours: phần giờ mà mỗi tài xế phải lái (cắt tối đa 8h/người)
-        double effectiveHours = Math.min(durationHours, 8.0);
+        double effectiveHours = driverShareHours(durationHours);
 
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
@@ -1378,6 +1378,42 @@ public class TripService {
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Phần giờ lái mà MỘT tài xế phải gánh trong một chuyến, tính ở mức nhân sự
+     * TỐI THIỂU mà validateStaffForTrip() sẽ đòi hỏi.
+     *
+     * Dành riêng cho hai dropdown "tài xế rảnh" (getAvailableDriversForTrip /
+     * getAvailableDriversForTimeRange). Chúng chạy TRƯỚC khi có phân công, nên
+     * không biết Admin sẽ gán bao nhiêu người — nhưng số đó không hề mù mờ:
+     * validateStaffForTrip() bắt buộc {@code assignedDriversCount >= requiredDrivers}
+     * với {@code requiredDrivers = ceil(duration / 8h)}, nên mức tối thiểu là suy
+     * ra được và cho ra phần chia LỚN NHẤT có thể — tức trường hợp xấu nhất.
+     *
+     * VÌ SAO KHÔNG DÙNG THẲNG {@code min(duration, 8.0)} NHƯ TRƯỚC: với chuyến dài
+     * hơn 8h, công thức đó mô hình hoá kịch bản "một tài xế lái trọn chuyến" —
+     * đúng cái kịch bản mà validateStaffForTrip() TỪ CHỐI thẳng (nó đòi đủ
+     * requiredDrivers người). Đó không phải thận trọng, đó là không mạch lạc: nó
+     * giấu khỏi Admin những tài xế mà validator sẵn sàng chấp nhận. Xem
+     * docs/todo/current_bugs_found.md mục #12.
+     *
+     * BẤT BIẾN ĐƯỢC BẢO TOÀN: vì {@code assignedDriversCount >= requiredDrivers},
+     * phần chia của validator LUÔN ≤ phần chia ở đây, nên dropdown vẫn là TẬP CON
+     * của "những người validator chấp nhận" — không bao giờ mời một người rồi bị
+     * từ chối lúc submit (quy tắc một chiều đã ghi ở THESIS_ROADMAP.md §8).
+     *
+     * KHÔNG gom chung với findBestAvailableDriver()/validateStaffForTrip(): hai
+     * chỗ đó chia cho số tài xế chúng ĐÃ BIẾT (totalDriversCount /
+     * assignedDriversCount), còn ở đây phải SUY RA mức tối thiểu. Cùng một trần
+     * 8h nhưng khác đầu vào — xem ghi chú §9 về việc hằng số 8.0 mang ba nghĩa.
+     *
+     * Package-private để test chốt trực tiếp trên số học này, cùng lý do
+     * {@code WhatIfSimulationService.coverableSlots} và {@code isBusBusy}.
+     */
+    static double driverShareHours(double durationHours) {
+        int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / 8.0));
+        return Math.min(durationHours / requiredDrivers, 8.0);
     }
 
     /**
