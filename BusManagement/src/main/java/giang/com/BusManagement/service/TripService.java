@@ -545,6 +545,31 @@ public class TripService {
         };
     }
 
+    /**
+     * Thực thi MỘT chuyển trạng thái theo whitelist FSM, kèm đồng bộ BusStatus.
+     *
+     * ⚠️ METHOD NÀY KHÔNG KIỂM TRA RÀNG BUỘC NGHIỆP VỤ. Nó chỉ trả lời "transition
+     * này có hợp lệ không", KHÔNG gọi validateBusForTrip()/validateStaffForTrip().
+     * Cổng ràng buộc nằm ở confirmAutoAssignedTrip()/approveTrip() (phê duyệt) và
+     * createManualTrip()/updateManualTrip() (tạo/sửa thủ công).
+     *
+     * ⚠️ HỆ QUẢ CHO NGƯỜI GỌI: nếu bạn truyền newStatus = ACTIVE, chuyến sẽ được
+     * kích hoạt (mở bán vé, đóng dấu saleOpenedAt) mà KHÔNG ràng buộc nào được
+     * kiểm — kể cả chuyến chưa có xe/tài xế. Hiện có ĐÚNG BỐN lối gọi, cả bốn đều
+     * đã tự lo:
+     * <ul>
+     * <li>AdminTripManagementController.updateTrip() — chạy updateManualTrip()
+     * (validate đầy đủ) TRƯỚC khi gọi vào đây;</li>
+     * <li>DispatchController.changeStatus() — chặn ACTIVE bằng allow-list
+     * BOARD_ACTIONS;</li>
+     * <li>AdminTripManagementController.cancelTrip() và TripService.cancelTrip()
+     * — truyền HẰNG SỐ CANCELLED, không bao giờ chạm tới nhánh ACTIVE.</li>
+     * </ul>
+     * Chỉ hai lối đầu mới truyền được newStatus tùy ý; hai lối sau được liệt kê để
+     * lần kiểm sau đếm đủ bốn call site và không tưởng danh sách này đã lạc hậu.
+     * Nếu bạn thêm lối gọi mới có thể truyền ACTIVE, PHẢI validate trước — đây
+     * chính là lỗ hổng #10 trong docs/todo/current_bugs_found.md.
+     */
     @Transactional
     public void updateTripStatus(Long tripId, TripStatus newStatus) {
         Trip trip = tripRepository.findById(tripId)

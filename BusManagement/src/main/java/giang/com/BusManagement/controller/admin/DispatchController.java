@@ -15,7 +15,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Bảng điều hành (Dispatch Center) — màn hình vận hành theo thời gian thực cho
@@ -42,6 +44,24 @@ public class DispatchController {
     private static final int UPCOMING_WINDOW_HOURS = 48;
 
     private static final List<TripStatus> BOARD_STATUSES = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED);
+
+    /**
+     * Các trạng thái đích mà bảng điều hành THỰC SỰ phơi ra — đúng ba nút của
+     * dispatch-board.html: "Xuất phát" (DEPARTED), "Hủy chuyến" (CANCELLED),
+     * "Hoàn thành" (COMPLETED). Khác với BOARD_STATUSES ở trên, vốn là bộ lọc
+     * chuyến nào được hiển thị.
+     *
+     * VÌ SAO PHẢI CHẶN Ở ĐÂY, KHÔNG TIN VÀO FSM: updateTripStatus() chỉ kiểm tra
+     * transition có HỢP LỆ hay không (canTransition) — nó KHÔNG chạy
+     * validateBusForTrip()/validateStaffForTrip(). Cổng ràng buộc nghiệp vụ nằm ở
+     * confirmAutoAssignedTrip()/approveTrip(). Thiếu allow-list này, một request
+     * PENDING_APPROVAL → ACTIVE sẽ kích hoạt chuyến (mở bán vé, đóng dấu
+     * saleOpenedAt) mà KHÔNG ràng buộc nào được kiểm: xe quá hạn bảo trì, tài xế
+     * hết bằng, trùng lịch, thậm chí chuyến chưa có xe lẫn tài xế.
+     * Xem docs/todo/current_bugs_found.md mục #10.
+     */
+    private static final Set<TripStatus> BOARD_ACTIONS = EnumSet.of(
+            TripStatus.DEPARTED, TripStatus.CANCELLED, TripStatus.COMPLETED);
 
     @GetMapping
     public String viewBoard(Model model) {
@@ -79,11 +99,23 @@ public class DispatchController {
      * Đổi trạng thái nhanh từ bảng điều hành. Không tự quyết định transition nào
      * hợp lệ — FSM trong TripService.updateTripStatus() là nơi kiểm tra và sẽ ném
      * IllegalStateException nếu transition sai.
+     *
+     * Chỉ giới hạn TẬP TRẠNG THÁI ĐÍCH mà màn hình này phơi ra (BOARD_ACTIONS):
+     * đó là trách nhiệm của controller, không phải của FSM. Đặc biệt ACTIVE bị
+     * loại — kích hoạt chuyến phải đi qua màn Phê Duyệt, nơi các validator nghiệp
+     * vụ thực sự chạy. Xem javadoc của BOARD_ACTIONS.
      */
     @PostMapping("/status")
     public String changeStatus(@RequestParam Long tripId,
             @RequestParam TripStatus newStatus,
             RedirectAttributes redirectAttributes) {
+        if (!BOARD_ACTIONS.contains(newStatus)) {
+            redirectAttributes.addFlashAttribute("error",
+                    "Bảng điều hành không hỗ trợ chuyển chuyến #" + tripId + " sang trạng thái "
+                            + newStatus + ". Việc kích hoạt chuyến phải thực hiện ở màn Phê Duyệt "
+                            + "để hệ thống kiểm tra đầy đủ ràng buộc xe, tài xế và lịch chạy.");
+            return "redirect:/admin/dispatch";
+        }
         try {
             tripService.updateTripStatus(tripId, newStatus);
             redirectAttributes.addFlashAttribute("success",
