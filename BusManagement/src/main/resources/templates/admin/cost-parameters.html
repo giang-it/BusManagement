@@ -42,7 +42,7 @@
                                     <label class="form-label fw-semibold">Chi Phí Nhiên Liệu (đồng / km)
                                         <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <input type="number" step="1" min="0" class="form-control"
+                                        <input type="number" step="1" min="1" class="form-control"
                                             th:field="*{fuelCostPerKm}" required placeholder="Ví dụ: 6000">
                                         <span class="input-group-text">đ/km</span>
                                     </div>
@@ -55,7 +55,7 @@
                                     <label class="form-label fw-semibold">Lương Tài Xế (đồng / giờ)
                                         <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <input type="number" step="1" min="0" class="form-control"
+                                        <input type="number" step="1" min="1" class="form-control"
                                             th:field="*{driverWagePerHour}" required placeholder="Ví dụ: 50000">
                                         <span class="input-group-text">đ/giờ</span>
                                     </div>

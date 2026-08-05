@@ -52,12 +52,57 @@ public class CostParameterService {
      * Lưu dòng cấu hình duy nhất. Nếu đã có dòng thì ghi đè chính dòng đó (giữ id,
      * đóng dấu lại updatedAt) thay vì tạo dòng mới — đây là chỗ thực thi quy ước
      * một-dòng-duy-nhất.
+     *
+     * Validate ở tầng service (không chỉ dựa vào `required`/`min` của form) theo
+     * đúng tiền lệ RouteService.saveRoute() — xem javadoc của validate().
      */
     @Transactional
     public void save(CostParameters form) {
+        validate(form);
+
         CostParameters target = repository.findAll().stream().findFirst().orElseGet(CostParameters::new);
         target.setFuelCostPerKm(form.getFuelCostPerKm());
         target.setDriverWagePerHour(form.getDriverWagePerHour());
         repository.save(target);
+    }
+
+    /**
+     * Cả hai suất phí bắt buộc phải LỚN HƠN 0.
+     *
+     * ====================================================================
+     * VÌ SAO 0 KHÔNG PHẢI ĐẦU VÀO HỢP LỆ
+     * ====================================================================
+     * 1. Chi phí nhiên liệu = {@code fuelCostPerKm × Route.distanceKm}, mà
+     *    RouteService.validateRoute() ĐÃ từ chối {@code distanceKm <= 0}. Canh một
+     *    thừa số của tích rồi thả thừa số kia thì guard đó bị phá bằng cửa sau —
+     *    chặn ở đây là HOÀN TẤT một quyết định đã có, không phải đặt luật mới.
+     * 2. Entity CostParameters sinh ra vì domain không có dữ liệu chi phí nào để
+     *    suy (xem javadoc của CostParameters). Nhập 0 đưa hệ thống về đúng trạng
+     *    thái "không có thông tin chi phí" nhưng nguỵ trang thành một con số đã
+     *    tính, rồi biến "lợi nhuận" thành "doanh thu" trên màn Đề Xuất Tăng Cường
+     *    và màn What-if mà không một cảnh báo nào.
+     * 3. Số 0 không được xử lý đặc biệt ở bất kỳ đâu — nó chỉ âm thầm bị nuốt
+     *    thành 0đ trong phép nhân của RecommendationService.estimateCost() và
+     *    WhatIfSimulationService.computeOutcome().
+     * 4. WhatIfSimulationService.positiveOrNull() đã loại 0/âm với cùng lý do
+     *    ("để tránh chi phí âm") — đây chỉ là áp cùng lập trường cho nguồn cấu
+     *    hình được LƯU, thay vì chỉ cho ô ghi đè tạm thời.
+     *
+     * Đây là ràng buộc TÍNH HỢP LỆ CỦA ĐẦU VÀO, không phải module định giá (§4
+     * Non-Goals): nó không quyết định suất phí là bao nhiêu — operator vẫn nhập —
+     * chỉ từ chối một giá trị không mang thông tin.
+     *
+     * Ném IllegalArgumentException để CostParameterController hiện flash "Lỗi: …"
+     * sẵn có, không cần sửa controller (cùng khuôn AdminRouteController).
+     */
+    private void validate(CostParameters form) {
+        requirePositive(form.getFuelCostPerKm(), "Chi phí nhiên liệu mỗi km");
+        requirePositive(form.getDriverWagePerHour(), "Lương tài xế mỗi giờ");
+    }
+
+    private void requirePositive(BigDecimal value, String label) {
+        if (value == null || value.signum() <= 0) {
+            throw new IllegalArgumentException(label + " phải lớn hơn 0!");
+        }
     }
 }
