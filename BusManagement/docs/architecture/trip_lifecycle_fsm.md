@@ -185,22 +185,25 @@ Two guards keep that true, and both live **outside** this FSM:
 
 | Guard | Where | Protects against |
 |---|---|---|
-| A `DEPARTED` trip's bus cannot be changed | `AdminTripManagementController.updateTrip()` | Defect **#14** — swapping the bus mid-trip left the old bus stranded in `TRAVELING` for ever (no self-recovery: the only two writers of `Bus.status`, `TripService:615/618`, both act on the **new** bus) |
+| A `DEPARTED` trip cannot be edited **at all** | `AdminTripManagementController.editRefusalReason()`, applied by both `showEditTripForm()` and `updateTrip()` | Defects **#14** and **#18** — while the trip is departed nothing about it can move, so `trip.bus` cannot change and the FSM cannot lose the bus it marked. It also pins `route`, whose `distanceKm` is read at *completion* time to advance the odometer |
 | A bus with an unfinished trip cannot be set `REPAIRING` | `BusService.updateBus()` | Defect **#15** — an admin's repair mark placed mid-trip was erased without warning by the `COMPLETED → READY` row above |
 
-Both were added 2026-08-06 and neither changes `TripService`: the FSM stays the sole authority on
-transitions, while the two screens stop *feeding* it a state it cannot represent. If a future change
-makes `trip.bus` mutable again while `DEPARTED`, this pairing breaks silently — there is no runtime
-check that would notice.
+Neither changes `TripService`: the FSM stays the sole authority on transitions, while the two screens
+stop *feeding* it a state it cannot represent.
 
-A **third**, non-enforcing layer was added 2026-08-11: `trip-edit-form.html` renders the bus field as
-`readonly` for a `DEPARTED` trip instead of a dropdown. That is **not** a guard and must not be
-mistaken for one — it only stops the screen from *offering* what the controller would refuse (it was
-offering 2–6 rejected buses per running trip). Deleting it breaks no invariant; deleting the
-controller guard does. Both are required, for different reasons: the guard for correctness, the
-template so the UI does not advertise an action that cannot succeed.
+**The first guard started narrower and was widened on 2026-08-11.** The 2026-08-06 fix for #14 locked
+only the **bus field** of a departed trip. When the owner ruled on #18 — apply `deleteTrip()`'s written
+per-status policy to editing as well — the narrower guard became strictly redundant and was folded in,
+because a rule that can never fire is the same dead code this project rejected when it declined #15's
+option (B). The FSM-invariant reasoning did not disappear with it; it is recorded in that method's
+javadoc and here.
 
-**Known limit, deliberately not closed here:** the `DEPARTED` guard locks the **bus** field only.
-Other fields of a running trip remain editable, and changing the **route** alters the distance later
-added to the odometer, since the sync block reads `trip.getRoute().getDistanceKm()` at *completion*
-time. That belongs to defect **#18** (`updateTrip()` applies no status policy at all), not to #14.
+**Status changes now leave exactly one door.** With the edit form closed for `DEPARTED` and
+`COMPLETED` trips, a departed trip advances only through the dispatch board
+(`POST /admin/dispatch/status`), whose target set is the `BOARD_ACTIONS` allow-list hardened by defect
+#10. One door for transitions, one door for trip details, and the second is open only before the bus
+rolls. Verified 2026-08-11 that this strands nothing: `findDispatchBoardTrips` has an upper time bound
+but **no lower one**, so every `DEPARTED` trip reaches the board however old it is — 5 of 5 on the day.
+
+If a future change lets `trip.bus` move again while `DEPARTED` — by narrowing this policy, or by adding
+a new write path — the pairing breaks **silently**. There is no runtime check that would notice.

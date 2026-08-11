@@ -119,7 +119,8 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 - Nội bộ gọi `tripService.getAvailableBusesForTimeRange()` và `getAvailableDriversForTimeRange()` (xem 6.6).
 
 ### 6.4. Sửa chuyến (`updateTrip`)
-- `GET /trips/edit/{id}`: load trip + dropdown đầy đủ route/bus/driver, đồng thời gửi `driversForJs` (rút gọn) và `savedCoDriverIds` cho JS hiển thị sẵn lựa chọn cũ.
+- **Chính sách theo trạng thái (`editRefusalReason()`, lỗi #18):** chuyến ở `DEPARTED` hoặc `COMPLETED` **không sửa được trường nào** — soi gương đúng tập trạng thái mà `TripService.deleteTrip()` cấm xoá. `PENDING_APPROVAL`/`ACTIVE`/`CANCELLED` vẫn sửa bình thường (`deleteTrip` cũng cho xoá `CANCELLED`). Một câu: *chuyến sửa được cho tới khi xuất phát; sau đó nó là bản ghi, không còn là kế hoạch.* Luật nằm ở **một** method dùng chung cho cả GET lẫn POST, `switch` không có `default` nên thêm `TripStatus` mới sẽ vỡ biên dịch. Nút Sửa ở `trip-list.html` ẩn theo cùng tập — nhưng đó chỉ là lớp **không-mời**; lớp chặn thật là ở `POST /trips/update`.
+- `GET /trips/edit/{id}`: từ chối + redirect nếu chuyến `DEPARTED`/`COMPLETED`; ngược lại load trip + dropdown đầy đủ route/bus/driver, đồng thời gửi `driversForJs` (rút gọn) và `savedCoDriverIds` cho JS hiển thị sẵn lựa chọn cũ.
 - `POST /trips/update`: **tách rõ 2 bước** để giữ FSM:
   1. Cập nhật field thường (route, bus, driver, assistant, coDrivers, thời gian, giá, số ghế) qua `tripService.updateManualTrip(existingTrip)` — **không** set status ở bước này.
   2. Nếu status mới khác status cũ → gọi `tripService.updateTripStatus(id, newStatus)` riêng để FSM `canTransition()` chạy và đồng bộ `BusStatus`.

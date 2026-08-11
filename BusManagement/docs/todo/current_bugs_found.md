@@ -1489,6 +1489,73 @@ cặp #15-vs-#16: mỗi mục một quyết định của chủ dự án, không
 
 ## 18. Sửa được MỌI trường của một chuyến đã `COMPLETED` — trong khi XOÁ chính chuyến đó thì bị cấm
 
+> **✅ ĐÃ SỬA (2026-08-11) — chủ dự án chọn phương án (a-đủ): áp NGUYÊN VẸN chính sách của
+> `deleteTrip`, tức chặn sửa cả `DEPARTED` lẫn `COMPLETED`.**
+>
+> Luật nay phát biểu bằng **một câu**: *chuyến sửa được cho tới khi xuất phát; sau khi xuất phát nó
+> là **bản ghi**, không còn là kế hoạch.* Đúng bằng tập trạng thái mà `TripService.deleteTrip()` nêu
+> tên, nên hai lối vào khớp nhau **từng trạng thái một**, không phải khớp đại khái.
+>
+> **Ba lớp, phân vai rõ ràng — chỉ lớp thứ ba là lớp chặn thật:**
+>
+> | Lớp | Ở đâu | Vai trò |
+> |---|---|---|
+> | Ẩn nút Sửa | `trip-list.html` | không MỜI |
+> | Từ chối mở form | `showEditTripForm()` (GET) | không MỜI (chặn URL gõ tay) |
+> | **Từ chối ghi** | **`updateTrip()` (POST)** | **CHẶN THẬT — thứ duy nhất cản được POST tự chế** |
+>
+> Luật nằm ở **một chỗ duy nhất**, `editRefusalReason()`, dùng chung cho cả GET lẫn POST, để hai lối
+> vào không thể trôi ra khác nhau — đúng cái đã sinh ra chính lỗi này. `switch` cố ý **không có
+> `default`**: thêm một `TripStatus` mới sẽ làm vỡ biên dịch, buộc người thêm phải quyết định, y hệt
+> `deleteTrip`.
+>
+> **Hai điều đã KIỂM TRƯỚC KHI SỬA, vì chúng quyết định (a-đủ) có lấy mất năng lực thật nào không —
+> cả hai đều là không:**
+> 1. **Hoàn thành chuyến `DEPARTED` không đi qua form sửa.** Nút "Hoàn thành" nằm ở **Bảng Điều
+>    Hành**, post sang `/admin/dispatch/status` — endpoint khác hẳn. Query của bảng
+>    (`findDispatchBoardTrips`) chỉ có cận **trên** (`departureTime <= now + 48h`), **không có cận
+>    dưới**, nên chuyến `DEPARTED` cũ tới đâu cũng vẫn hiện. Đo 2026-08-11: **5/5** chuyến `DEPARTED`
+>    đều có nút Hoàn thành, **0** chuyến bị bỏ sót.
+> 2. **"Ghi nhận xe chạy trễ" vốn đã KHÔNG làm được.** `Trip` chỉ có `departureTime` và
+>    `arrivalTimeExpected` — **không có trường giờ đến thực tế**. Sửa `arrivalTimeExpected` của chuyến
+>    đang chạy là sửa lại **kế hoạch** cho khớp thực tế, tức đúng thứ mục này đang cấm. Năng lực đó
+>    chưa bao giờ tồn tại nên không thể bị lấy mất.
+>
+> **Cái giá thật, sau khi trừ hai thứ trên:** chỉ còn **không sửa được giá / số ghế gõ nhầm sau khi
+> xe đã lăn bánh**. Mà đó chính xác là thứ `deleteTrip` tuyên bố phải giữ nguyên (*"báo cáo tài chính
+> phải được giữ nguyên"*), nên từ chối nó là **nhất quán**, không phải cứng nhắc.
+>
+> **(a-đủ) THAY THẾ guard hẹp của #14, không chạy song song.** Guard cũ chỉ khoá **ô xe** của chuyến
+> `DEPARTED`; luật mới khoá **cả chuyến**, tức điều kiện mạnh hơn hẳn — giữ cả hai thì guard #14
+> **không bao giờ chạy tới**, đúng loại code chết mà dự án đã bác khi loại phương án (B) của #15. Nên
+> guard #14 và ô Xe `readonly` ở `trip-edit-form.html` được **gộp vào đây**; lý do bất biến FSM của
+> #14 chuyển nguyên vào comment của luật mới và `trip_lifecycle_fsm.md` §8.1. Commit `de67c90` không
+> sai — nó **bị thay thế** bởi một quyết định rộng hơn, y như Step B thay Step A ở Hidden Cost #9.
+>
+> **Thêm một kẽ mà #14 không với tới, nay đã đóng:** đổi **`route`** của chuyến `DEPARTED` làm đổi số
+> km cộng vào odometer lúc `COMPLETED` (`TripService:621-627` đọc `trip.getRoute().getDistanceKm()`
+> tại thời điểm hoàn thành).
+>
+> **Kiểm chứng trên app thật** (default profile, PID 17540, port 8099):
+>
+> | Thao tác | Kết quả | DB |
+> |---|---|---|
+> | `GET edit/13`, `edit/3` (`DEPARTED`) | **302** + *"Chuyến #13 đang trên đường (DEPARTED)…"* | — |
+> | `GET edit/2764`, `edit/1` (`COMPLETED`) | **302** + *"…đã hoàn thành (COMPLETED). Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên…"* | — |
+> | `GET edit/2535` (`ACTIVE`), `edit/8` (`PENDING`), `edit/2`, `edit/1282` (`CANCELLED`) | **200**, form mở bình thường | — |
+> | **POST sửa chuyến `COMPLETED` 2764** — đúng cú tái hiện lỗi: xe 23→10 **kèm** `price` 180000→999999 | từ chối | `bus_id=23`, `price=180000`, odometer xe 23 và 10 **không đổi** |
+> | POST sửa chuyến `DEPARTED` 13 — xe 6→11 kèm `price=888888` | từ chối | `bus_id=6`, `price=200000` |
+> | **ĐỐI TRỌNG:** POST sửa chuyến `ACTIVE` 2535 | *"Cập nhật chuyến xe thành công!"* | lưu bình thường |
+> | Nút Sửa trên danh sách | `DEPARTED` 13/3 → **0**; `ACTIVE` 2535 và `PENDING` 8 → **1** | — |
+> | Bảng Điều Hành | **5** nút "Hoàn thành" — lối hoàn thành còn nguyên | — |
+>
+> Hàng quan trọng nhất là hàng thứ tư: **cùng chuyến 2764 mà hôm 06-08 sửa được**, nay bị từ chối, và
+> `price` gửi sai cố ý **không landing** ⇒ controller `return` trước khi chạm setter nào. DB đầu/cuối
+> phiên giống hệt (`SUM_odo` 246145, `SUM_lastmaint` 227790), **0** exception.
+>
+> **Không có test đơn vị** (dự án vẫn chưa có harness MockMvc — đã ghi ở #9/#10), nên luật được ghim
+> bằng test case viết ra: **TC_TRIP_040/041/042** và bản viết lại của TC_FSM_023/030/031/032.
+
 - **Mức độ:** nghiệp vụ — **sai lệch odometer bền và không thể phát hiện**, cộng với sửa được dữ
   liệu lịch sử mà Phase 6 đang đọc. Cùng họ tổn thất với **#6** và **#16**.
 - **Phân loại:** nhánh **3 — sai thuần túy**. Không phải "chưa nghĩ tới": dự án **đã ra chính sách**

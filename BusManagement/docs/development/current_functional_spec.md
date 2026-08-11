@@ -61,6 +61,9 @@ Only the Administrator workflow is currently exposed through the application:
     *   Trip status monitoring.
     *   Resource allocation.
     *   Administrative management of trip lifecycle including creation, modification, approval, cancellation, and operational state transitions.
+*   **Business Rules:**
+    *   A trip can be **edited only until it departs**. Once it is `DEPARTED` or `COMPLETED` it is a record, not a plan, and **no field** may be changed — the same status set that `deleteTrip()` refuses to delete, so the two entry points agree status by status. `PENDING_APPROVAL`, `ACTIVE` and `CANCELLED` trips remain editable (a cancelled trip may also still be deleted). A departed trip advances only through the dispatch board, which is the single remaining door for status transitions.
+    *   The rule exists because editing a departed or completed trip rewrites facts that other records were derived from: the odometer was advanced at completion using the route assigned **at that moment**, so changing the bus or route afterwards leaves the kilometres on a different vehicle, and completed trips are the observation set the demand forecast reads.
     *   Dynamic resource allocation API endpoint (`/api/admin/trips/available-resources`) that returns conflict-free available buses and drivers for a specified timeframe.
 
 ### Incident Management

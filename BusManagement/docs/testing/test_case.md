@@ -738,7 +738,14 @@
 - **Điều kiện tiên quyết:**
   - Chuyến ID=2 ở trạng thái `DEPARTED`, được gắn xe ID=2 (đang `TRAVELING`)
 - **Các bước thực hiện:**
-  1. `POST /admin/trip-management/trips/update` với `tripId=2`, `status=COMPLETED`
+  1. `POST /admin/dispatch/status` với `tripId=2`, `newStatus=COMPLETED`
+- **⚠️ Bước này ĐÃ ĐỔI (2026-08-11, lỗi #18).** Trước đây TC này đi qua
+  `POST /admin/trip-management/trips/update`, nhưng form Sửa nay **từ chối mọi thao tác** trên chuyến
+  `DEPARTED`, nên lối đó không còn. **Bảng Điều Hành là lối duy nhất còn phơi ra transition** — đúng
+  chủ ý: một cửa cho đổi trạng thái (đã siết bằng allow-list `BOARD_ACTIONS` ở lỗi #10), một cửa cho
+  sửa thông tin (chỉ mở trước khi xe lăn bánh). Đã kiểm 2026-08-11: bảng hiện **đủ 5/5** chuyến
+  `DEPARTED` vì `findDispatchBoardTrips` **không có cận dưới thời gian**, nên không chuyến nào bị kẹt.
+  **Kết quả mong đợi bên dưới KHÔNG đổi** — vẫn cùng một `updateTripStatus()`, cùng side-effect.
 - **Kết quả mong đợi:**
   - `canTransition(DEPARTED, COMPLETED)` → TRUE
   - `trip.setStatus(COMPLETED)`
@@ -836,66 +843,72 @@
 
 ---
 
-### TC_FSM_030 — Sửa chuyến: Chặn ĐỔI XE khi chuyến đang DEPARTED (lỗi #14)
+### TC_TRIP_040 — Sửa chuyến: Chặn MỌI thao tác sửa khi chuyến đã HOÀN THÀNH (lỗi #18)
 
-- **Mã TC:** TC_FSM_030
-- **Tên Kịch Bản:** Một request đổi xe cho chuyến **đang trên đường** phải bị tầng server từ chối
-- **Điều kiện tiên quyết:** Chuyến ở trạng thái `DEPARTED`, đang gán xe A; tồn tại xe B khác trong hệ thống
-- **Các bước thực hiện:**
-  1. `POST /admin/trip-management/trips/update` với `busId` = B, **giữ nguyên** `status=DEPARTED`
-- **Lưu ý về cách chạm tới TC này (2026-08-11):** từ khi ô Xe bị khoá ở template (**TC_FSM_032**),
-  kịch bản này **không còn đi tới được bằng UI** — phải gửi POST tự chế. Nó vẫn là TC bắt buộc:
-  guard ở controller là lớp phòng thủ thật, template chỉ là lớp không-mời. Nếu TC này bắt đầu pass
-  ở bước 1 thì bất biến đã hở lại, dù màn hình trông vẫn đúng.
-- **Kết quả mong đợi:**
-  - Guard trong `AdminTripManagementController.updateTrip()`: `status == DEPARTED && !busId.equals(currentBusId)` → TRUE
-  - `flash[error]` = `"Không thể đổi xe cho chuyến #{id} vì chuyến đang trên đường (DEPARTED). …"`
-  - Redirect về `/admin/trip-management/trips/edit/{id}`
-  - **DB: KHÔNG field nào của chuyến bị ghi** — guard `return` trước mọi setter. Kiểm bằng cách gửi
-    kèm một field cố tình sai (ví dụ `price`) và xác nhận nó không landing.
-  - `Bus.status` của cả xe A lẫn xe B không đổi
-- **Vì sao có TC này:** trước 2026-08-06 bước 3 **thành công**, xe A kẹt `TRAVELING` vĩnh viễn (biến
-  mất khỏi mọi nguồn chọn xe vốn chỉ lấy `READY`), xe B đang chạy thật thì vẫn `READY`, và hoàn thành
-  chuyến cũng **không** giải phóng xe A. Đây là test hồi quy của lỗi #14.
-- **Phạm vi:** chỉ khoá trường `bus`. Các trường khác của chuyến `DEPARTED` vẫn sửa được — xem lỗi #18.
-
----
-
-### TC_FSM_031 — Sửa chuyến DEPARTED nhưng GIỮ NGUYÊN xe → vẫn phải lưu được (đối trọng TC_FSM_030)
-
-- **Mã TC:** TC_FSM_031
-- **Tên Kịch Bản:** Admin sửa một chuyến đang `DEPARTED` mà không đổi xe
-- **Điều kiện tiên quyết:** Chuyến ở `DEPARTED`, gán xe A
-- **Các bước thực hiện:**
-  1. `POST /admin/trip-management/trips/update` với **cùng** `busId` = A, `status=DEPARTED`
-- **Kết quả mong đợi:**
-  - Guard: `!busId.equals(currentBusId)` → FALSE → **không chặn**
-  - `updateManualTrip` chạy bình thường → `flash[success]` = `"Cập nhật chuyến xe thành công!"`
-- **Vì sao có TC này:** chốt rằng bản sửa #14 chặn đúng việc **ĐỔI** xe, **không** biến màn Sửa của
-  chuyến đang chạy thành chỉ-đọc. Thiếu TC này, một bản sửa quá tay sẽ không bị phát hiện.
-
----
-
-### TC_FSM_032 — Form Sửa chuyến DEPARTED: ô Xe phải bị KHOÁ, không được mời xe khác (bổ sung #14, 2026-08-11)
-
-- **Mã TC:** TC_FSM_032
-- **Tên Kịch Bản:** Admin mở form Sửa của một chuyến **đang trên đường**
-- **Điều kiện tiên quyết:** Chuyến ở `DEPARTED`, đang gán xe A
+- **Mã TC:** TC_TRIP_040
+- **Tên Kịch Bản:** Admin sửa một chuyến đã `COMPLETED`
+- **Điều kiện tiên quyết:** Chuyến ở `COMPLETED` *(đo 2026-08-11: **1.392** chuyến)*
 - **Các bước thực hiện:**
   1. `GET /admin/trip-management/trips/edit/{id}`
+  2. `POST /admin/trip-management/trips/update` với `busId` khác, **kèm một field cố tình sai** (ví dụ `price`)
 - **Kết quả mong đợi:**
-  - **KHÔNG** có thẻ `<select name="busId">` trên trang
-  - Thay vào đó: một `<input readonly>` hiển thị đúng xe A (biển số + loại xe), và một
-    `<input type="hidden" name="busId">` mang **đúng id của xe A** — để form vẫn submit hợp lệ
-    (`busId` là `@RequestParam` **bắt buộc**; nếu dùng `select disabled` thì request hỏng ở tầng bind)
-  - Có dòng giải thích *"Chuyến đang trên đường — không đổi được xe."*
-  - **Đối chứng:** cùng trang với chuyến `PENDING_APPROVAL` / `ACTIVE` / `COMPLETED` / `CANCELLED`
-    thì `<select name="busId">` **vẫn phải có** — chỉ khoá đúng một trạng thái
-- **Vì sao có TC này:** guard #14 (TC_FSM_030) sinh ra một lối từ chối mới ở submit, nhưng dropdown
-  không đổi ⇒ màn hình mời 2–6 xe mà nó chắc chắn sẽ từ chối (đo 2026-08-11 trên 5 chuyến `DEPARTED`).
-  Điều đó ngược đúng luật javadoc `showEditTripForm()` tự phát biểu: *không mời thứ submit sẽ từ chối*.
-  TC này khoá lại lớp giao diện; **TC_FSM_030 khoá lớp server** — cả hai đều phải xanh, không thay
-  thế cho nhau.
+  - Bước 1 → **302**, `flash[error]` = `"Chuyến #{id} đã hoàn thành (COMPLETED). Dữ liệu lịch sử và
+    báo cáo tài chính phải được giữ nguyên, không thể sửa."` — **soi gương câu của `deleteTrip()`**
+  - Bước 2 → cùng câu đó, redirect về `/admin/trip-management/trips`
+  - **DB: KHÔNG field nào bị ghi** — `editRefusalReason()` chặn trước mọi setter; `price` gửi sai
+    không landing
+  - Odometer của **cả hai** xe không đổi
+- **Vì sao có TC này:** trước 2026-08-11, `deleteTrip()` **cấm xoá** chuyến `COMPLETED` kèm câu giải
+  thích, trong khi **sửa mọi trường** của chính chuyến đó thì trót lọt và báo thành công — cấm cái ồn
+  ào, thả cái im lặng. Tái hiện trên chuyến thật **2764**: đổi xe 23 → 10 báo thành công, `trips.bus_id`
+  đổi thật, nhưng **180 km của tuyến vẫn nằm trên xe 23** ⇒ hai bản ghi nói ngược nhau, không gì phát
+  hiện được. Đây là test hồi quy của lỗi #18.
+
+---
+
+### TC_TRIP_041 — Sửa chuyến: Chặn MỌI thao tác sửa khi chuyến ĐANG TRÊN ĐƯỜNG (lỗi #18, thay TC_FSM_030/031/032)
+
+- **Mã TC:** TC_TRIP_041
+- **Tên Kịch Bản:** Admin sửa một chuyến đang `DEPARTED`
+- **Điều kiện tiên quyết:** Chuyến ở `DEPARTED` *(đo 2026-08-11: 5 chuyến)*
+- **Các bước thực hiện:**
+  1. Xem danh sách chuyến → **nút Sửa phải KHÔNG render**
+  2. `GET /admin/trip-management/trips/edit/{id}` (gõ URL tay)
+  3. `POST /admin/trip-management/trips/update` đổi `busId`, kèm `price` cố tình sai
+- **Kết quả mong đợi:**
+  - Bước 1: `0` link `trips/edit/{id}` trên trang danh sách
+  - Bước 2 → **302** + `flash[error]` = `"Chuyến #{id} đang trên đường (DEPARTED). Không thể sửa chuyến
+    đang vận hành — thông tin chuyến phải khớp với hành trình thực tế. Dùng Bảng Điều Hành để đánh dấu
+    hoàn thành."`
+  - Bước 3 → cùng câu đó; **DB không đổi field nào**, `Bus.status` của cả hai xe giữ nguyên
+- **Ba lớp, chỉ lớp thứ ba là lớp chặn thật:** bước 1 và 2 là lớp **không-mời** (không cản được POST
+  tự chế); bước 3 là lớp **chặn**. Cả ba đều phải xanh — chúng không thay thế cho nhau.
+- **TC này THAY THẾ TC_FSM_030/031/032** (viết 2026-08-11 cho lỗi #14, khi luật còn là "chỉ khoá ô
+  xe"). Chủ dự án chọn (a-đủ) cho #18 nên luật mới **mạnh hơn hẳn**: khoá cả chuyến chứ không chỉ một
+  ô. Đặc biệt **TC_FSM_031 bị đảo ngược** — nó khẳng định "sửa chuyến `DEPARTED` mà giữ nguyên xe thì
+  vẫn lưu được", đúng là hành vi mà (a-đủ) **cố ý bỏ đi**.
+- **Kẽ mà bản sửa #14 không với tới, nay đã đóng:** đổi **`route`** của chuyến `DEPARTED` làm đổi số
+  km cộng vào odometer lúc `COMPLETED` (`TripService:621-627` đọc `route.distanceKm` tại thời điểm
+  hoàn thành, không phải lúc gán).
+
+---
+
+### TC_TRIP_042 — ĐỐI TRỌNG: chuyến CHƯA lăn bánh và chuyến ĐÃ HUỶ vẫn phải sửa được
+
+- **Mã TC:** TC_TRIP_042
+- **Tên Kịch Bản:** Bản sửa #18 không được đi quá tay thành "khoá mọi chuyến"
+- **Điều kiện tiên quyết:** Có chuyến ở `PENDING_APPROVAL`, `ACTIVE` và `CANCELLED`
+- **Các bước thực hiện:**
+  1. `GET` form Sửa của từng trạng thái trên
+  2. `POST /admin/trip-management/trips/update` trên một chuyến `ACTIVE`
+- **Kết quả mong đợi:**
+  - Bước 1 → **200**, form mở bình thường; nút Sửa **vẫn render** trên danh sách
+  - Bước 2 → `flash[success]` = `"Cập nhật chuyến xe thành công!"`, DB ghi bình thường
+- **Vì sao có TC này:** `CANCELLED` **cố ý** vẫn sửa được, vì `deleteTrip()` cũng cho **xoá**
+  `CANCELLED` (*"đã kết thúc vòng đời"*) — code phải khớp chính sách **từng dòng**, không khớp đại
+  khái. Thiếu TC này, một bản sửa quá tay (khoá luôn `CANCELLED`, hoặc khoá `ACTIVE`) sẽ không bị bắt.
+- **Ranh giới nghiệp vụ đang được ghim:** chuyến sửa được **cho tới khi xuất phát**; sau khi xuất phát
+  nó là **bản ghi**, không còn là kế hoạch.
 
 ---
 
