@@ -2,7 +2,10 @@ package giang.com.BusManagement.service;
 
 import giang.com.BusManagement.domain.Bus;
 import giang.com.BusManagement.domain.BusStatus;
+import giang.com.BusManagement.domain.Trip;
+import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.repository.BusRepository;
+import giang.com.BusManagement.repository.TripRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,24 @@ class BusServiceTest {
     private BusService busService;
     @Autowired
     private BusRepository busRepository;
+    @Autowired
+    private TripRepository tripRepository;
+
+    /**
+     * Chuyến tối thiểu chỉ đủ để guard REPAIRING nhìn thấy: guard hỏi
+     * existsByBusIdAndStatusIn(busId, statuses), nên route/tài xế không liên quan
+     * và để null. Ghi thẳng qua repository theo đúng tiền lệ DataInitializer —
+     * đi qua TripService sẽ kéo theo toàn bộ validate nghiệp vụ không thuộc
+     * phạm vi test này.
+     */
+    private Trip tripFor(Bus bus, TripStatus status) {
+        Trip trip = new Trip();
+        trip.setBus(bus);
+        trip.setStatus(status);
+        trip.setDepartureTime(java.time.LocalDateTime.now().plusHours(2));
+        trip.setTotalSeats(40);
+        return tripRepository.save(trip);
+    }
 
     /** Xe đã có lịch sử vận hành: 8000 km trọn đời, bảo trì cuối lúc 4000 km. */
     private Bus persistedBus() {
@@ -125,6 +146,49 @@ class BusServiceTest {
     @DisplayName("Guard REPAIRING không chặn nhầm xe chưa có chuyến nào")
     void update_toRepairingIsAllowedWhenBusHasNoTrips() {
         Bus bus = persistedBus();
+
+        Bus f = form(8000.0, 4000.0, 5000.0);
+        f.setStatus(BusStatus.REPAIRING);
+
+        assertDoesNotThrow(() -> busService.updateBus(bus.getId(), f));
+        assertEquals(BusStatus.REPAIRING, busRepository.findById(bus.getId()).orElseThrow().getStatus());
+    }
+
+    /**
+     * Ghim bản sửa lỗi #15. DEPARTED từng THIẾU trong danh sách chặn, nên Admin
+     * đánh dấu bảo trì cho một chiếc xe đang lăn bánh vẫn nhận "thành công" — rồi
+     * side-effect của COMPLETED (TripService:618) đặt lại READY và xoá dấu đó
+     * không một dòng cảnh báo.
+     *
+     * Chặn ở đây làm đường xoá âm thầm biến mất: không còn cách nào để xe ở
+     * REPAIRING trong lúc còn chuyến chưa kết thúc.
+     */
+    @Test
+    @DisplayName("Chặn REPAIRING khi xe đang có chuyến DEPARTED — lỗi #15")
+    void update_toRepairingIsBlockedWhenBusIsOnADepartedTrip() {
+        Bus bus = persistedBus();
+        tripFor(bus, TripStatus.DEPARTED);
+
+        Bus f = form(8000.0, 4000.0, 5000.0);
+        f.setStatus(BusStatus.REPAIRING);
+
+        assertThrows(RuntimeException.class, () -> busService.updateBus(bus.getId(), f));
+        assertEquals(BusStatus.READY, busRepository.findById(bus.getId()).orElseThrow().getStatus(),
+                "trạng thái xe không được đổi khi guard đã chặn");
+    }
+
+    /**
+     * ĐỐI TRỌNG. Danh sách chặn là phần bù của tập trạng thái CUỐI, nên bản sửa
+     * không được trượt thành "cứ có chuyến là chặn": một chiếc xe chỉ còn lịch sử
+     * COMPLETED/CANCELLED vẫn phải đưa đi bảo trì được — nếu không thì sau vài
+     * tháng vận hành sẽ không xe nào bảo trì được nữa.
+     */
+    @Test
+    @DisplayName("ĐỐI TRỌNG: chuyến COMPLETED/CANCELLED không chặn — chỉ chuyến CHƯA kết thúc mới chặn")
+    void update_toRepairingIsAllowedWhenOnlyTerminalTrips() {
+        Bus bus = persistedBus();
+        tripFor(bus, TripStatus.COMPLETED);
+        tripFor(bus, TripStatus.CANCELLED);
 
         Bus f = form(8000.0, 4000.0, 5000.0);
         f.setStatus(BusStatus.REPAIRING);

@@ -104,17 +104,27 @@ public class BusService {
         Bus existing = busRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy xe với ID: " + id));
 
-        // RÀNG BUỘC 1A: Kiểm tra nếu Admin cố tình chuyển trạng thái sang REPAIRING khi
-        // đang bận chạy lịch tương lai. Dời nguyên văn từ saveBus() sang đây vì luồng
-        // sửa nay đi qua method này; DEPARTED cố ý CHƯA thêm — đó là lỗi #15, một
-        // quyết định riêng.
+        // RÀNG BUỘC 1A: Không cho chuyển xe sang REPAIRING khi xe còn chuyến CHƯA
+        // KẾT THÚC — tức ĐÚNG PHẦN BÙ của tập trạng thái cuối trong FSM (xem
+        // TripService.canTransition), đúng như current_functional_spec.md phát biểu,
+        // và ĐÚNG BẰNG DriverService.BUSY_STATUSES (guard anh em chặn khóa tài xế
+        // còn chuyến dở dang, vốn đã đủ ba trạng thái từ trước — nên hai câu thông
+        // báo cũng dùng chung cách diễn đạt).
+        //
+        // DEPARTED từng bị BỎ SÓT, mà đó là ràng buộc MẠNH NHẤT: xe đang lăn bánh
+        // thật. Hệ quả (lỗi #15): Admin đánh dấu REPAIRING giữa chuyến → báo THÀNH
+        // CÔNG → rồi side-effect của COMPLETED (TripService:618, đúng và đã tài liệu
+        // hoá) đặt lại READY mà không xét trạng thái cũ, XOÁ dấu bảo trì không một
+        // dòng cảnh báo. Chặn ở đây làm đường xoá âm thầm đó biến mất hẳn: không còn
+        // cách nào để xe ở REPAIRING trong lúc còn chuyến chưa kết thúc, nên cũng
+        // không còn dấu nào để bị ghi đè.
         if (form.getStatus() == BusStatus.REPAIRING) {
-            boolean hasActiveTrips = tripRepository.existsByBusIdAndStatusIn(
+            boolean hasUnfinishedTrips = tripRepository.existsByBusIdAndStatusIn(
                     id,
-                    Arrays.asList(TripStatus.ACTIVE, TripStatus.PENDING_APPROVAL));
-            if (hasActiveTrips) {
+                    Arrays.asList(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED));
+            if (hasUnfinishedTrips) {
                 throw new RuntimeException(
-                        "Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho các chuyến xe đang hoạt động hoặc chờ duyệt!");
+                        "Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho chuyến xe chưa kết thúc (chờ duyệt / đang bán vé / đang trên đường). Hãy hoàn thành hoặc hủy các chuyến đó trước!");
             }
         }
 
