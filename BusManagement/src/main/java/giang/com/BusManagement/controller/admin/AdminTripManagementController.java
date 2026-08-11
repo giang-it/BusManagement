@@ -195,11 +195,19 @@ public class AdminTripManagementController {
      * thực thi.
      *
      * Thứ tự quan trọng: updateManualTrip() phải chạy TRƯỚC để lưu thông tin mới
-     * xuống DB,
-     * sau đó updateTripStatus() re-fetch trip từ DB và apply FSM transition trên
-     * trạng thái
-     * hiện tại — đảm bảo BusStatus synchronization cũng chạy đúng trên bus mới (nếu
-     * bus bị thay).
+     * xuống DB, sau đó updateTripStatus() re-fetch trip từ DB và apply FSM
+     * transition trên trạng thái hiện tại.
+     *
+     * ⚠️ ĐỒNG BỘ BusStatus CHỈ CHẠY KHI TRẠNG THÁI ĐỔI. Khối ở cuối method gọi
+     * updateTripStatus() dưới điều kiện {@code status != newStatus}, nên sửa một
+     * chuyến mà KHÔNG đổi trạng thái sẽ không chạy đồng bộ BusStatus nào cả —
+     * updateManualTrip() chỉ validate và save(), nó không đụng Bus.status.
+     *
+     * Câu trước đây ở chỗ này khẳng định ngược lại ("đảm bảo BusStatus
+     * synchronization cũng chạy đúng trên bus mới nếu bus bị thay") — mô tả một
+     * hành vi mà điều kiện bên dưới không cho xảy ra, và chính câu sai đó đã che
+     * lỗi #14 khỏi các lần rà trước. Trường hợp nguy hiểm duy nhất (đổi xe của
+     * chuyến đang DEPARTED) nay bị chặn thẳng ở đầu method; xem ràng buộc ở đó.
      */
     @PostMapping("/trips/update")
     public String updateTrip(@ModelAttribute Trip trip,
@@ -216,6 +224,36 @@ public class AdminTripManagementController {
 
             // Capture requested status TRƯỚC khi ghi đè existingTrip
             TripStatus newStatus = trip.getStatus();
+
+            // RÀNG BUỘC: chuyến ĐANG TRÊN ĐƯỜNG (DEPARTED) thì KHÔNG được đổi xe.
+            // Xem docs/todo/current_bugs_found.md mục #14.
+            //
+            // Vì sao chặn ở controller chứ không đồng bộ trạng thái xe: FSM giữ cặp
+            // bất biến "xe được đặt TRAVELING lúc vào DEPARTED phải chính là xe được
+            // trả READY lúc vào COMPLETED" (trip_lifecycle_fsm.md §2/§8), nhưng nó
+            // không lưu xe nào đã được đánh dấu — nó ĐỌC LẠI trip.getBus() ở cả hai
+            // đầu. Đổi xe giữa chừng làm FSM mất con trỏ: xe cũ kẹt TRAVELING vĩnh
+            // viễn (biến mất khỏi mọi nguồn chọn xe, vốn chỉ lấy từ READY), xe mới
+            // chạy thật mà vẫn READY. Không lối tự phục hồi — chỉ có hai nơi ghi
+            // BusStatus (TripService:615/618) và cả hai đều tác động lên xe MỚI.
+            //
+            // DEPARTED là trạng thái DUY NHẤT cần chặn: PENDING_APPROVAL và ACTIVE
+            // để xe ở READY (FSM §8: "PENDING_APPROVAL → ACTIVE does not change bus
+            // status"), nên đổi xe ở đó không phá gì. Chặn đúng một trạng thái là
+            // đóng kín được bất biến, không chặn thừa.
+            //
+            // Cùng nguyên tắc với allow-list BOARD_ACTIONS của bản sửa #10: quyết
+            // định màn hình này phơi ra cái gì là việc của controller, không phải
+            // của FSM — TripService không bị đụng tới.
+            Long currentBusId = existingTrip.getBus() != null ? existingTrip.getBus().getId() : null;
+            if (existingTrip.getStatus() == TripStatus.DEPARTED && !busId.equals(currentBusId)) {
+                redirectAttributes.addFlashAttribute("error",
+                        "Không thể đổi xe cho chuyến #" + existingTrip.getId()
+                                + " vì chuyến đang trên đường (DEPARTED). Xe đã lăn bánh thì việc thay xe là"
+                                + " thao tác ngoài hệ thống; hãy hoàn thành chuyến trước, hoặc sửa lại trạng"
+                                + " thái xe ở màn hình Quản Lý Xe.");
+                return "redirect:/admin/trip-management/trips/edit/" + trip.getId();
+            }
 
             // Cập nhật các trường thông tin (KHÔNG setStatus)
             Route route = routeRepository.findById(routeId).orElseThrow();
