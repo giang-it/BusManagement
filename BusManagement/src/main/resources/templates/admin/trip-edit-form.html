@@ -72,28 +72,18 @@
                                 <i class="fas fa-bus"></i> Xe <span class="text-danger">*</span>
                             </label>
                             <!--
-                            Chuyến DEPARTED: khoá ô Xe. Ràng buộc thật nằm ở updateTrip() (lỗi #14);
-                            chỗ này chỉ để dropdown đừng MỜI thứ submit chắc chắn từ chối.
-                            readonly + hidden chứ không phải select disabled: select disabled không
-                            gửi busId, mà busId là @RequestParam bắt buộc ⇒ hỏng ở tầng bind.
+                            Không cần khoá riêng ô Xe cho chuyến DEPARTED nữa: từ bản sửa #18, cả
+                            form này không mở cho chuyến DEPARTED/COMPLETED (showEditTripForm từ
+                            chối, và nút Sửa ở trip-list.html đã ẩn). Ô khoá đặt ở đây sẽ là code
+                            không bao giờ chạy tới.
                         -->
-                            <select name="busId" class="form-select" required
-                                th:if="${trip.status.name() != 'DEPARTED'}">
+                            <select name="busId" class="form-select" required>
                                 <option value="">-- Chọn xe --</option>
                                 <option th:each="bus : ${buses}" th:value="${bus.id}"
                                     th:text="${bus.licensePlate} + ' (' + ${bus.busType?.typeName} + ')'"
                                     th:selected="${bus.id == trip.bus?.id}">
                                 </option>
                             </select>
-                            <div th:if="${trip.status.name() == 'DEPARTED'}">
-                                <input type="text" class="form-control bg-light" readonly
-                                    th:value="${trip.bus?.licensePlate} + ' (' + ${trip.bus?.busType?.typeName} + ')'">
-                                <input type="hidden" name="busId" th:value="${trip.bus?.id}">
-                                <div class="form-text text-danger">
-                                    <i class="fas fa-lock"></i> Chuyến đang trên đường — không đổi được xe.
-                                    Hãy hoàn thành chuyến trước.
-                                </div>
-                            </div>
                         </div>
 
                         <div class="col-md-4 mb-3">

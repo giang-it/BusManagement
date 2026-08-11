@@ -443,7 +443,17 @@
                             </td>
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end gap-1">
-                                    <a th:href="@{/admin/trip-management/trips/edit/{id}(id=${trip.id})}"
+                                    <!--
+                                        Chuyến đã xuất phát hoặc đã hoàn thành thì không sửa được nữa
+                                        (lỗi #18) — ẩn nút thay vì để nó dẫn tới một form bị từ chối.
+                                        Tập trạng thái ở đây soi gương chính sách của
+                                        TripService.deleteTrip(). Nút Hủy ngay dưới dùng tập KHÁC
+                                        (ẩn với CANCELLED/COMPLETED) — cố ý không đồng bộ hoá hai
+                                        tập, vì đó là hai luật khác nhau và luật của nút Hủy không
+                                        thuộc phạm vi lỗi #18.
+                                    -->
+                                    <a th:if="${trip.status.name() != 'DEPARTED' and trip.status.name() != 'COMPLETED'}"
+                                        th:href="@{/admin/trip-management/trips/edit/{id}(id=${trip.id})}"
                                         class="action-btn btn-edit" title="Chỉnh sửa">
                                         <i class="bi bi-pen"></i>
                                     </a>

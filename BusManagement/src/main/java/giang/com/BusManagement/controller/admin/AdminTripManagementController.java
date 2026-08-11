@@ -148,10 +148,72 @@ public class AdminTripManagementController {
      * trạng thái không hợp lệ sau khi trip đã được tạo (ví dụ vừa quá hạn bảo
      * trì) — Admin vẫn cần thấy xe nào đang được gán để chủ động đổi sang xe khác.
      */
+    /**
+     * Chính sách SỬA chuyến theo trạng thái — soi gương chính sách XOÁ đã viết
+     * thành văn ở TripService.deleteTrip():1485-1507. Xem lỗi #18.
+     *
+     * Trước bản sửa này, updateTrip() không xét trạng thái ở bất kỳ đâu, nên
+     * deleteTrip cấm XOÁ một chuyến COMPLETED (thao tác ồn ào, có xác nhận) trong
+     * khi SỬA MỌI TRƯỜNG của chính chuyến đó (thao tác im lặng, không xác nhận,
+     * không log) thì trót lọt và báo thành công. Cấm cái ồn ào, thả cái im lặng.
+     *
+     * Luật phát biểu bằng MỘT câu: chuyến sửa được cho tới khi xuất phát; sau khi
+     * xuất phát nó là BẢN GHI, không còn là kế hoạch. Đó đúng là tập trạng thái
+     * mà deleteTrip nêu tên, nên hai lối vào nay khớp nhau từng trạng thái một.
+     *
+     * DEPARTED cũng là thứ giữ bất biến ghép đôi của FSM (trip_lifecycle_fsm.md
+     * §8.1): xe được đặt TRAVELING lúc vào DEPARTED phải chính là xe được trả
+     * READY lúc vào COMPLETED, mà FSM không nhớ nó đã đánh dấu xe nào — nó đọc
+     * lại trip.getBus() ở cả hai đầu. Khoá cả chuyến là điều kiện MẠNH HƠN "khoá
+     * mỗi ô xe" của bản sửa #14, nên #14 được gộp vào đây thay vì giữ song song;
+     * nó còn đóng thêm kẽ mà #14 không với tới: đổi TUYẾN của chuyến đang chạy
+     * làm đổi luôn số km cộng vào odometer lúc hoàn thành (TripService:621-627).
+     *
+     * KHÔNG chặn CANCELLED: deleteTrip cũng cho xoá CANCELLED ("đã kết thúc vòng
+     * đời"), nên code khớp chính sách từng dòng chứ không khớp đại khái.
+     *
+     * Việc này KHÔNG lấy mất năng lực nào, đã kiểm trước khi sửa:
+     * - Hoàn thành một chuyến DEPARTED vẫn làm ở Bảng Điều Hành, một endpoint
+     *   khác hẳn (POST /admin/dispatch/status). Query của bảng
+     *   (findDispatchBoardTrips) KHÔNG có cận dưới thời gian, nên mọi chuyến
+     *   DEPARTED dù cũ tới đâu vẫn hiện — đo ngày 2026-08-11: đủ 5/5, 0 chuyến
+     *   bị bỏ sót.
+     * - "Ghi nhận xe chạy trễ" vốn KHÔNG làm được: Trip chỉ có departureTime và
+     *   arrivalTimeExpected, không có trường giờ đến thực tế. Sửa
+     *   arrivalTimeExpected của chuyến đang chạy là sửa lại KẾ HOẠCH cho khớp
+     *   thực tế, tức đúng thứ mục #18 đang cấm.
+     *
+     * @return câu từ chối, hoặc null nếu chuyến còn sửa được
+     */
+    private String editRefusalReason(Trip trip) {
+        return switch (trip.getStatus()) {
+            case DEPARTED -> "Chuyến #" + trip.getId() + " đang trên đường (DEPARTED). "
+                    + "Không thể sửa chuyến đang vận hành — thông tin chuyến phải khớp với hành trình thực tế. "
+                    + "Dùng Bảng Điều Hành để đánh dấu hoàn thành.";
+
+            case COMPLETED -> "Chuyến #" + trip.getId() + " đã hoàn thành (COMPLETED). "
+                    + "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể sửa.";
+
+            // PENDING_APPROVAL, ACTIVE, CANCELLED: chuyến chưa lăn bánh hoặc đã bị
+            // huỷ — sửa được. Switch cố ý KHÔNG có default: thêm một TripStatus mới
+            // sẽ làm vỡ biên dịch, buộc người thêm phải quyết định, y như deleteTrip.
+            case PENDING_APPROVAL, ACTIVE, CANCELLED -> null;
+        };
+    }
+
     @GetMapping("/trips/edit/{id}")
-    public String showEditTripForm(@PathVariable Long id, Model model) {
+    public String showEditTripForm(@PathVariable Long id, Model model,
+            RedirectAttributes redirectAttributes) {
         Trip trip = tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến"));
+
+        // Không MỞ form cho chuyến mà mọi submit đều bị từ chối. Nút Sửa ở
+        // trip-list.html đã ẩn cho hai trạng thái này; đây là chặn cho URL gõ tay.
+        String refusal = editRefusalReason(trip);
+        if (refusal != null) {
+            redirectAttributes.addFlashAttribute("error", refusal);
+            return "redirect:/admin/trip-management/trips";
+        }
 
         List<Long> savedCoDriverIds = trip.getCoDrivers().stream()
                 .map(Driver::getUserId)
@@ -206,8 +268,13 @@ public class AdminTripManagementController {
      * Câu trước đây ở chỗ này khẳng định ngược lại ("đảm bảo BusStatus
      * synchronization cũng chạy đúng trên bus mới nếu bus bị thay") — mô tả một
      * hành vi mà điều kiện bên dưới không cho xảy ra, và chính câu sai đó đã che
-     * lỗi #14 khỏi các lần rà trước. Trường hợp nguy hiểm duy nhất (đổi xe của
-     * chuyến đang DEPARTED) nay bị chặn thẳng ở đầu method; xem ràng buộc ở đó.
+     * lỗi #14 khỏi các lần rà trước.
+     *
+     * Hệ quả của việc đồng bộ chỉ chạy khi trạng thái đổi nay đã VÔ HẠI, vì
+     * editRefusalReason() chặn mọi thao tác sửa trên chuyến DEPARTED/COMPLETED —
+     * tức trip.bus không thể đổi trong khoảng giữa hai đầu của cặp bất biến FSM.
+     * Trạng thái chỉ còn đi tiếp qua Bảng Điều Hành (POST /admin/dispatch/status),
+     * nơi duy nhất còn phơi ra transition, đúng như bản sửa #10 đã siết.
      */
     @PostMapping("/trips/update")
     public String updateTrip(@ModelAttribute Trip trip,
@@ -225,34 +292,18 @@ public class AdminTripManagementController {
             // Capture requested status TRƯỚC khi ghi đè existingTrip
             TripStatus newStatus = trip.getStatus();
 
-            // RÀNG BUỘC: chuyến ĐANG TRÊN ĐƯỜNG (DEPARTED) thì KHÔNG được đổi xe.
-            // Xem docs/todo/current_bugs_found.md mục #14.
+            // RÀNG BUỘC: chuyến đã XUẤT PHÁT hoặc đã HOÀN THÀNH thì không sửa được
+            // trường nào. Luật và toàn bộ lý do nằm ở editRefusalReason() — cùng một
+            // chỗ với lối GET, để hai lối vào không thể trôi ra khác nhau.
             //
-            // Vì sao chặn ở controller chứ không đồng bộ trạng thái xe: FSM giữ cặp
-            // bất biến "xe được đặt TRAVELING lúc vào DEPARTED phải chính là xe được
-            // trả READY lúc vào COMPLETED" (trip_lifecycle_fsm.md §2/§8), nhưng nó
-            // không lưu xe nào đã được đánh dấu — nó ĐỌC LẠI trip.getBus() ở cả hai
-            // đầu. Đổi xe giữa chừng làm FSM mất con trỏ: xe cũ kẹt TRAVELING vĩnh
-            // viễn (biến mất khỏi mọi nguồn chọn xe, vốn chỉ lấy từ READY), xe mới
-            // chạy thật mà vẫn READY. Không lối tự phục hồi — chỉ có hai nơi ghi
-            // BusStatus (TripService:615/618) và cả hai đều tác động lên xe MỚI.
-            //
-            // DEPARTED là trạng thái DUY NHẤT cần chặn: PENDING_APPROVAL và ACTIVE
-            // để xe ở READY (FSM §8: "PENDING_APPROVAL → ACTIVE does not change bus
-            // status"), nên đổi xe ở đó không phá gì. Chặn đúng một trạng thái là
-            // đóng kín được bất biến, không chặn thừa.
-            //
-            // Cùng nguyên tắc với allow-list BOARD_ACTIONS của bản sửa #10: quyết
-            // định màn hình này phơi ra cái gì là việc của controller, không phải
-            // của FSM — TripService không bị đụng tới.
-            Long currentBusId = existingTrip.getBus() != null ? existingTrip.getBus().getId() : null;
-            if (existingTrip.getStatus() == TripStatus.DEPARTED && !busId.equals(currentBusId)) {
-                redirectAttributes.addFlashAttribute("error",
-                        "Không thể đổi xe cho chuyến #" + existingTrip.getId()
-                                + " vì chuyến đang trên đường (DEPARTED). Xe đã lăn bánh thì việc thay xe là"
-                                + " thao tác ngoài hệ thống; hãy hoàn thành chuyến trước, hoặc sửa lại trạng"
-                                + " thái xe ở màn hình Quản Lý Xe.");
-                return "redirect:/admin/trip-management/trips/edit/" + trip.getId();
+            // Đây là lớp CHẶN THẬT. Nút Sửa ẩn ở trip-list.html và form GET bị từ
+            // chối chỉ là lớp KHÔNG-MỜI: chúng không cản được một POST tự chế, còn
+            // dòng này thì có. Cùng phân vai với allow-list BOARD_ACTIONS của bản
+            // sửa #10 — TripService không bị đụng tới.
+            String refusal = editRefusalReason(existingTrip);
+            if (refusal != null) {
+                redirectAttributes.addFlashAttribute("error", refusal);
+                return "redirect:/admin/trip-management/trips";
             }
 
             // Cập nhật các trường thông tin (KHÔNG setStatus)
