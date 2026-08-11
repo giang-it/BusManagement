@@ -82,7 +82,7 @@ public class DriverService {
         validateUsernameAvailable(formUser.getUsername(), userId);
 
         // RÀNG BUỘC: Không cho khóa tài xế đang còn chuyến dở dang.
-        // Cùng nguyên tắc với BusService.saveBus() — chặn chuyển xe sang REPAIRING
+        // Cùng nguyên tắc với BusService.updateBus() — chặn chuyển xe sang REPAIRING
         // khi xe còn được phân công cho chuyến chưa kết thúc.
         boolean isBeingDeactivated = Boolean.TRUE.equals(existing.getIsActive())
                 && !Boolean.TRUE.equals(formDriver.getIsActive());

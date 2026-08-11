@@ -59,8 +59,9 @@ public class AdminBusController {
     @PostMapping("/edit/{id}")
     public String updateBus(@PathVariable Long id, @ModelAttribute Bus bus, RedirectAttributes redirectAttributes) {
         try {
-            bus.setId(id);
-            busService.saveBus(bus);
+            // Truyền id riêng thay vì bus.setId(id): service phải nạp bản ghi cũ để
+            // biết ô số nào bị bỏ trống mà giữ nguyên (xem BusService.updateBus).
+            busService.updateBus(id, bus);
             redirectAttributes.addFlashAttribute("success", "Cập nhật thông tin xe thành công!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());

@@ -55,18 +55,24 @@
                                 </div>
                                 <hr class="my-4">
                                 <h5 class="text-muted"><i class="bi bi-speedometer2"></i> Thông Số Bảo Trì Định Kỳ</h5>
+                                <div class="col-12">
+                                    <div class="form-text mb-2">Khi sửa xe, để trống một ô nghĩa là
+                                        <strong>giữ nguyên giá trị hiện tại</strong> — muốn đặt về 0 thì gõ số 0.
+                                        Xe tạo mới bỏ trống sẽ dùng mặc định 0 / 0 / 5.000 km.</div>
+                                </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Odometer Hiện Tại (Km)</label>
-                                    <input type="number" step="0.1" class="form-control" th:field="*{odometer}">
+                                    <input type="number" step="0.1" min="0" class="form-control"
+                                        th:field="*{odometer}">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Km Lần Bảo Trì Cuối</label>
-                                    <input type="number" step="0.1" class="form-control"
+                                    <input type="number" step="0.1" min="0" class="form-control"
                                         th:field="*{lastMaintenanceOdometer}">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Ngưỡng Cảnh Báo (Km)</label>
-                                    <input type="number" step="0.1" class="form-control"
+                                    <input type="number" step="0.1" min="1" class="form-control"
                                         th:field="*{maintenanceThreshold}">
                                 </div>
                             </div>
