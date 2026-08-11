@@ -1069,6 +1069,94 @@ chạy: `buses 20 / drivers 36 / trips 1500 / incidents 8 / users 37 / routes 8 
 
 ## 14. Đổi xe cho một chuyến ĐANG CHẠY làm xe cũ kẹt `TRAVELING` vĩnh viễn
 
+> **✅ ĐÃ SỬA (2026-08-06) — chủ dự án chọn phương án (a): chặn ở controller.**
+> `AdminTripManagementController.updateTrip()` từ chối request đổi `busId` khi chuyến đang
+> `DEPARTED`, bằng flash `error` + redirect về chính form sửa — **`TripService` không bị đụng
+> một dòng nào**.
+>
+> **Vì sao (a) chứ không phải (b) "đồng bộ cả hai xe":**
+> 1. **Trùng tiền lệ #10 (2026-08-04):** ở đó chủ dự án đã duyệt allow-list phía controller thay
+>    vì nhét validate vào `TripService`, với lập luận *"lỗi là ở chỗ endpoint phơi ra một
+>    transition nó không hề định phơi"*. Ở đây màn Sửa phơi ra một **ô** nó không định phơi cho
+>    chuyến đang chạy — cùng hình dạng.
+> 2. **`trip_lifecycle_fsm.md` dòng 3** nói thẳng *"TripService is the sole authoritative
+>    implementation of all FSM logic"*. Đặt (b) ở controller là vi phạm trực tiếp; đặt trong
+>    `TripService` là sửa logic đã verified — §3 "Minimize refactoring".
+> 3. **(b) không đơn giản như nó trông.** "Xe cũ → `READY`" **không phải lúc nào cũng đúng**:
+>    `isBusBusy:327-328` chỉ coi là bận khi **cửa sổ thời gian giao nhau**, nên hai chuyến
+>    `DEPARTED` không giao giờ vẫn dùng chung một xe được. Trả xe cũ về `READY` khi đó sẽ **xoá
+>    nhầm** dấu `TRAVELING` hợp lệ của chuyến kia. (b) đúng thì phải kèm truy vấn phụ.
+> 4. **(b) phải thêm một side-effect không gắn với transition nào** vào bảng §8 của tài liệu FSM,
+>    phá đúng khuôn "Side effects on **entry**" mà bản sửa #6 đang dựa vào để tồn tại.
+>
+> **Chặn đúng MỘT trạng thái là đủ, không chặn thừa:** `DEPARTED` là trạng thái duy nhất xe mang
+> dấu `TRAVELING` do FSM đặt — FSM §8 ghi rõ *"`PENDING_APPROVAL → ACTIVE` does not change bus
+> status"* — nên đổi xe ở `PENDING_APPROVAL`/`ACTIVE` không phá gì và vẫn được phép.
+>
+> **Javadoc `:199-202` đã sửa.** Câu cũ khẳng định *"đảm bảo BusStatus synchronization cũng chạy
+> đúng trên bus mới (nếu bus bị thay)"* — mô tả một hành vi mà điều kiện `status != newStatus` ở
+> dưới **không cho xảy ra**. Chính câu sai đó đã che lỗi này khỏi các lần rà trước, nên nó được
+> thay bằng lời cảnh báo ngược lại: đồng bộ **chỉ** chạy khi trạng thái đổi.
+>
+> **Kiểm chứng trên app thật** (default profile, PID 14688, port 8099), chuyến `DEPARTED` **thật**
+> số 13 (route 1, xe 6):
+> | Thao tác qua HTTP | Flash | DB sau đó |
+> |---|---|---|
+> | Đổi xe 6 → 1, **kèm `price` cố tình đổi** 200000 → 999999 | *"Không thể đổi xe cho chuyến #13 vì chuyến đang trên đường (DEPARTED)…"* | `bus_id=6`, `price=200000` — **không field nào landing** |
+> | **ĐỐI TRỌNG:** cùng chuyến, **giữ nguyên** xe 6 | *"Cập nhật chuyến xe thành công!"* | lưu bình thường |
+>
+> Đối trọng là phần quan trọng: nó chứng minh bản sửa chặn đúng việc **ĐỔI** xe, **không** chặn
+> mọi thao tác sửa trên chuyến đang chạy. Bằng chứng mạnh nhất ở hàng đầu là `price` — tôi cố tình
+> gửi sai và nó **không** được ghi, tức controller `return` trước khi chạm tới bất kỳ setter nào.
+>
+> **Bán kính đo lại hôm nay (không chép số hôm qua):** 5 chuyến `DEPARTED`, 6 xe `TRAVELING`, và
+> **0 vi phạm bất biến thật** — dòng duy nhất SQL bắt được là xe 19, fixture seed đã nằm ở danh
+> sách "ĐÃ LOẠI". Tức bản sửa là **phòng ngừa**, không phải dọn dữ liệu: không có dòng hỏng nào
+> cần chữa.
+>
+> **Không có test đơn vị:** dự án vẫn chưa có harness MockMvc (đã ghi ở #9 và #10), nên guard ở
+> controller được chứng minh bằng cách drive app như trên — cùng cách #10 đã được chấp nhận.
+>
+> **⚠️ GIỚI HẠN PHẠM VI — nói rõ để lần rà sau không tưởng #14 đã khoá cả chuyến `DEPARTED`.**
+> Bản sửa khoá **duy nhất trường `bus`**. Các trường khác của chuyến đang chạy vẫn sửa được, và
+> đáng chú ý nhất là **`route`**: khối đồng bộ đọc `trip.getRoute().getDistanceKm()` **tại thời
+> điểm `COMPLETED`** (`TripService:621-627`), nên đổi tuyến của chuyến `DEPARTED` rồi bấm hoàn
+> thành sẽ cộng số km của tuyến **mới** vào odometer. Đó **không** phải #14 (không xe nào bị kẹt
+> trạng thái) mà thuộc **#18** — `updateTrip()` không có chính sách theo trạng thái. Ghi ở đây vì
+> nó lộ ra đúng lúc rà lại #14, và vì nó ảnh hưởng tới cách chọn bản sửa cho #18 (xem #18).
+>
+> ---
+>
+> **BỔ SUNG 2026-08-11 — bản sửa 06-08 đúng nhưng CHƯA ĐỦ: màn hình vẫn MỜI thứ nó sắp từ chối.**
+> Phát hiện khi drive app để kiểm chứng lại toàn bộ ba bản sửa chưa test. Guard chặn đúng, nhưng
+> `trip-edit-form.html` vẫn render dropdown Xe đầy đủ cho chuyến `DEPARTED` — không disable, không
+> một dòng cảnh báo. Đo trên dữ liệu thật:
+>
+> | Chuyến `DEPARTED` | Số option trong dropdown | Trong đó xe sẽ bị từ chối |
+> |---|---|---|
+> | #3, #6, #13 | 7 | **6** |
+> | #11, #12 | 3 | **2** |
+>
+> Chạm được bằng **ba cú click** (danh sách chuyến → Sửa → đổi dropdown → Lưu), không cần POST tự chế.
+>
+> **Vì sao đây là lỗi chứ không phải chuyện thẩm mỹ:** javadoc của chính `showEditTripForm()`
+> (`AdminTripManagementController:140-149`) phát biểu luật cho đúng dropdown này — dropdown được lọc
+> *"để Create và Edit nhất quán, **không cho Admin chọn lại một xe mà `validateBusForTrip()` sẽ từ
+> chối khi submit**"*. Bản sửa #14 thêm một lối từ chối mới ở submit mà **không** siết nguồn mời, nên
+> tự nó tạo ra đúng hình dạng câu đó cấm. Cùng nguyên tắc chủ dự án đã chốt ở #11/#15/#16: một thứ
+> không dùng được **không được giả vờ dùng được**.
+>
+> **Đã sửa (chủ dự án duyệt phương án "khoá ô Xe khi DEPARTED"):** `trip-edit-form.html` — chuyến
+> `DEPARTED` render một ô `readonly` hiển thị đúng xe hiện tại + một `input hidden` mang `busId`,
+> kèm dòng giải thích. **Không** dùng `select disabled`: select bị disabled **không gửi** `busId`, mà
+> `busId` là `@RequestParam` bắt buộc ⇒ request hỏng ngay ở tầng bind, đổi một lỗi nghiệp vụ có thông
+> báo thành một lỗi 400 trần. Cặp `readonly` + `hidden` là khuôn sẵn có của dự án (ô "Loại chuyến"
+> ngay dưới, và hai ô tự-điền ở `trip-create-form.html:182/293`).
+>
+> **Guard ở controller được GIỮ NGUYÊN, cố ý.** Template quyết định *mời* cái gì, controller quyết
+> định *chấp nhận* cái gì — đúng phân vai của bản sửa #10. Bỏ guard đi thì một POST tự chế lại phá
+> được bất biến; bỏ template đi thì màn hình lại nói dối. Hai lớp, hai việc khác nhau.
+
 - **Mức độ:** nghiệp vụ — **làm sai trạng thái bền trong DB** và **mất một xe khỏi đội**. Nặng nhất
   lần rà này.
 - **Phân loại:** nhánh **3 — sai thuần túy** (code mâu thuẫn chính javadoc của nó, và phá một cặp
@@ -1129,6 +1217,64 @@ chạy: `buses 20 / drivers 36 / trips 1500 / incidents 8 / users 37 / routes 8 
 
 ## 15. Xe có chuyến ĐANG CHẠY vẫn đặt được `REPAIRING`, rồi dấu đó bị `COMPLETED` xoá âm thầm
 
+> **✅ ĐÃ SỬA (2026-08-06) — chủ dự án chọn phương án (A): thêm `DEPARTED` vào guard.**
+> `BusService.updateBus()` nay chặn `REPAIRING` khi xe còn chuyến ở
+> `{PENDING_APPROVAL, ACTIVE, DEPARTED}` — **đúng phần bù của tập trạng thái cuối trong FSM**,
+> tức phát biểu được bằng MỘT câu ("mọi chuyến chưa kết thúc") thay vì một danh sách tuỳ ý.
+> Thông báo lỗi đổi theo cho khớp.
+>
+> **Vì sao (A) chứ không phải (B) "cho `COMPLETED` không ghi đè `REPAIRING`":**
+> 1. (B) sửa một side-effect **đang đúng như tài liệu** (`trip_lifecycle_fsm.md` §8) và buộc viết
+>    lại bảng đó thành có điều kiện, đẻ ra câu hỏi mới mà FSM không trả lời được: *"xe kết thúc
+>    chuyến ở trạng thái nào?"*.
+> 2. (B) **không chặn được nửa còn lại**: suốt chuyến `DEPARTED` xe vẫn ngồi ở `REPAIRING`, nên
+>    `DashboardService:158` đếm nó là "đang sửa" **trong khi nó đang trên đường** — bất biến vẫn
+>    vỡ, chỉ đổi kiểu.
+> 3. Sau (A), đường xoá âm thầm **không còn tồn tại**, nên (B) sẽ là **code chết**.
+>
+> **Cái giá đã được nói rõ và chấp nhận:** sau bản sửa, đánh dấu bảo trì cho xe hỏng **giữa đường**
+> trở thành **bị từ chối có thông báo**, thay vì "thành công rồi bị xoá ngầm" như trước. FSM không
+> có `DEPARTED → CANCELLED` nên hệ thống vốn **không mô hình hoá sự cố giữa đường**; thêm nó là
+> **tính năng mới**, không thuộc phạm vi sửa lỗi. Cùng nguyên tắc chủ dự án đã chốt ở #11 và #16:
+> một giá trị không mang thông tin không được nguỵ trang thành giá trị thật.
+>
+> **Pin bằng test:** 2 test mới trong `BusServiceTest` (10 → **12**). Cặp cốt lõi là ca chặn
+> (`DEPARTED`) + **đối trọng** "chuyến `COMPLETED`/`CANCELLED` **không** chặn" — nếu không có đối
+> trọng, bản sửa dễ trượt thành "cứ có chuyến là chặn", và sau vài tháng vận hành sẽ không xe nào
+> bảo trì được nữa. `mvnw test` **61/61**. **Non-vacuous:** gỡ `DEPARTED` khỏi danh sách →
+> **đúng 1 test đỏ** (`update_toRepairingIsBlockedWhenBusIsOnADepartedTrip`), 11 xanh.
+>
+> **Kiểm chứng trên app thật** (PID 14688, port 8099) — trên **xe thật số 6**, đang `TRAVELING` vì
+> chuyến `DEPARTED` 13 và **không** có chuyến `ACTIVE`/`PENDING` (đúng điều kiện guard cũ bỏ lọt):
+> | Thao tác | Flash | DB sau đó |
+> |---|---|---|
+> | Đặt `REPAIRING`, **kèm `brand` cố tình đổi** thành `PROBE-15` | *"Lỗi: Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho các chuyến xe chưa kết thúc…"* | xe 6 **y nguyên**; `brand` vẫn `Thaco-Mới6`; **0 dòng** mang brand `PROBE%` |
+> | **ĐỐI TRỌNG** trên xe tạm không có chuyến nào | *"Cập nhật thông tin xe thành công!"* | `REPAIRING` — bản sửa **không quá tay** |
+>
+> Xe tạm đã xoá **qua app**. `brand` cố tình sai không landing ⇒ service ném **trước khi chép** bất
+> cứ field nào — cùng bằng chứng đã dùng cho bản sửa #16.
+>
+> **Bán kính đo lại hôm nay:** đúng **3 xe** (id 6, 14, 15) đang ở tình trạng guard cũ cho lọt —
+> khớp con số đo ngày 2026-08-05, tái đo độc lập.
+>
+> **Bằng chứng củng cố tìm được khi rà lại (2026-08-06) — dự án đã ra đúng quyết định này ở entity
+> anh em từ trước:** `DriverService.BUSY_STATUSES:40-41` là
+> `{PENDING_APPROVAL, ACTIVE, DEPARTED}` — **đủ cả ba** — và được dùng để chặn khóa một tài xế còn
+> chuyến dở dang. Comment tại `DriverService:85` còn tự nhận là *"Cùng nguyên tắc với
+> `BusService.updateBus()` — chặn chuyển xe sang `REPAIRING` khi xe còn được phân công cho chuyến
+> chưa kết thúc"*. **Trước bản sửa này, câu đó SAI:** phía tài xế chặn 3 trạng thái, phía xe chặn 2.
+> Tức #15 không phải là áp một chuẩn ngoại lai, mà là **kéo phía xe về đúng quyết định project đã
+> có** — bên xe là ngoại lệ duy nhất, đúng như `CostParameterService` từng là ngoại lệ về validate
+> ở #11. Câu thông báo lỗi cũng đã đổi cho dùng chung cách diễn đạt với guard tài xế
+> (*"chờ duyệt / đang bán vé / đang trên đường"*), để không ai đọc hai câu rồi tưởng hai tập khác
+> nhau.
+>
+> **Tài liệu đã chỉnh cho khớp:** `database_schema.md:106` đổi từ *"active or pending trips"* sang
+> "unfinished" kèm ghi chú vì sao. `current_functional_spec.md:74` **đã đúng từ đầu** (*"unfinished
+> trips"*) nên giữ nguyên — đây chính là tài liệu mà code vừa được kéo về cho khớp.
+> `test_case.md`: TC_BUS_005/006 cập nhật danh sách + thông báo, và thêm **TC_BUS_006B** cho kịch
+> bản `DEPARTED` (test hồi quy của lỗi này).
+
 - **Mức độ:** nghiệp vụ — một quyết định an toàn của Admin bị hoàn tác không thông báo.
 - **Phân loại:** nhánh **3 — sai thuần túy**, nhưng **chỉ sau khi phát biểu lại**: chỗ sai là
   guard, **không phải** side-effect `COMPLETED → READY` (xem ghi chú phương pháp ở đầu mục).
@@ -1175,6 +1321,65 @@ chạy: `buses 20 / drivers 36 / trips 1500 / incidents 8 / users 37 / routes 8 
 ---
 
 ## 16. `BusService.saveBus()` không kiểm tra ba con số odometer — xoá trắng một ô là mất dữ liệu
+
+> **✅ ĐÃ SỬA (2026-08-05) — chủ dự án chọn phương án (a): ô trống = GIỮ NGUYÊN.**
+> `saveBus()` nay **chỉ dùng để tạo mới** (ném `IllegalArgumentException` nếu entity đã
+> có id), còn `updateBus(id, form)` nạp bản ghi cũ rồi **chép từng field** — đúng khuôn
+> `IncidentService.updateIncident()`. Cả hai đi qua `validate()` dùng chung.
+> `AdminBusController.updateBus` bỏ `bus.setId(id)` và gọi `updateBus(id, bus)`.
+>
+> **Vì sao (a) chứ không phải (b) "báo lỗi bắt nhập lại":**
+> 1. **Cùng nguyên tắc chủ dự án đã chốt ở #11, áp cho "thiếu giá trị" thay vì "số 0".**
+>    Ở #11, số 0 bị bác vì nó *"nguỵ trang thành một con số đã tính"*. Ô rỗng biến thành
+>    `0.0` chính là cái nguỵ trang đó, cộng thêm việc xoá mất số thật.
+> 2. **Project đã có sẵn khuôn này ở hai chỗ:** `IncidentService.updateIncident:50-55` và
+>    `AdminTripManagementController.updateTrip:214-231`. `BusService` là ngoại lệ, đúng
+>    như `CostParameterService` từng là ngoại lệ về validate.
+> 3. **Không mất khả năng nào:** `validate()` cho phép 0, nên muốn đặt odometer = 0 thì
+>    **gõ số 0**. Ba cột này là số dùng để tính toán, không có trạng thái "để trống" hợp lệ.
+> 4. Cả hai phương án đều **buộc phải tách ngữ nghĩa tạo/sửa**, nên (a) không tốn thêm gì.
+>
+> **Ba quyết định phụ:** (i) chỉ **ba ô số** áp luật "trống = giữ nguyên"; biển số / hãng /
+> loại xe / trạng thái vẫn chép nguyên như form gửi, vì để trống ở đó là ý định hợp lệ —
+> ghi rõ trong javadoc để lần rà sau không coi đây là bất đối xứng vô cớ. (ii) **Tripwire**:
+> `saveBus()` từ chối entity đã có id, nếu không thì một lời gọi cũ sẽ merge và ghi đè mọi
+> cột, đồng thời đi vòng qua ràng buộc `REPAIRING` nay nằm trong `updateBus()`. (iii) Ràng
+> buộc `REPAIRING` được **dời nguyên văn**, **KHÔNG** thêm `DEPARTED` — đó là lỗi #15, một
+> quyết định riêng, không trộn vào đây.
+>
+> **Pin bằng test:** `service/BusServiceTest` (**10 test**, `@SpringBootTest @Transactional`
+> cùng khuôn `CostParameterServiceTest`). Cặp cốt lõi là "ô trống thì giữ nguyên" +
+> **đối trọng** "gõ số 0 thì vẫn ghi 0", để bản sửa không trượt thành "bỏ qua mọi số 0".
+> `mvnw test` **59/59**. **Non-vacuous, hai lần đo:** quay `updateBus` về hành vi cũ
+> (null → mặc định) → **đúng 1 test đỏ** (`update_blankNumberKeepsExistingValue`), 9 test
+> còn lại xanh; bỏ `validate(existing)` → **đúng 3 test đỏ** (ba ca ràng buộc), 7 test còn
+> lại xanh.
+>
+> **Kiểm chứng trên app thật** (default profile, PID 11944, port 8099), xe tạm 28 xuất phát
+> `8000 / 4000 / 5000`:
+> | Thao tác qua form | Flash | DB sau đó |
+> |---|---|---|
+> | **Xoá trắng ô Odometer** (đúng cú đã phá dữ liệu) | *"…thành công!"* | **8000 / 4000 / 5000** — giữ nguyên |
+> | Gõ số 0 tường minh (đối trọng) | *"…thành công!"* | **0 / 0 / 5000** — vẫn ghi được 0 |
+> | `odometer = -500` | *"Lỗi: Odometer không được âm!"* | không đổi |
+> | `maintenanceThreshold = 0` | *"Lỗi: Ngưỡng cảnh báo bảo trì phải lớn hơn 0 km!"* | không đổi |
+> | `odometer < lastMaintenanceOdometer` | *"Lỗi: Odometer (3999.0 km) không được nhỏ hơn km lần bảo trì cuối (4000.0 km)!"* | không đổi |
+>
+> **Hai hồi quy đã chứng minh không hỏng:** (A) **tạo** xe bỏ trống cả ba ô vẫn nhận mặc
+> định **0 / 0 / 5000** như trước; (B) ràng buộc `REPAIRING` vừa dời chỗ vẫn chặn đúng trên
+> **xe thật số 7** (đang có chuyến `ACTIVE`/`PENDING`) — và bằng chứng mạnh nhất là **không
+> field nào bị ghi**: tôi cố tình gửi `brand=Hyundai`, DB vẫn giữ `Thaco-Mới7`, tức service
+> ném lỗi trước khi chép bất cứ thứ gì.
+>
+> Đã xoá hai xe tạm **qua app**; snapshot trước/sau **giống hệt** (`buses 20 / trips 1500`,
+> `SUM(odometer) 246145`, `SUM(last_maintenance_odometer) 227790`), 0 dòng vi phạm ràng
+> buộc mới, 0 exception trong log.
+>
+> **Phát hiện kèm khi rà lối ghi:** `Proj_functions_summary.md` khẳng định `AdminController`
+> có route tạo xe song song `/buses/new`, `/buses/save` gọi `AdminService.createNewBus()`
+> *"không validate gì"*. **Sai — không thứ nào tồn tại**: `AdminController` chỉ có
+> `/users/new` + `/users/save`, `AdminService` chỉ có `createNewUser()`. Đã sửa câu đó;
+> `BusService` là lối ghi `buses` duy nhất từ giao diện, nên bản sửa này không bị hở.
 
 - **Mức độ:** nghiệp vụ — **mất dữ liệu bền** (số km trọn đời) và **khoá xe vĩnh viễn**. Cùng họ với
   **#11** đã được chủ dự án chốt là lỗi thật.
@@ -1256,3 +1461,149 @@ chạy: `buses 20 / drivers 36 / trips 1500 / incidents 8 / users 37 / routes 8 
 - **`#numbers.formatDecimal(avgExperienceYears, 0, 1)`** (`dashboard-analytics.html:345`) — cùng
   khuôn lỗi #2 nhưng chỉ lộ khi trung bình số năm kinh nghiệm toàn đội < 1. Không nâng thành mục
   riêng; sửa kèm khi nào sửa #2.
+
+## Mục nhỏ — ghi để mai sửa (phát hiện 2026-08-05, hẹn xử lý 2026-08-06)
+
+- **`current_functional_spec.md:158` ghi sai công thức chặn bảo trì — nửa sau của câu.**
+  Chủ dự án đã xem và quyết định **hoãn sang 2026-08-06**, không gộp vào bản sửa #16.
+  - **Nội dung sai:** *"…or if the distance of the trip will push the odometer into the warning
+    threshold (`odometer + distance >= maintenanceThreshold * 0.9`)"*.
+  - **Code thật:** `Bus.isNearMaintenance(additionalKm)` (`domain/Bus.java:72-76`) tính
+    `(getKmSinceLastMaintenance() + additionalKm) >= maintenanceThreshold * 0.9`, tức **km kể từ
+    lần bảo trì cuối**, không phải **odometer trọn đời**. Với dữ liệu hiện tại hai vế lệch nhau
+    rất xa: xe 16 có odometer 17.755 nhưng `km_since` chỉ 4.995.
+  - **Vì sao đáng ghi:** **nửa trước của chính câu đó lại đúng**
+    (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`), nên người đọc dễ tin cả câu đã
+    được kiểm. Nếu tin theo vế sai thì gần như **mọi** xe trong đội đều bị coi là "sắp đến hạn"
+    (odometer ~12.000 > 4.500), tức mô tả một hệ thống không thể xếp nổi một chuyến nào.
+  - **Mức độ:** tài liệu thuần — **0 dòng code sai**, không ảnh hưởng hành vi. Cùng họ với #3.
+  - **Cách sửa:** đổi `odometer + distance` thành `kmSinceLastMaintenance + distance` trong đúng
+    một mệnh đề; không đụng phần còn lại của câu.
+
+---
+
+# Rà ngày 2026-08-06 — hai mục phát sinh khi phân tích #14/#15
+
+*Cả hai được tìm thấy trong lúc đọc để sửa #14/#15, và được tách riêng theo đúng kỷ luật đã áp cho
+cặp #15-vs-#16: mỗi mục một quyết định của chủ dự án, không gộp vào bản sửa đang làm.*
+
+## 18. Sửa được MỌI trường của một chuyến đã `COMPLETED` — trong khi XOÁ chính chuyến đó thì bị cấm
+
+- **Mức độ:** nghiệp vụ — **sai lệch odometer bền và không thể phát hiện**, cộng với sửa được dữ
+  liệu lịch sử mà Phase 6 đang đọc. Cùng họ tổn thất với **#6** và **#16**.
+- **Phân loại:** nhánh **3 — sai thuần túy**. Không phải "chưa nghĩ tới": dự án **đã ra chính sách**
+  cho đúng câu hỏi này, chỉ là lối vào thứ hai không áp nó.
+- **Ở đâu:** `AdminTripManagementController.updateTrip()` không xét trạng thái chuyến ở bất kỳ đâu.
+  Nó ghi đè route / bus / driver / departureTime / arrivalTime / totalSeats / price rồi gọi
+  `updateManualTrip()` (chỉ validate ràng buộc nghiệp vụ, **không** xét trạng thái) và `save()`.
+  Đến `:261` mới xét trạng thái, nhưng chỉ để quyết định **có gọi FSM không** — status không đổi ⇒
+  bỏ qua, báo thành công.
+- **Mâu thuẫn nội tại — đây là bằng chứng chính:** `TripService.deleteTrip():1469-1492` có một
+  chính sách theo trạng thái **viết thành văn**:
+  ```
+  DEPARTED  → NGHIÊM CẤM (đang trên đường, ảnh hưởng hành trình thực)
+  COMPLETED → NGHIÊM CẤM (báo cáo tài chính & lịch sử phải được giữ nguyên)
+  CANCELLED → Cho phép   (đã kết thúc vòng đời, dọn dẹp DB)
+  ```
+  Tức dự án **đã tuyên bố** chuyến `COMPLETED` là dữ liệu được bảo vệ. Nhưng thao tác **ồn ào**
+  (xoá — có xác nhận, mất cả dòng) thì bị cấm, còn thao tác **im lặng** (sửa mọi trường) thì cho
+  qua. **Cấm cái ồn ào, thả cái im lặng — ngược.**
+- **Template cũng đã biết luật này, chỉ nút Sửa bị bỏ sót:** nút **Hủy** ngay cạnh có sẵn guard
+  `th:if="${trip.status.name() != 'CANCELLED' and trip.status.name() != 'COMPLETED'}"`
+  (`trip-list.html:451`); nút **Sửa** (`:446`) không có guard nào.
+- **Thiệt hại cụ thể (không chỉ là "viết lại lịch sử"):** lúc vào `COMPLETED`, `TripService:618-627`
+  đã cộng `route.distanceKm` vào **chiếc xe đang được gán lúc đó**. Đổi xe sau đó ⇒ `trips.bus_id`
+  trỏ xe B nhưng **số km nằm vĩnh viễn trên xe A**. Hai bản ghi nói ngược nhau và **không gì phát
+  hiện được**. Kéo theo: `kmSinceLastMaintenance` sai → bộ lọc bảo trì trong `findBestAvailableBus()`
+  sai → màn Đề Xuất Thay Xe (70% điểm theo odometer) xếp sai. Thiệt hại thứ hai: sửa
+  `route`/`departureTime` của chuyến `COMPLETED` là sửa thẳng một quan sát mà
+  `TripRepository.findDemandHistoryByStatus(...)` của Phase 6 đọc để dựng dự báo.
+
+> **Đã tái hiện trên app thật (2026-08-06, default profile, PID 14688, port 8099)** — trên chuyến
+> `COMPLETED` **thật** số 2764 (route 5 / 180 km, xe 23, chạy xong 2026-08-03):
+>
+> | Bước | Kết quả |
+> |---|---|
+> | `GET /admin/trip-management/trips/edit/2764` | **200**, 27.835 bytes — form render bình thường, **0** `disabled`, không một cảnh báo nào |
+> | Dropdown xe trên chính form đó | **7 option** ⇒ Admin được mời **6 xe thay thế** cho một chuyến đã chạy xong |
+> | `POST /trips/update` đổi xe **23 → 10** | **"Cập nhật chuyến xe thành công!"** |
+> | DB ngay sau đó | `trips.bus_id` = **10**; odometer xe 23 = **2280**, xe 10 = **12630** — **cả hai KHÔNG đổi** |
+> | ⇒ hệ quả | 180 km của chuyến vẫn nằm trên **xe 23**, trong khi chuyến nay ghi là **xe 10** |
+> | **CÙNG chuyến đó**, `POST /trips/delete/2764` | **"⛔ Không thể xóa: Chuyến #2764 đã hoàn thành (COMPLETED). Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa."** |
+>
+> Hai hàng cuối là toàn bộ luận điểm: **cùng một chuyến, cùng một phiên** — sửa mọi trường thì
+> "thành công", xoá thì bị cấm kèm câu giải thích. Chuyến 2764 đã được **khôi phục về xe 23** ngay
+> sau đó và khớp mốc từng field; snapshot DB đầu/cuối phiên **giống hệt nhau**.
+
+- **Chạm được bằng UI, không cần POST tự chế:** ba cú click (danh sách chuyến → Sửa → đổi dropdown →
+  Lưu). Bán kính: **1.392** chuyến `COMPLETED` trên dữ liệu hiện tại.
+- **Cách sửa đề xuất — (a):** áp đúng chính sách của `deleteTrip` lên `updateTrip` — chặn khi chuyến
+  `COMPLETED`, thông báo soi gương câu của `deleteTrip`; kèm `th:if` cho nút Sửa như nút Hủy đã có.
+  Chỉ chặn `COMPLETED`; **`CANCELLED` giữ nguyên cho sửa**, vì `deleteTrip` cũng cho xoá `CANCELLED`
+  — code sẽ khớp chính sách **từng dòng một**, không khớp đại khái.
+  *Đã cân nhắc và loại (b) "chặn theo từng field"*: phải phán xử từng trường và phải giải thích vì
+  sao `price` sửa được trong khi `deleteTrip` nói *"báo cáo tài chính phải được giữ nguyên"* — nó
+  tạo ra chính sách **thứ hai**, khác chính sách đã có.
+- **⚠️ Điều chủ dự án cần biết TRƯỚC khi chọn: chính sách của `deleteTrip` nêu tên CẢ HAI trạng
+  thái, không chỉ `COMPLETED`.** Nó cấm xoá cả `DEPARTED` (*"đang trên đường, ảnh hưởng hành trình
+  thực"*). Nên có hai mức độ áp dụng, và chúng khác nhau về hệ quả:
+  - **(a-hẹp)** chỉ chặn sửa chuyến `COMPLETED` → bản sửa #14 vẫn cần thiết và vẫn là thứ duy nhất
+    bảo vệ chuyến `DEPARTED`.
+  - **(a-đủ)** chặn sửa cả `DEPARTED` lẫn `COMPLETED`, tức áp chính sách `deleteTrip` **nguyên vẹn**
+    → **bao trùm luôn bản sửa #14**, biến guard ở `updateTrip` thành thừa (không sai, chỉ thừa), và
+    đồng thời đóng nốt cạnh đã ghi ở cuối mục #14: đổi **`route`** của chuyến `DEPARTED` làm đổi số
+    km cộng vào odometer lúc `COMPLETED`, thứ mà #14 **không** khoá.
+  Hai mức này là quyết định nghiệp vụ thật, không phải chi tiết kỹ thuật: (a-đủ) nhất quán hơn với
+  chính sách đã viết, nhưng lấy đi khả năng sửa bất kỳ thông tin nào của một chuyến đang chạy — kể
+  cả sửa giá hay số ghế do gõ nhầm. Nếu chọn (a-đủ) thì **không cần** revert #14; chỉ cần ghi nhận
+  guard của #14 trở thành lớp phòng thủ thứ hai.
+- **Vì sao chưa sửa:** chủ dự án mới chỉ duyệt việc **xác minh**; bản sửa là quyết định riêng.
+
+---
+
+## 19. Guard `TRAVELING` trong `validateBusForTrip` chỉ sống ở 1 trong 4 lối gọi
+
+- **Mức độ:** **latent** — sai lệch đo được hôm nay bằng **0**, chỉ chạm được bằng POST tự chế.
+- **Phân loại:** nhánh **3 theo câu chữ** (tên biến khẳng định một điều mà code không kiểm), nhưng
+  **có một cách đọc ngược lại hợp lý** — xem phần cuối. Ghi lại chính vì chưa chốt được hướng đọc.
+- **Ở đâu:** `TripService.validateBusForTrip:936-944`
+  ```java
+  if (bus.getStatus() == BusStatus.TRAVELING) {
+      boolean travelingForThisTrip = excludeTripId != null
+              && trip.getId() != null
+              && excludeTripId.equals(trip.getId());   // ← chỉ so hai ID CHUYẾN
+      if (!travelingForThisTrip) { throw ...; }
+  }
+  ```
+  Tên biến nói *"xe đang chạy **vì chính chuyến này**"* — một khẳng định về **chiếc xe** — nhưng
+  biểu thức **không hỏi gì về chiếc xe**.
+
+| Lối gọi | `excludeTripId` truyền vào | Biểu thức | Guard |
+|---|---|---|---|
+| `createManualTrip:882` | `null` | false | ✅ **sống** |
+| `updateManualTrip:907` | `existingTrip.getId()` | **luôn true** | ❌ chết |
+| `approveTrip:860` | `tripId` | **luôn true** | ❌ chết |
+| `confirmAutoAssignedTrip:806` | `tripId` | **luôn true** | ❌ chết |
+
+- **Hệ quả:** cùng một chiếc xe `TRAVELING`, `POST /trips/create` **từ chối** còn
+  `POST /trips/approve` **nhận** — chỉ còn `isBusBusy` (giao cửa sổ thời gian) đứng chắn.
+- **Vì sao KHÔNG nâng thành lỗi nặng:** (1) mọi nguồn chọn xe đều lọc `READY` —
+  `getAvailableBusesForTrip:1249-1251` (dropdown Sửa **và** màn Phê Duyệt, `AdminTripController:69`),
+  `getAvailableBusesForTimeRange:1344`, `findBestAvailableBus:292-293` — nên xe `TRAVELING` **không
+  bao giờ xuất hiện trên giao diện**; (2) **không vi phạm bất biến nào**: luật §8 là một chiều
+  (dropdown không được *mời* thứ validator sẽ từ chối), ở đây dropdown **chặt hơn** validator, đúng
+  như lập luận đã dùng cho #12; (3) **cách đọc ngược lại hợp lý**: `isBusBusy` mới là luật đúng, còn
+  chặn theo `TRAVELING` là **thừa và quá chặt** — xếp một xe đang chạy vào chuyến chiều mai là bình
+  thường. Theo cách đọc này thì đây là *nới lỏng đúng, viết sai cách*.
+- **HOÃN CÓ CHỦ ĐÍCH — chủ dự án đã quyết định sửa mục này SAU #14 (2026-08-06), và lý do là kỹ
+  thuật, không phải trì hoãn:** bản sửa #14 làm cho lối `update` **tự đúng**. Khi không được đổi xe
+  của chuyến `DEPARTED` nữa, thì trên lối edit một xe `TRAVELING` **chỉ có thể là chính xe của
+  chuyến đang sửa** (vì `DEPARTED` là trạng thái duy nhất xe mang dấu `TRAVELING`) — đúng y điều tên
+  biến muốn nói, **đúng do cấu trúc, không thêm dòng nào**. Hố còn lại chỉ ở `approveTrip:860`, nơi
+  chuyến đang `PENDING_APPROVAL` nên xe của nó **không bao giờ** `TRAVELING` vì chính nó ⇒ escape ở
+  đó vô nghĩa và siết được bằng **một điều kiện**.
+  **Sửa trước #14** thì phải thêm query repository mới (kiểu `existsByBusIdAndStatusInAndIdNot`);
+  **sửa sau #14** thì còn 1 dòng. Đó là lý do không gộp và không làm trước.
+- **Câu hỏi nghiệp vụ cần chốt trước khi sửa:** *"một xe đang trên đường có được xếp lịch cho chuyến
+  TƯƠNG LAI không?"* Mọi lối chọn xe hôm nay đều trả lời **KHÔNG** ⇒ tính nhất quán nghiêng về việc
+  làm guard nói đúng điều nó đang định nói.

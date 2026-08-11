@@ -60,10 +60,12 @@ COMPLETED, CANCELLED → (terminal, không chuyển đi đâu nữa)
 **Service:** `BusService`
 
 - `findAllWithBusType()`, `findById()`, `findAllBusTypes()`.
-- `saveBus()`: auto-default `maintenanceThreshold=5000.0`, `lastMaintenanceOdometer=0.0`, `odometer=0.0` nếu null; **chặn** chuyển status sang `REPAIRING` nếu xe đang có trip `ACTIVE`/`PENDING_APPROVAL`.
+- `saveBus()`: **CHỈ dùng để TẠO MỚI** (ném `IllegalArgumentException` nếu entity đã có id — cập nhật phải qua `updateBus`). Auto-default `maintenanceThreshold=5000.0`, `lastMaintenanceOdometer=0.0`, `odometer=0.0` nếu null, rồi `validate()`.
+- `updateBus(id, form)`: nạp bản ghi cũ rồi **chép từng field** (khuôn `IncidentService.updateIncident`). Ba ô số để trống nghĩa là **giữ nguyên giá trị cũ**, không phải đặt về 0 — mặc-định-lúc-tạo áp cho luồng sửa chính là lỗi #16 (xoá trắng ô odometer làm mất số km trọn đời). Muốn đặt 0 thì gõ số 0. **Chặn** chuyển status sang `REPAIRING` nếu xe còn trip ở `PENDING_APPROVAL`/`ACTIVE`/**`DEPARTED`** — tức **mọi chuyến chưa kết thúc**, đúng phần bù của tập trạng thái cuối trong FSM, và đúng cùng tập `DriverService.BUSY_STATUSES` đang dùng để chặn khóa tài xế. (`DEPARTED` được thêm 2026-08-06, lỗi #15: trước đó xe đang lăn bánh vẫn đánh dấu bảo trì được, rồi dấu ấy bị side-effect `COMPLETED → READY` xoá âm thầm.)
+- `validate()` (dùng chung cho cả hai): odometer ≥ 0, km bảo trì cuối ≥ 0, `odometer ≥ lastMaintenanceOdometer` (nếu không `kmSinceLastMaintenance` âm ⇒ xe không bao giờ tới hạn bảo trì), `maintenanceThreshold > 0` (ngưỡng 0 khiến `needsMaintenance()` luôn true ⇒ xe bị khoá vĩnh viễn).
 - `deleteBus()`: **chặn cứng** xóa nếu xe đã từng gắn với bất kỳ trip nào (`existsByBusId`) — gợi ý đổi sang `REPAIRING` thay vì xóa.
 
-**Lưu ý kiến trúc:** `AdminController` (`/admin`) cũng có `GET/POST /buses/new` và `/buses/save` gọi `AdminService.createNewBus()` — đây là **route trùng lặp/song song** với `AdminBusController`, hai luồng tạo bus khác nhau cùng tồn tại (một qua `BusService` có validate, một qua `AdminService` không có validate gì).
+**Lưu ý kiến trúc:** `AdminController` (`/admin`) chỉ có `GET /users/new` + `POST /users/save` gọi `AdminService.createNewUser()`. **Không có route tạo xe song song** — `BusService` là lối ghi `buses` duy nhất từ giao diện (ngoài `DataInitializer`/`HistoricalDataBackfill` là seeder). *(Câu cũ ở đây mô tả `/buses/new`, `/buses/save` và `AdminService.createNewBus()` — không có thứ nào tồn tại trong mã nguồn; đã sửa 2026-08-05 khi rà lối ghi cho bản sửa #16.)*
 
 ---
 

@@ -173,3 +173,34 @@ Because step 1 re-scans every `ACTIVE` trip on every 10-second tick, a trip that
 | All others             | No change             |
 
 `PENDING_APPROVAL → ACTIVE` does **not** change bus status. The bus stays `READY` until departure.
+
+### 8.1. The pairing invariant, and what protects it
+
+The two rows above are a **pair**: the bus set `TRAVELING` on entering `DEPARTED` must be the same
+bus set `READY` on entering `COMPLETED`. `updateTripStatus()` does **not** remember which bus it
+marked — it re-reads `trip.getBus()` at both ends — so the pair holds **only while `trip.bus` does
+not change in between**.
+
+Two guards keep that true, and both live **outside** this FSM:
+
+| Guard | Where | Protects against |
+|---|---|---|
+| A `DEPARTED` trip's bus cannot be changed | `AdminTripManagementController.updateTrip()` | Defect **#14** — swapping the bus mid-trip left the old bus stranded in `TRAVELING` for ever (no self-recovery: the only two writers of `Bus.status`, `TripService:615/618`, both act on the **new** bus) |
+| A bus with an unfinished trip cannot be set `REPAIRING` | `BusService.updateBus()` | Defect **#15** — an admin's repair mark placed mid-trip was erased without warning by the `COMPLETED → READY` row above |
+
+Both were added 2026-08-06 and neither changes `TripService`: the FSM stays the sole authority on
+transitions, while the two screens stop *feeding* it a state it cannot represent. If a future change
+makes `trip.bus` mutable again while `DEPARTED`, this pairing breaks silently — there is no runtime
+check that would notice.
+
+A **third**, non-enforcing layer was added 2026-08-11: `trip-edit-form.html` renders the bus field as
+`readonly` for a `DEPARTED` trip instead of a dropdown. That is **not** a guard and must not be
+mistaken for one — it only stops the screen from *offering* what the controller would refuse (it was
+offering 2–6 rejected buses per running trip). Deleting it breaks no invariant; deleting the
+controller guard does. Both are required, for different reasons: the guard for correctness, the
+template so the UI does not advertise an action that cannot succeed.
+
+**Known limit, deliberately not closed here:** the `DEPARTED` guard locks the **bus** field only.
+Other fields of a running trip remain editable, and changing the **route** alters the distance later
+added to the odometer, since the sync block reads `trip.getRoute().getDistanceKm()` at *completion*
+time. That belongs to defect **#18** (`updateTrip()` applies no status policy at all), not to #14.

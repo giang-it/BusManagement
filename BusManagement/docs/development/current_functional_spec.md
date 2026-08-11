@@ -27,6 +27,8 @@ Only the Administrator workflow is currently exposed through the application:
 *   **Business Rules:**
     *   A bus has one of three statuses: `READY` (available for dispatch), `TRAVELING` (currently on a trip), or `REPAIRING` (under maintenance).
     *   Vehicles exceeding their maintenance thresholds cannot be assigned to trips.
+    *   The three maintenance figures are validated in `BusService` on both create and edit: odometer and last-maintenance reading may not be negative, the odometer may not be **below** the last-maintenance reading (that would make `kmSinceLastMaintenance` negative, so the vehicle would never come due for service), and the threshold must be greater than zero (a threshold of `0` makes `needsMaintenance()` permanently true, locking the vehicle out of every trip — servicing it cannot clear the condition).
+    *   When **editing** a bus, leaving one of those three boxes empty means **keep the current value**, not "set it to zero"; to store a zero the operator types `0`. Only on **creation** does an empty box fall back to the defaults (0 / 0 / 5000 km).
     *   Bus status is automatically synchronized during trip lifecycle transitions.
     *   A bus that has ever been assigned to a trip, or that has **any** incident recorded against it, cannot be hard-deleted — operational history is preserved; the bus is moved to `REPAIRING` instead. "Any" includes incidents already `RESOLVED`: the guard protects referential integrity, not open work. Because `Incident.bus` is mandatory, an incident cannot be unlinked from its bus, so the incident records must be deleted first if the bus itself is genuinely to be removed.
 
@@ -155,7 +157,7 @@ During manual creation or modification, the backend enforces the following valid
 *   **Bus Availability Constraints:**
     *   The bus status must not be `REPAIRING` or `TRAVELING` (unless editing the currently assigned trip).
     *   **Double-Booking Check:** The bus must not be assigned to another trip overlapping with the window `[departure - 1 hour, arrival + 1 hour]` (preparation buffer).
-    *   **Maintenance Block:** The bus cannot be assigned if it has already exceeded its maintenance threshold (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`) or if the distance of the trip will push the odometer into the warning threshold (`odometer + distance >= maintenanceThreshold * 0.9`).
+    *   **Maintenance Block:** The bus cannot be assigned if it has already exceeded its maintenance threshold (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`) or if the distance of the trip will push it into the warning band (`kmSinceLastMaintenance + distance >= maintenanceThreshold * 0.9`). *(Both clauses measure km **since the last service**, not lifetime odometer — `Bus.kmSinceLastMaintenance` is `odometer - lastMaintenanceOdometer`, which is why the first clause spells that subtraction out. Until 2026-08-11 the second clause read `odometer + distance`, which would have compared a lifetime reading against a service interval; the code, `Bus.isNearMaintenance()`, was always right.)*
 *   **Driver Availability Constraints:**
     *   The driver (main, co-driver, or assistant) must be active (`isActive = true`).
     *   The driver (main, co-driver, or assistant) must hold a driver licence that is still valid **on the trip's departure date** (`licenceExpiryDate > departureDate`) — not merely valid on the day the assignment is made. A trip departing after the licence expires is rejected even if the licence is still valid today.

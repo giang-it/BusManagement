@@ -118,11 +118,12 @@
   2. Thay đổi `status = REPAIRING`, giữ nguyên các trường khác
   3. `POST /admin/buses/edit/1`
 - **Kết quả mong đợi:**
-  - Trong `BusService.saveBus()`: `bus.getId() != null && bus.getStatus() == BusStatus.REPAIRING` → TRUE
-  - `tripRepository.existsByBusIdAndStatusIn(1L, [ACTIVE, PENDING_APPROVAL])` → TRUE
-  - `throw new RuntimeException("Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho các chuyến xe đang hoạt động hoặc chờ duyệt!")`
-  - Controller bắt Exception → `flash[error]` = `"Lỗi: Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho các chuyến xe đang hoạt động hoặc chờ duyệt!"`
+  - Trong `BusService.updateBus(id, form)`: `form.getStatus() == BusStatus.REPAIRING` → TRUE
+  - `tripRepository.existsByBusIdAndStatusIn(1L, [PENDING_APPROVAL, ACTIVE, DEPARTED])` → TRUE
+  - `throw new RuntimeException("Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho chuyến xe chưa kết thúc (chờ duyệt / đang bán vé / đang trên đường). Hãy hoàn thành hoặc hủy các chuyến đó trước!")`
+  - Controller bắt Exception → `flash[error]` = `"Lỗi: "` + câu trên
   - Redirect về `/admin/buses`, trạng thái xe trong DB KHÔNG thay đổi
+- **Ghi chú (2026-08-06, lỗi #15):** danh sách trạng thái chặn nay gồm cả `DEPARTED` — phần bù của tập trạng thái cuối, và **đúng bằng `DriverService.BUSY_STATUSES`** của guard khóa tài xế; câu thông báo cũng dùng chung cách diễn đạt với guard đó. Kịch bản `DEPARTED` được ghi riêng ở **TC_BUS_006B**.
 
 ---
 
@@ -136,9 +137,27 @@
 - **Các bước thực hiện:**
   1. `POST /admin/buses/edit/2` với `status = REPAIRING`
 - **Kết quả mong đợi:**
-  - `tripRepository.existsByBusIdAndStatusIn(2L, [ACTIVE, PENDING_APPROVAL])` → TRUE (match PENDING_APPROVAL)
+  - `tripRepository.existsByBusIdAndStatusIn(2L, [PENDING_APPROVAL, ACTIVE, DEPARTED])` → TRUE (match PENDING_APPROVAL)
   - Throw RuntimeException với cùng thông báo như TC_BUS_005
   - `flash[error]` xuất hiện, DB không thay đổi
+
+---
+
+### TC_BUS_006B — Cập nhật xe: Chặn chuyển sang REPAIRING khi xe đang có chuyến DEPARTED (lỗi #15)
+
+- **Mã TC:** TC_BUS_006B
+- **Tên Kịch Bản:** Admin đánh dấu bảo trì cho một chiếc xe **đang lăn bánh** (chuyến `DEPARTED`)
+- **Điều kiện tiên quyết:**
+  - Xe đang ở `TRAVELING` vì có chuyến `DEPARTED`, và **không** có chuyến `ACTIVE`/`PENDING_APPROVAL` nào
+    *(đo ngày 2026-08-06: xe id 6, 14, 15 đúng điều kiện này)*
+- **Các bước thực hiện:**
+  1. `POST /admin/buses/edit/{id}` với `status = REPAIRING`
+- **Kết quả mong đợi:**
+  - `tripRepository.existsByBusIdAndStatusIn(id, [PENDING_APPROVAL, ACTIVE, DEPARTED])` → TRUE (match `DEPARTED`)
+  - Throw RuntimeException với cùng thông báo như TC_BUS_005 → `flash[error]`, DB không đổi
+- **Vì sao có TC này:** trước 2026-08-06 bước 1 **thành công**, rồi khi chuyến chuyển sang `COMPLETED`,
+  side-effect `bus.status = READY` (`TripService:618`) **xoá dấu bảo trì không cảnh báo** và xe được mời
+  chạy tiếp. Đây là kịch bản hồi quy của lỗi #15 — nếu nó lại pass ở bước 1 thì lỗi đã quay lại.
 
 ---
 
@@ -814,6 +833,69 @@
   - Trong controller: `existingTrip.getStatus() != newStatus` → FALSE → `updateTripStatus` KHÔNG được gọi
   - Chỉ `updateManualTrip` chạy → lưu thông tin chuyến bình thường
   - DB: trạng thái vẫn là `ACTIVE`
+
+---
+
+### TC_FSM_030 — Sửa chuyến: Chặn ĐỔI XE khi chuyến đang DEPARTED (lỗi #14)
+
+- **Mã TC:** TC_FSM_030
+- **Tên Kịch Bản:** Một request đổi xe cho chuyến **đang trên đường** phải bị tầng server từ chối
+- **Điều kiện tiên quyết:** Chuyến ở trạng thái `DEPARTED`, đang gán xe A; tồn tại xe B khác trong hệ thống
+- **Các bước thực hiện:**
+  1. `POST /admin/trip-management/trips/update` với `busId` = B, **giữ nguyên** `status=DEPARTED`
+- **Lưu ý về cách chạm tới TC này (2026-08-11):** từ khi ô Xe bị khoá ở template (**TC_FSM_032**),
+  kịch bản này **không còn đi tới được bằng UI** — phải gửi POST tự chế. Nó vẫn là TC bắt buộc:
+  guard ở controller là lớp phòng thủ thật, template chỉ là lớp không-mời. Nếu TC này bắt đầu pass
+  ở bước 1 thì bất biến đã hở lại, dù màn hình trông vẫn đúng.
+- **Kết quả mong đợi:**
+  - Guard trong `AdminTripManagementController.updateTrip()`: `status == DEPARTED && !busId.equals(currentBusId)` → TRUE
+  - `flash[error]` = `"Không thể đổi xe cho chuyến #{id} vì chuyến đang trên đường (DEPARTED). …"`
+  - Redirect về `/admin/trip-management/trips/edit/{id}`
+  - **DB: KHÔNG field nào của chuyến bị ghi** — guard `return` trước mọi setter. Kiểm bằng cách gửi
+    kèm một field cố tình sai (ví dụ `price`) và xác nhận nó không landing.
+  - `Bus.status` của cả xe A lẫn xe B không đổi
+- **Vì sao có TC này:** trước 2026-08-06 bước 3 **thành công**, xe A kẹt `TRAVELING` vĩnh viễn (biến
+  mất khỏi mọi nguồn chọn xe vốn chỉ lấy `READY`), xe B đang chạy thật thì vẫn `READY`, và hoàn thành
+  chuyến cũng **không** giải phóng xe A. Đây là test hồi quy của lỗi #14.
+- **Phạm vi:** chỉ khoá trường `bus`. Các trường khác của chuyến `DEPARTED` vẫn sửa được — xem lỗi #18.
+
+---
+
+### TC_FSM_031 — Sửa chuyến DEPARTED nhưng GIỮ NGUYÊN xe → vẫn phải lưu được (đối trọng TC_FSM_030)
+
+- **Mã TC:** TC_FSM_031
+- **Tên Kịch Bản:** Admin sửa một chuyến đang `DEPARTED` mà không đổi xe
+- **Điều kiện tiên quyết:** Chuyến ở `DEPARTED`, gán xe A
+- **Các bước thực hiện:**
+  1. `POST /admin/trip-management/trips/update` với **cùng** `busId` = A, `status=DEPARTED`
+- **Kết quả mong đợi:**
+  - Guard: `!busId.equals(currentBusId)` → FALSE → **không chặn**
+  - `updateManualTrip` chạy bình thường → `flash[success]` = `"Cập nhật chuyến xe thành công!"`
+- **Vì sao có TC này:** chốt rằng bản sửa #14 chặn đúng việc **ĐỔI** xe, **không** biến màn Sửa của
+  chuyến đang chạy thành chỉ-đọc. Thiếu TC này, một bản sửa quá tay sẽ không bị phát hiện.
+
+---
+
+### TC_FSM_032 — Form Sửa chuyến DEPARTED: ô Xe phải bị KHOÁ, không được mời xe khác (bổ sung #14, 2026-08-11)
+
+- **Mã TC:** TC_FSM_032
+- **Tên Kịch Bản:** Admin mở form Sửa của một chuyến **đang trên đường**
+- **Điều kiện tiên quyết:** Chuyến ở `DEPARTED`, đang gán xe A
+- **Các bước thực hiện:**
+  1. `GET /admin/trip-management/trips/edit/{id}`
+- **Kết quả mong đợi:**
+  - **KHÔNG** có thẻ `<select name="busId">` trên trang
+  - Thay vào đó: một `<input readonly>` hiển thị đúng xe A (biển số + loại xe), và một
+    `<input type="hidden" name="busId">` mang **đúng id của xe A** — để form vẫn submit hợp lệ
+    (`busId` là `@RequestParam` **bắt buộc**; nếu dùng `select disabled` thì request hỏng ở tầng bind)
+  - Có dòng giải thích *"Chuyến đang trên đường — không đổi được xe."*
+  - **Đối chứng:** cùng trang với chuyến `PENDING_APPROVAL` / `ACTIVE` / `COMPLETED` / `CANCELLED`
+    thì `<select name="busId">` **vẫn phải có** — chỉ khoá đúng một trạng thái
+- **Vì sao có TC này:** guard #14 (TC_FSM_030) sinh ra một lối từ chối mới ở submit, nhưng dropdown
+  không đổi ⇒ màn hình mời 2–6 xe mà nó chắc chắn sẽ từ chối (đo 2026-08-11 trên 5 chuyến `DEPARTED`).
+  Điều đó ngược đúng luật javadoc `showEditTripForm()` tự phát biểu: *không mời thứ submit sẽ từ chối*.
+  TC này khoá lại lớp giao diện; **TC_FSM_030 khoá lớp server** — cả hai đều phải xanh, không thay
+  thế cho nhau.
 
 ---
 

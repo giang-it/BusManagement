@@ -92,7 +92,7 @@ Physical bus records including odometer tracking and maintenance data.
 | `brand`                     | `String`     | nullable               |                                            |
 | `odometer`                  | `Double`     | nullable               | Total km driven since manufacture          |
 | `last_maintenance_odometer` | `Double`     | nullable               | Odometer reading at last maintenance       |
-| `maintenance_threshold`     | `Double`     | nullable, default 5000 | Default set in `BusService.saveBus()`      |
+| `maintenance_threshold`     | `Double`     | nullable, default 5000 | Default applied **on creation** by `BusService.saveBus()`; on edit an empty box keeps the stored value (`updateBus`) |
 | `status`                    | `String`     | Enum as VARCHAR        | `READY`, `TRAVELING`, `REPAIRING`          |
 
 **Relationships:**
@@ -103,7 +103,7 @@ Physical bus records including odometer tracking and maintenance data.
 - `needsMaintenance()` = `kmSinceLastMaintenance >= maintenanceThreshold`
 - `isNearMaintenance(additionalKm)` = `(kmSinceLastMaintenance + additionalKm) >= maintenanceThreshold * 0.9`
 
-**Deletion rule:** Cannot be deleted if the bus has any associated trip record (checked via `TripRepository.existsByBusId`). Cannot be set to `REPAIRING` if it has active or pending trips.
+**Deletion rule:** Cannot be deleted if the bus has any associated trip record (checked via `TripRepository.existsByBusId`). Cannot be set to `REPAIRING` if it has any **unfinished** trip — `PENDING_APPROVAL`, `ACTIVE` **or `DEPARTED`**, i.e. exactly the complement of the FSM's terminal states. `DEPARTED` was missing from this guard until 2026-08-06 (defect #15): a bus could be marked under repair while physically on the road, and the mark was then erased without warning by the `COMPLETED → READY` side effect. This line previously read "active or pending trips", which is what the code did rather than what `current_functional_spec.md` required.
 
 ---
 
