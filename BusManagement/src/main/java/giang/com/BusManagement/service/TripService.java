@@ -984,7 +984,11 @@ public class TripService {
      * Kiểm tra toàn bộ ràng buộc liên quan đến xe trước khi gán vào chuyến.
      *
      * Chặn cứng (throw IllegalArgumentException) nếu:
-     * - Xe đang REPAIRING hoặc TRAVELING.
+     * - Xe đang REPAIRING.
+     * - Xe mang cờ TRAVELING mà KHÔNG có chuyến DEPARTED nào giải thích cờ đó
+     * (trạng thái xe lệch với lịch chuyến — xem lỗi #19). Nếu có chuyến đang
+     * chạy giải thích, việc xe có nhận thêm chuyến được hay không do luật cửa
+     * sổ thời gian ngay bên dưới quyết định, KHÔNG do cái cờ.
      * - Xe đang bận (trùng lịch) trong cửa sổ [departure - 1h, arrival + 1h].
      * - Xe đã QUÁ HẠN bảo trì (needsMaintenance() == true ngay hiện tại).
      * - Quãng đường của chuyến này sẽ đẩy xe vào vùng SẮP/QUÁ hạn bảo trì
@@ -1001,13 +1005,49 @@ public class TripService {
             throw new IllegalArgumentException(
                     "Xe " + bus.getLicensePlate() + " đang được bảo trì/sửa chữa, không thể gán vào chuyến!");
         }
-        if (bus.getStatus() == BusStatus.TRAVELING) { // ← THAY BẰNG ĐOẠN NÀY
-            boolean travelingForThisTrip = excludeTripId != null
-                    && trip.getId() != null
-                    && excludeTripId.equals(trip.getId());
-            if (!travelingForThisTrip) {
+        // Xe mang cờ TRAVELING: chỉ chặn khi KHÔNG có chuyến nào đang chạy giải
+        // thích cho cái cờ đó. Xem lỗi #19.
+        //
+        // Bản cũ hỏi sai câu. Nó kiểm `excludeTripId.equals(trip.getId())` và đặt
+        // tên biến là "travelingForThisTrip" — một khẳng định về CHIẾC XE — nhưng
+        // biểu thức không hỏi gì về chiếc xe, chỉ hỏi "có đang validate chính
+        // chuyến này không", điều luôn đúng ở 3/4 lối gọi. Kết quả: cùng một chiếc
+        // xe TRAVELING, /trips/create từ chối còn /trips/approve nhận.
+        //
+        // Vì sao KHÔNG chặn mọi xe TRAVELING (phương án "siết", đã thử và bỏ):
+        // isBusBusy() bên dưới ĐÃ chặn ca cửa sổ thời gian giao nhau. Chặn thêm
+        // theo cờ chỉ thêm được ca KHÔNG giao nhau — tức xếp xe cho chuyến tuần
+        // sau trong khi hôm nay nó đang chạy — vốn là vận hành bình thường. Đo
+        // 2026-08-12: 2 chuyến mang hình dạng này (8 trên xe 20, 14 trên xe 7);
+        // chuyến 8 đã sửa được thật trên app sau bản vá này, còn chuyến 14 vốn đã
+        // không lưu được vì một luật KHÁC (giờ lái 8h/ngày của tài xế chính), nên
+        // siết chỉ thêm cho nó một lý do chặn thứ hai. Bán kính mà siết THÊM VÀO
+        // là 1 chuyến. Quan trọng hơn con số: showEditTripForm() cưỡng bức thêm xe
+        // hiện tại vào dropdown ⇒ siết thì form sẽ MỜI đúng chiếc xe nó sắp từ
+        // chối, phá bất biến một chiều của #12.
+        //
+        // Vì sao KHÔNG bỏ hẳn nhánh này (phương án "nới"): cờ này là tín hiệu ĐỘC
+        // LẬP với bảng trips. §9 của roadmap ghi rõ Bus.status có hai người ghi
+        // (FSM và BusService) và có thể lệch với lịch chuyến. Một chiếc xe mang cờ
+        // TRAVELING mà không chuyến DEPARTED nào giải thích thì hoặc là dữ liệu đã
+        // lệch, hoặc là admin tự đặt tay — cả hai trường hợp đều KHÔNG nên xếp lịch
+        // tiếp. Fail-closed ở đây là đúng.
+        //
+        // Vì sao query KHÔNG cần vế loại trừ chuyến hiện tại: chuyến đang được
+        // validate không bao giờ ở trạng thái DEPARTED — #18 chặn sửa chuyến đã
+        // xuất phát, #20 chỉ cho duyệt chuyến PENDING_APPROVAL, còn createManualTrip
+        // thì chuyến chưa tồn tại. Nên mọi chuyến DEPARTED tìm thấy chắc chắn là
+        // chuyến KHÁC. Đây đúng là điều mục #19 dự đoán khi hoãn nó lại sau #14.
+        // Dùng lại existsByBusIdAndStatusIn() có sẵn (BusService.updateBus đang
+        // dùng cho guard #15), không thêm query mới.
+        if (bus.getStatus() == BusStatus.TRAVELING) {
+            boolean explainedByARunningTrip = tripRepository.existsByBusIdAndStatusIn(
+                    bus.getId(), List.of(TripStatus.DEPARTED));
+            if (!explainedByARunningTrip) {
                 throw new IllegalArgumentException("Xe " + bus.getLicensePlate()
-                        + " đang trên đường (TRAVELING), không thể gán vào chuyến mới cho đến khi hoàn thành chuyến hiện tại!");
+                        + " đang mang trạng thái TRAVELING nhưng không có chuyến nào đang chạy để giải thích"
+                        + " — trạng thái xe đang không nhất quán với lịch chuyến. Hãy đóng chuyến còn treo ở"
+                        + " Bảng Điều Hành, hoặc sửa lại trạng thái xe ở màn Quản Lý Xe, trước khi xếp lịch mới!");
             }
         }
 

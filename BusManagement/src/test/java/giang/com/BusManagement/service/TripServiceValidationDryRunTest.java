@@ -5,8 +5,10 @@ import giang.com.BusManagement.domain.BusStatus;
 import giang.com.BusManagement.domain.Driver;
 import giang.com.BusManagement.domain.Role;
 import giang.com.BusManagement.domain.Trip;
+import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.domain.User;
 import giang.com.BusManagement.repository.BusRepository;
+import giang.com.BusManagement.repository.TripRepository;
 import giang.com.BusManagement.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,9 @@ class TripServiceValidationDryRunTest {
 
     @Autowired
     private BusRepository busRepository;
+
+    @Autowired
+    private TripRepository tripRepository;
 
     private Bus bus;
     private Driver driver;
@@ -144,6 +149,110 @@ class TripServiceValidationDryRunTest {
 
         assertTrue(result.isValid(), "Tài xế sạch phải hợp lệ");
         assertNull(result.getFailureReason());
+    }
+
+    // =====================================================================
+    // Lỗi #19 — cờ TRAVELING chỉ chặn khi KHÔNG có chuyến nào giải thích nó
+    //
+    // Bản cũ hỏi `excludeTripId.equals(trip.getId())` dưới cái tên
+    // "travelingForThisTrip", nên guard sống ở createManualTrip (excludeTripId
+    // null) và CHẾT ở ba lối còn lại: cùng một chiếc xe, /trips/create từ chối
+    // còn /trips/approve nhận. Bốn test dưới chốt cả ba ca của luật mới, và ca
+    // cuối chốt thẳng vào chính sự bất nhất đó.
+    // =====================================================================
+
+    /** Lưu một chuyến DEPARTED cho `bus` trong cửa sổ chỉ định. */
+    private void giveBusARunningTrip(LocalDateTime dep, LocalDateTime arr) {
+        Trip running = new Trip();
+        running.setBus(bus);
+        running.setDriver(driver);
+        running.setDepartureTime(dep);
+        running.setArrivalTimeExpected(arr);
+        running.setTotalSeats(40);
+        running.setStatus(TripStatus.DEPARTED);
+        tripRepository.save(running);
+    }
+
+    /**
+     * Ca dữ liệu LỆCH: xe mang cờ TRAVELING mà không chuyến nào đang chạy. Đúng
+     * tình trạng của xe seed 51B-DAG.CH (TC_FSM_007) và của bất kỳ xe nào bị đặt
+     * tay sang TRAVELING. Fail-closed: không xếp lịch trên trạng thái không nhất
+     * quán.
+     */
+    @Test
+    void busDryRun_travelingBusWithNoRunningTrip_fails() {
+        bus.setStatus(BusStatus.TRAVELING);
+        busRepository.save(bus);
+
+        ValidationResult result = tripService.validateBusForTripDryRun(bus, validTrip(), null);
+
+        assertFalse(result.isValid(), "Cờ TRAVELING không có chuyến nào giải thích thì phải bị chặn");
+        assertNotNull(result.getFailureReason());
+        assertTrue(result.getFailureReason().contains("không nhất quán"),
+                "Thông điệp phải nói đúng bệnh (trạng thái lệch), nhận được: " + result.getFailureReason());
+    }
+
+    /**
+     * Ca mà phương án "siết" sẽ chặn nhầm: xe đang chạy một chuyến có thật, và
+     * chuyến mới nằm ở cửa sổ KHÔNG giao nhau. Đây chính là hình dạng của hai
+     * chuyến thật (8 và 14) đo được ngày 2026-08-12.
+     */
+    @Test
+    void busDryRun_travelingBusExplainedByRunningTrip_nonOverlappingWindow_returnsPass() {
+        bus.setStatus(BusStatus.TRAVELING);
+        busRepository.save(bus);
+        // Chuyến đang chạy nằm ở QUÁ KHỨ xa so với cửa sổ của validTrip() (ngày mai).
+        giveBusARunningTrip(departure.minusDays(3), departure.minusDays(3).plusHours(4));
+
+        ValidationResult result = tripService.validateBusForTripDryRun(bus, validTrip(), null);
+
+        assertTrue(result.isValid(),
+                "Xe đang chạy một chuyến khác, cửa sổ không giao nhau ⇒ vẫn xếp lịch được. Lý do: "
+                        + result.getFailureReason());
+    }
+
+    /**
+     * ĐỐI TRỌNG của ca trên: cùng tình huống nhưng cửa sổ GIAO nhau thì vẫn phải
+     * bị chặn — bằng luật cửa sổ (isBusBusy), không phải bằng cái cờ. Thiếu ca
+     * này thì một bản sửa "bỏ hẳn nhánh TRAVELING" cũng qua được ca trên.
+     */
+    @Test
+    void busDryRun_travelingBusExplainedByRunningTrip_overlappingWindow_fails() {
+        bus.setStatus(BusStatus.TRAVELING);
+        busRepository.save(bus);
+        // Chuyến đang chạy TRÙNG cửa sổ với validTrip().
+        giveBusARunningTrip(departure, departure.plusHours(4));
+
+        ValidationResult result = tripService.validateBusForTripDryRun(bus, validTrip(), null);
+
+        assertFalse(result.isValid(), "Cửa sổ giao nhau thì phải bị chặn");
+        assertTrue(result.getFailureReason().contains("đang bận"),
+                "Phải bị chặn bởi luật cửa sổ thời gian, nhận được: " + result.getFailureReason());
+    }
+
+    /**
+     * CHỐT THẲNG VÀO LỖI #19: cùng một chiếc xe, cùng một cửa sổ, câu trả lời
+     * phải GIỐNG NHAU dù đang tạo chuyến mới (excludeTripId = null, lối
+     * createManualTrip) hay đang thao tác trên một chuyến đã có (excludeTripId =
+     * id chuyến, lối updateManualTrip/approveTrip/confirmAutoAssignedTrip).
+     *
+     * Trước bản sửa, hai vế này KHÁC nhau: vế đầu từ chối, vế sau nhận.
+     */
+    @Test
+    void busDryRun_travelingBus_sameAnswerWhetherNewAssignmentOrExistingTrip() {
+        bus.setStatus(BusStatus.TRAVELING);
+        busRepository.save(bus);
+
+        Trip persisted = validTrip();
+        persisted.setStatus(TripStatus.PENDING_APPROVAL);
+        persisted = tripRepository.save(persisted);
+
+        ValidationResult asNewAssignment = tripService.validateBusForTripDryRun(bus, validTrip(), null);
+        ValidationResult asExistingTrip = tripService.validateBusForTripDryRun(bus, persisted, persisted.getId());
+
+        assertEquals(asNewAssignment.isValid(), asExistingTrip.isValid(),
+                "Cùng xe, cùng cửa sổ ⇒ tạo mới và sửa chuyến đã có phải cho cùng một câu trả lời");
+        assertFalse(asNewAssignment.isValid(), "Và ở đây câu trả lời chung phải là TỪ CHỐI (cờ không được giải thích)");
     }
 
     // =====================================================================
