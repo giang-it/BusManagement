@@ -786,13 +786,73 @@ public class TripService {
     // =========================================================================
 
     /**
+     * Tiền điều kiện chung của HAI lối phê duyệt: chỉ chuyến đang
+     * {@code PENDING_APPROVAL} mới được duyệt. Xem lỗi #20.
+     *
+     * VÌ SAO CẦN: cả hai lối duyệt đều kết thúc bằng changeStatusToActive(), tức
+     * chúng THỰC HIỆN MỘT TRANSITION (X → ACTIVE) trên một bản ghi đã tồn tại,
+     * nhưng lại không đi qua cổng FSM updateTripStatus()/canTransition(). Whitelist
+     * FSM (canTransition:536-546) chỉ cho PENDING_APPROVAL → ACTIVE; vậy mà thiếu
+     * guard này, một POST tự chế duyệt được cả chuyến CANCELLED, COMPLETED hay
+     * DEPARTED — đúng ba dòng mà trip_lifecycle_fsm.md §5 liệt kê trong bảng
+     * "Invalid Transitions (ENFORCED)". Đã tái hiện thật trên chuyến 2749
+     * (CANCELLED → ACTIVE, cả hai lối, app báo "thành công").
+     *
+     * VÌ SAO LỖ NÀY SỐNG QUA BA LẦN RÀ: Proj_functions_summary.md:53 miễn trừ cả
+     * ba method dùng changeStatusToActive() với lý do "trường hợp tạo/duyệt —
+     * không có from state cần kiểm tra transition". Câu đó ĐÚNG với
+     * createManualTrip() — Trip còn transient, chưa có bản ghi nào trong DB nên
+     * không có from-state để nói tới — và SAI với hai method này, vốn mở đầu bằng
+     * tripRepository.findById() ⇒ nạp một bản ghi đã tồn tại, có from-state hẳn
+     * hoi. Một tính chất của method thứ nhất đã bị khái quát cho cả ba. Cùng khuôn
+     * với lỗi #14, nơi một câu javadoc sai đã che lỗi khỏi các lần rà trước.
+     *
+     * VÌ SAO KIỂM BẰNG != CHỨ KHÔNG PHẢI switch-không-default như deleteTrip():
+     * deleteTrip có chính sách RIÊNG cho từng trạng thái (mỗi nhánh một thông
+     * điệp), nên buộc người thêm TripStatus mới phải quyết định là đúng. Ở đây
+     * luật chỉ có một vế — "duyệt được đúng từ PENDING_APPROVAL" — nên một trạng
+     * thái mới rơi vào nhánh TỪ CHỐI là mặc định AN TOÀN (fail-closed) và cũng là
+     * câu trả lời đúng. Sao chép hình dạng switch vào đây sẽ là bắt chước hình
+     * thức, không phải giữ nhất quán về lập luận.
+     *
+     * KHÔNG chặn ở controller như allow-list BOARD_ACTIONS của lỗi #10: ở #10 câu
+     * hỏi là "màn hình phơi ra STATUS ĐÍCH nào" — việc của controller. Ở đây đích
+     * cố định (ACTIVE) và câu hỏi là về STATUS NGUỒN, tức bất biến vòng đời mà
+     * trip_lifecycle_fsm.md:3 giao cho TripService giữ ("sole authoritative
+     * implementation... no status change should bypass it").
+     *
+     * @throws IllegalStateException nếu chuyến không ở PENDING_APPROVAL — cùng
+     *                               kiểu ngoại lệ mà deleteTrip() và
+     *                               updateTripStatus() dùng cho vi phạm chính sách
+     *                               theo trạng thái
+     */
+    private void requirePendingApproval(Trip trip) {
+        if (trip.getStatus() != TripStatus.PENDING_APPROVAL) {
+            throw new IllegalStateException(
+                    "Chuyến #" + trip.getId() + " đang ở trạng thái " + trip.getStatus()
+                            + ", không phải PENDING_APPROVAL nên không thể phê duyệt. "
+                            + "Chỉ chuyến đang chờ duyệt mới được kích hoạt; "
+                            + "quy trình vận hành sau khi chuyến đã mở bán nằm ở Bảng Điều Hành.");
+        }
+    }
+
+    /**
      * Admin xác nhận chuyến đã được AI phân công đầy đủ — chỉ cần 1 click.
      * Hệ thống kiểm tra lại ràng buộc trước khi kích hoạt.
+     *
+     * Tiền điều kiện trạng thái nằm ở requirePendingApproval() — dùng chung với
+     * approveTrip() để hai lối duyệt không thể trôi ra khác nhau, đúng khuôn
+     * editRefusalReason() của lỗi #18.
      */
     @Transactional
     public String confirmAutoAssignedTrip(Long tripId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
+
+        // Kiểm TRƯỚC mọi thứ khác: rẻ nhất, và báo đúng bệnh. Nếu để sau
+        // validateBusForTrip(), một chuyến COMPLETED sai trạng thái có thể bị báo
+        // thành "xe quá hạn bảo trì" — đúng là bị chặn, nhưng sai lý do.
+        requirePendingApproval(trip);
 
         if (trip.getBus() == null) {
             throw new IllegalStateException("Chuyến chưa được phân công xe. Vui lòng dùng form phân công thủ công.");
@@ -822,12 +882,20 @@ public class TripService {
     /**
      * Admin phân công thủ công (dùng khi AI không tìm được tài nguyên tự động).
      * Vẫn kiểm tra ràng buộc trước khi lưu.
+     *
+     * Tiền điều kiện trạng thái nằm ở requirePendingApproval() — dùng chung với
+     * confirmAutoAssignedTrip(). Phải kiểm TRƯỚC setBus()/setDriver() bên dưới:
+     * hai setter đó ghi lên entity đang được quản lý, nên nếu chặn muộn hơn thì
+     * một chuyến DEPARTED có thể bị dời con trỏ xe trước khi bị từ chối — đúng
+     * thiệt hại của lỗi #14 (xe cũ kẹt TRAVELING vĩnh viễn).
      */
     @Transactional
     public String approveTrip(Long tripId, Long busId, Long driverId, Long assistantId,
             java.util.List<Long> coDriverIds) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
+
+        requirePendingApproval(trip);
 
         Bus bus = busRepository.findById(busId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy xe #" + busId));
@@ -1517,6 +1585,33 @@ public class TripService {
     /**
      * Hàm Helper chuyên trách việc chuyển trạng thái chuyến xe sang ACTIVE.
      * Đồng thời đóng dấu thời gian mở bán nếu chuyến xe chưa từng được mở bán.
+     *
+     * ⚠️ BẤT BIẾN: với một chuyến ĐÃ TỒN TẠI, chỉ được VÀO ACTIVE từ
+     * PENDING_APPROVAL — đúng dòng duy nhất whitelist FSM cho phép
+     * (canTransition:541). Method này KHÔNG tự kiểm; mỗi call site phải tự bảo
+     * đảm. Hiện có ĐÚNG BỐN, và chúng KHÔNG cùng một dạng:
+     * <ul>
+     * <li>updateTripStatus() — canTransition() đã lọc; ACTIVE → ACTIVE đã return
+     * sớm ở nhánh from == to, nên tới đây chỉ còn PENDING_APPROVAL;</li>
+     * <li>confirmAutoAssignedTrip() và approveTrip() — nạp bản ghi bằng
+     * findById() nên CÓ from-state; được bảo đảm bằng requirePendingApproval()
+     * gọi ngay đầu method (lỗi #20);</li>
+     * <li>createManualTrip() — TẠO MỚI, ngoại lệ thật sự: Trip còn transient
+     * (id == null, chưa có bản ghi nào trong DB) nên KHÔNG có from-state để nói
+     * tới. Lưu ý trạng thái của nó lúc này KHÔNG phải mặc định PENDING_APPROVAL
+     * của entity: AdminTripManagementController.createTrip():117 đã set thẳng
+     * ACTIVE trước khi gọi vào đây.</li>
+     * </ul>
+     * ⛔ HỆ QUẢ QUAN TRỌNG — ĐỪNG "gom guard về một chỗ" bằng cách chuyển
+     * requirePendingApproval() vào chính method này. Nghe thì gọn (một chốt chặn
+     * cho cả bốn cửa), nhưng nó sẽ ném lỗi ở lối createManualTrip() vì trạng thái
+     * ở đó là ACTIVE ⇒ VỠ TOÀN BỘ chức năng tạo chuyến thủ công. Guard phải nằm ở
+     * hai method phê duyệt, đúng chỗ nó đang nằm.
+     *
+     * THÊM CALL SITE MỚI trên một chuyến đã tồn tại thì phải tự bảo đảm bất biến
+     * này, nếu không sẽ tái tạo đúng lỗi #20: duyệt được một chuyến
+     * CANCELLED/COMPLETED/DEPARTED và app báo "thành công", trong khi
+     * trip_lifecycle_fsm.md §5 ghi ba transition đó là "Invalid — ENFORCED".
      */
     private void changeStatusToActive(Trip trip) {
         trip.setStatus(TripStatus.ACTIVE);

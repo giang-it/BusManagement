@@ -2,6 +2,7 @@ package giang.com.BusManagement.controller.admin;
 
 import giang.com.BusManagement.domain.Driver;
 import giang.com.BusManagement.domain.Trip;
+import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.service.TripService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -56,8 +57,28 @@ public class AdminTripController {
      * chọn.
      */
     @GetMapping("/approve/{id}")
-    public String showApproveForm(@PathVariable Long id, Model model) {
+    public String showApproveForm(@PathVariable Long id, Model model,
+            RedirectAttributes redirectAttributes) {
         Trip trip = tripService.getTripById(id);
+
+        // Lớp KHÔNG-MỜI (lỗi #20). Chặn thật nằm ở TripService.requirePendingApproval();
+        // chỗ này chỉ để form đừng MỜI một thao tác mà service chắc chắn từ chối.
+        //
+        // Cùng phân vai với showEditTripForm() của lỗi #18: template quyết định cái
+        // gì được MỜI, service quyết định cái gì được NHẬN. Thiếu lớp này, bản sửa
+        // #20 sẽ tự tạo ra đúng anti-pattern "mời thứ sẽ từ chối" mà dự án vừa bác
+        // khi revert #19 ngày 2026-08-11 — trước bản sửa thì form này submit được
+        // (chính là lỗi), sau bản sửa thì nó sẽ hiện ra rồi báo lỗi khi bấm.
+        //
+        // Hàng chờ duyệt (pending-trips.html) vốn chỉ liệt kê PENDING_APPROVAL, nên
+        // đây là chặn cho URL gõ tay / bookmark cũ, không phải cho luồng thường.
+        if (trip.getStatus() != TripStatus.PENDING_APPROVAL) {
+            redirectAttributes.addFlashAttribute("error",
+                    "Chuyến #" + id + " đang ở trạng thái " + trip.getStatus()
+                            + ", không còn nằm trong hàng chờ duyệt nên không mở được form phê duyệt.");
+            return "redirect:/admin/trips/pending";
+        }
+
         model.addAttribute("trip", trip);
 
         boolean isAutoAssigned = (trip.getBus() != null && trip.getDriver() != null);
@@ -121,6 +142,12 @@ public class AdminTripController {
             if (warning != null) {
                 redirectAttributes.addFlashAttribute("warning", warning);
             }
+        } catch (IllegalStateException e) {
+            // Xem ghi chú cùng loại ở processManualApproval(): chuyến không còn ở
+            // PENDING_APPROVAL thì form /approve/{id} cũng từ chối mở, nên quay lại đó
+            // chỉ tạo thêm một lần chuyển hướng để tới cùng một chỗ (lỗi #20).
+            redirectAttributes.addFlashAttribute("error", "⛔ " + e.getMessage());
+            return "redirect:/admin/trips/pending";
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi xác nhận: " + e.getMessage());
             return "redirect:/admin/trips/approve/" + tripId;
@@ -154,6 +181,18 @@ public class AdminTripController {
             // Lỗi vi phạm ràng buộc → báo cho Admin biết
             redirectAttributes.addFlashAttribute("error", "⛔ Vi phạm ràng buộc: " + e.getMessage());
             return "redirect:/admin/trips/approve/" + tripId;
+        } catch (IllegalStateException e) {
+            // Vi phạm chính sách theo TRẠNG THÁI (lỗi #20: chuyến không còn ở
+            // PENDING_APPROVAL). Tách khỏi nhánh Exception bên dưới vì "Lỗi hệ thống"
+            // sẽ đổ cho hệ thống hỏng, trong khi đây là một thao tác không hợp lệ và
+            // hệ thống đang hoạt động đúng. Cùng cách phân biệt mà
+            // AdminTripManagementController.updateTrip() đã dùng cho ngoại lệ FSM.
+            //
+            // Về đích redirect: quay lại /approve/{id} sẽ vô nghĩa vì form đó nay cũng
+            // từ chối mở cho chuyến không phải PENDING_APPROVAL — sẽ thành hai lần
+            // chuyển hướng để tới cùng một chỗ. Đi thẳng về hàng chờ.
+            redirectAttributes.addFlashAttribute("error", "⛔ " + e.getMessage());
+            return "redirect:/admin/trips/pending";
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi hệ thống: " + e.getMessage());
             return "redirect:/admin/trips/approve/" + tripId;
