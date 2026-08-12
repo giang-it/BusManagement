@@ -1674,3 +1674,165 @@ cặp #15-vs-#16: mỗi mục một quyết định của chủ dự án, không
 - **Câu hỏi nghiệp vụ cần chốt trước khi sửa:** *"một xe đang trên đường có được xếp lịch cho chuyến
   TƯƠNG LAI không?"* Mọi lối chọn xe hôm nay đều trả lời **KHÔNG** ⇒ tính nhất quán nghiêng về việc
   làm guard nói đúng điều nó đang định nói.
+
+---
+
+# Rà ngày 2026-08-12 — kiểm chứng lại bản sửa #18 (chủ dự án chưa test), phát sinh #20
+
+*Chủ dự án yêu cầu kiểm lại `e5afa8f`/`8975c7a` — đã push nhưng anh chưa kịp test. Bản sửa #18
+**đứng vững toàn bộ** (đo lại độc lập, không đọc lại ghi chép cũ rồi tin: GET/POST bị từ chối trên
+`DEPARTED`/`COMPLETED` với giá + xe + số ghế bị đổi cố ý mà không trường nào rơi xuống DB; đối trọng
+`ACTIVE`/`CANCELLED` vẫn sửa được thật; nút Sửa 0 lần cho hai trạng thái bị chặn và 3/1/98 lần cho
+ba trạng thái còn lại — khớp đúng số chuyến trong DB; bảng điều hành vẫn đủ 5/5 chuyến `DEPARTED`;
+`mvnw clean test` 61/61; DB giống hệt trước/sau). Trong lúc truy dấu "còn lối ghi nào khác vào
+`trips`" thì tìm ra #20 — **lỗi có sẵn từ trước, không phải do bản sửa #18.***
+
+## 20. Hai lối PHÊ DUYỆT đi vòng qua FSM — duyệt được cả chuyến `CANCELLED`/`COMPLETED`/`DEPARTED`
+
+> **✅ ĐÃ SỬA (2026-08-12) — chủ dự án chọn phương án B′ (guard ở service, một helper dùng chung cho
+> cả hai lối) + lớp KHÔNG-MỜI ở `showApproveForm`.**
+
+- **Mức độ:** **lỗi thật, hỏng dữ liệu** — không phải latent. Đã tái hiện trên app thật.
+- **Phân loại (ba nhánh):** nhánh **3 — lỗi thật**. Xem phần "vì sao không phải tính năng" bên dưới,
+  vì nhánh 1 ở mục này có một lập luận **thật** cần bác bỏ chứ không phải bù nhìn.
+- **Ở đâu:** `TripService.approveTrip():893` và `TripService.confirmAutoAssignedTrip():848`, cả hai
+  kết thúc bằng `changeStatusToActive():1616` — hàm **set thẳng** `trip.setStatus(ACTIVE)`, không
+  bao giờ gọi `canTransition()`.
+
+| | |
+|---|---|
+| `canTransition()` được gọi ở | **đúng 1 chỗ**: `TripService:579`, trong `updateTripStatus()` |
+| Số lối vào `ACTIVE` | **4**: `updateTripStatus:605`, `createManualTrip:953`, `confirmAutoAssignedTrip:869`, `approveTrip:931` |
+| Số lối có kiểm from-state | **2** (hai lối đầu, bảo đảm bằng cấu trúc) |
+
+- **Tái hiện thật (2026-08-12, app thật, PID khớp log):** chuyến **2749** đang `CANCELLED` — trạng
+  thái CUỐI, `trip_lifecycle_fsm.md` §5 xếp vào bảng *"Invalid Transitions (**Enforced**)"* — bị lật
+  sang `ACTIVE` qua **cả hai** cửa `POST /admin/trips/approve` và `POST /admin/trips/confirm`, app
+  báo *"kích hoạt thành công"*. Đã trả về `CANCELLED` bằng đường hợp lệ (`ACTIVE → CANCELLED`), DB
+  nguyên vẹn.
+
+### Vì sao KHÔNG phải tính năng — lập luận phản biện phải bác bỏ
+
+`Proj_functions_summary.md:53` (bản cũ) **có ghi hẳn lý do biện minh**:
+
+> *"`createManualTrip()` và `approveTrip()`/`confirmAutoAssignedTrip()` dùng `changeStatusToActive()`
+> trực tiếp vì đây là trường hợp tạo/duyệt — **không có "from state" cần kiểm tra transition**."*
+
+Câu đó **đúng 1/3**:
+
+| Method | Có from-state? | Bằng chứng |
+|---|---|---|
+| `createManualTrip(Trip)` | **Không** — câu văn đúng | Nhận `Trip` **transient** (id `null`, chưa có bản ghi trong DB) ⇒ không có trạng thái cũ nào để chuyển đi |
+| `approveTrip(...)` | **CÓ** | Dòng đầu: `tripRepository.findById(tripId)` — `TripService:895` |
+| `confirmAutoAssignedTrip(...)` | **CÓ** | Dòng đầu: `tripRepository.findById(tripId)` — `TripService:849` |
+
+Một tính chất **chỉ đúng với method thứ nhất** đã bị khái quát cho cả ba. Và ba tài liệu khác nói
+ngược lại: `Proj_functions_summary.md:51` (*"**Mọi** thay đổi status hợp lệ **phải** đi qua
+`updateTripStatus()`"*), `trip_lifecycle_fsm.md:3` (*"sole authoritative implementation… **no status
+change should bypass it**"*), và `trip_lifecycle_fsm.md` §5 (chữ **Enforced**).
+
+**Nhánh 2 (quyết định hết hiệu lực) cũng bị loại:** `git log -S "changeStatusToActive"` chỉ ra **một**
+commit (`18fb37f`) — chưa từng có kiểm tra trạng thái nào bị gỡ. Nó ra đời thiếu, không bị tháo ra.
+
+### Vì sao lỗ này sống qua BA lần rà toàn dự án
+
+`Proj_functions_summary.md:52` ghi: *"Các luồng **đã được audit và sửa để không bypass FSM**:
+`cancelTrip()`, `rejectTrip()`, `updateTrip()`"*. Tức đã từng có hẳn một chiến dịch truy bypass FSM —
+và nó **dừng ngay ở dòng 53**, vì tài liệu nói ở đây không có gì phải kiểm. Đợt rà 2026-08-05 còn
+liệt kê đủ **cả bốn** call site của `changeStatusToActive`, nhưng câu hỏi lúc đó là *"validate nghiệp
+vụ có chạy không?"* — với approve/confirm thì **có chạy**. Không ai hỏi *"transition này có hợp lệ
+không?"*.
+
+Đối xứng đáng nhớ, và chính nó làm lỗi ẩn được lâu:
+
+| Cửa | Kiểm FSM | Kiểm nghiệp vụ |
+|---|---|---|
+| `POST /admin/dispatch/status` | ✅ | ❌ → **lỗi #10**, đã vá bằng allow-list |
+| `POST /admin/trips/approve` \| `/confirm` | ❌ → **lỗi #20** | ✅ |
+
+Cùng khuôn với **#14**, nơi dự án đã ghi: *"chính câu sai đó đã che lỗi #14 khỏi các lần rà trước"*.
+
+### Hậu quả
+
+1. **Hồi sinh trạng thái cuối** — đã dò thật.
+2. **Cộng odometer lần hai:** `COMPLETED` → (approve) → `ACTIVE` → (bảng ĐH) → `DEPARTED` →
+   `COMPLETED` chạy lại khối `TripService:617-628`. Đúng họ hỏng dữ liệu của **#6**, qua cửa khác.
+   *Suy luận từ code — **cố ý KHÔNG chạy**: không có đường hoàn tác qua app, vì đưa `ACTIVE` về
+   `COMPLETED` buộc phải đi qua `DEPARTED`→`COMPLETED`, tức tự gây ra chính sự hỏng đó.*
+3. **Phá con trỏ xe (họ #14):** `approveTrip:906` `setBus()` **trước** mọi kiểm tra ⇒ xe cũ của
+   chuyến `DEPARTED` kẹt `TRAVELING` vĩnh viễn. #18 chỉ đóng cửa form Sửa.
+4. **Mở bán vé lại:** `changeStatusToActive` đóng dấu `saleOpenedAt` nếu đang null.
+
+**Khả năng chạm từ UI = 0** (`getPendingTrips():1508` lọc đúng `PENDING_APPROVAL`; chỉ
+`pending-trips.html` link tới màn duyệt) — **đúng hạng #10**, thứ dự án đã coi là lỗi và vẫn vá.
+
+### Bản sửa
+
+- **`TripService.requirePendingApproval(Trip)`** — một helper giữ luật, gọi ở **đầu** cả hai method
+  (khuôn `editRefusalReason()` của #18: một luật, hai lối vào, không thể trôi ra khác nhau). Ném
+  `IllegalStateException` — cùng kiểu mà `deleteTrip()` và `updateTripStatus()` dùng cho vi phạm
+  chính sách theo trạng thái. Ở `approveTrip` phải đứng **trước `setBus()`**, nếu không con trỏ xe
+  đã kịp dời trước khi bị từ chối.
+- **Kiểm bằng `!=` chứ không phải `switch`-không-`default`** như `deleteTrip`: ở đó mỗi trạng thái có
+  chính sách và thông điệp riêng nên bắt người thêm `TripStatus` phải quyết định là đúng; ở đây luật
+  chỉ có một vế, và một trạng thái mới rơi vào nhánh **từ chối** là mặc định **an toàn** (fail-closed)
+  và cũng là câu trả lời đúng. Sao chép hình dạng `switch` vào đây là bắt chước hình thức.
+- **Lớp KHÔNG-MỜI:** `AdminTripController.showApproveForm()` từ chối mở form cho chuyến không phải
+  `PENDING_APPROVAL`. **Không phải tô điểm:** thiếu nó, bản sửa sẽ *tự tạo ra* đúng anti-pattern
+  "mời thứ sẽ từ chối" — thứ dự án vừa bác khi revert #19 ngày 2026-08-11 — vì trước bản sửa form
+  này submit **được**.
+- **Hai `catch (IllegalStateException)`** ở controller: nếu để rơi vào nhánh `Exception` thì lời từ
+  chối hiện ra là *"Lỗi hệ thống"*, tức đổ cho hệ thống hỏng trong khi hệ thống đang chạy đúng. Cùng
+  cách phân biệt mà `AdminTripManagementController.updateTrip()` đã dùng cho ngoại lệ FSM.
+- **Đã cân nhắc và TỪ CHỐI (fix gốc):** đưa hẳn transition về `updateTripStatus(tripId, ACTIVE)` để
+  thực thi đúng câu ở `Proj_functions_summary.md:51`. Đúng gốc nhất, nhưng đổi **luồng điều khiển
+  của đường mở bán vé** — nơi nhạy cảm nhất — trong khi §3 buộc tối thiểu hoá thay đổi trong
+  `TripService`. Ghi lại làm giới hạn đã biết, cùng khuôn với việc **tách cột `Bus.status`** đã bị
+  từ chối ở #14/#15. B′ không chặn đường lên phương án này về sau.
+- **`TripService:1616` (`changeStatusToActive`) nay ghi rõ bất biến** "chỉ vào `ACTIVE` từ
+  `PENDING_APPROVAL`" kèm bảng 4 call site và ai bảo đảm nó — để người thêm call site thứ 5 không
+  tái tạo lỗi này.
+
+### Kiểm chứng
+
+- **Test:** 6 ca thêm vào `TripServiceStatusTransitionTest` (cùng chủ đề "hợp lệ hoá transition",
+  không dựng class song song) — 4 ca từ chối + **2 đối trọng**. `mvnw clean test` **67/67**.
+  **Non-vacuous:** vô hiệu hoá hai lời gọi guard ⇒ **đúng 4 đỏ**, và đỏ dạng `Failures` (assertion)
+  chứ không phải `Errors` — nghĩa là lệnh duyệt đã **chạy thành công**, bằng chứng mạnh nhất.
+  Ca `approveTrip_onDepartedTrip_isRefusedAndDoesNotMoveTheBusPointer` khẳng định thẳng vào con trỏ
+  xe, không chỉ vào trạng thái.
+- **App thật (PID 20784 khớp log, profile mặc định):** 4 phép POST từng phá được hệ thống nay đều bị
+  chặn, DB không đổi — chuyến 13 vẫn ở xe 6 dù `busId=1` được gài cố ý. GET form duyệt: 302 cho
+  `CANCELLED`/`COMPLETED`/`DEPARTED`/`ACTIVE`, **200 cho `PENDING_APPROVAL`**. **Đối trọng trên app
+  thật:** dựng một chuyến `PENDING_APPROVAL` riêng (không đụng chuyến 8 của chủ dự án), duyệt qua
+  **cả hai** cửa — đều `→ ACTIVE` và đóng dấu `saleOpenedAt` — rồi **xoá cứng** fixture đó.
+  16/16 màn admin còn 200, **0** exception, DB giống hệt trước/sau (`trips` 1500, phân bố trạng thái
+  và cả 20 odometer/status không đổi).
+
+### Ảnh hưởng của bản sửa #20 lên mục #19 (còn ĐANG MỞ) — đọc trước khi xử lý #19
+
+Bản sửa này chèn code vào `TripService` nên **số dòng mà mục #19 trích đã dịch**. Mục #19 ở trên
+giữ nguyên theo luật append-only (đúng tại thời điểm viết); bảng đối chiếu để dùng hôm nay:
+
+| #19 trích | Nay nằm ở |
+|---|---|
+| `approveTrip:860` (lối gọi `validateBusForTrip` còn hở) | **`TripService:928`** |
+| `validateBusForTrip:936-944` (nhánh `TRAVELING`) | **`TripService:999+`**, biến `travelingForThisTrip` ở **`:1005`** |
+
+**Quan trọng hơn số dòng — bản sửa #20 KHÔNG đóng #19, và cũng không đổi hướng của nó.** #19 nói về
+việc `validateBusForTrip` có nên từ chối một xe đang `TRAVELING` hay không; #20 chỉ chặn *chuyến sai
+trạng thái* đi vào lối duyệt. Hai câu hỏi độc lập. **Nhưng #20 có thu hẹp #19 thêm một bậc:** lối
+`approveTrip` nay chỉ nhận chuyến `PENDING_APPROVAL`, mà chuyến `PENDING_APPROVAL` thì xe của nó
+không bao giờ `TRAVELING` *vì chính nó* — đúng điều mục #19 đã dự đoán ("hố còn lại chỉ ở
+`approveTrip`… siết được bằng một điều kiện"). Ruling cho #19 vẫn đang chờ chủ dự án, và lập luận
+"nới" ghi ở #19 (đo được 2 chuyến hợp lệ sẽ thành không lưu được nếu siết) **không bị bản sửa này
+làm thay đổi**.
+
+## Mục nhỏ (2026-08-12)
+
+- **`templates/admin/suggestions.html` là template MỒ CÔI** — không controller nào render (`grep`
+  toàn `src/main/java` không ra lời gọi nào). Nó còn `POST` tới `/admin/trips/approve/{id}`, một
+  đường **không tồn tại** (mapping thật là `@PostMapping("/approve")` không path-variable, và
+  `@GetMapping("/approve/{id}")`). **Không phải lỗi** — không hành vi nào sai vì không ai tới được
+  — là **rác cần dọn**, cùng loại với hai query chết đã ghi ở đợt rà 2026-08-04. Đáng dọn vì nó mô
+  tả một giao diện phê duyệt không còn tồn tại, dễ làm người sau tin nhầm.

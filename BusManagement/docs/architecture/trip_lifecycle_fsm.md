@@ -99,6 +99,34 @@ Any attempt throws `IllegalStateException`.
 | `DEPARTED → ACTIVE`    | Cannot reverse                |
 | `DEPARTED → CANCELLED` | Not in whitelist              |
 
+### 5.1. "Enforced" was a promise with a hole in it until 2026-08-12 (defect #20)
+
+`canTransition()` is called from exactly **one** place — `updateTripStatus():579`. But there
+are **four** ways into `ACTIVE`, because `changeStatusToActive()` sets the status directly and
+never consults the whitelist. Two of those four operate on an **already persisted** trip:
+
+| Entry into `ACTIVE` | What guarantees it is legal |
+|---|---|
+| `updateTripStatus():605` | `canTransition()`; `ACTIVE → ACTIVE` already returned early at the same-status guard, so only `PENDING_APPROVAL` reaches it |
+| `confirmAutoAssignedTrip():869` | **`requirePendingApproval()`** — added by this fix |
+| `approveTrip():931` | **`requirePendingApproval()`** — added by this fix |
+| `createManualTrip():953` | **Not a transition at all** — the `Trip` is still transient (`id == null`, no row exists), so there is no source state. Note its status here is **`ACTIVE`, not the entity default**: `AdminTripManagementController.createTrip():117` sets it before calling the service |
+
+> **Do not "tidy" this by moving the guard into `changeStatusToActive()` itself.** One choke point for
+> all four doors reads better than two call sites, and it is wrong: the creation path arrives with the
+> status already `ACTIVE`, so the guard would throw on **every manually created trip**. The guard
+> belongs to the two *approval* methods, which are the ones holding a persisted row.
+
+Before the fix, a crafted `POST /admin/trips/approve` or `/admin/trips/confirm` performed
+`CANCELLED → ACTIVE`, `COMPLETED → ACTIVE` or `DEPARTED → ACTIVE` and reported success —
+the first three rows of the table above. Reproduced on the real app (trip 2749, both doors).
+Two consequences beyond the resurrection itself: a re-completed trip adds `route.distanceKm`
+to the odometer a **second** time (the defect #6 damage through another door), and
+`approveTrip()` moves `trip.bus` before any status check, which is the defect #14 damage.
+
+**Adding a fifth entry into `ACTIVE` means guaranteeing that invariant again** — the whitelist
+alone will not catch it, which is precisely how this survived three full-project reviews.
+
 ---
 
 ## 6. Automatic Transitions (Scheduler)
@@ -204,6 +232,16 @@ javadoc and here.
 #10. One door for transitions, one door for trip details, and the second is open only before the bus
 rolls. Verified 2026-08-11 that this strands nothing: `findDispatchBoardTrips` has an upper time bound
 but **no lower one**, so every `DEPARTED` trip reaches the board however old it is — 5 of 5 on the day.
+
+> **The sentence above was written on 2026-08-11 and was not true until 2026-08-12 (defect #20).**
+> A second door existed the whole time: `POST /admin/trips/approve` and `/admin/trips/confirm`
+> reached `changeStatusToActive()` without consulting the FSM, so a `DEPARTED` trip could be sent
+> back to `ACTIVE` — and `approveTrip()` reassigns `trip.bus` on the way, which is exactly the
+> pairing invariant this section exists to protect. It is true now that both approval doors require
+> `PENDING_APPROVAL` (§5.1). Recorded rather than quietly edited, because the lesson is the shape of
+> the error: the claim was made about the *screen* the fix had just closed, and generalised into a
+> claim about **every** path. When closing a door, enumerate the others by grepping for the write,
+> not by reasoning about the screen in front of you.
 
 If a future change lets `trip.bus` move again while `DEPARTED` — by narrowing this policy, or by adding
 a new write path — the pairing breaks **silently**. There is no runtime check that would notice.

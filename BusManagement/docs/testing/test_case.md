@@ -1511,6 +1511,55 @@
   - **Lưu ý:** Nếu chuyến đã bán vé, nghiệp vụ có thể cần kiểm tra thêm nhưng code hiện tại không chặn ở `rejectTrip()`
 
 ---
+---
+
+### TC_APR_011 — Phê duyệt chuyến KHÔNG ở `PENDING_APPROVAL` bị từ chối (lỗi #20)
+
+- **Mã TC:** TC_APR_011
+- **Tên Kịch Bản:** Cả hai lối phê duyệt chỉ nhận chuyến đang chờ duyệt; mọi trạng thái khác bị từ chối và DB không đổi
+- **Điều kiện tiên quyết:** Có chuyến ở `CANCELLED`, `COMPLETED` và `DEPARTED` (đã tái hiện thật trên chuyến 2749 `CANCELLED`, 2764 `COMPLETED`, 13 `DEPARTED`)
+- **Các bước thực hiện:**
+  1. `POST /admin/trips/approve` với `tripId` của chuyến `CANCELLED`, kèm `busId`/`driverId` hợp lệ
+  2. Lặp lại với chuyến `COMPLETED`
+  3. Lặp lại với chuyến `DEPARTED`, **cố tình truyền một `busId` KHÁC** với xe hiện tại
+  4. `POST /admin/trips/confirm` với `tripId` của chuyến `CANCELLED`
+- **Kết quả mong đợi:**
+  - `requirePendingApproval(trip)` ném `IllegalStateException` **trước** `setBus()`/`setDriver()`
+  - Controller bắt riêng `IllegalStateException` → `flash[error]` bắt đầu bằng `⛔` và nêu đúng trạng thái thật, redirect về `/admin/trips/pending` (KHÔNG quay lại `/approve/{id}`, vì form đó nay cũng từ chối mở)
+  - DB **không đổi**: `trips.status` giữ nguyên, và ở bước 3 `trips.bus_id` vẫn là xe cũ — `busId` gài cố ý không được ghi
+  - **Trước bản sửa:** cả 4 bước đều báo "thành công" và trạng thái bị lật sang `ACTIVE`
+- **Ghi chú:** không chạm được từ UI (hàng chờ chỉ liệt kê `PENDING_APPROVAL`) — cùng hạng với TC của lỗi #10
+
+---
+
+### TC_APR_012 — Form phê duyệt không MỞ cho chuyến không còn chờ duyệt (lỗi #20, lớp không-mời)
+
+- **Mã TC:** TC_APR_012
+- **Tên Kịch Bản:** `GET /admin/trips/approve/{id}` chỉ mở cho `PENDING_APPROVAL`
+- **Điều kiện tiên quyết:** Có chuyến ở mỗi trạng thái
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/approve/{id}` lần lượt với chuyến `CANCELLED`, `COMPLETED`, `DEPARTED`, `ACTIVE`
+  2. `GET /admin/trips/approve/{id}` với chuyến `PENDING_APPROVAL`
+- **Kết quả mong đợi:**
+  - Bước 1: **302** về `/admin/trips/pending`, `flash[error]` nêu trạng thái thật của chuyến
+  - Bước 2: **200**, template `admin/approve-form` render bình thường
+- **Vì sao TC này tồn tại:** đây là lớp KHÔNG-MỜI, không phải lớp chặn. Nếu bỏ nó mà vẫn giữ guard ở service thì form sẽ mời một thao tác chắc chắn bị từ chối — đúng anti-pattern đã khiến #19 bị revert ngày 2026-08-11
+
+---
+
+### TC_APR_013 — ĐỐI TRỌNG: luồng duyệt thật vẫn chạy (lỗi #20)
+
+- **Mã TC:** TC_APR_013
+- **Tên Kịch Bản:** Guard của #20 không được biến thành "cấm duyệt tất"
+- **Điều kiện tiên quyết:** Một chuyến `PENDING_APPROVAL` đã có xe + tài xế hợp lệ
+- **Các bước thực hiện:**
+  1. `POST /admin/trips/approve` với `tripId`, `busId`, `driverId` của chuyến đó
+  2. (Trên một chuyến `PENDING_APPROVAL` khác) `POST /admin/trips/confirm`
+- **Kết quả mong đợi:**
+  - Cả hai: `flash[success]`, `trips.status = 'ACTIVE'`, và `sale_opened_at` được đóng dấu (tác dụng phụ khi VÀO `ACTIVE`)
+  - Đây là ca **bắt buộc** phải chạy cùng TC_APR_011/012: thiếu nó thì một bản sửa "chặn hết" cũng qua được toàn bộ các TC kia
+
+---
 
 <a name="module-6"></a>
 ## MODULE 6: TẦNG BẢO MẬT & CẤU HÌNH (Security & Configuration)
