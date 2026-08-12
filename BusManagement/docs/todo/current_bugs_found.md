@@ -1630,6 +1630,64 @@ cặp #15-vs-#16: mỗi mục một quyết định của chủ dự án, không
 
 ## 19. Guard `TRAVELING` trong `validateBusForTrip` chỉ sống ở 1 trong 4 lối gọi
 
+> **✅ ĐÃ SỬA (2026-08-12) — chủ dự án chọn hướng "giữ tín hiệu chống lệch", sau khi cả hai hướng
+> ban đầu (siết / nới) đều bị bác vì mỗi hướng sai ở một ca khác nhau.**
+>
+> **Luật mới, một câu:** cờ `TRAVELING` chỉ chặn khi **không có chuyến `DEPARTED` nào giải thích nó**;
+> nếu có chuyến thật đứng sau cờ, quyền quyết định thuộc về luật cửa sổ thời gian (`isBusBusy`).
+>
+> **Vì sao không phải "siết" (chặn mọi xe `TRAVELING`)** — hướng này từng được duyệt hôm 2026-08-11 rồi
+> phải revert, và đo lại ngày 12-08 vẫn hỏng: `isBusBusy` **đã** chặn ca cửa sổ giao nhau, nên cờ chỉ
+> thêm được ca **không giao nhau** — xếp xe cho chuyến tuần sau trong khi hôm nay nó đang chạy, vốn là
+> vận hành bình thường. **Bán kính, đo lại chính xác hơn lần 08-11:** vẫn 2 chuyến mang hình dạng này
+> (8 trên xe 20, 14 trên xe 7, cả hai cửa sổ không giao), nhưng chỉ **chuyến 8** là bằng chứng trực
+> tiếp — nó **đã sửa được thật** trên app sau bản vá này. **Chuyến 14 thì vốn đã không lưu được** vì
+> một luật hoàn toàn khác: *"Tài xế chính … đã được phân công lái 2.0h trong ngày 2026-08-01, thêm
+> chuyến này (7.5h) sẽ vượt 8h/ngày"* — nên siết chỉ **thêm cho nó một lý do chặn thứ hai**. ⇒ **Bán
+> kính mà siết THÊM VÀO là 1 chuyến, không phải 2**; ghi chú ngày 2026-08-11 đếm 2 là đúng về *hình
+> dạng dữ liệu* nhưng chưa tách ra ca đã bị chặn sẵn. *(Phép đo này cũng chứng minh luôn bản vá chạy
+> đúng: lỗi của chuyến 14 đến từ `validateStaffForTrip` ở `TripService:976`, tức `validateBusForTrip`
+> ở dòng **975 ngay trước đó đã CHO QUA** chiếc xe 7 đang `TRAVELING`.)*
+>
+> Tệ hơn con số: `showEditTripForm():224-225` **cưỡng bức thêm xe hiện tại** vào dropdown ⇒ siết thì
+> form sẽ MỜI đúng chiếc xe nó sắp từ chối, phá bất biến một chiều của #12 — lần thứ ba anti-pattern
+> này xuất hiện và bị bác. **Lập luận này độc lập với số chuyến**, nên nó mới là lý do quyết định.
+>
+> **Vì sao không phải "nới" (bỏ hẳn nhánh)** — cờ này là tín hiệu **độc lập** với bảng `trips`. Roadmap
+> §9 đã ghi `Bus.status` có hai người ghi và có thể lệch với lịch chuyến. Bỏ nhánh đi thì **xe 19
+> (`51B-DAG.CH`, `TRAVELING` mà không có chuyến `DEPARTED` nào — fixture `DataInitializer:158`) trở
+> thành gán được**, và `TC_FSM_007` bị đảo. Fail-closed trước một trạng thái không nhất quán mới là
+> đúng.
+>
+> **Ba ca, ba câu trả lời — chỉ hướng đã chọn đúng cả ba:**
+>
+> | Ca | Nới | Siết | **Đã chọn** |
+> |---|---|---|---|
+> | TRAVELING + có chuyến DEPARTED + cửa sổ **giao** | chặn | chặn | chặn |
+> | TRAVELING + có chuyến DEPARTED + cửa sổ **không giao** | cho | **chặn nhầm** | cho |
+> | TRAVELING + **không** chuyến nào giải thích | **cho nhầm** | chặn | chặn |
+>
+> **Chi phí bằng 0 về hạ tầng:** dùng lại `TripRepository.existsByBusIdAndStatusIn()` **đã có sẵn**
+> (`BusService.updateBus()` đang dùng cho guard #15) — **không thêm query mới**. Và query **không cần
+> vế loại trừ chuyến hiện tại** như mục #19 dự đoán, vì chuyến đang được validate không bao giờ ở trạng
+> thái `DEPARTED`: #18 chặn sửa chuyến đã xuất phát, #20 chỉ cho duyệt chuyến `PENDING_APPROVAL`, còn
+> `createManualTrip` thì chuyến chưa tồn tại. **Việc hoãn #19 lại sau #14 đã trả lãi đúng như §9 dự
+> đoán — thậm chí hai lần**, vì #18 và #20 tiếp tục thu hẹp nó.
+>
+> **Kiểm chứng:** `mvnw clean test` **71/71** (+4 ca trong `TripServiceValidationDryRunTest`, phủ đúng
+> ba ca trên cộng một ca chốt thẳng vào bản thân lỗi #19: *cùng xe, cùng cửa sổ ⇒ tạo mới và sửa chuyến
+> đã có phải cho cùng một câu trả lời*). **Non-vacuous:** khôi phục nguyên trạng logic cũ ⇒ **đúng 4
+> đỏ**, 8 ca cũ vẫn xanh. **App thật (PID 32492):** xe 19 bị từ chối với thông điệp mới; xe 7 cửa sổ
+> không giao **tạo được**; xe 7 cửa sổ giao bị chặn bởi *"đang bận trong khoảng thời gian này"* (đúng
+> luật cửa sổ, không phải cờ); xe 18 `REPAIRING` vẫn bị từ chối (đối trọng). **Và ca chốt:** duyệt
+> chuyến `PENDING` #8 bằng xe 19 — cùng input mà `/trips/create` vừa từ chối — nay **cũng bị từ chối
+> với đúng thông điệp đó**, chuyến 8 không bị ghi gì. 9/9 màn admin 200, 0 exception, DB giống hệt
+> trước/sau.
+>
+> **Câu hỏi nghiệp vụ ghi ở cuối mục này đã được trả lời:** *"một xe đang trên đường có được xếp lịch
+> cho chuyến TƯƠNG LAI không?"* → **CÓ**, miễn cửa sổ không giao nhau. Các dropdown vẫn lọc `READY`
+> (chặt hơn validator — đúng chiều được phép), nên giao diện không đổi.
+
 - **Mức độ:** **latent** — sai lệch đo được hôm nay bằng **0**, chỉ chạm được bằng POST tự chế.
 - **Phân loại:** nhánh **3 theo câu chữ** (tên biến khẳng định một điều mà code không kiểm), nhưng
   **có một cách đọc ngược lại hợp lý** — xem phần cuối. Ghi lại chính vì chưa chốt được hướng đọc.
@@ -1696,7 +1754,7 @@ ba trạng thái còn lại — khớp đúng số chuyến trong DB; bảng đi
 - **Phân loại (ba nhánh):** nhánh **3 — lỗi thật**. Xem phần "vì sao không phải tính năng" bên dưới,
   vì nhánh 1 ở mục này có một lập luận **thật** cần bác bỏ chứ không phải bù nhìn.
 - **Ở đâu:** `TripService.approveTrip():893` và `TripService.confirmAutoAssignedTrip():848`, cả hai
-  kết thúc bằng `changeStatusToActive():1616` — hàm **set thẳng** `trip.setStatus(ACTIVE)`, không
+  kết thúc bằng `changeStatusToActive():1656` — hàm **set thẳng** `trip.setStatus(ACTIVE)`, không
   bao giờ gọi `canTransition()`.
 
 | | |
@@ -1763,7 +1821,7 @@ Cùng khuôn với **#14**, nơi dự án đã ghi: *"chính câu sai đó đã 
    chuyến `DEPARTED` kẹt `TRAVELING` vĩnh viễn. #18 chỉ đóng cửa form Sửa.
 4. **Mở bán vé lại:** `changeStatusToActive` đóng dấu `saleOpenedAt` nếu đang null.
 
-**Khả năng chạm từ UI = 0** (`getPendingTrips():1508` lọc đúng `PENDING_APPROVAL`; chỉ
+**Khả năng chạm từ UI = 0** (`getPendingTrips():1548` lọc đúng `PENDING_APPROVAL`; chỉ
 `pending-trips.html` link tới màn duyệt) — **đúng hạng #10**, thứ dự án đã coi là lỗi và vẫn vá.
 
 ### Bản sửa
@@ -1789,7 +1847,7 @@ Cùng khuôn với **#14**, nơi dự án đã ghi: *"chính câu sai đó đã 
   của đường mở bán vé** — nơi nhạy cảm nhất — trong khi §3 buộc tối thiểu hoá thay đổi trong
   `TripService`. Ghi lại làm giới hạn đã biết, cùng khuôn với việc **tách cột `Bus.status`** đã bị
   từ chối ở #14/#15. B′ không chặn đường lên phương án này về sau.
-- **`TripService:1616` (`changeStatusToActive`) nay ghi rõ bất biến** "chỉ vào `ACTIVE` từ
+- **`TripService:1656` (`changeStatusToActive`) nay ghi rõ bất biến** "chỉ vào `ACTIVE` từ
   `PENDING_APPROVAL`" kèm bảng 4 call site và ai bảo đảm nó — để người thêm call site thứ 5 không
   tái tạo lỗi này.
 
@@ -1809,27 +1867,33 @@ Cùng khuôn với **#14**, nơi dự án đã ghi: *"chính câu sai đó đã 
   16/16 màn admin còn 200, **0** exception, DB giống hệt trước/sau (`trips` 1500, phân bố trạng thái
   và cả 20 odometer/status không đổi).
 
-### Ảnh hưởng của bản sửa #20 lên mục #19 (còn ĐANG MỞ) — đọc trước khi xử lý #19
+### Ảnh hưởng của bản sửa #20 lên mục #19
 
-Bản sửa này chèn code vào `TripService` nên **số dòng mà mục #19 trích đã dịch**. Mục #19 ở trên
-giữ nguyên theo luật append-only (đúng tại thời điểm viết); bảng đối chiếu để dùng hôm nay:
+*(Viết khi #19 còn mở. **#19 đã được sửa ngay sau đó, cùng ngày 2026-08-12** — xem khối kết luận ở
+đầu mục #19. Giữ lại đoạn này vì nó ghi đúng cơ chế "sửa cái này làm cái kia teo lại".)*
 
-| #19 trích | Nay nằm ở |
-|---|---|
-| `approveTrip:860` (lối gọi `validateBusForTrip` còn hở) | **`TripService:928`** |
-| `validateBusForTrip:936-944` (nhánh `TRAVELING`) | **`TripService:999+`**, biến `travelingForThisTrip` ở **`:1005`** |
+Bản sửa #20 chèn code vào `TripService` nên số dòng mục #19 trích đã dịch; mục #19 giữ nguyên theo
+luật append-only. **#20 không đóng #19**, nhưng **thu hẹp nó thêm một bậc**: lối `approveTrip` nay chỉ
+nhận chuyến `PENDING_APPROVAL`, mà chuyến `PENDING_APPROVAL` thì xe của nó không bao giờ `TRAVELING`
+*vì chính nó* — đúng điều mục #19 đã dự đoán khi hoãn lại sau #14.
 
-**Quan trọng hơn số dòng — bản sửa #20 KHÔNG đóng #19, và cũng không đổi hướng của nó.** #19 nói về
-việc `validateBusForTrip` có nên từ chối một xe đang `TRAVELING` hay không; #20 chỉ chặn *chuyến sai
-trạng thái* đi vào lối duyệt. Hai câu hỏi độc lập. **Nhưng #20 có thu hẹp #19 thêm một bậc:** lối
-`approveTrip` nay chỉ nhận chuyến `PENDING_APPROVAL`, mà chuyến `PENDING_APPROVAL` thì xe của nó
-không bao giờ `TRAVELING` *vì chính nó* — đúng điều mục #19 đã dự đoán ("hố còn lại chỉ ở
-`approveTrip`… siết được bằng một điều kiện"). Ruling cho #19 vẫn đang chờ chủ dự án, và lập luận
-"nới" ghi ở #19 (đo được 2 chuyến hợp lệ sẽ thành không lưu được nếu siết) **không bị bản sửa này
-làm thay đổi**.
+**Và đó chính là thứ làm bản sửa #19 rẻ đi:** cộng với #18 (không sửa được chuyến đã xuất phát),
+ba bản vá cùng bảo đảm *chuyến đang được validate không bao giờ ở trạng thái `DEPARTED`* — nên query
+của #19 **không cần vế loại trừ chuyến hiện tại**, và dùng lại được `existsByBusIdAndStatusIn()` có
+sẵn thay vì thêm query mới như mục #19 từng lo. Một minh hoạ sạch cho ghi chú §9 *"thứ tự sửa lỗi có
+thể mang tải trọng, không chỉ là gọn gàng"*.
 
 ## Mục nhỏ (2026-08-12)
 
+- **`AdminTripManagementController.showCreateTripForm():68` nạp `buses` và `drivers` rồi KHÔNG ai dùng.**
+  `busRepository.findAll()` + `driverRepository.findAll()` được đẩy vào model mỗi lần mở form Tạo, nhưng
+  `trip-create-form.html` **không render hai biến đó**: `<select id="busSelect">` (`:225`) khởi tạo
+  `disabled` và rỗng, chỉ được JavaScript đổ dữ liệu từ `/api/admin/trips/available-resources` — API này
+  lọc `READY` + `!isBusBusy` + bảo trì. **Không phải lỗi** (không hành vi nào sai, và form KHÔNG mời xe
+  `TRAVELING`/`REPAIRING` như một phán đoán ban đầu ngày 12-08 đã tưởng — phán đoán đó **sai**, đã kiểm
+  lại bằng `grep` toàn template: không có `th:each` nào trên `${buses}`/`${drivers}`) — là **rác**: hai
+  query thừa (20 xe + 36 tài xế) trên mỗi lần mở form. Cùng loại với hai query chết ghi ở đợt rà
+  2026-08-04. Dọn thì xoá hai dòng, nhưng đó là **quyết định của chủ dự án**, không nằm trong phạm vi #19.
 - **`templates/admin/suggestions.html` là template MỒ CÔI** — không controller nào render (`grep`
   toàn `src/main/java` không ra lời gọi nào). Nó còn `POST` tới `/admin/trips/approve/{id}`, một
   đường **không tồn tại** (mapping thật là `@PostMapping("/approve")` không path-variable, và

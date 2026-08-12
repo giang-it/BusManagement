@@ -164,7 +164,7 @@ Because step 1 re-scans every `ACTIVE` trip on every 10-second tick, a trip that
 | Rule                              | Condition                                                    | Effect |
 |-----------------------------------|--------------------------------------------------------------|--------|
 | Bus under repair                  | `bus.status == REPAIRING`                                   | Reject |
-| Bus traveling (different trip)    | `bus.status == TRAVELING` and not editing its own trip      | Reject |
+| Bus flagged traveling, unexplained | `bus.status == TRAVELING` **and no `DEPARTED` trip exists for that bus** | Reject |
 | Bus scheduling conflict           | Trip in `[departure−1h, arrival+1h]` exists for bus         | Reject |
 | Bus past maintenance threshold    | `kmSinceLastMaintenance >= maintenanceThreshold`            | Reject |
 | Bus near maintenance threshold    | `kmSinceLastMaintenance + routeKm >= threshold × 0.9`      | Reject |
@@ -182,6 +182,28 @@ Because step 1 re-scans every `ACTIVE` trip on every 10-second tick, a trip that
 | Personnel duplication             | Same person in two roles on the same trip                   | Reject |
 
 *Assistants skip the daily driving-hour limit but are still checked for scheduling conflicts.*
+
+> **Why the `TRAVELING` row asks about a trip and not just the flag (defect #19, 2026-08-12).**
+> It used to read "`bus.status == TRAVELING` and not editing its own trip", implemented as
+> `excludeTripId.equals(trip.getId())` — a comparison of two *trip* ids under a variable named
+> `travelingForThisTrip`, which is a claim about the *bus*. That expression is `true` on three of the
+> four call sites, so the same bus was refused at `/trips/create` and accepted at `/trips/approve`.
+>
+> Blocking **every** traveling bus was tried and rejected: `isBusBusy` already refuses an overlapping
+> window, so the flag only adds the *non-overlapping* case — scheduling a bus for next week while it
+> is out today, which is ordinary operations. Two real trips have that shape (8 and 14); trip 8 is the
+> one that proves it — it saves normally under the rule adopted — while trip 14 is already unsaveable
+> for an unrelated staffing rule, so tightening would only have added a second reason. The deciding
+> argument does not rest on the count anyway: `showEditTripForm()` force-adds the current bus to the
+> dropdown, so the form would have offered exactly the bus it then refuses.
+>
+> Dropping the row entirely was also rejected: `Bus.status` is written by two owners and can disagree
+> with the trip table (see the roadmap's Developer Note on `Bus.status`). A bus flagged `TRAVELING`
+> with **no** `DEPARTED` trip behind it is either that desync or an admin's manual mark — neither is
+> something to schedule on. So the flag is honoured only when nothing explains it; when a running trip
+> does explain it, the window rule decides. The check needs no "other than this trip" clause, because
+> the trip being validated can never itself be `DEPARTED` (defect #18 blocks editing one, #20 restricts
+> approval to `PENDING_APPROVAL`, and creation has no row yet).
 
 ### Update-only Validation (`updateManualTrip`)
 

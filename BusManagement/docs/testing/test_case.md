@@ -461,17 +461,43 @@
 
 ---
 
-### TC_FSM_007 — Tạo chuyến thủ công: Chặn khi xe đang ở trạng thái TRAVELING
+### TC_FSM_007 — Tạo chuyến thủ công: Chặn khi xe mang cờ TRAVELING mà KHÔNG có chuyến nào giải thích
 
 - **Mã TC:** TC_FSM_007
-- **Tên Kịch Bản:** Admin chọn xe đang ở trạng thái `TRAVELING` (đang chạy chuyến khác)
-- **Điều kiện tiên quyết:** Xe "51B-DAG.CH" có `status = TRAVELING`
+- **Tên Kịch Bản:** Admin chọn xe mang cờ `TRAVELING` nhưng không có chuyến `DEPARTED` nào đứng sau cờ đó (trạng thái xe lệch với lịch chuyến)
+- **Điều kiện tiên quyết:** Xe "51B-DAG.CH" có `status = TRAVELING` và **không** có chuyến `DEPARTED` nào (đúng fixture `DataInitializer:158`)
 - **Các bước thực hiện:**
-  1. `POST /admin/trip-management/trips/create` với busId của xe TRAVELING
+  1. `POST /admin/trip-management/trips/create` với busId của xe đó
 - **Kết quả mong đợi:**
-  - `validateBusForTrip`: `bus.getStatus() == BusStatus.TRAVELING` → TRUE
-  - `throw new IllegalArgumentException("Xe 51B-DAG.CH đang trên đường (TRAVELING), không thể gán vào chuyến mới cho đến khi hoàn thành chuyến hiện tại!")`
-  - `flash[error]` chứa thông báo lỗi tương ứng
+  - `validateBusForTrip`: cờ `TRAVELING` → hỏi `existsByBusIdAndStatusIn(busId, [DEPARTED])` → FALSE ⇒ chặn
+  - `throw new IllegalArgumentException("Xe 51B-DAG.CH đang mang trạng thái TRAVELING nhưng không có chuyến nào đang chạy để giải thích — …")`
+  - `flash[error]` chứa thông báo lỗi tương ứng; **không có dòng nào được ghi**
+- **Ghi chú (lỗi #19, 2026-08-12):** *kết quả* của TC này không đổi — xe 51B-DAG.CH vẫn bị từ chối — nhưng **lý do và thông điệp đã đổi**. Trước đây mọi xe `TRAVELING` đều bị chặn ở lối tạo; nay cờ chỉ chặn khi **không có chuyến nào giải thích nó**. Xem TC_FSM_007a/007b cho hai ca còn lại.
+
+---
+
+### TC_FSM_007a — Xe TRAVELING vì một chuyến có thật, cửa sổ KHÔNG giao → CHO PHÉP
+
+- **Mã TC:** TC_FSM_007a
+- **Tên Kịch Bản:** Xếp lịch cho một chiếc xe đang chạy chuyến khác, vào khung giờ không đụng nhau
+- **Điều kiện tiên quyết:** Xe đang `TRAVELING` và **có** chuyến `DEPARTED` của nó; chuyến mới nằm ở cửa sổ không giao với chuyến đó
+- **Các bước thực hiện:**
+  1. `POST /admin/trip-management/trips/create` với busId của xe đó, thời gian không giao
+- **Kết quả mong đợi:**
+  - Tạo **thành công** — cờ `TRAVELING` đã được một chuyến thật giải thích, nên quyền quyết định thuộc về luật cửa sổ thời gian
+- **Vì sao TC này tồn tại:** đây chính là ca mà phương án "chặn mọi xe TRAVELING" sẽ chặn nhầm. Đo ngày 2026-08-12: 2 chuyến thật mang hình dạng này (8 và 14). Chuyến 8 đã được lái thử qua form Sửa và **lưu thành công**; chuyến 14 vốn đã không lưu được vì luật giờ lái 8h/ngày, nên siết chỉ thêm cho nó một lý do chặn nữa.
+
+---
+
+### TC_FSM_007b — Xe TRAVELING vì một chuyến có thật, cửa sổ GIAO → CHẶN (bằng luật cửa sổ)
+
+- **Mã TC:** TC_FSM_007b
+- **Tên Kịch Bản:** Vẫn chiếc xe đó, nhưng chuyến mới đụng giờ với chuyến đang chạy
+- **Các bước thực hiện:**
+  1. `POST /admin/trip-management/trips/create` với thời gian giao với chuyến `DEPARTED` của xe
+- **Kết quả mong đợi:**
+  - `throw new IllegalArgumentException("Xe … đang bận trong khoảng thời gian này!")` — chặn bởi **`isBusBusy`**, không phải bởi cái cờ
+- **Vì sao TC này tồn tại:** đối trọng của TC_FSM_007a. Thiếu nó thì một bản sửa "bỏ hẳn nhánh TRAVELING" cũng qua được 007a mà không ai phát hiện luật cửa sổ đã hỏng.
 
 ---
 
