@@ -90,6 +90,37 @@ chủ dự án trước khi xử lý.
 
 ## 2. `#numbers.formatDecimal(x, 0, 1)` làm mất số 0 đứng đầu
 
+> **✅ ĐÃ SỬA (2026-08-13).** Tham số thứ hai (`minIntegerDigits`) đổi `0` → `1` ở **hai** chỗ trong
+> `dashboard-analytics.html`: `:372` (cột "Giờ lái hôm nay", chính là chỗ mục này ghi — số dòng đã
+> dịch từ `:357`) và `:345` (`avgExperienceYears`, **mục này bỏ sót**, mắc y hệt nhưng chưa lộ vì
+> trung bình hiện là 4.9).
+>
+> **Quét toàn bộ 58 lời gọi `formatDecimal` trong templates: đúng hai chỗ đó dính, không còn chỗ nào
+> khác.** Dạng `(x, 0, 0)` và dạng 5 tham số `(x, 0, 'COMMA', 0, 'POINT')` **KHÔNG** dính — đã đo bằng
+> `DecimalFormat` thật, không suy luận: khi không có chữ số thập phân nào, `DecimalFormat` rơi vào
+> nhánh "in một số 0" nên ra `"0"` đúng. Đừng "sửa cho đồng bộ" các chỗ đó — chúng không hỏng.
+>
+> Bằng chứng hai chiều, chạy bằng Java thật: `(0.0, 0, 1)` → `".0"`; `(0.0, 1, 1)` → `"0.0"`;
+> `(0.4, 0, 1)` → `".4"`; `(0.0, 0, 0)` → `"0"`.
+>
+> **⚠️ ĐÍNH CHÍNH một khẳng định sai của chính đợt rà 2026-08-13 (ghi lại thay vì chôn đi).** Đợt rà
+> đó tuyên bố lỗi này *"đang hiện trên cả 5/5 dòng ngay bây giờ"*, lập luận rằng DB không có chuyến
+> nào hôm nay nên mọi tài xế đều 0.0h. **Sai.** Tiền đề bị thiếu một vế: `sumDrivingHours()` — xem
+> javadoc `TripService:718` — **cộng thêm giờ nền mock `totalDrivingHours24h` khi ngày là hôm nay**,
+> chứ không chỉ cộng giờ từ các chuyến. Đo trên app thật: top-5 là **11.0 / 10.0 / 9.0 / 8.0 / 7.9**,
+> đều ≥ 1 nên **không dòng nào hiển thị sai**. Đo trên DB: **0/33** tài xế hoạt động có giờ nền trong
+> khoảng (0,1). ⇒ **Đánh giá gốc của mục này ("hiếm khi lộ ra") là ĐÚNG; đợt rà 2026-08-13 đã lật nó
+> trên một tiền đề sai.** Cùng khuôn với các lần trước — xem §9 roadmap, ghi chú về những câu văn sai
+> khiến người rà tin nhầm.
+>
+> **Vẫn đáng sửa dù tiềm ẩn:** 21/33 tài xế có giờ nền = 0, nên chỉ cần bộ fixture "tài xế bận" của
+> `DataInitializer` vắng mặt (cài mới không chạy profile `demo`) là cả 5 dòng rơi về 0.0 → `.0`; và
+> một chuyến thật cho ai đó 0.5h cũng đủ. Sửa tốn 2 ký tự, không rủi ro.
+>
+> Kiểm chứng: `mvnw clean test` **71/71**; drive app thật (PID 6576 rồi 24044), 14/14 trang admin 200,
+> **0** template/SpEL exception, cột giờ lái render `11.0/10.0/9.0/8.0/7.9` đúng như DB, snapshot DB
+> **giống hệt** trước/sau.
+
 - **Mức độ:** hiển thị, nhẹ.
 - **Ở đâu:** `templates/admin/dashboard-analytics.html:357` (ô "Giờ lái hôm nay"
   của bảng `topLoadedDrivers`).
@@ -104,6 +135,29 @@ chủ dự án trước khi xử lý.
 
 ## 3. `02_project_context.md` §10 khẳng định sai về timestamp
 
+> **✅ ĐÃ SỬA (2026-08-13).** Chỉ sửa **vế nguyên nhân**, giữ nguyên kết luận "chưa có widget Recent
+> Activity" và tính chất *bị từ chối có chủ đích* của nó — đúng như mục này dặn.
+>
+> **Bán kính thật rộng gấp 5 lần mục này ghi: 5 dòng / 3 file, không phải 1 dòng / 1 file.**
+>
+> | File | Dòng | Mục này có ghi? |
+> |---|---|---|
+> | `02_project_context.md` | 31 | ❌ bỏ sót — khẳng định `Trip.createdAt` là timestamp **duy nhất** |
+> | `02_project_context.md` | 94 | ✅ dòng duy nhất được ghi |
+> | `current_functional_spec.md` | 105 | ❌ bỏ sót |
+> | `current_functional_spec.md` | 248 | ❌ bỏ sót |
+> | `Proj_functions_summary.md` | 380 | ❌ bỏ sót |
+>
+> Đã kiểm bằng code chứ không bằng trí nhớ: `Incident.java:76-78` đúng là `@CreationTimestamp` +
+> `updatable = false`, cùng dạng với `Trip.createdAt` — nên vế "không entity nào có timestamp" sai ở
+> cả 5 chỗ. Dòng `:31` được viết lại cho đủ: hai entity có `@CreationTimestamp`, còn
+> `Incident.resolvedAt` và `Trip.saleOpenedAt` là **mốc nghiệp vụ**, không phải cột audit kỹ thuật —
+> phân biệt này lấy từ Hidden Cost #2 của roadmap, để không ai đếm nhầm thành bốn.
+>
+> Bốn dòng còn lại giữ nguyên kết luận và nói thêm **vì sao kết luận vẫn đứng dù lý do cũ đã chết**:
+> hai cột `@CreationTimestamp` vẫn không đủ phủ cho một activity feed chung, và **không entity nào có
+> `updatedAt`**. Không file code nào bị đụng.
+
 - **Mức độ:** tài liệu.
 - **Nội dung sai:** *"No 'Recent Activity'/audit-trail widget exists, because no
   entity has creation/update timestamps"*.
@@ -116,6 +170,53 @@ chủ dự án trước khi xử lý.
   2026-07-17 trong khi dòng này bị bỏ sót.
 
 ## 4. Scheduler AI in log liên tục khi rảnh
+
+> **✅ ĐÃ SỬA (2026-08-13).** `TripService` nay dùng `@Slf4j` (Lombok, khớp `@RequiredArgsConstructor`
+> sẵn có — **không thêm dependency**, slf4j đã nằm trong `spring-boot-starter`). Cả **12** lời gọi
+> `System.out.printf` của class được chuyển sang logger, chia mức theo ngữ nghĩa:
+>
+> | Mức | Số dòng | Là gì |
+> |---|---|---|
+> | `debug` | 4 | nằm trên đường quét 10 giây — chẩn đoán của một job nền |
+> | `info` | 6 | sự kiện thật, mỗi lần một hành động (tạo chuyến tăng cường, admin duyệt/phân công/từ chối/xoá) |
+> | `warn` | 2 | cảnh báo thật (không tự phân công được; bằng lái sắp hết hạn) |
+>
+> **Mục này ghi 3 dòng spam. Thật ra có 4** — dòng `🔥 ... HOT` cũng lặp vô hạn, và nó là dòng nguy
+> hiểm nhất: tại `:82` điều kiện là `isHotTrip(trip) && !hasAlreadySuggested(trip)`, mà `&&` lượng giá
+> **trái trước**, nên một chuyến đã được đề xuất rồi vẫn in `🔥` mỗi 10 giây mãi mãi. **Đây đúng là
+> kịch bản Phase 9 sẽ tạo ra** — Booking làm `ticketsSold` tăng, chuyến vượt 90%, dòng này bật.
+>
+> **CỐ Ý KHÔNG đổi thứ tự hai điều kiện ở `:82`.** Đảo lại sẽ diệt spam tận gốc nhưng là **thay đổi
+> logic** (bắt mọi chuyến `ACTIVE` chạy một query tồn tại mỗi 10 giây, trong khi hiện tại cổng
+> occupancy in-memory chặn trước) — trộn việc vào một bản dọn log. Ghi lại ở đây như một mục riêng
+> nếu chủ dự án muốn xét sau. `fixedRate = 10_000` **giữ nguyên** — là hành vi nghiệp vụ, đúng như
+> mục này dặn.
+>
+> **Bằng chứng hai chiều, đo trên app thật** (không thể chứng minh bằng sự vắng mặt, vì dữ liệu hiện
+> tại không có chuyến nào >90% ghế — 4 chuyến `ACTIVE` đều 0%). Đã tạo điều kiện để dòng debug **buộc
+> phải** bắn: đặt `trips.tickets_sold=48` cho chuyến 14 (`total_seats=50` → 96%), chuyến này đã khởi
+> hành nên rơi đúng Gate 3.
+>
+> | Mức log | Số dòng về chuyến #14 |
+> |---|---|
+> | mặc định (INFO), ~4 vòng quét | **0** |
+> | `logging.level...TripService=DEBUG`, ~30 vòng | **32** (1 dòng/10 giây — đúng hành vi cũ) |
+>
+> Tức chẩn đoán **được giữ lại sau một công tắc**, không bị xoá; và 32 dòng đó chính là ảnh chụp của
+> lỗi gốc. Bật lại bằng `-Dlogging.level.giang.com.BusManagement.service.TripService=DEBUG`.
+>
+> **Không đổi một byte nội dung thông điệp nào.** Đã so bản cũ vs bản mới trên cùng một test: phần
+> text giống hệt tới từng byte; chỗ nào có `%.1f`/`%.0f` thì truyền `String.format(...)` làm tham số
+> để giữ nguyên cách làm tròn. Logger chỉ **thêm** tiền tố timestamp/level/PID/thread/logger.
+> Vỡ mã tiếng Việt trên console là **có sẵn** (bản `System.out` cũ vỡ y hệt — đã đo, không suy luận;
+> skill `verify` cũng đã ghi nhận từ trước), không phải do bản sửa này.
+>
+> **Phạm vi dừng ở `TripService`.** `DataInitializer` (1) và `HistoricalDataBackfill` (11) vẫn dùng
+> `System.out` — chúng là script seed chạy một lần, xuất ra cho người đang ngồi xem terminal, và
+> chuyển chúng là việc không liên quan.
+>
+> Kiểm chứng: `mvnw clean test` **71/71**; 14/14 trang admin 200; **0** exception; snapshot DB
+> **giống hệt** trước/sau (`tickets_sold` của chuyến 14 đã trả về 0).
 
 - **Mức độ:** vận hành.
 - **Ở đâu:** `TripService.scanAndSuggestExtraTrips()` (`@Scheduled(fixedRate = 10_000)`).
