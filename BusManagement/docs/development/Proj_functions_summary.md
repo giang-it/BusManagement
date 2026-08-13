@@ -377,7 +377,7 @@ Bootstrap tabs dùng `data-bs-toggle="tab"` thuần client-side (không gọi l�
 - 1 shortcut link mới trong `admin/dashboard.html` trỏ tới `/admin/analytics`, không đổi 6 shortcut cũ.
 
 ### 14.5. Giới hạn có chủ đích (đã thống nhất với người dùng khi thiết kế, không phải thiếu sót)
-- **Không có "Recent Activity" feed:** không có cột `createdAt`/`updatedAt` nào trên `Trip` hay entity khác; việc thêm cột mới chỉ để phục vụ Dashboard đã bị từ chối có chủ đích khi thiết kế — nếu sau này cần lịch sử hoạt động thật, nên thiết kế Audit Log riêng, không sửa từng entity hiện có.
+- **Không có "Recent Activity" feed:** việc thêm cột mới chỉ để phục vụ Dashboard đã bị từ chối có chủ đích khi thiết kế, và quyết định đó vẫn giữ nguyên. *(Lý do ghi ban đầu — "không có cột `createdAt`/`updatedAt` nào" — nay đã lỗi thời: `Trip.createdAt` có từ Phase 0 và `Incident.reportedAt` có từ Phase 2. Nhưng chỉ hai cột đó thì vẫn không đủ phủ cho một feed hoạt động chung, và không entity nào có `updatedAt`.)* Nếu sau này cần lịch sử hoạt động thật, nên thiết kế Audit Log riêng, không sửa từng entity hiện có.
 - **Utilization rate / AI outcome breakdown chỉ là snapshot tức thời**, không phải xu hướng lịch sử (không có bảng lưu trạng thái theo thời gian).
 - **Không có entity Ticket/Assistant/MaintenanceRecord riêng** — Dashboard suy ra toàn bộ số liệu liên quan từ field có sẵn trên `Trip`/`Bus`/`Driver` (assistant vẫn là `Driver` qua FK `Trip.assistant`, không phải entity riêng).
 

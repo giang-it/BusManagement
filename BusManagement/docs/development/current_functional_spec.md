@@ -102,7 +102,7 @@ Only the Administrator workflow is currently exposed through the application:
     *   **Strategic Analytics** (tabbed): Fleet, Trips, Routes, Drivers, Occupancy, and AI Recommendation outcome breakdown — each with supporting cards/tables and one Chart.js chart (Bar or Doughnut).
     *   Entry point: `GET /admin/analytics` (`DashboardController`), backed by a read-only `DashboardService` (`@Transactional(readOnly = true)`).
 *   **Reused Thresholds (not redefined):** "Hot trip" uses the same 90% occupancy threshold as `Trip.needsReinforcement()`; "license expiring soon" uses the same 7-day window already used by `TripService`'s driver auto-assignment.
-*   **Known Gaps (by design, not oversight):** No "Recent Activity" feed — no entity has creation/update timestamps, and adding one was explicitly declined for this feature to avoid a schema change. Fleet utilization and AI-suggestion outcome counts are point-in-time snapshots, not historical trends.
+*   **Known Gaps (by design, not oversight):** No "Recent Activity" feed — it was explicitly declined for this feature to avoid a schema change, and the decision still stands. (The original reason, "no entity has creation/update timestamps", is out of date: `Trip.createdAt` arrived in Phase 0 and `Incident.reportedAt` in Phase 2. Those two alone would still not back a general activity feed, which needs coverage across every entity.) Fleet utilization and AI-suggestion outcome counts are point-in-time snapshots, not historical trends.
 
 ### Driver Recommendation
 *   **Purpose:** Answer *"who still has capacity to take a trip on this date?"* — the inverse of the "busiest drivers today" ranking already on the Analytics Drivers tab. That ranking is monitoring; this is a staffing recommendation.
@@ -245,7 +245,7 @@ The following capabilities are intentionally deferred or omitted from the curren
 5.  ~~**Persistent Data Retention:** The database strategy runs in a recreate-on-startup mode (`create-drop`), which clears transactional records between restarts.~~ **Resolved:** the default profile now persists data (`ddl-auto=update`, `DataInitializer` gated to `@Profile("demo")`). Wiping requires explicitly running the `demo` profile. Note that no migration tool (Flyway/Liquibase) exists — schema evolution still relies on Hibernate's `update`.
 6.  **No reporting or analytics:** The system lacks utilization charts, revenue analysis, or reports.
 7.  **No audit logs:** Admin actions and historical configuration changes are not tracked in audit trails.
-8.  **No activity/audit-log-based analytics:** A "Recent Activity" widget was considered for the Dashboard & Analytics module but intentionally omitted — no entity has `createdAt`/`updatedAt` columns, and adding one just for this feature was explicitly declined. A proper audit log would need to be designed separately.
+8.  **No activity/audit-log-based analytics:** A "Recent Activity" widget was considered for the Dashboard & Analytics module but intentionally omitted — adding schema just for this feature was explicitly declined. Only `Trip.createdAt` (Phase 0) and `Incident.reportedAt` (Phase 2) carry a creation timestamp; no entity has `updatedAt`, so the coverage a general activity feed needs does not exist. A proper audit log would need to be designed separately.
 
 ---
 
