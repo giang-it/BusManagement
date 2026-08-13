@@ -4,6 +4,7 @@ import giang.com.BusManagement.domain.*;
 import giang.com.BusManagement.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TripService {
 
     private final TripRepository tripRepository;
@@ -104,16 +106,16 @@ public class TripService {
 
         // ── Gate 3: departure must still be in the future ───────────────────────
         if (trip.getDepartureTime() == null || !trip.getDepartureTime().isAfter(now)) {
-            System.out.printf("⏩ [AI] Chuyến #%d: đã khởi hành, bỏ qua.%n", trip.getId());
+            log.debug("⏩ [AI] Chuyến #{}: đã khởi hành, bỏ qua.", trip.getId());
             return false;
         }
 
         // ── Gate 4: enough lead time remaining ──────────────────────────────────
         long hoursUntilDeparture = trip.getHoursUntilDeparture();
         if (hoursUntilDeparture < MIN_HOURS_BEFORE_DEPARTURE) {
-            System.out.printf(
-                    "⏩ [AI] Chuyến #%d: còn %.1f giờ đến khởi hành (< %d giờ yêu cầu). Không đủ thời gian mở vé mới.%n",
-                    trip.getId(), (double) hoursUntilDeparture, MIN_HOURS_BEFORE_DEPARTURE);
+            log.debug(
+                    "⏩ [AI] Chuyến #{}: còn {} giờ đến khởi hành (< {} giờ yêu cầu). Không đủ thời gian mở vé mới.",
+                    trip.getId(), String.format("%.1f", (double) hoursUntilDeparture), MIN_HOURS_BEFORE_DEPARTURE);
             return false;
         }
 
@@ -122,17 +124,17 @@ public class TripService {
         if (trip.getOccupancyRate() < INSTANT_HOT_THRESHOLD) {
             long hoursOnSale = trip.getHoursOnSale();
             if (hoursOnSale < MIN_SALE_OPEN_HOURS) {
-                System.out.printf(
-                        "⏩ [AI] Chuyến #%d: chỉ mới mở bán %.0f giờ (< %d giờ yêu cầu). Có thể là spike ảo.%n",
-                        trip.getId(), (double) hoursOnSale, MIN_SALE_OPEN_HOURS);
+                log.debug(
+                        "⏩ [AI] Chuyến #{}: chỉ mới mở bán {} giờ (< {} giờ yêu cầu). Có thể là spike ảo.",
+                        trip.getId(), String.format("%.0f", (double) hoursOnSale), MIN_SALE_OPEN_HOURS);
                 return false;
             }
         }
 
-        System.out.printf(
-                "🔥 [AI] Chuyến #%d HOT: %.1f%% ghế, còn %d giờ, đã mở bán %d giờ.%n",
+        log.debug(
+                "🔥 [AI] Chuyến #{} HOT: {}% ghế, còn {} giờ, đã mở bán {} giờ.",
                 trip.getId(),
-                trip.getOccupancyRate() * 100,
+                String.format("%.1f", trip.getOccupancyRate() * 100),
                 hoursUntilDeparture,
                 trip.getHoursOnSale());
         return true;
@@ -144,8 +146,8 @@ public class TripService {
      * Gán originalTrip trực tiếp vì chuyến gốc đã tồn tại trong DB.
      */
     private void createExtraTrip(Trip trip) {
-        System.out.printf("🤖 [AI] Chuyến #%d đạt %.1f%% lấp đầy. Đang tạo chuyến tăng cường...%n",
-                trip.getId(), trip.getOccupancyRate() * 100);
+        log.info("🤖 [AI] Chuyến #{} đạt {}% lấp đầy. Đang tạo chuyến tăng cường...",
+                trip.getId(), String.format("%.1f", trip.getOccupancyRate() * 100));
 
         // --- Tính thời gian ---
         LocalDateTime extraDeparture = trip.getDepartureTime().plusMinutes(30);
@@ -178,13 +180,13 @@ public class TripService {
                     ? result.getAssistant().getUser().getFullName()
                     : "Không có";
 
-            System.out.printf("✅ [AI] Phân công thành công: Xe %s | Tài xế chính: %s | Số tài phụ: %d | Phụ xe: %s%n",
+            log.info("✅ [AI] Phân công thành công: Xe {} | Tài xế chính: {} | Số tài phụ: {} | Phụ xe: {}",
                     result.getBus().getLicensePlate(),
                     result.getDriver().getUser().getFullName(),
                     result.getCoDrivers().size(),
                     assistantName);
         } else {
-            System.out.printf("⚠️ [AI] Không tự phân công được: %s → Admin xử lý thủ công.%n",
+            log.warn("⚠️ [AI] Không tự phân công được: {} → Admin xử lý thủ công.",
                     result.getFailureReason());
         }
 
@@ -476,7 +478,7 @@ public class TripService {
                 .orElse(null);
 
         if (fallback != null) {
-            System.out.printf("⚠️ [AI] Tài xế/Phụ xe %s được chọn nhưng bằng lái SẮP HẾT HẠN (vào %s)!%n",
+            log.warn("⚠️ [AI] Tài xế/Phụ xe {} được chọn nhưng bằng lái SẮP HẾT HẠN (vào {})!",
                     fallback.getUser().getFullName(), fallback.getLicenseExpiryDate());
         }
 
@@ -869,7 +871,7 @@ public class TripService {
         changeStatusToActive(trip);
         tripRepository.save(trip);
 
-        System.out.printf("✅ Admin xác nhận chuyến #%d | Xe: %s | Tài xế chính: %s | Số tài xế phụ: %d | Phụ xe: %s%n",
+        log.info("✅ Admin xác nhận chuyến #{} | Xe: {} | Tài xế chính: {} | Số tài xế phụ: {} | Phụ xe: {}",
                 tripId,
                 trip.getBus().getLicensePlate(),
                 trip.getDriver().getUser().getFullName(),
@@ -931,7 +933,7 @@ public class TripService {
         changeStatusToActive(trip);
         tripRepository.save(trip);
 
-        System.out.printf("✅ Admin phân công thủ công chuyến #%d | Xe: %s | Tài xế: %s%n",
+        log.info("✅ Admin phân công thủ công chuyến #{} | Xe: {} | Tài xế: {}",
                 tripId, bus.getLicensePlate(), driver.getUser().getFullName());
 
         return warning;
@@ -1324,7 +1326,7 @@ public class TripService {
     @Transactional
     public void rejectTrip(Long tripId) {
         updateTripStatus(tripId, TripStatus.CANCELLED);
-        System.out.printf("❌ Admin từ chối chuyến tăng cường #%d%n", tripId);
+        log.info("❌ Admin từ chối chuyến tăng cường #{}", tripId);
     }
 
     // =========================================================================
@@ -1618,7 +1620,7 @@ public class TripService {
         // Kích hoạt @SQLDelete: phát ra UPDATE trips SET is_deleted=true WHERE id=?
         tripRepository.delete(trip);
 
-        System.out.printf("🗑️ Admin xóa mềm chuyến #%d (trạng thái cũ: %s)%n",
+        log.info("🗑️ Admin xóa mềm chuyến #{} (trạng thái cũ: {})",
                 tripId, trip.getStatus());
     }
 

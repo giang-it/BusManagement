@@ -111,12 +111,17 @@ Optional FK fields bind empty-string → `null` via `DomainClassConverter`
   the repository bean, so a bad property path (`existsByDriverUserId` against
   `@MapsId`) fails as `PropertyReferenceException`. Green context = names valid.
   It still says nothing about behaviour — go drive it.
-- **Log spam:** the AI extra-trip scheduler prints `[AI] Chuyến #N: còn … giờ đến
-  khởi hành` continuously while idle and drowns real output. `grep` the log for
+- **Log spam — fixed 2026-08-13, defect #4.** The AI extra-trip scheduler used to
+  print `[AI] Chuyến #N: …` every 10s while idle and drown real output. Those four
+  scan-path lines are now `log.debug` (`TripService` uses `@Slf4j`), so the default
+  run is quiet. To get them back while debugging the scheduler:
+  `-Dlogging.level.giang.com.BusManagement.service.TripService=DEBUG`. The eight
+  event lines in that class stayed visible (`info`/`warn`). `grep` the log for
   `TemplateProcessingException|SpelEvaluationException|PropertyReferenceException`
   rather than reading it.
-- **Console log is mojibake** under Git Bash (Vietnamese output). Judge from the
-  HTTP response and the DB, not the console text.
+- **Console log is mojibake** under Git Bash (Vietnamese output) — this is the
+  Windows console charset, not the app, and it was identical under the old
+  `System.out`. Judge from the HTTP response and the DB, not the console text.
 
 ## Referential integrity is service-level, not DB-level
 
