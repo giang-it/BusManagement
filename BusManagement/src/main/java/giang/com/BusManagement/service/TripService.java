@@ -1552,6 +1552,28 @@ public class TripService {
     }
 
     /**
+     * Các chuyến của Bảng Điều Hành (Dispatch Center): mọi chuyến đang trên đường
+     * (DEPARTED) và các chuyến đã kích hoạt (ACTIVE) có giờ khởi hành trước mốc
+     * {@code until}.
+     *
+     * Tập trạng thái hiển thị nằm ở đây chứ không ở controller — cùng lý do
+     * getPendingTrips() tự ôm PENDING_APPROVAL: đó là tham số của câu truy vấn,
+     * thuộc tầng service. KHÁC với DispatchController.BOARD_ACTIONS, vốn là tập
+     * trạng thái ĐÍCH mà màn hình cho phép chuyển sang.
+     *
+     * Truy vấn KHÔNG có cận dưới thời gian (xem TripRepository), nên một chuyến
+     * DEPARTED đã quá hạn từ lâu vẫn hiện trên bảng thay vì bị kẹt ngoài tầm với —
+     * đây là lối duy nhất còn phơi ra transition DEPARTED → COMPLETED sau lỗi #18.
+     *
+     * @param until mốc trên của departureTime; màn hình quyết định nhìn xa bao
+     *              nhiêu (xem DispatchController.UPCOMING_WINDOW_HOURS)
+     */
+    public List<Trip> getDispatchBoardTrips(LocalDateTime until) {
+        List<TripStatus> boardStatuses = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED);
+        return tripRepository.findDispatchBoardTrips(boardStatuses, until);
+    }
+
+    /**
      * Toàn bộ chuyến kèm quan hệ đầy đủ (mọi trạng thái) — dùng cho các dropdown
      * chọn chuyến ở tầng UI. Giữ tên trung lập theo nghiệp vụ chuyến xe để không
      * ràng buộc TripService vào một màn hình cụ thể nào.

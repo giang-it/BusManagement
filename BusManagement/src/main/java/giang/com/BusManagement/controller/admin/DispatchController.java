@@ -2,7 +2,6 @@ package giang.com.BusManagement.controller.admin;
 
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.domain.TripStatus;
-import giang.com.BusManagement.repository.TripRepository;
 import giang.com.BusManagement.service.TripService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -33,7 +32,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DispatchController {
 
-    private final TripRepository tripRepository;
     private final TripService tripService;
 
     /**
@@ -43,13 +41,11 @@ public class DispatchController {
      */
     private static final int UPCOMING_WINDOW_HOURS = 48;
 
-    private static final List<TripStatus> BOARD_STATUSES = List.of(TripStatus.ACTIVE, TripStatus.DEPARTED);
-
     /**
      * Các trạng thái đích mà bảng điều hành THỰC SỰ phơi ra — đúng ba nút của
      * dispatch-board.html: "Xuất phát" (DEPARTED), "Hủy chuyến" (CANCELLED),
-     * "Hoàn thành" (COMPLETED). Khác với BOARD_STATUSES ở trên, vốn là bộ lọc
-     * chuyến nào được hiển thị.
+     * "Hoàn thành" (COMPLETED). Khác với bộ lọc chuyến nào được HIỂN THỊ trên
+     * bảng, vốn nằm trong TripService.getDispatchBoardTrips().
      *
      * VÌ SAO PHẢI CHẶN Ở ĐÂY, KHÔNG TIN VÀO FSM: updateTripStatus() chỉ kiểm tra
      * transition có HỢP LỆ hay không (canTransition) — nó KHÔNG chạy
@@ -66,8 +62,8 @@ public class DispatchController {
     @GetMapping
     public String viewBoard(Model model) {
         LocalDateTime now = LocalDateTime.now();
-        List<Trip> boardTrips = tripRepository.findDispatchBoardTrips(
-                BOARD_STATUSES, now.plusHours(UPCOMING_WINDOW_HOURS));
+        List<Trip> boardTrips = tripService.getDispatchBoardTrips(
+                now.plusHours(UPCOMING_WINDOW_HOURS));
 
         // Đang chạy: đã xuất phát, chưa hoàn thành.
         List<Trip> inProgress = boardTrips.stream()
