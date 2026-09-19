@@ -354,7 +354,7 @@
 ### TC_FSM_001 — API tài nguyên rảnh: Happy path với khung giờ hợp lệ
 
 - **Mã TC:** TC_FSM_001
-- **Tên Kịch Bản:** Gọi API lọc xe và tài xế rảnh với thời gian departure < arrival hợp lệ
+- **Tên Kịch Bản:** Gọi API lọc xe, tài xế và phụ xe rảnh với thời gian departure < arrival hợp lệ
 - **Điều kiện tiên quyết:**
   - Có ít nhất 5 xe READY không bị trùng lịch trong khung giờ test
   - Có ít nhất 5 tài xế active, bằng lái còn hạn, tổng giờ lái trong ngày + duration <= 8h
@@ -362,12 +362,15 @@
   1. `GET /api/admin/trips/available-resources?departure=2026-09-01T08:00&arrival=2026-09-01T14:00`
 - **Kết quả mong đợi:**
   - HTTP 200 OK
-  - Response JSON: `{ "buses": [...], "drivers": [...] }`
+  - Response JSON: `{ "buses": [...], "drivers": [...], "assistants": [...] }` — **ba** khoá
   - `buses` array: chỉ chứa xe READY, trạng thái hiện tại không phải REPAIRING/TRAVELING, không bận trong window `[07:00, 15:00]` (departure-1h đến arrival+1h), chưa quá hạn/sắp quá hạn bảo trì
   - `drivers` array: chỉ chứa tài xế active, bằng lái còn hạn, tổng giờ lái hôm đó + 6h <= 8h, không bận trong window `[07:30, 14:30]` (departure-30p đến arrival+30p)
+  - `assistants` array (lỗi #13): **cùng ba điều kiện trên TRỪ trần 8h** — active, bằng lái còn hạn vào ngày khởi hành, không bận trong window `[07:30, 14:30]`. Phụ xe không cầm lái nên `validateStaffForTrip()` không áp trần giờ cho vai trò này
+  - **Bất biến phải đúng ở mọi lần gọi:** `assistants` ⊇ `drivers` (hiệu `drivers − assistants` luôn RỖNG). Đây là quy tắc một chiều của §8 — dropdown không được mời người validator sẽ từ chối
   - Mỗi bus DTO chứa: `id`, `licensePlate`, `typeName`, `capacity`, `brand`
-  - Mỗi driver DTO chứa: `userId`, `fullName`, `licenseNumber`, `experienceYears`
+  - Mỗi driver/assistant DTO chứa: `userId`, `fullName`, `licenseNumber`, `experienceYears`
   - Xe và tài xế được sắp xếp theo `kmSinceLastMaintenance` / `totalDrivingHours24h` tăng dần
+- **Lưu ý khi kiểm bằng tay — dễ "đậu rỗng nghĩa":** hai danh sách chỉ LỆCH nhau khi có người thật sự có giờ lái trong ngày khởi hành. `sumDrivingHours()` cộng giờ nền mock `totalDrivingHours24h` **chỉ khi ngày khởi hành là HÔM NAY**, nên với một ngày tương lai không có chuyến nào thì mọi tài xế đọc 0h và hai danh sách **bằng nhau** — đó là kết quả ĐÚNG, không phải lỗi. Muốn thấy khoảng lệch thì chọn khởi hành hôm nay, hoặc tạo trước một chuyến thật vào ngày đích. Đo ngày 2026-09-11 trên tuyến 30h: khởi hành hôm nay → `drivers=20`/`assistants=31`; khởi hành ngày mai → `31/31`
 
 ---
 
@@ -404,6 +407,7 @@
 - **lưu ý:**
   - `buses` array: chỉ chứa xe READY, trạng thái hiện tại không phải REPAIRING/TRAVELING, không bận trong window `[05:00, 11:00]` (departure-1h đến arrival+1h), chưa quá hạn/sắp quá hạn bảo trì
   - `drivers` array: chỉ chứa tài xế active, bằng lái còn hạn, tổng giờ lái hôm đó + 6h <= 8h, không bận trong window `[05:30, 10:30]` (departure-30p đến arrival+30p)
+  - `assistants` array: cùng điều kiện `drivers` **trừ** trần 8h (lỗi #13) — xem TC_FSM_001. Bộ lọc trùng lịch áp y nguyên cho phụ xe, nên một người đang bận ở chuyến giao khung giờ vẫn bị loại khỏi CẢ HAI danh sách
 
 ---
 

@@ -90,7 +90,7 @@ Entry points (verified against the `@RequestMapping`s, not guessed):
 | `/admin/analytics` | Renders `dashboard-analytics.html` — **the path is not `/admin/dashboard-analytics`** (that 404s) |
 | `/admin/trip-management/trips` | Trip list + `/create`, `/edit/{id}`. `trip-management` is the documented anti-pattern controller |
 | `/admin/trips/pending` | Pending-approval queue (`AdminTripController`) |
-| `/api/admin/trips/available-resources` | JSON: conflict-free buses/drivers for a window |
+| `/api/admin/trips/available-resources` | JSON: `{buses, drivers, assistants}` for a window. `assistants` ⊇ `drivers` (no 8h cap on that role) |
 
 **Don't assume a controller's `@RequestMapping` base is itself a page** — all of
 these 404: `/admin/trips`, `/admin/trip-management`, `/admin/trips/create`. Only
@@ -119,6 +119,21 @@ Optional FK fields bind empty-string → `null` via `DomainClassConverter`
   event lines in that class stayed visible (`info`/`warn`). `grep` the log for
   `TemplateProcessingException|SpelEvaluationException|PropertyReferenceException`
   rather than reading it.
+- **Driving-hour probes: a future-dated departure reads 0 h for everyone.**
+  `sumDrivingHours()` adds the mock `Driver.totalDrivingHours24h` baseline **only
+  when the date being asked about is today**, and on current data every
+  non-terminal trip sits in July–August. So any probe that compares "who is over
+  their hour budget" on a *tomorrow* departure gets `0 h` for all 33 drivers and
+  passes vacuously. Measured 2026-09-11 on a 30 h route: departing **today** →
+  `drivers=20` vs `assistants=31`; departing **tomorrow** → `31/31`, difference
+  zero. Pick a departure **today**, or create a real trip on the target date
+  first. This same omission produced a wrong claim in the 2026-08-13 re-audit of
+  defect #2.
+- **Python here is Windows Python, not MSYS.** A `/tmp/...` path passed as a
+  *command-line argument* gets mangled to a real Windows path by MSYS and works;
+  the same string written **inside** the script resolves against the drive root
+  and fails with `FileNotFoundError`. Pipe the file through stdin instead. Also
+  set `PYTHONIOENCODING=utf-8` or printing Vietnamese dies on `cp1252`.
 - **Console log is mojibake** under Git Bash (Vietnamese output) — this is the
   Windows console charset, not the app, and it was identical under the old
   `System.out`. Judge from the HTTP response and the DB, not the console text.

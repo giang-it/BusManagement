@@ -52,6 +52,14 @@ Ghi lại tại đây thay vì sửa ngay, vì tất cả đều **nằm ngoài 
 và sửa kèm sẽ trộn việc không liên quan vào commit của phase. Cần quyết định của
 chủ dự án trước khi xử lý.
 
+> **CẬP NHẬT 2026-09-11 — cả năm mục #1–#5 nay đã ĐÓNG.** #1 sửa 2026-07-20;
+> #2/#3/#4 sửa 2026-08-13; **#5 sửa 2026-09-11**. Câu "cần quyết định của chủ dự án"
+> ở trên là của thời điểm viết (2026-07-20) và lý do hoãn ("ngoài phạm vi Phase 3/4")
+> đã hết hiệu lực ngay hôm đó. Đợt tái thẩm 2026-08-13 đã chỉ ra rằng nhãn *"mở do
+> chủ ý"* mà §8 roadmap gán cho nhóm này **chưa bao giờ là một phán quyết của chủ dự
+> án** — không có ruling nào được ghi ở đâu cả. Giữ nguyên đoạn trên để không xoá dấu
+> vết, nhưng **đừng đọc nó như trạng thái hiện tại.**
+
 ## 1. Bằng lái được kiểm tra theo NGÀY HÔM NAY, không theo ngày khởi hành
 
 > **✅ ĐÃ SỬA (2026-07-20).** Thêm `Driver.isLicenseValid(LocalDate)`; bản không
@@ -229,6 +237,43 @@ chủ dự án trước khi xử lý.
 - **Đã ghi nhận trước đó:** `THESIS_ROADMAP.md` §8, mục ngày 2026-07-17.
 
 ## 5. `DispatchController` inject thẳng Repository
+
+> **✅ ĐÃ SỬA (2026-09-11).** `TripService.getDispatchBoardTrips(until)` nhận lời gọi
+> `findDispatchBoardTrips(...)`; `DispatchController` bỏ field `TripRepository`, bỏ
+> import, và bỏ hằng `BOARD_STATUSES` (tập trạng thái **hiển thị** giờ thuộc service —
+> cùng lý do `getPendingTrips()` tự ôm `PENDING_APPROVAL`: nó là tham số của câu truy
+> vấn). Câu query **không đổi một chữ**. Controller giữ lại `UPCOMING_WINDOW_HOURS`
+> (màn hình quyết định nhìn xa bao nhiêu), việc chia 3 nhóm để hiển thị, và
+> `BOARD_ACTIONS` — tập trạng thái **ĐÍCH**, một khái niệm khác hẳn, nên javadoc của
+> nó được sửa để trỏ sang chỗ mới thay vì trỏ tới hằng đã bị xoá.
+>
+> **Vì sao tên `getDispatchBoardTrips` chứ không trung lập như `getAllTrips()` yêu cầu:**
+> javadoc của `getAllTrips()` đòi tên trung lập cho một query **dùng chung nhiều màn**
+> (`findAllWithDetails`). Query này chỉ tồn tại cho bảng điều hành và chính repository
+> đã mang tên `findDispatchBoardTrips` — đặt tên trung lập ở tầng service sẽ làm đứt
+> mạch truy vết giữa hai tầng.
+>
+> **Phạm vi cố ý hẹp:** chỉ `DispatchController`. Hai controller còn lại vẫn inject
+> Repository và **vẫn mở**: `AdminController` (3 lời gọi `count()`, nợ chưa thành mục)
+> và `AdminTripManagementController` (18 điểm chạm, **có cả đường ghi** — Warn #4 trong
+> `project_report.md`). Gộp vào đây sẽ biến một bản dọn 2 dòng thành refactor 21 điểm
+> chạm, trái quy tắc Atomic Changes. Lý do chọn `DispatchController` không phải vì nó
+> nhỏ nhất mà vì nó là controller **duy nhất ra đời SAU khi §3 được viết** (Phase 1),
+> tức nó vi phạm một luật đang có hiệu lực; hai cái kia là nợ có trước luật.
+>
+> **Kiểm chứng (drive app thật, default profile, PID 19092 khớp log — 0 ghi):** trang
+> `/admin/dispatch` render **đúng 8 chuyến** `{12, 11, 6, 7, 3, 2535, 13, 14}`, khớp
+> tuyệt đối với SQL viết độc lập theo đúng vị từ của query
+> (`status IN (ACTIVE, DEPARTED) AND departure_time <= NOW()+48h AND is_deleted=0`);
+> chuyến 8 (`PENDING_APPROVAL`) bị loại đúng. Nhóm: 5 `inProgress` + 3 `overdue` +
+> 0 `upcoming` ⇒ 5×1 + 3×2 = **11 nút**, trang có đúng 11 `name="tripId"`. Đường GHI
+> được kiểm bằng hai request **bị từ chối ở hai tầng khác nhau mà không ghi gì**:
+> `newStatus=ACTIVE` bị `BOARD_ACTIONS` chặn ở controller (guard #10 còn nguyên), và
+> `DEPARTED → CANCELLED` bị FSM chặn trong `updateTripStatus()` (chứng minh dây nối
+> service vẫn sống sau khi dời lời gọi đọc). Cách kiểm này **mạnh hơn** so A/B hai
+> build như dự định ban đầu: nó chứng minh kết quả *đúng*, không chỉ *không đổi*.
+> `mvnw clean test` **75/75**, 17/17 trang admin 200, 0 exception
+> template/SpEL/lazy-init, snapshot DB **khớp tuyệt đối** trước/sau.
 
 - **Mức độ:** kiến trúc, nhất quán.
 - **Ở đâu:** `controller/admin/DispatchController.java:34` — `private final TripRepository tripRepository;`.
@@ -1093,7 +1138,66 @@ sửa #12 thậm chí **thu hẹp** khoảng lệch này (trên tuyến 30h: 8,0
 
 ## 13. Dropdown "Phụ xe" ở form TẠO chuyến bị lọc bằng luật 8h — màn Phê Duyệt thì không
 
-- **Mức độ:** nhất quán code ↔ code ↔ tài liệu. **Tiềm ẩn — chỉ chạm được ở 3 tuyến > 8h.**
+> **✅ ĐÃ SỬA (2026-09-11).** Thêm `TripService.getAvailableAssistantsForTimeRange(departure, arrival)`
+> — đúng bộ lọc của `getAvailableDriversForTimeRange()` **trừ** dòng trần 8h, giữ nguyên ba
+> ràng buộc còn lại (active / bằng lái còn hạn **vào ngày khởi hành** / không trùng lịch
+> trong cửa sổ ±`MIN_REST_BETWEEN_TRIPS_MINUTES`), khớp MỘT-MỘT với đúng những gì
+> `validateStaffForTrip()` kiểm cho vai trò phụ xe. `TripRestController` trả thêm khoá
+> `assistants`; `trip-create-form.html` đổ `assistants` vào `assistantSelect`.
+>
+> **Ba chỗ cố ý KHÔNG đổi** (đây là phần dễ sửa hỏng nhất, nên ghi ra): slot **Tài xế phụ**
+> (`availableDriversData` → `addCoDriverSlot`) vẫn dùng `drivers`, vì tài xế phụ **có** chịu
+> trần 8h (`validateStaffForTrip` ném "Tài xế phụ … sẽ vượt 8h/ngày") — đổ danh sách phụ xe
+> vào đó sẽ tạo ra đúng lỗi ngược lại; cổng `hasResources` vẫn xét `drivers`, vì tài xế chính
+> là bắt buộc nên 0 tài xế = không tạo được chuyến dù có bao nhiêu phụ xe; và dropdown Tài xế
+> chính vẫn dùng `drivers`. Biến chết `assistantOptionsHtml` được xoá — nó nằm trong đúng 6
+> dòng bị viết lại, không phải việc lạc. Lời gọi mới `buildDriverOptions(assistants, '-- Không có --')`
+> bỏ tham số thứ ba, và `includeEmpty` mặc định `true`, nên tuỳ chọn "không có phụ xe" (bắt
+> buộc với chuyến ≤ 8h) được giữ nguyên — đã kiểm trên trang đã render.
+>
+> **Không phá bất biến nào:** bản sửa không nới lỏng gì, nó chỉ **thôi áp một luật mà
+> validator chưa bao giờ áp**. Tập phụ xe là siêu tập của tập tài xế, nên quy tắc một chiều
+> của §8 vẫn đúng — đo được `drivers − assistants = ∅` ở cả ba mốc thời gian thử.
+>
+> **Test:** `TripServiceAssistantAvailabilityTest` (4 test, `@SpringBootTest` + `@Transactional`
+> trên `busmanagement_test`). Chốt **cả hai chiều**: người trượt trần 8h phải vắng ở danh sách
+> tài xế nhưng **có mặt** ở danh sách phụ xe; và phụ xe **vẫn** bị loại khi bị khoá / hết bằng
+> lái / trùng lịch. Test mạnh nhất chạy thẳng `validateStaffForTripDryRun()` lên đúng con người
+> bị giấu (validator **chấp nhận**), kèm đối trọng cùng người đó ở vai tài xế chính thì bị từ
+> chối vì trần giờ — chứng minh sự bất đối xứng giữa hai vai là **có thật trong validator**,
+> không phải giả định của bản sửa. **Non-vacuous:** bật lại filter 8h vào method mới làm đúng
+> **2 test đỏ dạng `Failures`** (không phải `Errors`, tức dropdown thật sự co lại), hai test
+> chốt ràng buộc-giữ-lại vẫn xanh. `mvnw clean test` **75/75**.
+>
+> **Kiểm chứng (drive app thật, PID 19092, read-only — 0 ghi, snapshot DB khớp tuyệt đối):**
+> endpoint trả **ba** khoá `{buses, drivers, assistants}`; tuyến 30h khởi hành **hôm nay** →
+> `drivers=20`, `assistants=31` ⇒ **11 người hợp lệ trước đây bị giấu** (userId 23–33); trang
+> form đã render dùng `data.assistants` ở `:492` và `buildDriverOptions(assistants, …)` ở `:554`,
+> `availableDriversData = drivers` ở `:514` giữ nguyên.
+>
+> ---
+>
+> **ĐÍNH CHÍNH 1 — con số "21/33, giấu 12 người" bên dưới sai VỀ BẢN CHẤT, không chỉ cũ.**
+> `33` là tổng tài xế active **chưa qua bộ lọc bằng lái**, còn `21` là số **sau** bộ lọc giờ:
+> hai con số ở hai tầng lọc khác nhau thì không trừ được cho nhau. Cả hai dropdown đều áp bộ
+> lọc bằng lái. Số đúng, đo trên app thật ngày 2026-09-11: **20 vs 31 ⇒ giấu 11**.
+>
+> **ĐÍNH CHÍNH 2 — câu "5 tuyến ≤ 8h: không bị" bên dưới SAI, và đây là phần đáng giữ lại
+> nhất.** Đo trên app thật cùng ngày: tuyến **2 giờ** khởi hành hôm nay cũng giấu **6** phụ xe
+> hợp lệ (`drivers=25` vs `assistants=31`). Lỗi #13 cắn ở **mọi** tuyến, bất cứ khi nào có
+> người có giờ lái > 0 trong ngày khởi hành — hiện nguồn duy nhất là giờ nền mock
+> `totalDrivingHours24h` (chỉ cộng cho HÔM NAY), sau này là chuyến thật đã xếp vào ngày đó.
+> Điều **thật sự** đặc biệt ở 3 tuyến > 8h không phải là "chỉ ở đó mới bị" mà là ở đó phụ xe
+> là ràng buộc **BẮT BUỘC** (`validateStaffForTrip`), nên thiệt hại nặng nhất. Câu cũ đã lấy
+> một tính chất đúng-về-mức-độ rồi phát biểu thành một khẳng định về **phạm vi** — cùng khuôn
+> với các câu sai đã che lỗi #14/#18/#20, lần này nằm trong chính mục bug register.
+>
+> **Một cái bẫy đo lường cho lần sau:** nếu kiểm endpoint với khởi hành **ngày mai**, hai danh
+> sách ra **31/31**, lệch 0 — vì `sumDrivingHours()` chỉ cộng giờ nền mock khi ngày xét là hôm
+> nay, và mọi chuyến chưa-kết-thúc hiện đều nằm ở tháng 7–8. Đó là kết quả ĐÚNG, nhưng một lần
+> kiểm như vậy **không chứng minh được gì**. Đã ghi vào `.claude/skills/verify/SKILL.md`.
+
+- **Mức độ:** nhất quán code ↔ code ↔ tài liệu. **Tiềm ẩn — chỉ chạm được ở 3 tuyến > 8h.** *(phạm vi này SAI — xem Đính chính 2 ở trên)*
 - **Phân loại:** nhánh **3 — sai thuần túy** (một màn áp lên vai trò phụ xe đúng cái ràng buộc mà
   project tuyên bố **không** áp cho vai trò đó; màn anh em cùng nhiệm vụ đã làm đúng).
 - **Ở đâu:** `TripRestController:58-62` trả về **một** danh sách `drivers` duy nhất, lấy từ
@@ -1132,11 +1236,15 @@ sửa #12 thậm chí **thu hẹp** khoảng lệch này (trên tuyến 30h: 8,0
 
 ## Mục nhỏ (2026-08-05)
 
-- **Biến chết trong `trip-create-form.html:546`:**
+- **Biến chết trong `trip-create-form.html:546`:** ✅ **ĐÃ XOÁ cùng bản sửa #13 (2026-09-11)**,
+  đúng như dự kiến bên dưới.
   `const assistantOptionsHtml = buildDriverOptions(drivers, '-- Không có --', false);` được tính
   rồi **không dùng ở đâu** — ba dòng ngay dưới (`:547-550`) dựng lại chuỗi **y hệt** bằng
   `drivers.map(...)` inline. Biến chết, **0 ảnh hưởng hành vi**. Không xoá kèm vì không thuộc bản
   sửa nào đang mở; xoá được cùng lúc với #13 (cùng file, cùng khối `renderResources`).
+  *(Bản sửa #13 viết lại đúng khối đó: ba dòng inline được thay bằng một lời gọi
+  `buildDriverOptions(assistants, '-- Không có --')`, nên biến chết biến mất như một hệ quả
+  của việc dùng lại hàm, không phải một lần xoá lạc việc.)*
 
 ---
 
