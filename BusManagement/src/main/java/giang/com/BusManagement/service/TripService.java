@@ -161,6 +161,10 @@ public class TripService {
         extraTrip.setDepartureTime(extraDeparture);
         extraTrip.setArrivalTimeExpected(extraArrival);
         extraTrip.setStatus(TripStatus.PENDING_APPROVAL);
+        // Số ghế tạm lấy theo chuyến gốc; nếu AI phân công được xe thì bên dưới sẽ
+        // thay bằng sức chứa THẬT của xe đó (lỗi #22). Giữ số của chuyến gốc chỉ
+        // cho trường hợp không tìm được xe — lúc đó chuyến chưa có xe nào để mà so,
+        // và validateBusForTrip() sẽ đối chiếu lại khi Admin phân công thủ công.
         extraTrip.setTotalSeats(trip.getTotalSeats());
         extraTrip.setPrice(trip.getPrice());
         extraTrip.setExtraTrip(true);
@@ -175,6 +179,17 @@ public class TripService {
             extraTrip.setAssistant(result.getAssistant());
             extraTrip.getCoDrivers().clear();
             extraTrip.getCoDrivers().addAll(result.getCoDrivers());
+
+            // Chuyến tăng cường mở bán ĐÚNG sức chứa của xe được gán. Trước đây số
+            // ghế được chép nguyên từ chuyến gốc — vốn là con số Admin gõ tay, không
+            // ràng buộc với xe nào — rồi AI chọn một xe khác theo loại của tuyến, nên
+            // đã sinh ra chuyến bán 40 ghế trên xe 22 chỗ (lỗi #22, chuyến 6 trên DB
+            // thật). Cùng cách RecommendationService.buildCard() đặt totalSeats từ xe
+            // được chọn, và cùng mặc định mà form tạo chuyến tự điền từ data-capacity.
+            Integer capacity = seatCapacityOf(result.getBus());
+            if (capacity != null) {
+                extraTrip.setTotalSeats(capacity);
+            }
 
             String assistantName = result.getAssistant() != null
                     ? result.getAssistant().getUser().getFullName()
@@ -1017,6 +1032,8 @@ public class TripService {
      * - Xe đã QUÁ HẠN bảo trì (needsMaintenance() == true ngay hiện tại).
      * - Quãng đường của chuyến này sẽ đẩy xe vào vùng SẮP/QUÁ hạn bảo trì
      * (>= 90% maintenanceThreshold sau khi cộng route.distanceKm).
+     * - Số ghế mở bán (totalSeats) lớn hơn sức chứa của xe theo loại xe (lỗi #22;
+     * bỏ qua khi xe chưa gán loại).
      *
      * Giữ kiểu trả về String (warning) để tương thích với các nơi gọi hiện tại
      * (flash message "warning" ở Controller) — hiện tại luôn trả về null vì
@@ -1114,7 +1131,30 @@ public class TripService {
                     + "km) sau chuyến này — vui lòng chọn xe khác hoặc đưa xe đi bảo trì trước!");
         }
 
+        // RÀNG BUỘC SỨC CHỨA: số ghế mở bán không được vượt số chỗ thật của xe (lỗi
+        // #22). Đây là chỗ DUY NHẤT giữ luật này, nên nó phủ mọi đường ghi vào
+        // totalSeats: tạo thủ công, sửa, hai lối phê duyệt, và cổng dry-run của
+        // Recommendation. Bán ÍT hơn sức chứa vẫn hợp lệ — đó là quyết định kinh
+        // doanh; bán NHIỀU hơn là bán ghế không tồn tại. Xe chưa gán loại thì không
+        // có sức chứa để so, bỏ qua thay vì đoán (cùng cách các luật bảo trì bỏ qua
+        // khi maintenanceThreshold == null).
+        Integer capacity = seatCapacityOf(bus);
+        if (capacity != null && trip.getTotalSeats() > capacity) {
+            throw new IllegalArgumentException("Chuyến mở bán " + trip.getTotalSeats() + " ghế nhưng xe "
+                    + bus.getLicensePlate() + " (" + bus.getBusType().getTypeName() + ") chỉ có " + capacity
+                    + " chỗ — hãy giảm số ghế của chuyến hoặc chọn xe lớn hơn!");
+        }
+
         return null;
+    }
+
+    /**
+     * Sức chứa (số chỗ thật) của xe theo loại xe, hoặc null nếu xe chưa được gán
+     * loại. Dùng chung cho luật sức chứa trong validateBusForTrip() và cho việc
+     * đặt số ghế của chuyến tăng cường trong createExtraTrip() — một định nghĩa.
+     */
+    private static Integer seatCapacityOf(Bus bus) {
+        return bus.getBusType() != null ? bus.getBusType().getCapacity() : null;
     }
 
     /**
