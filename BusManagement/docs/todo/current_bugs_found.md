@@ -2138,3 +2138,322 @@ sinh `765c062` 15:15 **cùng ngày** (hai controller kia có từ tháng 3–4, 
   *Bài học ghi lại:* lần rà 2026-09-19 lúc đầu khẳng định quan sát này *"chưa được ghi ở đâu"* vì chỉ
   `grep` file này; `project_report.md` đánh số riêng (Bug/Warn/Incon/🟣) và cũng là nơi giữ mục mở.
   Trước khi tuyên bố "chưa ghi", phải quét **cả hai** file.
+
+---
+
+# Rà soát toàn dự án lần bốn (2026-09-19) — năm lỗi mới #21–#25, chín mục nhỏ, một danh sách đã loại
+
+Rà theo yêu cầu chủ dự án (*"xem lại thật kỹ, ko chỉ dựa vào tài liệu, kiểm tra xem có vấn đề,
+thiếu nhất quán gì không"*), chạy ngay sau khi #5/#13 được commit (`ccee141`/`a6e28af`/`9f9ba15`/
+`f0cb06b`). **Trạng thái nền:** `mvnw test` 75/75, `temp` == `origin/temp`, mọi lỗi #1–#20 đã đóng.
+
+**Phương pháp — code và dữ liệu thật trước, docs chỉ để đối chiếu.** Bốn nguồn bằng chứng, theo
+thứ tự: (1) đọc lại từng `@PostMapping` và từng đường `repository.save()`; (2) **13 câu SQL bất
+biến** chạy read-only trên DB thật (loại xe ↔ tuyến, số ghế ↔ sức chứa, vé > ghế, DEPARTED ↔
+TRAVELING, odometer ↔ bảo trì, trùng lịch xe/tài xế, bằng lái/khoá, sự cố ↔ chuyến…) — 9/13 ra
+**0**, 4 câu ra dòng thật và mỗi dòng dẫn về một chỗ code; (3) một **test probe tạm** trên
+`busmanagement_test` (viết, chạy, **xoá**, không commit — bản sao ở thư mục tmp của phiên) cho lỗ
+hổng mà đo trên DB thật sẽ phải ghi; (4) **drive app thật** (PID 27652, default profile) cho các
+finding nằm ở nút bấm/form — chỉ GET, cộng đúng một POST chắc chắn không ghi được vì đụng unique
+constraint; snapshot DB **khớp tuyệt đối** trước/sau. Mỗi ứng viên qua bài ba chiều và được quét
+**cả ba** file (`current_bugs_found.md`, `project_report.md`, `THESIS_ROADMAP.md`) trước khi gọi
+là mới — bài học 2026-09-19 buổi sáng.
+
+**Chưa sửa gì. Chờ quyết định của chủ dự án.**
+
+---
+
+## 21. MỌI endpoint "tạo mới" nhận `id` gửi lên và GHI ĐÈ bản ghi có sẵn — với Trip là cửa thứ năm vào `ACTIVE`, đi vòng qua #18 và #20
+
+> **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG, và hai chỗ bên dưới được đính
+> chính.** Chủ dự án yêu cầu *"thật sự test, chứ không tự suy luận"*: lần ghi đầu chỉ có 3 probe ở
+> tầng service; lần này **clone toàn bộ DB thật sang `busmanagement_test`** (mysqldump, chữ ký MD5
+> 2.071 chuyến khớp), chạy một JVM thứ hai (port 8098, PID 28056, `processlist` xác nhận 10/10
+> connection vào bản clone, 0 vào DB thật) và **POST thật qua HTTP** vào từng endpoint như một client
+> bên ngoài. DB thật snapshot **khớp tuyệt đối** trước/sau. Kết quả từng đường:
+>
+> | Đường | POST với `id` của… | Kết quả đo được |
+> |---|---|---|
+> | `/trips/create` | chuyến **3327** `COMPLETED`, 35 vé, 120.000đ, xe 8 | flash *"Tạo chuyến xe thành công!"*; dòng 3327 → **`ACTIVE`, 0 vé, 1đ, xe 23, tài xế 2, `sale_opened_at` đóng dấu mới**; `COUNT(*)` 2071 → 2071. `created_at`/`is_extra_trip`/`original_trip_id` giữ nguyên (form không gửi, giá trị vốn là mặc định) |
+> | `/trips/create` | chuyến **3** `DEPARTED`, xe 7 `TRAVELING` | thành công; 3 → `ACTIVE` trên xe 23; **xe 7 kẹt `TRAVELING` với 0 chuyến `DEPARTED` giải thích** — đúng thiệt hại #14, và từ đó bị cả dropdown (lọc `READY`) lẫn `validateBusForTrip` (#19) loại vĩnh viễn cho tới khi admin sửa tay |
+> | `/trips/create` | chuyến **10** đã **soft-delete** | **KHÔNG hồi sinh, không tạo dòng mới** — Hibernate ném `StaleStateException` (*"Row was already updated or deleted"*), flash *"Lỗi: …"*. Soft-delete tình cờ được bảo vệ; ghi để không ai phóng đại mục này |
+> | `/routes/create` | tuyến **1** (120 km / 120′ / loại 1, trạm 1→2) | → **999 km / 999′ / `suitable_bus_type_id = NULL`**, lộ trình thành 11→10; 8 → 8 tuyến. Cột form không gửi bị **xoá thành NULL** (merge chép cả null). Blast radius: **416** chuyến (388 `COMPLETED`, 2 `DEPARTED`) đang trỏ tuyến này — nhãn tuyến trên mọi màn, quãng đường cộng odometer lúc hoàn thành, và series dự báo của tuyến 1 đều đổi theo |
+> | `/stations/create` | bến **1** | tên → `HIJACKED-STATION`; 11 → 11 |
+> | `/incidents/create` | sự cố **9** (xe 17, chuyến 1, tài xế 2, `VEHICLE_BREAKDOWN`) | flash *"Đã ghi nhận sự cố mới!"*; → xe 2, chuyến **NULL**, tài xế **NULL**, `OTHER`, mô tả `HIJACKED`, **`resolved_at` bị đóng dấu lại**; `reported_at` giữ (`updatable = false`); 8 → 8 |
+> | `/drivers/create` | user **1 = admin** (chưa có driver row) | flash *"Thêm mới tài xế thành công!"*; **admin → `hijacked-admin`, `ROLE_DRIVER`, mật khẩu mới, thêm một driver row** (drivers 36 → 37). **Tài khoản admin duy nhất biến mất.** |
+> | `/drivers/create` | user **2** đã là tài xế | **THẤT BẠI, rollback, 0 thiệt hại** — Hibernate `NonUniqueObjectException` khi `persist(driver)` với `@MapsId` trùng PK. *(Đính chính: dòng bảng gốc bên dưới viết "ghi đè bất kỳ User nào" — đúng chỉ với user **chưa** có driver row, tức admin/user thường; user đã là tài xế thì không.)* |
+> | `/users/save` | user **37** (`ROLE_DRIVER`) | → `hijacked-user`, **`ROLE_ADMIN`**, mật khẩu `newpw`; 37 → 37. Tự phong admin bằng một request |
+>
+> **Thống kê thiệt hại trên sandbox sau chín request:** 0 admin còn lại · 1 user tự phong admin ·
+> 2 chuyến `COMPLETED`/`DEPARTED` hồi sinh thành `ACTIVE` · 1 xe kẹt `TRAVELING` mới · tuyến 1 đổi
+> km kéo theo 416 chuyến · 1 bến đổi tên · 1 sự cố mất liên kết chuyến/tài xế. Không dòng nào để
+> lại dấu vết phân biệt được với thao tác hợp lệ (không audit column ngoài `created_at`).
+
+- **Mức độ:** toàn vẹn dữ liệu + bất biến vòng đời. **Tiềm ẩn về UI (form không gửi `id`), chạm
+  được bằng POST tự chế** — cùng lớp với #10 và #20, cả hai đã được coi là lỗi và sửa.
+- **Phân loại:** nhánh **3 — sai thuần tuý**, và còn là **trái với một quyết định đã có**: #16 đã
+  đặt tripwire *"`saveBus()` từ chối entity đã có id, nếu không JPA sẽ merge và ghi đè mọi cột"*
+  (`BusService:56`) — nhưng chỉ cho xe. Sáu đường tạo còn lại không có.
+- **Cơ chế, hai nửa đều đã chứng minh bằng test probe (3/3 xanh) chứ không suy luận:**
+  1. Không có `@InitBinder` nào trong toàn `src/main/java` ⇒ `@ModelAttribute` bind **mọi** property
+     có setter, kể cả `id`. Probe: `new WebDataBinder(new Trip()).bind({"id":"2064"})` ⇒ `getId() ==
+     2064`.
+  2. `SimpleJpaRepository.save()` hỏi `isNew(entity)` = "id có null không"; id ≠ null ⇒ `em.merge()`
+     ⇒ **UPDATE** dòng đó bằng toàn bộ trạng thái của object form. Probe trên `busmanagement_test`:
+     một chuyến `COMPLETED` (40 ghế, **30 vé**, giá 100.000đ) → gọi `createManualTrip(trip có id đó,
+     status ACTIVE như controller set)` ⇒ dòng đó thành **`ACTIVE`, vé về 0, giá 1đ, `count()` không
+     đổi** (không có dòng mới). Probe thứ ba: `stationService.save(Station{id có sẵn})` ⇒ tên bến bị
+     ghi đè, `count()` không đổi.
+- **Ở đâu — bảy đường tạo, sáu hở:**
+
+  | Endpoint | Chuỗi gọi | Guard `id` |
+  |---|---|---|
+  | `POST /admin/trip-management/trips/create` | `AdminTripManagementController.createTrip():76` → `TripService.createManualTrip():946` → `tripRepository.save():956` | **không** |
+  | `POST /admin/routes/create` | `AdminRouteController.createRoute():41` → `RouteService.saveRoute()` — hàm này còn dùng chính `route.getId() == null` để **quyết định** tạo hay sửa (`:64`) | **không** |
+  | `POST /admin/stations/create` | `AdminStationController.createStation():30` → `StationService.save()` | **không** |
+  | `POST /admin/incidents/create` | `AdminIncidentController.createIncident():47` → `IncidentService.createIncident()` → `save()` | **không** |
+  | `POST /admin/drivers/create` | `AdminDriverController.createDriver():39` → `DriverService.createDriver()` → `userRepository.save(user)` — ghi đè **bất kỳ** `User` nào (kể cả admin), ép `role = ROLE_DRIVER`, rồi `driverRepository.save(driver)` với `@MapsId` | **không** |
+  | `POST /admin/users/save` | `AdminController.saveUser():48` → `AdminService.createNewUser()` → `save()` | **không** |
+  | `POST /admin/buses/create` | `AdminBusController.createBus():33` → `BusService.saveBus()` | ✅ ném `IllegalArgumentException` (#16) |
+
+- **Vì sao với Trip là nặng nhất — nó phá hai bản sửa đã commit và một câu trong tài liệu kiến
+  trúc:** `trip_lifecycle_fsm.md` §5.1 liệt kê bốn cửa vào `ACTIVE` và miễn trừ `createManualTrip()`
+  với lý do *"không phải transition — Trip còn transient (id == null)"*. Câu đó **chỉ đúng khi
+  endpoint bảo đảm id null**, mà endpoint không bảo đảm. Gửi `id` của một chuyến `COMPLETED` /
+  `CANCELLED` / `DEPARTED` là thực hiện đúng ba transition §5 ghi *"Invalid — ENFORCED"*, không qua
+  `canTransition()`, không qua `requirePendingApproval()` (#20), không qua `editRefusalReason()`
+  (#18), và còn **xoá `ticketsSold`** — thứ #18 gọi là "lịch sử tài chính". §8.1 nói *"Status changes
+  now leave exactly one door"* — sai lần thứ hai, cùng khuôn với lần #20 đã đính chính. Với
+  `DEPARTED` còn thêm thiệt hại #14 (xe cũ kẹt `TRAVELING`): merge đổi `bus_id` của một chuyến
+  đang chạy.
+- **Bán kính:** chạm được từ ngoài bằng một request; **0 dòng dữ liệu hiện bị hỏng** (đo: không
+  thấy dấu vết — không thể phân biệt sau khi xảy ra, đó cũng là vấn đề). `foreign_key_checks=0`
+  không cản gì. Không cần đăng nhập (permit-all, CSRF tắt — §4 Non-Goals).
+- **Cách sửa (để chủ dự án chọn):** (A) tripwire kiểu `saveBus()` ở **đầu mỗi service create**
+  (`createManualTrip`, `saveRoute` khi gọi từ create, `StationService.save` tách create/update,
+  `createIncident`, `createDriver`, `createNewUser`) — nhất quán với #16, service tự bảo vệ, không
+  phụ thuộc controller; (B) `@InitBinder` + `setDisallowedFields("id")` trên các handler create —
+  ít dòng hơn nhưng là lớp **không-mời**, không phải lớp **chặn thật** (một caller nội bộ vẫn lọt), và
+  project đã ba lần chọn "chặn ở service" (#16, #20). Riêng `RouteService.saveRoute()` cần tách
+  quyết định tạo/sửa ra khỏi `route.getId()` — controller edit đã `route.setId(id)` từ path (`:83`),
+  nên tách được mà không đổi hành vi edit.
+- **Vì sao chưa sửa:** đụng 6 service + có thể 6 controller; là một quyết định về **khuôn** (A hay
+  B) áp cho toàn bộ tầng tạo mới, không phải một dòng vá.
+
+---
+
+## 22. `Trip.totalSeats` không bao giờ được đối chiếu với sức chứa xe — đường AI chép số ghế của chuyến gốc TRƯỚC khi chọn xe; chuyến 6 (DEPARTED) đang bán 40 ghế trên xe 22 chỗ
+
+> **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG, thêm bằng chứng cổng duyệt cho
+> qua.** Trên bản clone: `POST /admin/trips/confirm tripId=8` (chuyến AI, 30 ghế, xe 20 = 22 chỗ) →
+> flash *"đã được kích hoạt thành công!"* → chuyến 8 **`ACTIVE`, `total_seats = 30`, `capacity = 22`**.
+> Tức `confirmAutoAssignedTrip()` chạy đủ `validateBusForTrip()` + `validateStaffForTrip()` mà vẫn
+> mở bán 30 ghế trên xe 22 chỗ. Đo lại dữ liệu thật: chuyến 6 (`DEPARTED`) 40/22 và chuyến 8
+> (`PENDING`) 30/22, cả hai `tickets_sold = 0` — nên thiệt hại **hiện tại** là 0 vé bán quá, nhưng
+> chỉ vì chưa có luồng bán vé (Phase 9 chưa làm) chứ không phải vì có gì chặn. Hậu quả đo được ngay:
+> với chuyến 6, 20 vé bán ra sẽ đọc là 20/40 = 50 % (không "đông") thay vì 20/22 = 91 % (đông) — bộ
+> quét 10 giây, dashboard và ngưỡng 0,90 đều bị lừa theo cùng hướng.
+
+- **Mức độ:** nhất quán nghiệp vụ; **có dòng thật đang sai** trên DB.
+- **Phân loại:** nhánh **3** với một dè dặt: không tài liệu nào **phát biểu** luật "số ghế ≤ sức chứa
+  xe", nhưng **ý định** đó nằm ở hai chỗ code mới hơn — form tạo chuyến để ô `totalSeats`
+  **`readonly`** và tự điền từ `data-capacity` của xe (`trip-create-form.html:292`, `:677-681`);
+  `RecommendationService.buildCard():235` đặt `candidate.setTotalSeats(capacity)` từ xe được chọn.
+  Chỉ đường **cũ nhất** (scheduler) và form Sửa là không theo. Chủ dự án cần chốt luật trước khi
+  sửa; nếu chốt "số ghế = số ghế mở bán, độc lập với xe" thì mục này thành *không phải lỗi* —
+  nhưng lúc đó phải giải thích được vì sao form tạo khoá ô đó.
+- **Ở đâu:** `TripService.createExtraTrip():164` — `extraTrip.setTotalSeats(trip.getTotalSeats())`
+  chạy **trước** `autoAssignResources()` (`:170`); sau khi có xe (`:173`) không cập nhật lại.
+  `confirmAutoAssignedTrip()` / `approveTrip()` không nhận/không chỉnh số ghế. `validateBusForTrip()`
+  (5 luật, `trip_lifecycle_fsm.md` §7) không có luật nào so `totalSeats` với `bus.busType.capacity`.
+  Form Sửa cho gõ tự do (`trip-edit-form.html`: `min="1"` phía client).
+- **Dữ liệu thật (đo 2026-09-19):** 3 chuyến chưa kết thúc có `total_seats ≠ capacity`, trong đó
+  **2/3 chuyến AI** — chuyến **6** (`DEPARTED`, tăng cường của chuyến 1): **40 ghế trên xe 20
+  (Limousine, 22 chỗ)**, tức hệ thống sẵn sàng bán 18 vé không có ghế; chuyến **8**
+  (`PENDING_APPROVAL`, của chuyến 3): 30 ghế trên xe 22 chỗ. Gốc rễ là chuyến gốc do
+  `DataInitializer` seed đã lệch (chuyến 1: 40 ghế trên xe 22; chuyến 3: 30 trên xe 50), và AI chép
+  nguyên con số. Câu C (`tickets_sold > total_seats`) vẫn 0 — tức chưa ai bán quá, nhưng không gì
+  ngăn.
+- **Hậu quả ngoài chuyện bán quá ghế:** `getOccupancyRate() = sold / totalSeats` bị **kéo thấp** khi
+  `totalSeats` > sức chứa thật ⇒ ngưỡng 0,90 (`needsReinforcement`, scheduler, dashboard) kích
+  hoạt **muộn** trên xe nhỏ; và ngược lại, `RecommendationService` tính doanh thu bằng `capacity`
+  của xe còn màn Trip tính bằng `totalSeats` — hai định nghĩa "sức chứa" cho cùng một chuyến.
+- **Cách sửa (nếu chốt luật):** (1) `createExtraTrip()` đặt `totalSeats` từ `result.getBus()` sau
+  khi phân công thành công (giữ số cũ khi thất bại — chưa có xe); (2) `approveTrip()` /
+  `confirmAutoAssignedTrip()` đồng bộ `totalSeats = capacity` của xe được duyệt, hoặc ít nhất
+  `validateBusForTrip()` chặn `totalSeats > capacity`; (3) mở khoá `readonly` ở form tạo là **không**
+  cần — nó đang đúng.
+- **Vì sao chưa sửa:** cần chốt luật; đụng `createExtraTrip()` và có thể validator.
+
+---
+
+## 23. `trip-list.html` MỜI hai thao tác mà service chắc chắn từ chối: "Hủy" trên chuyến `DEPARTED`, "Xóa" theo một điều kiện chỉ đúng cho nhánh `ACTIVE`
+
+> **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG cả ba chiều.** Trên bản clone,
+> gửi đúng ba POST mà các nút (hoặc chỗ nút bị giấu) sẽ gửi: (1) `cancel/3` — chuyến `DEPARTED`, nút
+> **có** hiện → flash *"Không thể hủy: Lỗi luồng vận hành: … từ [DEPARTED] sang [CANCELLED]"*, DB
+> không đổi; (2) `delete/9` — `COMPLETED` 0 vé, nút **có** hiện → flash *"Không thể xóa: Chuyến #9 đã
+> hoàn thành…"*, DB không đổi; (3) `delete/2` — `CANCELLED` **21 vé**, nút **bị giấu** → flash *"Đã
+> xóa chuyến xe #2 thành công."*, `is_deleted = 1`. Nghĩa là template mời đúng thứ bị từ chối và giấu
+> đúng thứ được phép. Thiệt hại: không mất dữ liệu (service chặn đúng), là **10 nút chết + 136 thao
+> tác hợp lệ bị giấu** trên dữ liệu thật hôm nay.
+
+- **Mức độ:** lớp không-mời (UI ↔ chính sách service) — cùng lớp #12/#18/#19/#20 đã lập thành nguyên
+  tắc. **Chạm được từ UI, không cần POST tự chế.**
+- **Phân loại:** nhánh **3 — sai thuần tuý**.
+- **Ở đâu:**
+  - `trip-list.html:462-463` — nút **Hủy** hiện khi `status != CANCELLED and != COMPLETED` ⇒ hiện cả trên
+    `DEPARTED`, mà `canTransition(DEPARTED, CANCELLED) == false` (`TripService:545`, `trip_lifecycle_fsm.md`
+    §5 ghi đích danh *"`DEPARTED → CANCELLED`: Not in whitelist"*). Bấm ⇒ *"Không thể hủy: Lỗi luồng
+    vận hành…"*, lần nào cũng vậy.
+  - `trip-list.html:471` — nút **Xóa** hiện khi `ticketsSold == 0`. `deleteTrip():1669-1695` có chính
+    sách **theo trạng thái**: `DEPARTED`/`COMPLETED` cấm tuyệt đối (kể cả 0 vé), `ACTIVE` chỉ khi 0
+    vé, `PENDING_APPROVAL`/`CANCELLED` cho **vô điều kiện** (kể cả có vé). Điều kiện của template chỉ
+    trùng với nhánh `ACTIVE`; sai cả hai chiều ở bốn nhánh còn lại.
+- **Bán kính (đo trên trang đã render, PID 27652):** **5** form Hủy trên 5 chuyến `DEPARTED`
+  `{3, 6, 11, 12, 13}` — 5/5 sẽ bị từ chối; **5** form Xóa trên các chuyến `DEPARTED`/`COMPLETED` 0 vé
+  `{6, 9, 11, 12, 13}` — 5/5 sẽ bị từ chối; và **136** chuyến `PENDING_APPROVAL`/`CANCELLED` có vé
+  (phần lớn là `CANCELLED` của backfill, vốn giữ nguyên vé — có chủ đích, xem §9) bị **giấu** nút Xóa
+  dù service cho phép.
+- **Cách sửa:** `th:if` soi đúng bảng: Hủy ⇔ `status ∈ {PENDING_APPROVAL, ACTIVE}`; Xóa ⇔
+  `status ∈ {PENDING_APPROVAL, CANCELLED} ∨ (status == ACTIVE ∧ ticketsSold == 0)`. Thuần template,
+  0 Java. Tiện thể: nhãn "Xóa vĩnh viễn" (`:475`) mô tả sai một thao tác **xoá mềm**.
+- **Vì sao chưa sửa:** nhỏ nhưng là một quyết định UI nên đi cùng #24.
+
+---
+
+## 24. Form Sửa liệt kê đủ năm `TripStatus`; chọn một transition FSM cấm thì các trường khác ĐÃ được lưu trước đó rồi màn hình mới báo lỗi
+
+> **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG.** Trên bản clone: form sửa
+> chuyến 7 (`ACTIVE`) render option `COMPLETED` (đo thật); gửi đúng form đó với **giá 200.000 →
+> 123.456** và **status = COMPLETED** → HTTP 302 về `/edit/7`, flash *"Không thể đổi trạng thái: Lỗi
+> luồng vận hành: … từ [ACTIVE] sang [COMPLETED]"*, nhưng DB: `status = ACTIVE`, **`price =
+> 123456.00`** — giá đã ghi trong khi màn hình đang báo lỗi. Thiệt hại: không mất dữ liệu, nhưng
+> người dùng bị dẫn tới kết luận sai ("chưa lưu gì") — và nếu họ sửa "lại" thì ghi hai lần.
+
+- **Mức độ:** lớp không-mời + thông điệp gây hiểu nhầm. **Chạm được từ UI.**
+- **Phân loại:** nửa đầu (select không lọc) là nhánh **3**; nửa sau (lưu trước, kiểm transition sau)
+  là **thiết kế có chủ đích** — javadoc `updateTrip()` ghi rõ *"updateManualTrip() phải chạy TRƯỚC"*
+  — nên không phải lỗi, nhưng **thông điệp** thì sai: người dùng nhận *"Không thể đổi trạng thái"* và
+  quay lại form mà không được nói rằng tuyến/xe/giờ/giá vừa sửa **đã được ghi**.
+- **Ở đâu:** `trip-edit-form.html:191-195` — `<option th:each="status : ${statuses}">` với
+  `statuses = TripStatus.values()` (`AdminTripManagementController:234`). `updateTrip():345` gọi
+  `updateManualTrip()` (`@Transactional`, **commit**) rồi `:351` gọi `updateTripStatus()`
+  (`@Transactional` **thứ hai**); controller không transactional nên hai bước là hai transaction.
+  Ngoại lệ FSM rơi vào `catch (IllegalStateException)` `:360` ⇒ flash lỗi, redirect về form.
+- **Đo trên app thật:** form sửa chuyến 7 (`ACTIVE`) render đủ **5** option; FSM từ `ACTIVE` chỉ nhận
+  `DEPARTED`/`CANCELLED` (và chính nó). Tương tự chuyến `CANCELLED` (terminal) vẫn được mời cả bốn
+  trạng thái khác. Ghi chú: mục #15 (dòng 1412) từng **nhắc qua** select này khi tái hiện, chưa bao
+  giờ thành mục riêng hay có ruling.
+- **Cách sửa (hai phương án cho nửa đầu, một cho nửa sau):** select chỉ liệt kê `{trạng thái hiện
+  tại} ∪ {đích hợp lệ theo canTransition}` — cần một hàm public nhỏ trong `TripService` (vd
+  `allowedTransitionsFrom(status)`) vì `canTransition()` đang `private`, **hoặc** controller tự đặt
+  tập đích theo bảng (nhân bản bảng FSM ra controller — trái §3). Với nửa sau: hoặc gộp hai bước vào
+  một transaction (một method service mới — đụng `TripService`), hoặc giữ nguyên và **đổi thông
+  điệp** thành *"Đã lưu thông tin chuyến, nhưng KHÔNG đổi được trạng thái: …"*. Chủ dự án chọn.
+- **Vì sao chưa sửa:** liên quan `TripService`; cần ruling về mức độ (chỉ thông điệp, hay atomic).
+
+---
+
+## 25. `/admin/users/new` — form tạo user cũ: trùng username ⇒ HTTP 500; và mời `ROLE_DRIVER` ⇒ tạo user tài xế không có hồ sơ `Driver`, đúng thứ `DriverService` cảnh báo là "mồ côi"
+
+> **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG cả hai nửa.** (a) Trên bản clone
+> lặp lại POST trùng username → **HTTP 500**, `users` không đổi (lần đầu đã đo trên app thật, log
+> `Duplicate entry 'admin'`). (b) `POST /admin/users/save username=orphan-driver role=ROLE_DRIVER`
+> → 302 `?success=user`; `users` 37 → 38, `drivers` 37 → 37; user **42** có `role = ROLE_DRIVER` và
+> **0 driver row**. Sau đó: `/admin/drivers` không liệt kê nó (0 lần xuất hiện), `/admin/drivers/edit/42`
+> redirect về danh sách (không tìm thấy), và không tồn tại màn danh sách/sửa/xoá user nào
+> (`AdminController` chỉ có `/users/new` + `/users/save`). Bản ghi đúng nghĩa **mồ côi**: không màn nào
+> thấy, không màn nào sửa được, không thể gắn hồ sơ tài xế. Thiệt hại: một tài khoản rác vĩnh viễn mỗi
+> lần lỡ tay.
+
+- **Mức độ:** thấp; code có trước roadmap. **Chạm được từ UI.**
+- **Phân loại:** nhánh **3** (hai lỗi độc lập trong cùng một màn).
+- **Ở đâu:** `AdminController.saveUser():48-52` → `AdminService.createNewUser()` — endpoint **ghi duy
+  nhất** trong project không có `try/catch` và không kiểm `findByUsername` (mọi controller khác đều
+  flash + redirect; `DriverService.validateUsernameAvailable()` đã có sẵn nhưng không được gọi ở
+  đây). `user-form.html:44` — `th:each="r : ${roles}"` với `Role.values()`.
+- **Đo trên app thật:** `POST /admin/users/save username=admin` ⇒ **HTTP 500** (Whitelabel), log
+  `DataIntegrityViolationException: Duplicate entry 'admin' for key 'users.UK…'`; DB không đổi (unique
+  constraint chặn trước khi ghi — đó là lý do probe này an toàn). Nửa thứ hai chưa tái hiện (sẽ tạo
+  dòng thật) nhưng đọc thẳng được: chọn `ROLE_DRIVER` ⇒ `users` có dòng role tài xế, `drivers` không
+  — `DriverService.deleteDriver()` javadoc (`:123`) đã mô tả đúng bản ghi này là *"mồ côi không
+  còn giao diện nào quản lý được"*, và Phase 1 (owner-approved) chọn **một form gộp User+Driver**
+  chính để không sinh ra nó.
+- **Cách sửa:** (1) `try/catch` + kiểm username như `DriverService`; (2) bỏ `ROLE_DRIVER` khỏi
+  `roles` của màn này (tạo tài xế đi `/admin/drivers/create`), hoặc bỏ hẳn màn này nếu chủ dự án
+  thấy nó thừa (chỉ tạo `ROLE_ADMIN`/`ROLE_USER` thủ công, không có màn sửa/xoá user).
+- **Vì sao chưa sửa:** quyết định giữ hay bỏ màn thuộc chủ dự án.
+
+---
+
+## Mục nhỏ (2026-09-19) — không phải lỗi hành vi, hoặc cần một ruling trước
+
+- **Javadoc `updateTripStatus()` (`TripService:567`) gọi tên `TripService.cancelTrip()` — method không
+  tồn tại.** Lối gọi thứ tư thật là `TripService.rejectTrip():1327`. Số đếm "đúng bốn call site" vẫn
+  đúng, tên sai. Đây là chính cái javadoc-tripwire mà #10/#20 dựng để lần rà sau đếm — một câu sai
+  trong tripwire thì đắt hơn một câu sai thường (§9). Sửa: đổi tên trong comment. 0 hành vi.
+- **`TripService.isHotTrip():101` so literal `0.9` trong khi đang cầm một `Trip`** — chỗ **duy nhất**
+  trong hệ thống có thể gọi `trip.needsReinforcement()` mà không gọi. Đồng thời ghi chú §9 đếm ngưỡng
+  0,90 có *"bốn bản sao"* (Trip / Dashboard / Forecast / What-if) là **đếm thiếu**: `TripService:101`
+  và `DashboardService:270-271` (biên bucket) là bản 5 và 6. Hành vi y hệt (`<= 0.9` ⇔ `!(> 0.90)`).
+  Sửa là một dòng trong `TripService` ⇒ **ruling** (§3 "minimize changes to TripService"), kèm sửa
+  số đếm ở §9.
+- **`application.properties:30` `spring.autoconfigure.exclude` trỏ tới hai class ở package Boot-3
+  (`org.springframework.boot.autoconfigure.security.servlet.*`) — không tồn tại trong Boot 4.0.2**
+  (đã kiểm trong jar: class thật là `org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration`).
+  Boot bỏ qua **im lặng** (log không một dòng) ⇒ security auto-config **đang bật**, app sống nhờ
+  `SecurityConfig` permit-all; comment *"vô hiệu hóa hoàn toàn security"* ngay trên dòng đó là **sai**.
+  `BusManagementApplication.java:6-8` import đúng ba class Boot-4 tương ứng mà **không dùng** — ai đó
+  bắt đầu chuyển sang `@SpringBootApplication(exclude = …)` rồi bỏ dở. `spring.security.user.name/
+  password=a` (`:27-28`) cũng chết. Hậu quả: **0**. Là rác cấu hình + một câu sai. Dọn: xoá 3 dòng
+  properties + 3 import, hoặc hoàn tất `exclude` trên annotation — cách nào cũng cần chạy lại app.
+- **`docs/architecture/database_schema.md` không có bảng `cost_parameters`** (thêm 2026-07-24, Phase
+  7 bước 3); có đủ 10 bảng còn lại. Tài liệu lạc hậu một bảng. Cùng loại với #3 (docs).
+- **`Proj_functions_summary.md:31` vẫn liệt kê `Route.departurePoint`/`destinationPoint` (String) là
+  field hiện tại** — code chỉ còn dòng comment *"ĐÃ XÓA"* (`Route.java:31-32`), và
+  `database_schema.md:403` nói rõ đã bỏ. Hai doc mâu thuẫn nhau, một cái sai với code.
+- **Loại xe ↔ `Route.suitableBusType` không phải luật ở validator, nhưng hai trong bốn đường "mời" lại
+  lọc cứng theo nó.** `findBestAvailableBus()` (AI) và `getAvailableBusesForTrip()` (dropdown Duyệt/Sửa)
+  lọc `findByStatusAndBusType`; `getAvailableBusesForTimeRange()` (API form Tạo — *"không lọc loại xe
+  vì form này chưa biết tuyến nào"*, javadoc `:1452`) và `validateBusForTrip()` (5 luật, §7 FSM doc)
+  **không**. Dữ liệu thật: **3** chuyến chưa kết thúc do người tạo sai loại (3, 13, 14) và **1.299**
+  chuyến toàn cục (backfill quay vòng xe không xét loại — **đã biết**, chính là lý do Phase 6 dự báo
+  tỉ lệ lấp đầy thay vì số vé). Không vi phạm bất biến một chiều (mời hẹp hơn validator là được phép).
+  **Ruling:** loại xe là **luật** (thì thêm vào validator + API) hay **ưu tiên** (thì bỏ lọc cứng ở
+  dropdown, hoặc ghi rõ là ưu tiên)? Không tự sửa.
+- **Sự cố 9: `bus_id = 17` nhưng `trip_id = 1` mà xe của chuyến 1 là xe 1.** Form sự cố cho chọn xe
+  và chuyến độc lập, `IncidentService.validate()` không đối chiếu. Không tài liệu nào phát biểu luật
+  "nếu có chuyến thì xe phải là xe của chuyến". Dòng này sinh 2026-07-16 16:51 (ngày kiểm chứng
+  Phase 2) — có thể là dấu vết một lần thử. **Ruling** về luật; nếu có luật thì đây là dòng dữ liệu
+  cần sửa tay.
+- **Sửa `Route.distanceKm` khi tuyến đang có chuyến `DEPARTED`** (`AdminRouteController.updateRoute()`
+  không guard) làm đổi số km cộng vào odometer lúc hoàn thành — `updateTripStatus():623-627` đọc
+  `route.getDistanceKm()` **tại thời điểm** `COMPLETED`. Đây là đúng cạnh mà #18 đóng cho `trip.route`
+  (đổi tuyến của chuyến), còn mở qua **entity tuyến**. 5 chuyến `DEPARTED` hiện tại nằm trên tuyến 1
+  và 2, cả hai sửa được. **Không chắc là lỗi**: sửa một quãng đường nhập sai thì có lẽ *nên* áp vào
+  chuyến đang chạy. **Ruling.**
+- **`/admin/incidents/create` nặng 343 KB** vì dropdown chuyến nạp `getAllTrips()` — 2.071 dòng, tăng
+  theo mỗi lần backfill. Cùng họ Hidden Cost #4 (trang danh sách chuyến 7,43 MB); ghi để không bị
+  bỏ quên khi làm pagination.
+
+## ĐÃ KIỂM ở lần rà 2026-09-19 — không phải lỗi, đừng nêu lại
+
+- **Các file chat log `2026-*.txt` và `repomix-output.xml` ở gốc repo** — đã nằm trong `.gitignore`
+  (`/20??-??-??-*.txt`, `repomix-output.xml`), `git ls-files` không có. Không phải rác tracked.
+- **`spring.jpa.show-sql: false` dùng dấu hai chấm trong file `.properties`** — cú pháp
+  `java.util.Properties` chấp nhận `=`, `:` và khoảng trắng làm dấu phân cách. Hợp lệ.
+- **Sửa entity managed trong controller rồi service ném lỗi (vd `updateTrip()` đã `setBus()` trước khi
+  `updateManualTrip()` từ chối) — có bị flush không?** Không: OSIV giữ `EntityManager` mở nhưng không
+  có transaction ⇒ Hibernate không flush; rollback của service không đóng EM pre-bound nhưng cũng không
+  ghi. Đã được các phiên #14/#15/#18 chứng minh bằng "trường bị đổi cố ý không bao giờ chạm DB". Giữ
+  nguyên kết luận.
+- **9/13 câu SQL bất biến ra 0** trên DB thật: vé > ghế; `DEPARTED` mà xe không `TRAVELING`; odometer
+  < mốc bảo trì; giá `NULL`/≤ 0 hoặc ghế ≤ 0; phụ xe trùng tài xế chính; tài xế khoá / hết bằng vào
+  ngày khởi hành trên chuyến chưa kết thúc; chuyến `ACTIVE`/`DEPARTED` thiếu xe hoặc tài xế; **0 cặp**
+  chuyến chưa kết thúc trùng lịch trên cùng xe; **0 cặp** trùng lịch trên cùng tài xế chính. Xe 19
+  `TRAVELING` không có chuyến giải thích: fixture đã biết (#19).
+- **`Trip.getHoursUntilDeparture()` cắt phần lẻ (`toHours()`)** rồi so `< 72` — 72,9h đọc 72 (qua),
+  71,9h đọc 71 (chặn). Biên đúng hướng bảo thủ, không lỗi.
+- **Bucket lấp đầy ở `DashboardService.buildOccupancyStats()`** `<0,5 / [0,5;0,7) / [0,7;0,9] / >0,9`
+  — phủ kín, không hở, biên trên `> 0.9` khớp `needsReinforcement()`.
