@@ -7,7 +7,7 @@
 | **4/4** | 🔴 Lỗi logic nghiêm trọng — **đã fix hết** |
 | **4/5** | 🟡 Cảnh báo thiết kế — đã fix 4, còn mở 1 (Warn #5 đã fix ở Phase 0) |
 | **2/3** | 🔵 Thiếu nhất quán — đã fix 2, còn mở 1 |
-| **1/4** | 🟣 Vấn đề Phụ xe (Codex review) — đã fix 1, còn mở 3 |
+| **1/4** | 🟣 Vấn đề Phụ xe (Codex review) — đã fix 1, còn mở 3 *(trong đó #3 chỉ còn mở một nửa — nửa form tạo đã xong, xem đính chính 2026-09-19)* |
 
 ---
 
@@ -74,8 +74,12 @@ Vẫn tồn tại trong `TripRepository`, chưa được gọi ở đâu trong `
 ### #2: Mâu thuẫn hiển thị vs validate khi thiếu phụ xe (chuyến >8h) — ⚠️ **CÒN MỞ**
 `approve-form.html` (khu vực hiển thị kết quả AI auto-assign) vẫn hiện thông báo "Chuyến vẫn có thể chạy nhưng không có phụ xe" mà **không** disable nút "Xác nhận & Kích hoạt", trong khi `validateStaffForTrip()` sẽ chặn cứng (`throw IllegalArgumentException`) nếu chuyến >8h thiếu assistant. Cần đồng bộ: disable nút + ghi rõ đây là hard block khi rơi vào trường hợp này.
 
-### #3: `trip-create-form.html`/`trip-edit-form.html` hiển thị toàn bộ DB thay vì lọc động — ⚠️ **CÒN MỞ**
-Chưa gọi API `/api/admin/trips/available-resources` để lọc xe/tài xế rảnh theo thời gian như wizard đã làm ở nơi khác.
+### #3: `trip-create-form.html`/`trip-edit-form.html` hiển thị toàn bộ DB thay vì lọc động — ⚠️ **CÒN MỞ MỘT NỬA** (form tạo ✅ từ 2026-06-17; form sửa còn mở)
+*(Câu gốc, giữ nguyên để không xoá dấu vết:)* Chưa gọi API `/api/admin/trips/available-resources` để lọc xe/tài xế rảnh theo thời gian như wizard đã làm ở nơi khác.
+
+**Đính chính 2026-09-19 — mục này đã cũ nửa câu ngay từ lúc được đưa vào `docs/`.** Form **tạo** đã gọi API lọc động từ commit `27f38de` (2026-06-17), tức trước cả khi câu trên vào repo docs (`07af949`, 2026-07-14). Từ 2026-09-11 (lỗi #13 trong `docs/todo/current_bugs_found.md`, commit `a6e28af`) API đó còn trả thêm danh sách `assistants` riêng, nên nửa "form tạo" **đóng**.
+
+Nửa **form sửa** thì vẫn đúng đến hôm nay, đo trên code và DB thật: `AdminTripManagementController.showEditTripForm():232` đổ `driverRepository.findAllWithUser()` — **36/36** hồ sơ, kể cả **3** tài xế đã khóa và **2** tài xế hết bằng lái, tức 5 người `validateStaffForTrip()` từ chối ngay khi submit — vào cả dropdown Tài xế chính lẫn Phụ xe (`trip-edit-form.html:95` và `:108`, không `th:if` nào), chưa kể ai trùng lịch / quá giờ tuỳ từng chuyến. Trong khi ô **Xe** của chính màn đó **có** lọc (`:222`, qua `tripService.getAvailableBusesForTrip(id)`). Đây là chiều ngược với lỗi #13: màn sửa **mời người sẽ bị từ chối** — validator vẫn chặn ở bước lưu nên không mất dữ liệu, chỉ là khoảng trống ở lớp "không-mời" mà project đã nêu thành nguyên tắc từ #12/#18/#19/#20. Xử lý là một quyết định riêng của chủ dự án (xem `THESIS_ROADMAP.md` §8 mục 2026-09-19), không gộp vào bản sửa nào đang có.
 
 ### #4: Dropdown co-driver không loại trừ lẫn nhau trên FE — ⚠️ **CÒN MỞ**
 Admin có thể chọn trùng tài xế phụ trên giao diện, chỉ bị chặn khi submit lên server.
@@ -86,7 +90,7 @@ Admin có thể chọn trùng tài xế phụ trên giao diện, chỉ bị ch�
 
 1. **#2 (Phụ xe)** — đồng bộ UI/validate khi thiếu phụ xe cho chuyến >8h (rủi ro UX cao nhất, dễ gây hoang mang Admin).
 2. **Warn #2** — quyết định rõ trip thủ công có qua `PENDING_APPROVAL` không.
-3. **#3, #4 (Phụ xe)** — lọc động tài nguyên + loại trừ trùng lặp trên `trip-create-form`/`trip-edit-form`.
+3. **#3, #4 (Phụ xe)** — lọc động tài nguyên + loại trừ trùng lặp trên `trip-create-form`/`trip-edit-form`. *(Đính chính 2026-09-19: nửa `trip-create-form` của #3 đã xong từ 2026-06-17 — chỉ còn `trip-edit-form`; xem mục #3.)*
 4. **Warn #4** — refactor `AdminTripManagementController` để không inject Repository trực tiếp.
 5. **Incon #3** — dọn dead code `countBusyTripsAnyRole`/`findAllTripsByDriverOnDate`.
 6. ~~**Warn #5** — tách profile `dev`/`prod` cho `ddl-auto`~~ — **đã làm ở Phase 0** (xem Warn #5 ở trên). Hóa ra không thể "để cuối": đây là điều kiện tiên quyết cho toàn bộ pillar Decision Support (`docs/development/THESIS_ROADMAP.md`, Phase 5-7), không chỉ ảnh hưởng khi deploy thật.

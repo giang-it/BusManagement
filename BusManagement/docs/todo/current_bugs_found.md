@@ -2109,3 +2109,32 @@ thể mang tải trọng, không chỉ là gọn gàng"*.
   `@GetMapping("/approve/{id}")`). **Không phải lỗi** — không hành vi nào sai vì không ai tới được
   — là **rác cần dọn**, cùng loại với hai query chết đã ghi ở đợt rà 2026-08-04. Đáng dọn vì nó mô
   tả một giao diện phê duyệt không còn tồn tại, dễ làm người sau tin nhầm.
+
+---
+
+# Kiểm chứng độc lập #5 và #13 trước khi commit (2026-09-19) — cả hai đứng vững, đã commit và push
+
+Rà theo yêu cầu chủ dự án (*"kiểm tra lại, đảm bảo đây chính xác là một lỗi và đã được fix hoàn
+toàn, không gây tổn thất hay thiếu nhất quán"*), **đo lại từ đầu thay vì tin ghi chú 2026-09-11**.
+Cả hai qua bài kiểm tra ba chiều ở nhánh **3 — sai thuần tuý**: #13 vì HEAD đổ đúng danh sách đã
+lọc 8h vào `assistantSelect` trong khi `validateStaffForTrip():1224-1241` không có dòng giờ nào cho
+phụ xe; #5 vì git chứng minh luật §3 sinh `79b5c4a` 14:20 ngày 2026-07-16 còn `DispatchController`
+sinh `765c062` 15:15 **cùng ngày** (hai controller kia có từ tháng 3–4, trước luật). Bằng chứng đầy
+đủ ở `THESIS_ROADMAP.md` §8 mục 2026-09-19. **Commit:** `ccee141` (#5), `a6e28af` (#13), `9f9ba15`
+(docs) — push `origin/temp`; stash `wip-5-13` đã drop.
+
+## Mục nhỏ (2026-09-19)
+
+- **Màn SỬA chuyến mời toàn bộ tài xế, không lọc — đã ghi từ trước ở `docs/reports/project_report.md`
+  mục 🟣 #3, nhưng mục đó cũ nửa câu.** Phát hiện trong lúc kiểm #13 (câu hỏi tự nhiên: màn Sửa chọn
+  phụ xe thế nào?). `showEditTripForm():232` đổ `driverRepository.findAllWithUser()` — **36/36** hồ
+  sơ, gồm **3** đã khóa + **2** hết bằng, tức 5 người `validateStaffForTrip()` từ chối ngay — vào cả
+  hai dropdown (`trip-edit-form.html:95`, `:108`), trong khi ô Xe cùng màn có lọc (`:222`). Chiều
+  **ngược** với #13 (mời người sẽ bị từ chối, thay vì giấu người sẽ được nhận); validator vẫn chặn ở
+  bước lưu nên không mất dữ liệu. #3 của `project_report.md` đã gộp cả form tạo lẫn form sửa vào
+  một câu "chưa gọi API", trong khi form tạo đã gọi từ `27f38de` (2026-06-17) — trước cả khi câu đó
+  vào `docs/` (`07af949`). Đã **đính chính tại chỗ** ở `project_report.md` (nửa tạo đóng, nửa sửa
+  mở kèm bán kính đo hôm nay). **Không sửa code** — quyết định của chủ dự án, không gộp vào #13.
+  *Bài học ghi lại:* lần rà 2026-09-19 lúc đầu khẳng định quan sát này *"chưa được ghi ở đâu"* vì chỉ
+  `grep` file này; `project_report.md` đánh số riêng (Bug/Warn/Incon/🟣) và cũng là nơi giữ mục mở.
+  Trước khi tuyên bố "chưa ghi", phải quét **cả hai** file.
