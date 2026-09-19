@@ -33,8 +33,7 @@ public class AdminTripManagementController {
     @GetMapping("/trips")
     public String listAllTrips(Model model) {
         // SỬA: Dùng findAllWithDetails() thay vì findAll()
-        model.addAttribute("trips", tripRepository.findAllWithDetails());
-        model.addAttribute("statuses", TripStatus.values());
+        populateTripList(model, tripRepository.findAllWithDetails());
         return "admin/trip-list";
     }
 
@@ -46,14 +45,59 @@ public class AdminTripManagementController {
         if (status != null && !status.isEmpty()) {
             TripStatus tripStatus = TripStatus.valueOf(status);
             // SỬA: Dùng findByStatusWithDetails() thay vì findByStatus()
-            model.addAttribute("trips", tripRepository.findByStatusWithDetails(tripStatus));
+            populateTripList(model, tripRepository.findByStatusWithDetails(tripStatus));
         } else {
             // SỬA: Dùng findAllWithDetails() thay vì findAll()
-            model.addAttribute("trips", tripRepository.findAllWithDetails());
+            populateTripList(model, tripRepository.findAllWithDetails());
         }
-        model.addAttribute("statuses", TripStatus.values());
         model.addAttribute("selectedStatus", status);
         return "admin/trip-list";
+    }
+
+    /**
+     * Đổ danh sách chuyến vào model kèm ba tập id quyết định NÚT NÀO ĐƯỢC MỜI:
+     * sửa / hủy / xóa. Template chỉ hỏi {@code contains(trip.id)} — nó KHÔNG còn tự
+     * chép điều kiện trạng thái bằng tay (lỗi #23).
+     *
+     * Mỗi tập được suy từ đúng chính sách mà tầng chấp nhận sẽ áp:
+     * <ul>
+     * <li>sửa — {@link #editRefusalReason} (lỗi #18), cùng method mà GET/POST sửa dùng;</li>
+     * <li>hủy — {@code TripService.allowedTransitionsFrom(status)} chứa CANCELLED
+     * VÀ chuyến chưa ở CANCELLED: whitelist FSM cho same-state qua như một no-op,
+     * nhưng một nút "Hủy" trên chuyến đã hủy là nút vô nghĩa, không phải một thao
+     * tác được mời;</li>
+     * <li>xóa — {@code TripService.deleteRefusalReason(trip)} == null, tức đúng
+     * chính sách mà deleteTrip() sẽ thực thi.</li>
+     * </ul>
+     * Trước đây nút Hủy hiện cả trên DEPARTED (FSM cấm DEPARTED → CANCELLED) và nút
+     * Xóa hiện theo {@code ticketsSold == 0} — chỉ đúng cho nhánh ACTIVE — nên vừa
+     * mời thứ bị từ chối (10 nút trên dữ liệu thật) vừa giấu thứ được phép (136
+     * chuyến). Đây là lớp KHÔNG-MỜI; lớp chặn thật vẫn ở service và không đổi.
+     *
+     * Ba lần lặp trên danh sách đã nạp sẵn, không truy vấn thêm — rẻ kể cả với
+     * hơn hai nghìn dòng.
+     */
+    private void populateTripList(Model model, List<Trip> trips) {
+        java.util.Set<Long> editableIds = new java.util.HashSet<>();
+        java.util.Set<Long> cancellableIds = new java.util.HashSet<>();
+        java.util.Set<Long> deletableIds = new java.util.HashSet<>();
+        for (Trip trip : trips) {
+            if (editRefusalReason(trip) == null) {
+                editableIds.add(trip.getId());
+            }
+            if (trip.getStatus() != TripStatus.CANCELLED
+                    && tripService.allowedTransitionsFrom(trip.getStatus()).contains(TripStatus.CANCELLED)) {
+                cancellableIds.add(trip.getId());
+            }
+            if (tripService.deleteRefusalReason(trip) == null) {
+                deletableIds.add(trip.getId());
+            }
+        }
+        model.addAttribute("trips", trips);
+        model.addAttribute("statuses", TripStatus.values());
+        model.addAttribute("editableIds", editableIds);
+        model.addAttribute("cancellableIds", cancellableIds);
+        model.addAttribute("deletableIds", deletableIds);
     }
 
     // ==================== TẠO TRIP THỦ CÔNG ====================
@@ -231,7 +275,11 @@ public class AdminTripManagementController {
         model.addAttribute("buses", availableBuses);
         List<Driver> drivers = driverRepository.findAllWithUser();
         model.addAttribute("drivers", drivers);
-        model.addAttribute("statuses", TripStatus.values());
+        // Select trạng thái chỉ MỜI những đích mà FSM sẽ nhận (kèm chính trạng thái
+        // hiện tại). Trước đây liệt kê đủ TripStatus.values() nên một chuyến ACTIVE
+        // được mời cả COMPLETED/PENDING_APPROVAL rồi bị canTransition() từ chối
+        // sau khi các trường khác đã lưu — lỗi #24. Lớp chặn thật nằm ở updateTrip().
+        model.addAttribute("statuses", tripService.allowedTransitionsFrom(trip.getStatus()));
 
         List<Map<String, Object>> driversForJs = drivers.stream().map(d -> {
             Map<String, Object> map = new HashMap<>();
@@ -259,6 +307,18 @@ public class AdminTripManagementController {
      * Thứ tự quan trọng: updateManualTrip() phải chạy TRƯỚC để lưu thông tin mới
      * xuống DB, sau đó updateTripStatus() re-fetch trip từ DB và apply FSM
      * transition trên trạng thái hiện tại.
+     *
+     * ⚠️ HAI BƯỚC LÀ HAI TRANSACTION (controller không @Transactional), nên nếu bước
+     * 2 bị FSM từ chối thì bước 1 ĐÃ commit. Trước đây đúng thế xảy ra: chọn một
+     * đích FSM cấm, các trường khác được ghi, màn hình lại báo "Không thể đổi trạng
+     * thái" như thể chưa lưu gì (lỗi #24). Nay transition được HỎI TRƯỚC bằng
+     * TripService.allowedTransitionsFrom() — cùng whitelist mà updateTripStatus()
+     * sẽ kiểm — và từ chối ngay khi chưa ghi gì; select trạng thái ở form cũng chỉ
+     * mời đúng danh sách đó (showEditTripForm). Vẫn giữ hai bước thay vì gộp vào
+     * một method service mới, vì gộp là tái cấu trúc đường bán vé (§3 "minimize
+     * changes to TripService") cho một lỗ mà pre-check đã đóng: sau pre-check,
+     * updateTripStatus() không còn lý do nào để từ chối ngoài chuyến biến mất giữa
+     * hai request.
      *
      * ⚠️ ĐỒNG BỘ BusStatus CHỈ CHẠY KHI TRẠNG THÁI ĐỔI. Khối ở cuối method gọi
      * updateTripStatus() dưới điều kiện {@code status != newStatus}, nên sửa một
@@ -304,6 +364,19 @@ public class AdminTripManagementController {
             if (refusal != null) {
                 redirectAttributes.addFlashAttribute("error", refusal);
                 return "redirect:/admin/trip-management/trips";
+            }
+
+            // RÀNG BUỘC: đích trạng thái phải hợp lệ theo FSM — kiểm Ở ĐÂY, TRƯỚC KHI
+            // ghi bất cứ gì, vì hai bước bên dưới là hai transaction (lỗi #24). Đây là
+            // lớp CHẶN THẬT cho một POST tự chế; select ở form Sửa là lớp KHÔNG-MỜI.
+            // Luật vẫn là canTransition() của TripService — ở đây chỉ hỏi.
+            if (newStatus != null && !tripService.allowedTransitionsFrom(existingTrip.getStatus()).contains(newStatus)) {
+                redirectAttributes.addFlashAttribute("error", String.format(
+                        "Không thể đổi trạng thái chuyến #%d từ [%s] sang [%s] — chưa có thay đổi nào được lưu. "
+                                + "Các đích hợp lệ: %s.",
+                        existingTrip.getId(), existingTrip.getStatus(), newStatus,
+                        tripService.allowedTransitionsFrom(existingTrip.getStatus())));
+                return "redirect:/admin/trip-management/trips/edit/" + trip.getId();
             }
 
             // Cập nhật các trường thông tin (KHÔNG setStatus)
@@ -358,8 +431,11 @@ public class AdminTripManagementController {
             return "redirect:/admin/trip-management/trips";
 
         } catch (IllegalStateException e) {
-            // FSM từ chối transition không hợp lệ (ví dụ: COMPLETED → ACTIVE)
-            redirectAttributes.addFlashAttribute("error", "Không thể đổi trạng thái: " + e.getMessage());
+            // FSM từ chối ở bước 2 — chỉ còn xảy ra khi trạng thái chuyến đổi giữa hai
+            // request (pre-check ở trên đã lọc đích không hợp lệ). Bước 1 đã commit,
+            // nên nói thẳng điều đó thay vì để người dùng tưởng chưa lưu gì (lỗi #24).
+            redirectAttributes.addFlashAttribute("error",
+                    "Thông tin chuyến ĐÃ được lưu, nhưng không đổi được trạng thái: " + e.getMessage());
             return "redirect:/admin/trip-management/trips/edit/" + trip.getId();
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());

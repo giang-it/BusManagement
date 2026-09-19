@@ -563,6 +563,27 @@ public class TripService {
     }
 
     /**
+     * Các trạng thái mà một chuyến đang ở {@code from} được phép chuyển sang —
+     * gồm cả chính {@code from} (giữ nguyên luôn hợp lệ, xem canTransition).
+     *
+     * Đây là điểm truy cập PUBLIC duy nhất vào whitelist FSM, thêm cho lỗi #23/#24:
+     * tầng UI trước đây tự chép bảng transition ra template bằng tay (nút "Hủy"
+     * hiện cả trên DEPARTED, select trạng thái liệt kê đủ 5 giá trị) rồi lệch với
+     * canTransition(). Từ nay tầng UI HỎI service — nút Hủy hiện khi danh sách này
+     * chứa CANCELLED, select trạng thái ở form Sửa chỉ liệt kê đúng danh sách này,
+     * và updateTrip() kiểm bằng nó TRƯỚC khi ghi bất cứ gì. Bảng luật vẫn nằm
+     * nguyên trong canTransition(); hàm này chỉ liệt kê nó, không định nghĩa lại
+     * — cùng tiền lệ public-overload của getDrivingHoursForDate().
+     *
+     * Thứ tự trả về là thứ tự khai báo của enum, để select trên form ổn định.
+     */
+    public List<TripStatus> allowedTransitionsFrom(TripStatus from) {
+        return java.util.Arrays.stream(TripStatus.values())
+                .filter(to -> canTransition(from, to))
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Thực thi MỘT chuyển trạng thái theo whitelist FSM, kèm đồng bộ BusStatus.
      *
      * ⚠️ METHOD NÀY KHÔNG KIỂM TRA RÀNG BUỘC NGHIỆP VỤ. Nó chỉ trả lời "transition
@@ -1728,29 +1749,9 @@ public class TripService {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy chuyến xe #" + tripId));
 
-        switch (trip.getStatus()) {
-            case DEPARTED -> throw new IllegalStateException(
-                    "Chuyến #" + tripId + " đang trên đường (DEPARTED). " +
-                            "Không thể xóa chuyến đang vận hành — sẽ phá vỡ hành trình thực tế và dữ liệu GPS.");
-
-            case COMPLETED -> throw new IllegalStateException(
-                    "Chuyến #" + tripId + " đã hoàn thành (COMPLETED). " +
-                            "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa.");
-
-            case ACTIVE -> {
-                if (trip.getTicketsSold() > 0) {
-                    throw new IllegalStateException(String.format(
-                            "Chuyến #%d đang ACTIVE và đã có %d vé bán ra. " +
-                                    "Vui lòng dùng chức năng 'Hủy chuyến' thay vì xóa " +
-                                    "để hệ thống xử lý hoàn vé và thông báo cho hành khách.",
-                            tripId, trip.getTicketsSold()));
-                }
-                // ACTIVE nhưng chưa bán vé nào → an toàn để xóa mềm
-            }
-
-            // PENDING_APPROVAL và CANCELLED: cho phép xóa không điều kiện
-            case PENDING_APPROVAL, CANCELLED -> {
-                /* proceed */ }
+        String refusal = deleteRefusalReason(trip);
+        if (refusal != null) {
+            throw new IllegalStateException(refusal);
         }
 
         // Kích hoạt @SQLDelete: phát ra UPDATE trips SET is_deleted=true WHERE id=?
@@ -1758,6 +1759,46 @@ public class TripService {
 
         log.info("🗑️ Admin xóa mềm chuyến #{} (trạng thái cũ: {})",
                 tripId, trip.getStatus());
+    }
+
+    /**
+     * Chính sách XÓA theo trạng thái, phát biểu thành dữ liệu: câu từ chối, hoặc
+     * {@code null} nếu chuyến xóa được. {@link #deleteTrip} là nơi thực thi (ném
+     * IllegalStateException khi khác null); tầng UI là nơi HỎI (nút "Xóa" ở danh
+     * sách chuyến chỉ hiện khi trả về null — lỗi #23).
+     *
+     * Tách ra khỏi deleteTrip() thay vì để template tự chép điều kiện: trước đây
+     * trip-list.html hiện nút Xóa theo {@code ticketsSold == 0} — chỉ khớp đúng
+     * nhánh ACTIVE của bảng dưới, nên mời xóa chuyến DEPARTED/COMPLETED 0 vé (bị
+     * từ chối 100 %) và giấu nút với 136 chuyến PENDING/CANCELLED có vé (được phép).
+     * Cùng khuôn với AdminTripManagementController.editRefusalReason() (lỗi #18):
+     * một method, hai người dùng — thực thi và mời — nên không thể lệch nhau nữa.
+     *
+     * Switch cố ý KHÔNG có default: thêm một TripStatus mới thì vỡ biên dịch, buộc
+     * người thêm phải quyết định chính sách xóa cho nó.
+     */
+    public String deleteRefusalReason(Trip trip) {
+        Long tripId = trip.getId();
+        return switch (trip.getStatus()) {
+            case DEPARTED -> "Chuyến #" + tripId + " đang trên đường (DEPARTED). "
+                    + "Không thể xóa chuyến đang vận hành — sẽ phá vỡ hành trình thực tế và dữ liệu GPS.";
+
+            case COMPLETED -> "Chuyến #" + tripId + " đã hoàn thành (COMPLETED). "
+                    + "Dữ liệu lịch sử và báo cáo tài chính phải được giữ nguyên, không thể xóa.";
+
+            // ACTIVE nhưng chưa bán vé nào → an toàn để xóa mềm; đã có vé → phải đi
+            // luồng Hủy chuyến.
+            case ACTIVE -> trip.getTicketsSold() > 0
+                    ? String.format(
+                            "Chuyến #%d đang ACTIVE và đã có %d vé bán ra. "
+                                    + "Vui lòng dùng chức năng 'Hủy chuyến' thay vì xóa "
+                                    + "để hệ thống xử lý hoàn vé và thông báo cho hành khách.",
+                            tripId, trip.getTicketsSold())
+                    : null;
+
+            // PENDING_APPROVAL và CANCELLED: cho phép xóa không điều kiện
+            case PENDING_APPROVAL, CANCELLED -> null;
+        };
     }
 
     /**
