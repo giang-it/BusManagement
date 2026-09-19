@@ -37,8 +37,21 @@ public class IncidentService {
         return incidentRepository.countByStatus(status);
     }
 
+    /**
+     * TẠO MỚI một sự cố. Entity truyền vào phải chưa có id — tripwire cùng khuôn
+     * BusService.saveBus() (lỗi #16), áp cho đường này vì lỗi #21: controller bind
+     * Incident bằng @ModelAttribute không có @InitBinder, nên một POST tự chế mang
+     * id có sẵn sẽ khiến save() thành MERGE và ghi đè bản ghi đó (đã tái hiện: sự
+     * cố mất liên kết chuyến/tài xế, resolvedAt bị đóng dấu lại). Cập nhật phải đi
+     * qua updateIncident(id, form).
+     */
     @Transactional
     public void createIncident(Incident incident) {
+        if (incident.getId() != null) {
+            throw new IllegalArgumentException(
+                    "createIncident() chỉ dùng để ghi nhận sự cố mới (id phải trống). Sự cố #" + incident.getId()
+                            + " đã tồn tại — muốn sửa thì dùng chức năng Sửa sự cố.");
+        }
         validate(incident);
         if (incident.getStatus() == null) {
             incident.setStatus(IncidentStatus.OPEN);

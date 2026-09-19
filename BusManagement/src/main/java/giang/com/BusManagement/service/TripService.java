@@ -940,10 +940,32 @@ public class TripService {
     }
 
     /**
-     * Admin tạo chuyến thủ công từ form
+     * Admin tạo chuyến thủ công từ form.
+     *
+     * CHỈ dành cho chuyến MỚI — entity truyền vào phải chưa có id. Đây là tripwire
+     * cùng khuôn với BusService.saveBus() (lỗi #16), áp cho đường tạo chuyến vì
+     * lỗi #21: AdminTripManagementController.createTrip() bind Trip bằng
+     * @ModelAttribute, không có @InitBinder nào chặn field id, nên một POST tự chế
+     * mang id của chuyến có sẵn sẽ tới đây với id ≠ null; tripRepository.save()
+     * khi đó là MERGE — ghi đè mọi cột của chuyến đó bằng nội dung form, đặt
+     * status = ACTIVE (controller set trước khi gọi), xoá ticketsSold, và đi vòng
+     * qua cả editRefusalReason() (#18) lẫn requirePendingApproval() (#20). Đã tái
+     * hiện thật: chuyến COMPLETED 35 vé → ACTIVE 0 vé; chuyến DEPARTED đổi xe làm
+     * xe cũ kẹt TRAVELING (thiệt hại #14). Với guard này, "Trip còn transient" mà
+     * trip_lifecycle_fsm.md §5.1 dùng để miễn trừ method khỏi FSM trở thành điều
+     * được BẢO ĐẢM, không còn là điều được giả định.
+     *
+     * Ném IllegalArgumentException như mọi vi phạm đầu vào khác của class này, để
+     * controller hiện flash "Lỗi: …" sẵn có.
      */
     @Transactional
     public String createManualTrip(Trip trip) {
+        if (trip.getId() != null) {
+            throw new IllegalArgumentException(
+                    "createManualTrip() chỉ dùng để tạo chuyến mới (id phải trống). Chuyến #" + trip.getId()
+                            + " đã tồn tại — muốn sửa thì dùng chức năng Sửa chuyến.");
+        }
+
         if (trip.getArrivalTimeExpected() != null && trip.getArrivalTimeExpected().isBefore(trip.getDepartureTime())) {
             throw new IllegalArgumentException("Thời gian đến dự kiến phải sau thời gian khởi hành!");
         }

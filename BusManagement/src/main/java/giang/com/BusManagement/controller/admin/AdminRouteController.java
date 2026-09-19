@@ -43,7 +43,7 @@ public class AdminRouteController {
             @RequestParam(required = false) List<Long> stationIds,
             RedirectAttributes redirectAttributes) {
         try {
-            routeService.saveRoute(route, stationIds);
+            routeService.createRoute(route, stationIds);
             redirectAttributes.addFlashAttribute("success", "Thêm mới tuyến đường thành công!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());
@@ -80,8 +80,9 @@ public class AdminRouteController {
             @RequestParam(required = false) List<Long> stationIds,
             RedirectAttributes redirectAttributes) {
         try {
-            route.setId(id);
-            routeService.saveRoute(route, stationIds);
+            // Truyền id riêng thay vì route.setId(id): service nạp bản ghi cũ rồi chép
+            // từng field, không merge nguyên object form (xem RouteService.updateRoute).
+            routeService.updateRoute(id, route, stationIds);
             redirectAttributes.addFlashAttribute("success", "Cập nhật tuyến đường thành công!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());

@@ -50,41 +50,85 @@ public class RouteService {
     }
 
     /**
-     * Tạo mới hoặc cập nhật một tuyến kèm lộ trình.
+     * TẠO MỚI một tuyến kèm lộ trình. CHỈ dùng cho việc tạo — cập nhật phải đi qua
+     * {@link #updateRoute(Long, Route, List)}.
+     *
+     * Trước đây một hàm saveRoute() làm cả hai việc và tự chọn nhánh theo
+     * {@code route.getId() == null}. Đó chính là lỗi #21 ở tuyến: controller bind
+     * Route bằng @ModelAttribute không có @InitBinder, nên một POST tự chế tới
+     * /routes/create mang id có sẵn rơi vào nhánh "cập nhật" — đã tái hiện thật:
+     * tuyến 1 từ 120 km/loại 1 thành 999 km/loại NULL (merge chép cả cột form
+     * không gửi), lộ trình bị thay, 416 chuyến lịch sử trỏ vào tuyến đó đổi theo.
+     * Tripwire dưới đây cùng khuôn BusService.saveBus() (lỗi #16).
      *
      * @param route      thông tin tuyến (distanceKm, estimatedDuration,
-     *                   suitableBusType). Có id -> cập nhật, null -> tạo mới.
+     *                   suitableBusType); id phải trống.
      * @param stationIds danh sách id trạm THEO ĐÚNG THỨ TỰ lộ trình; stopOrder
      *                   được đánh lại 1..n theo vị trí trong danh sách này.
      */
     @Transactional
-    public void saveRoute(Route route, List<Long> stationIds) {
+    public void createRoute(Route route, List<Long> stationIds) {
+        if (route.getId() != null) {
+            throw new IllegalArgumentException(
+                    "createRoute() chỉ dùng để tạo tuyến mới (id phải trống). Tuyến #" + route.getId()
+                            + " đã tồn tại — muốn sửa thì dùng chức năng Sửa tuyến.");
+        }
         validateRoute(route, stationIds);
 
-        boolean isNew = route.getId() == null;
-
-        // routeStations của object gửi từ form luôn rỗng; nếu để nguyên rồi save,
-        // cascade sẽ không đụng tới các bản ghi cũ (không có orphanRemoval), nên
-        // lộ trình được xử lý tường minh bên dưới thay vì dựa vào cascade.
+        // routeStations của object gửi từ form luôn rỗng; lộ trình được dựng tường
+        // minh bên dưới thay vì dựa vào cascade.
         route.setRouteStations(null);
         Route saved = routeRepository.save(route);
+        rebuildStops(saved, stationIds);
+    }
 
-        if (!isNew) {
-            // Xóa toàn bộ lộ trình cũ rồi dựng lại: khóa chính của RouteStation là
-            // tổ hợp (routeId, stationId) nên không thể "sửa" stationId của một bản
-            // ghi — đổi trạm thực chất là xóa dòng cũ + thêm dòng mới.
-            routeStationRepository.deleteAll(routeStationRepository.findByRouteIdOrderByStopOrderAsc(saved.getId()));
-            routeStationRepository.flush();
-        }
+    /**
+     * CẬP NHẬT một tuyến: nạp bản ghi có sẵn theo id từ URL rồi chép từng field
+     * của form sang — khuôn của BusService.updateBus() và
+     * IncidentService.updateIncident(), thay cho merge nguyên object form (merge
+     * ghi đè cả cột mà form không gửi).
+     *
+     * Ba field chép nguyên như form gửi: quãng đường và thời lượng là input
+     * `required`; loại xe phù hợp cho phép "-- Không giới hạn --" (null) và null ở
+     * đó là ý định hợp lệ của Admin, nên KHÔNG áp luật "trống = giữ nguyên" của
+     * BusService cho ô này.
+     *
+     * Lộ trình: xoá toàn bộ RouteStation cũ rồi dựng lại. Khoá chính của
+     * RouteStation là tổ hợp (routeId, stationId) nên không thể "sửa" stationId
+     * của một bản ghi — đổi trạm thực chất là xoá dòng cũ + thêm dòng mới; flush()
+     * giữa hai bước để dòng mới không đụng dòng cũ trong cùng transaction.
+     */
+    @Transactional
+    public void updateRoute(Long id, Route form, List<Long> stationIds) {
+        Route existing = routeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy tuyến với ID: " + id));
 
+        validateRoute(form, stationIds);
+
+        existing.setDistanceKm(form.getDistanceKm());
+        existing.setEstimatedDuration(form.getEstimatedDuration());
+        existing.setSuitableBusType(form.getSuitableBusType());
+
+        // Buông tham chiếu tới collection cũ trước khi xoá các dòng của nó, y như
+        // saveRoute() trước đây (merge với routeStations = null): cascade = ALL
+        // không có orphanRemoval nên việc xoá phải làm tường minh qua repository.
+        existing.setRouteStations(null);
+        routeStationRepository.deleteAll(routeStationRepository.findByRouteIdOrderByStopOrderAsc(id));
+        routeStationRepository.flush();
+
+        rebuildStops(existing, stationIds);
+    }
+
+    /** Ghi lộ trình cho một tuyến đã có id, stopOrder đánh 1..n theo thứ tự danh sách. */
+    private void rebuildStops(Route route, List<Long> stationIds) {
         int stopOrder = 1;
         for (Long stationId : stationIds) {
             Station station = stationRepository.findById(stationId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy bến xe #" + stationId));
 
             RouteStation rs = new RouteStation();
-            rs.setId(new RouteStationId(saved.getId(), station.getId()));
-            rs.setRoute(saved);
+            rs.setId(new RouteStationId(route.getId(), station.getId()));
+            rs.setRoute(route);
             rs.setStation(station);
             rs.setStopOrder(stopOrder++);
             routeStationRepository.save(rs);

@@ -30,7 +30,7 @@ public class AdminStationController {
     @PostMapping("/create")
     public String createStation(@ModelAttribute Station station, RedirectAttributes redirectAttributes) {
         try {
-            stationService.save(station);
+            stationService.createStation(station);
             redirectAttributes.addFlashAttribute("success", "Thêm mới bến xe thành công!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());
@@ -55,8 +55,9 @@ public class AdminStationController {
     public String updateStation(@PathVariable Long id, @ModelAttribute Station station,
             RedirectAttributes redirectAttributes) {
         try {
-            station.setId(id);
-            stationService.save(station);
+            // Truyền id riêng thay vì station.setId(id): service nạp bản ghi cũ rồi chép
+            // từng field, không merge nguyên object form (xem StationService.updateStation).
+            stationService.updateStation(id, station);
             redirectAttributes.addFlashAttribute("success", "Cập nhật thông tin bến xe thành công!");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());

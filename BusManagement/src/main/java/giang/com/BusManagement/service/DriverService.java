@@ -51,9 +51,24 @@ public class DriverService {
     /**
      * Tạo mới hồ sơ tài xế: tạo User (role tự gán ROLE_DRIVER) rồi tạo Driver
      * trỏ vào User đó.
+     *
+     * Cả hai object phải chưa có khoá — tripwire cùng khuôn BusService.saveBus()
+     * (lỗi #16), áp cho đường này vì lỗi #21: controller bind User và Driver bằng
+     * @ModelAttribute không có @InitBinder, nên một POST tự chế mang id của một
+     * user có sẵn sẽ khiến userRepository.save() thành MERGE. Đã tái hiện thật:
+     * tài khoản admin duy nhất bị đổi username/mật khẩu, hạ xuống ROLE_DRIVER và
+     * gắn thêm một driver row. (Với user đã là tài xế, Hibernate tự ném
+     * NonUniqueObjectException ở bước persist Driver — nhưng đó là lưới tình cờ,
+     * không phải luật, nên không dựa vào nó.)
      */
     @Transactional
     public void createDriver(User user, Driver driver) {
+        if (user.getId() != null || driver.getUserId() != null) {
+            throw new IllegalArgumentException(
+                    "createDriver() chỉ dùng để tạo tài xế mới (id phải trống). Hồ sơ #"
+                            + (user.getId() != null ? user.getId() : driver.getUserId())
+                            + " đã tồn tại — muốn sửa thì dùng chức năng Sửa tài xế.");
+        }
         normalizeUser(user);
         validateUsernameAvailable(user.getUsername(), null);
 
@@ -160,7 +175,6 @@ public class DriverService {
             user.setPhone(null);
         }
     }
-
     /**
      * @param currentUserId id của tài xế đang sửa (null khi tạo mới) — để không
      *                      tự báo trùng với chính mình.
