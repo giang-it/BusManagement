@@ -31,6 +31,8 @@ public class DriverService {
     private final UserRepository userRepository;
     private final TripRepository tripRepository;
     private final IncidentRepository incidentRepository;
+    /** Giữ luật "username duy nhất" dùng chung cho mọi đường tạo/sửa tài khoản (lỗi #25). */
+    private final AdminService adminService;
 
     /**
      * Các trạng thái khiến một tài xế được coi là "còn ràng buộc công việc".
@@ -70,7 +72,7 @@ public class DriverService {
                             + " đã tồn tại — muốn sửa thì dùng chức năng Sửa tài xế.");
         }
         normalizeUser(user);
-        validateUsernameAvailable(user.getUsername(), null);
+        adminService.requireUsernameAvailable(user.getUsername(), null);
 
         user.setRole(Role.ROLE_DRIVER);
         user.setStatus(Boolean.TRUE);
@@ -94,7 +96,7 @@ public class DriverService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tài xế với ID: " + userId));
 
         normalizeUser(formUser);
-        validateUsernameAvailable(formUser.getUsername(), userId);
+        adminService.requireUsernameAvailable(formUser.getUsername(), userId);
 
         // RÀNG BUỘC: Không cho khóa tài xế đang còn chuyến dở dang.
         // Cùng nguyên tắc với BusService.updateBus() — chặn chuyển xe sang REPAIRING
@@ -174,16 +176,5 @@ public class DriverService {
         if (user.getPhone() != null && user.getPhone().isBlank()) {
             user.setPhone(null);
         }
-    }
-    /**
-     * @param currentUserId id của tài xế đang sửa (null khi tạo mới) — để không
-     *                      tự báo trùng với chính mình.
-     */
-    private void validateUsernameAvailable(String username, Long currentUserId) {
-        userRepository.findByUsername(username).ifPresent(found -> {
-            if (!found.getId().equals(currentUserId)) {
-                throw new RuntimeException("Tên đăng nhập '" + username + "' đã tồn tại, vui lòng chọn tên khác!");
-            }
-        });
     }
 }

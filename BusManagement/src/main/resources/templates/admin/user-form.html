@@ -16,6 +16,9 @@
                     <h4 class="mb-0">👤 Thêm Tài Khoản Mới</h4>
                 </div>
                 <div class="card-body p-4">
+                    <div th:if="${error}" class="alert alert-danger">
+                        <span th:text="${error}"></span>
+                    </div>
                     <form th:action="@{/admin/users/save}" th:object="${user}" method="post">
                         <div class="mb-3">
                             <label class="form-label font-weight-bold">Tên đăng nhập</label>
