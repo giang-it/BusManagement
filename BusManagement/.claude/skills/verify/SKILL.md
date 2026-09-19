@@ -67,6 +67,32 @@ UNION ALL SELECT 'incidents',COUNT(*) FROM busmanagement.incidents
 UNION ALL SELECT 'users',COUNT(*) FROM busmanagement.users;" 2>/dev/null
 ```
 
+## Write paths: drive a clone, not the real database
+
+For any probe that **writes** (create/update/delete, approvals, crafted POSTs), do not
+touch `busmanagement`. Clone it into the test schema and point a second JVM there —
+same code, same data, zero risk. Used for defects #21–#25 on 2026-09-19.
+
+```bash
+MYSQL="/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe"
+DUMP="/c/Program Files/MySQL/MySQL Server 8.0/bin/mysqldump.exe"
+"$DUMP" -uroot -pgiangmysql --default-character-set=utf8mb4 --single-transaction busmanagement > /tmp/real.sql 2>/dev/null
+"$MYSQL" -uroot -pgiangmysql -e "DROP DATABASE IF EXISTS busmanagement_test; CREATE DATABASE busmanagement_test CHARACTER SET utf8mb4;" 2>/dev/null
+"$MYSQL" -uroot -pgiangmysql --default-character-set=utf8mb4 busmanagement_test < /tmp/real.sql 2>/dev/null
+
+nohup ./mvnw -o spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=8098 \
+  -Dspring.datasource.url=jdbc:mysql://localhost:3306/busmanagement_test?sessionVariables=foreign_key_checks=0" \
+  > /tmp/app8098.log 2>&1 &
+```
+
+Three checks before believing a result from the clone: (1) row counts + an MD5 over
+`trips` match the real DB right after the restore; (2) `information_schema.processlist`
+shows the new JVM's pool on `busmanagement_test` and **none** on `busmanagement`;
+(3) the real DB's snapshot is identical at the end. Do not pass the `demo` profile
+here either — the datasource override is a JVM arg, and a typo in it would wipe the
+real schema. The next `mvnw test` recreates `busmanagement_test` (create-drop), so the
+dirty clone needs no cleanup — but it also means the sandbox is gone after a test run.
+
 ## Drive it
 
 Admin CRUD is Thymeleaf forms; **deletes are `GET`**. Success/failure surfaces as

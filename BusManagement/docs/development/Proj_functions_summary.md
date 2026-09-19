@@ -76,7 +76,8 @@ COMPLETED, CANCELLED → (terminal, không chuyển đi đâu nữa)
 **Controller:** `AdminStationController` (`/admin/stations`) — list/create/edit/delete qua `StationService`.
 **Service:** `StationService`
 
-- CRUD cơ bản.
+- `createStation()`: **CHỈ tạo mới** — ném `IllegalArgumentException` nếu entity đã có id (tripwire khuôn `BusService.saveBus()`, lỗi #21: trước đây một hàm `save()` là upsert, POST tự chế mang id có sẵn sẽ ghi đè bến đó).
+- `updateStation(id, form)`: nạp bản ghi theo id từ URL rồi chép `stationName`/`address` (khuôn `updateBus`/`updateIncident`), không merge nguyên object form.
 - `deleteById()`: chặn xóa nếu station đang có `routeStations` (đang thuộc tuyến nào).
 - **Ghi chú đã biết:** `DataInitializer` tạo Station nhưng (tùy version) **không seed `RouteStation`** nối Station với Route — bảng `route_stations` có thể trống, route vẫn dùng String tự do cho điểm đi/đến không liên kết Station thật.
 
@@ -87,7 +88,7 @@ COMPLETED, CANCELLED → (terminal, không chuyển đi đâu nữa)
 **Controller:** `AdminController` (`/admin`)
 
 - `GET /admin/dashboard`: thống kê `totalUsers`, `totalBuses`, `pendingTrips` (count theo `TripStatus.PENDING_APPROVAL`).
-- `GET/POST /admin/users/new`, `/users/save`: tạo User mới qua `AdminService.createNewUser()` — **không mã hóa password** (có comment TODO nhắc nhưng chưa làm), không có validate trùng username.
+- `GET/POST /admin/users/new`, `/users/save`: tạo User **không phải tài xế** qua `AdminService.createNewUser()` — **không mã hóa password** (có comment TODO nhắc nhưng chưa làm). **Từ 2026-09-19 (lỗi #25):** select role không mời `ROLE_DRIVER` và service từ chối nó (tài xế phải tạo ở `/admin/drivers/create` để có hồ sơ `Driver` kèm theo); trùng username / username trống bị `AdminService.requireUsernameAvailable()` chặn với câu nghiệp vụ thay vì rơi xuống unique constraint của DB thành HTTP 500; controller bọc `try/catch` → flash "Lỗi: …" trên chính form như mọi controller khác. Luật username duy nhất nay ở **một** chỗ — `DriverService` uỷ quyền sang `AdminService.requireUsernameAvailable()` cho cả tạo lẫn sửa tài xế.
 
 Không có chức năng sửa/xóa/list user nào khác trong code.
 
@@ -98,6 +99,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 ### 6.1. Danh sách & lọc
 - `GET /trips`: liệt kê tất cả trip (mọi status) qua `tripRepository.findAllWithDetails()` (JOIN FETCH đầy đủ route/bus/busType/driver/assistant/coDrivers, tránh N+1).
 - `GET /trips/filter?status=...`: lọc theo `TripStatus`.
+- **Nút nào được mời (lỗi #23, 2026-09-19):** cả hai handler đi qua `populateTripList()`, hàm này đưa vào model ba `Set<Long>` — `editableIds` (`editRefusalReason(trip) == null`), `cancellableIds` (`TripService.allowedTransitionsFrom(status)` chứa `CANCELLED` **và** chuyến chưa ở `CANCELLED`), `deletableIds` (`TripService.deleteRefusalReason(trip) == null`) — và `trip-list.html` chỉ hỏi `contains(trip.id)`. Template **không** còn tự chép điều kiện trạng thái: trước đây nút Hủy hiện cả trên `DEPARTED` (FSM cấm) và nút Xóa hiện theo `ticketsSold == 0` (chỉ đúng nhánh `ACTIVE` của `deleteTrip()`), tức 10 nút luôn bị từ chối và 136 chuyến bị giấu nút Xóa dù xóa được.
 
 ### 6.2. Tạo chuyến thủ công (Manual Trip Creation)
 - `GET /trips/create`: hiển thị form, đổ toàn bộ `routes`, `buses`, `drivers` từ Repository (không lọc theo tình trạng rảnh/bận).
@@ -123,17 +125,19 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 
 ### 6.4. Sửa chuyến (`updateTrip`)
 - **Chính sách theo trạng thái (`editRefusalReason()`, lỗi #18):** chuyến ở `DEPARTED` hoặc `COMPLETED` **không sửa được trường nào** — soi gương đúng tập trạng thái mà `TripService.deleteTrip()` cấm xoá. `PENDING_APPROVAL`/`ACTIVE`/`CANCELLED` vẫn sửa bình thường (`deleteTrip` cũng cho xoá `CANCELLED`). Một câu: *chuyến sửa được cho tới khi xuất phát; sau đó nó là bản ghi, không còn là kế hoạch.* Luật nằm ở **một** method dùng chung cho cả GET lẫn POST, `switch` không có `default` nên thêm `TripStatus` mới sẽ vỡ biên dịch. Nút Sửa ở `trip-list.html` ẩn theo cùng tập — nhưng đó chỉ là lớp **không-mời**; lớp chặn thật là ở `POST /trips/update`.
-- `GET /trips/edit/{id}`: từ chối + redirect nếu chuyến `DEPARTED`/`COMPLETED`; ngược lại load trip + dropdown đầy đủ route/bus/driver, đồng thời gửi `driversForJs` (rút gọn) và `savedCoDriverIds` cho JS hiển thị sẵn lựa chọn cũ.
+- `GET /trips/edit/{id}`: từ chối + redirect nếu chuyến `DEPARTED`/`COMPLETED`; ngược lại load trip + dropdown đầy đủ route/bus/driver, đồng thời gửi `driversForJs` (rút gọn) và `savedCoDriverIds` cho JS hiển thị sẵn lựa chọn cũ. **Select trạng thái chỉ liệt kê `TripService.allowedTransitionsFrom(trip.status)`** (lỗi #24, 2026-09-19) — trước đây liệt kê đủ `TripStatus.values()`.
 - `POST /trips/update`: **tách rõ 2 bước** để giữ FSM:
   1. Cập nhật field thường (route, bus, driver, assistant, coDrivers, thời gian, giá, số ghế) qua `tripService.updateManualTrip(existingTrip)` — **không** set status ở bước này.
   2. Nếu status mới khác status cũ → gọi `tripService.updateTripStatus(id, newStatus)` riêng để FSM `canTransition()` chạy và đồng bộ `BusStatus`.
-  - Bắt riêng `IllegalStateException` (FSM reject) và `Exception` chung, redirect lại form edit với flash error.
+  - **Pre-check trước bước 1 (lỗi #24):** vì hai bước là hai transaction, đích trạng thái được kiểm bằng `allowedTransitionsFrom()` **trước khi ghi gì** — đích không hợp lệ ⇒ flash *"…chưa có thay đổi nào được lưu. Các đích hợp lệ: […]"* và redirect, không field nào chạm DB. Trước đây bước 1 đã commit rồi bước 2 mới bị FSM từ chối, màn hình báo như thể chưa lưu.
+  - Bắt riêng `IllegalStateException` (FSM reject ở bước 2 — nay chỉ còn khi trạng thái đổi giữa hai request; thông điệp nói rõ *"Thông tin chuyến ĐÃ được lưu, nhưng không đổi được trạng thái"*) và `Exception` chung, redirect lại form edit với flash error.
 - **`TripService.updateManualTrip()`:** validate `arrival > departure`, validate `totalSeats >= ticketsSold`, gọi `validateBusForTrip`/`validateStaffForTrip` (loại trừ chính trip này khỏi check trùng lịch), save — **không đổi status**.
 
 ### 6.5. Hủy chuyến (`cancelTrip`)
 - `POST /trips/cancel/{id}`: gọi `tripService.updateTripStatus(id, CANCELLED)` — đã đi qua FSM đúng cách (đã fix khỏi bypass cũ). Bắt `IllegalStateException` riêng cho lỗi transition không hợp lệ (VD COMPLETED→CANCELLED).
 
 ### 6.6. Xóa chuyến (`deleteTrip`) — Soft delete có điều kiện
+- Chính sách theo trạng thái nằm ở **`TripService.deleteRefusalReason(trip)`** (câu từ chối hoặc `null`; lỗi #23, 2026-09-19) — `deleteTrip()` ném `IllegalStateException` khi khác `null`, và danh sách chuyến hỏi cùng hàm để quyết định có mời nút Xóa không. Switch không có `default`: thêm `TripStatus` mới là vỡ biên dịch.
 - `POST /trips/delete/{id}` → `tripService.deleteTrip(id)`:
   - `DEPARTED` → **chặn cứng**, không cho xóa.
   - `COMPLETED` → **chặn cứng**, giữ lịch sử báo cáo tài chính.
@@ -147,9 +151,10 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 
 **`validateBusForTrip(bus, trip, excludeTripId)`:**
 - Chặn nếu `bus.status == REPAIRING`.
-- Chặn nếu `bus.status == TRAVELING`.
+- Chặn nếu `bus.status == TRAVELING` **mà không có chuyến `DEPARTED` nào của xe đó giải thích cờ** (lỗi #19, 2026-08-12 — cờ được tôn trọng chỉ khi nó lệch với lịch chuyến; khi có chuyến đang chạy giải thích thì luật cửa sổ thời gian bên dưới quyết định).
+- Chặn nếu `trip.totalSeats > bus.busType.capacity` — số ghế mở bán không được vượt sức chứa thật của xe (lỗi #22, 2026-09-19); bán ít hơn vẫn hợp lệ; xe chưa gán loại thì bỏ qua. Đây là chỗ **duy nhất** giữ luật này nên nó phủ cả Create/Update/Approve/Confirm lẫn cổng dry-run của Recommendation.
 - Tính cửa sổ bận `[departure - BUS_PREP_BUFFER_HOURS(1h), arrival + 1h]`, gọi `isBusBusy()` (kiểm tra overlap với các trip khác có status `ACTIVE/DEPARTED/PENDING_APPROVAL`, exclude chính trip này nếu update) → chặn nếu bận.
-- Nếu xe sắp/đã vượt `maintenanceThreshold` sau chuyến này → **không chặn**, chỉ trả về `warning` string.
+- Chặn nếu xe **đã quá hạn** bảo trì (`needsMaintenance()`), và chặn nếu quãng đường chuyến này đẩy xe vào vùng **sắp đến hạn** (`isNearMaintenance(route.distanceKm)`, ≥ 90 % ngưỡng). *(Đính chính 2026-09-19: câu cũ ở đây — "không chặn, chỉ trả về warning" — mô tả hành vi đã bị thay từ trước Phase 0; kênh `warning` vẫn tồn tại trong chữ ký nhưng hiện luôn `null`, xem javadoc của method.)*
 
 **`validateStaffForTrip(trip, excludeTripId)`:**
 1. Tính `durationHours`, suy ra `requiredDrivers = ceil(durationHours / 8.0)` (tối thiểu 1).
@@ -182,8 +187,8 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 ### 7.4. `createExtraTrip(trip)`
 - Departure mới = departure gốc + 30 phút.
 - Arrival mới = departure mới + `route.estimatedDuration` (phút; fallback 240 phút nếu null).
-- Trip mới: copy `route`, `totalSeats`, `price` từ gốc; `status = PENDING_APPROVAL`; `isExtraTrip = true`; `originalTrip` = trip gốc.
-- Gọi `autoAssignResources(extraTrip)` (mục 7.5) — nếu thành công gán bus/driver/assistant/coDrivers vào trip mới; nếu fail, log lý do, **vẫn save trip** (ở trạng thái `PENDING_APPROVAL` không có resource — chờ Admin xử lý thủ công qua `AdminTripController`).
+- Trip mới: copy `route`, `price` từ gốc; `status = PENDING_APPROVAL`; `isExtraTrip = true`; `originalTrip` = trip gốc. `totalSeats` chỉ **tạm** chép từ gốc.
+- Gọi `autoAssignResources(extraTrip)` (mục 7.5) — nếu thành công gán bus/driver/assistant/coDrivers vào trip mới **và đặt `totalSeats` = sức chứa của xe được gán** (`busType.capacity`; lỗi #22, 2026-09-19 — trước đây chép nguyên số ghế của chuyến gốc, vốn là số Admin gõ tay, nên đã sinh chuyến bán 40 ghế trên xe 22 chỗ); nếu fail, log lý do, giữ số ghế của gốc làm chỗ trống (validator sẽ so lại khi Admin phân công tay), **vẫn save trip** (ở trạng thái `PENDING_APPROVAL` không có resource — chờ Admin xử lý thủ công qua `AdminTripController`).
 
 ### 7.5. `autoAssignResources(trip)` — Thuật toán AI trung tâm
 1. Tính `tripDurationHours`.
@@ -326,6 +331,7 @@ Hai hàm `...Assistants...` áp **ba** điều kiện đầu trừ trần 8h —
 - Dashboard & Analytics (đọc-only, xem mục 14): Operational KPIs (Pending Approvals, Upcoming Trips, Active Trips, Maintenance Alerts, AI Suggestions, Available Resources) + Strategic Analytics theo 6 tab (Fleet/Trips/Routes/Drivers/Occupancy/AI), biểu đồ Chart.js. Không thêm entity/cột DB nào; không đổi business rule nào ngoài 1 method public wrapper tái sử dụng `TripService.getDrivingHoursForDate()`.
 - **CRUD Tài xế** (Phase 1) — `DriverService`/`AdminDriverController`. Một form gộp tạo **cả `User` lẫn `Driver`** (role ép `ROLE_DRIVER`), vì `Driver` dùng `@MapsId` nên không thể tồn tại thiếu `User`. Guard: không cho vô hiệu hóa hoặc xóa tài xế đang còn chuyến chưa kết thúc. Hai trường `monthlyRestDays` và `totalDrivingHours24h` cố ý **không** đưa lên form: `monthlyRestDays` không được đọc ở bất kỳ đâu trong code (quy tắc "nghỉ đủ 2 ngày/tháng" của spec gốc chưa từng được cài), nên một ô nhập được sẽ ngụ ý một tác dụng không tồn tại; còn `totalDrivingHours24h` thì **có** tác dụng thật (`getDrivingHoursForDate()` cộng nó vào tổng giờ trong ngày) nhưng được ghi rõ trong `TripService` là dữ liệu mock seed, sau này sẽ do IoT/GPS bơm vào — nên cũng không phải trường cho Admin sửa.
 - **CRUD Tuyến đường** (Phase 1) — `RouteService`/`AdminRouteController`, có trình sửa nhiều điểm dừng động; `stopOrder` được đánh lại 1..n theo thứ tự gửi lên. Sửa điểm dừng là **xóa rồi dựng lại** chứ không update, vì PK của `RouteStation` là cặp `(routeId, stationId)` — đổi trạm nghĩa là đổi khóa chính. Chặn xóa tuyến đang có chuyến; chặn một tuyến đi qua cùng một trạm hai lần (giới hạn mô hình, không phải lựa chọn nghiệp vụ).
+ *(2026-09-19, lỗi #21: `saveRoute()` — một upsert chọn nhánh theo `route.getId()` — được tách thành `createRoute(route, stationIds)` (từ chối entity đã có id, tripwire khuôn `saveBus()`) và `updateRoute(id, form, stationIds)` (nạp bản ghi theo id từ URL, chép `distanceKm`/`estimatedDuration`/`suitableBusType`, rồi xoá-dựng-lại lộ trình như trước). Merge nguyên object form không còn — nên cột form không gửi cũng không còn bị ghi đè thành NULL.)*
 - **Bảng Điều phối** (Phase 1) — `DispatchController` (`/admin/dispatch`), gom chuyến thành 3 nhóm: quá giờ khởi hành / đang trên đường / sắp khởi hành trong 48h. Mọi thao tác đổi trạng thái đều **ủy quyền cho `TripService.updateTripStatus()`**, không tự đổi, nên FSM và đồng bộ `BusStatus` vẫn là một đường duy nhất. **Từ 2026-09-11 (lỗi #5) việc ĐỌC cũng đi qua service**: `TripService.getDispatchBoardTrips(until)` giữ tập trạng thái hiển thị (`ACTIVE`/`DEPARTED`), controller chỉ còn giữ cửa sổ 48h và việc chia 3 nhóm để hiển thị — nên controller này không còn inject `TripRepository`. Lưu ý vẫn còn hai controller inject thẳng Repository: `AdminController` (3 lời gọi `count()`) và `AdminTripManagementController` (Warn #4 trong `project_report.md`, **vẫn mở**) — #5 chỉ đóng trường hợp `DispatchController`.
 - **Quản lý Sự cố** (Phase 2) — entity `Incident` + enum `IncidentType` (5 giá trị: `VEHICLE_BREAKDOWN`, `ACCIDENT`, `ROAD_ISSUE`, `STAFF_ISSUE`, `OTHER`) và `IncidentStatus` (`OPEN`/`IN_PROGRESS`/`RESOLVED`), `IncidentService`, `AdminIncidentController`. `bus` **bắt buộc** (mọi sự cố đều quy về một xe cụ thể), `trip` và `driver` tùy chọn (xe hỏng trong bãi thì không có chuyến; không có đăng nhập nên không suy ra được người báo). **Không có FSM** cho `IncidentStatus` — Admin đi lại tự do, kể cả mở lại sự cố đã đóng nhầm; quy tắc duy nhất là `resolvedAt` tự đóng dấu khi vào `RESOLVED` và bị xóa khi rời khỏi. Ghi sự cố **không** tự đổi `Bus.status`; chuyển xe sang `REPAIRING` vẫn là thao tác tay có chủ đích. Xe hoặc tài xế còn bản ghi sự cố thì **không xóa cứng được** — kể cả khi sự cố đã `RESOLVED`, vì ràng buộc này bảo vệ toàn vẹn tham chiếu chứ không phải công việc đang mở.
 - **API kiểm tra nghiệp vụ dạng dry-run** (Phase 3) — `ValidationResult` + `TripService.validateBusForTripDryRun()` / `validateStaffForTripDryRun()`: bọc `try`/`catch` quanh **chính hai validator sẵn có** (mục 6.7), trả về kết quả đạt/không đạt thay vì ném exception. Hai validator gốc và cả 4 nơi gọi kiểu ném exception **không bị sửa một dòng nào**. Chỉ bắt `IllegalArgumentException` — loại mà validator dùng để báo vi phạm nghiệp vụ; lỗi kỹ thuật (NPE, lỗi truy cập dữ liệu…) vẫn được ném lên chứ không bị biến thành "tài nguyên không hợp lệ". Giữ nguyên fail-fast nên mỗi kết quả chỉ mang **một** lý do — quy tắc đầu tiên bị vi phạm. Không có UI: đây là API để Decision Support (Phase 7) gọi.

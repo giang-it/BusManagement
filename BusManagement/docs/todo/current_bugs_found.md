@@ -2165,6 +2165,37 @@ là mới — bài học 2026-09-19 buổi sáng.
 
 ## 21. MỌI endpoint "tạo mới" nhận `id` gửi lên và GHI ĐÈ bản ghi có sẵn — với Trip là cửa thứ năm vào `ACTIVE`, đi vòng qua #18 và #20
 
+> **✅ ĐÃ SỬA (2026-09-19, phiên bốn) — phương án A, tripwire ở tầng service cho cả sáu cửa; NOT
+> COMMITTED.** Khuôn của `BusService.saveBus()` (#16) áp cho từng đường tạo: `createManualTrip()`,
+> `IncidentService.createIncident()`, `DriverService.createDriver()` (kiểm cả `user.id` lẫn
+> `driver.userId`), `AdminService.createNewUser()` ném `IllegalArgumentException` khi entity đã có
+> khoá. Hai upsert được **tách**: `RouteService.saveRoute()` → `createRoute(route, stationIds)` +
+> `updateRoute(id, form, stationIds)`; `StationService.save()` → `createStation()` +
+> `updateStation(id, form)` — đường cập nhật nạp bản ghi theo id từ URL rồi chép từng field (khuôn
+> `updateBus`/`updateIncident`), nên merge nguyên object form biến mất và **cột form không gửi
+> không còn bị ghi đè thành NULL** (route 1 từng mất `suitable_bus_type_id` vì thế). Controller
+> tuyến/bến đổi sang gọi đúng hàm; không thêm `@InitBinder` — đó là lớp không-mời, caller nội bộ
+> vẫn lọt, và project đã ba lần chọn "chặn ở service".
+>
+> **Test:** `CreatePathIdTripwireTest` (9): sáu tripwire, mỗi test khẳng định *ném* **và** *bản ghi
+> nạn nhân không đổi* (admin giữ role/mật khẩu, chuyến COMPLETED giữ vé, tuyến giữ loại xe và lộ
+> trình…), cộng hai test cho đường cập nhật mới (chép field, dựng lại lộ trình đúng thứ tự, không đẻ
+> dòng mới). Non-vacuous: tắt tripwire Station → đúng 1 đỏ. `mvnw clean test` **90/90**.
+>
+> **Kiểm chứng trên clone DB thật (JVM riêng, port 8098, PID 12120, `processlist` 10/10 vào clone):**
+> phát lại **nguyên văn 8 request** đã phá hoại buổi sáng → 8/8 bị từ chối với flash *"Lỗi:
+> createX() chỉ dùng để tạo mới (id phải trống)…"*, chữ ký MD5 bảng `trips`, tuyến 1, bến 1, sự cố
+> 9, user 1/37, `COUNT(drivers)` đều **IDENTICAL**. Regression: tạo tuyến/bến/sự cố/tài xế/user/chuyến
+> bằng form thật → đều thành công (+1 dòng đúng chỗ); sửa tuyến 10 (đổi km, bỏ loại xe, đảo lộ
+> trình 3→2→1) và sửa bến 12 → đúng, không đẻ dòng mới. 20/20 trang 200, 0 exception template. DB
+> thật snapshot khớp tuyệt đối. **Một cạnh còn lại, thuộc #25:** cửa `/admin/users/save` từ chối
+> đúng (không ghi) nhưng hiện ra **HTTP 500** vì `AdminController.saveUser()` không có `try/catch`.
+>
+> **Docs:** `trip_lifecycle_fsm.md` §5.1 (dòng `createManualTrip` — "id == null" nay là điều được
+> bảo đảm) và §8.1 (đính chính "one door" lần hai); `Proj_functions_summary.md` (Route/Station
+> service). **Vì sao không sửa ở `changeStatusToActive()` hay FSM:** lỗ hổng nằm ở *tầng tạo mới*
+> (upsert), không ở FSM — chặn đúng chỗ thì FSM không cần biết đến nó.
+
 > **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG, và hai chỗ bên dưới được đính
 > chính.** Chủ dự án yêu cầu *"thật sự test, chứ không tự suy luận"*: lần ghi đầu chỉ có 3 probe ở
 > tầng service; lần này **clone toàn bộ DB thật sang `busmanagement_test`** (mysqldump, chữ ký MD5
@@ -2244,6 +2275,47 @@ là mới — bài học 2026-09-19 buổi sáng.
 
 ## 22. `Trip.totalSeats` không bao giờ được đối chiếu với sức chứa xe — đường AI chép số ghế của chuyến gốc TRƯỚC khi chọn xe; chuyến 6 (DEPARTED) đang bán 40 ghế trên xe 22 chỗ
 
+> **✅ ĐÃ SỬA (2026-09-19, phiên bốn) — luật chốt: `totalSeats ≤ sức chứa xe được gán`; NOT
+> COMMITTED.** Chủ dự án yêu cầu sửa; luật được chọn là luật **tối thiểu đúng**: bán ít hơn sức
+> chứa là quyết định kinh doanh (hợp lệ), bán nhiều hơn là bán ghế không tồn tại (chặn). Hai nửa:
+> (1) **một luật cứng mới ở `validateBusForTrip()`** — sau các luật bảo trì — so `trip.totalSeats`
+> với `bus.busType.capacity`, bỏ qua khi xe chưa gán loại (không có thông tin thì không đoán, cùng
+> cách các luật bảo trì bỏ qua khi `maintenanceThreshold == null`). Vì đây là chỗ duy nhất giữ luật,
+> nó tự phủ tạo thủ công, sửa, cả hai cửa duyệt và cổng dry-run của Recommendation. (2)
+> **`createExtraTrip()` đặt số ghế = sức chứa xe AI chọn** sau khi phân công thành công (cùng cách
+> `RecommendationService.buildCard():235` và form tạo chuyến `readonly` từ `data-capacity`); không
+> có xe thì giữ số của chuyến gốc làm chỗ trống — validator so lại lúc Admin phân công tay. Helper
+> `seatCapacityOf(Bus)` dùng chung cho cả hai nửa để chỉ có **một** định nghĩa sức chứa.
+>
+> **Test:** `TripServiceSeatCapacityTest` (6): 30 > 22 bị từ chối kèm đúng số trong thông điệp; = 22
+> và < 22 đều qua; xe không loại → bỏ qua; đường throw (`createManualTrip`) cùng luật kèm đối trọng
+> 22 ghế tạo được; và **hai test chạy thẳng `scanAndSuggestExtraTrips()`** với chuyến gốc 40 ghế
+> 97,5 % trên xe không đúng loại: có xe 22 chỗ → chuyến tăng cường **22 ghế** (không phải 40), gán
+> đúng tài xế rảnh; không còn xe → giữ 40 làm chỗ trống. Non-vacuous: tắt luật → 2 đỏ, bỏ đặt ghế
+> theo xe → 1 đỏ. `mvnw clean test` **90/90**.
+>
+> **Kiểm chứng trên clone DB thật (PID 12120):** tạo chuyến 30 ghế trên xe 22 chỗ → *"Lỗi: Chuyến
+> mở bán 30 ghế nhưng xe 11A-111.11 (Limousine) chỉ có 22 chỗ — hãy giảm số ghế của chuyến hoặc chọn
+> xe lớn hơn!"*, `COUNT(trips)` không đổi; cùng request với 22 ghế → tạo được. Chuyến 8 (dữ liệu
+> thật, 30 ghế / xe 22 chỗ): `confirm` → *"Lỗi xác nhận: …chỉ có 22 chỗ…"*, `approve` thủ công cùng
+> xe → *"Vi phạm ràng buộc: …"*, vẫn `PENDING_APPROVAL`; **lối thoát cho dòng cũ đã chứng minh:** sửa
+> chuyến 8 về 22 ghế qua form Sửa (PENDING sửa được) → *"Cập nhật thành công"* → `confirm` → `ACTIVE`
+> 22/22. DB thật khớp tuyệt đối.
+>
+> **Dữ liệu thật cần chủ dự án xử lý tay (không tự sửa):** chuyến **8** `PENDING` 30/22 — nay bị cả
+> hai cửa duyệt từ chối cho tới khi hạ về ≤ 22 (một thao tác sửa); chuyến **6** `DEPARTED` 40/22 —
+> không sửa được (#18), sẽ hoàn thành qua Bảng Điều Hành như lịch sử, 0 vé đã bán nên không có gì
+> lệch. `DataInitializer` (profile `demo`) vẫn seed chuyến gốc với số ghế ≠ sức chứa (40 trên xe 22)
+> vì ghi thẳng qua repository — dữ liệu seed, ngoài phạm vi; chuyến tăng cường mà AI sinh từ chúng
+> nay đúng sức chứa. **Cạnh còn lại, ghi để biết:** đổi *loại* của một xe (`BusService.updateBus`)
+> sang loại nhỏ hơn khi xe đang gánh chuyến mở bán nhiều ghế hơn sẽ tạo dòng lệch mà không luật nào
+> bắt — cùng hình dạng hai-người-ghi của #15; chưa có ruling.
+>
+> **Docs:** `trip_lifecycle_fsm.md` §7 (thêm dòng luật), `current_functional_spec.md` (ràng buộc xe
+> + bước tạo chuyến tăng cường), `Proj_functions_summary.md` §6.7 + §7.4 (kèm đính chính hai câu cũ
+> trong §6.7 đã lạc hậu từ trước: "TRAVELING chặn vô điều kiện" — sai từ #19; "bảo trì chỉ warning"
+> — sai từ trước Phase 0).
+
 > **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG, thêm bằng chứng cổng duyệt cho
 > qua.** Trên bản clone: `POST /admin/trips/confirm tripId=8` (chuyến AI, 30 ghế, xe 20 = 22 chỗ) →
 > flash *"đã được kích hoạt thành công!"* → chuyến 8 **`ACTIVE`, `total_seats = 30`, `capacity = 22`**.
@@ -2289,6 +2361,32 @@ là mới — bài học 2026-09-19 buổi sáng.
 
 ## 23. `trip-list.html` MỜI hai thao tác mà service chắc chắn từ chối: "Hủy" trên chuyến `DEPARTED`, "Xóa" theo một điều kiện chỉ đúng cho nhánh `ACTIVE`
 
+> **✅ ĐÃ SỬA (2026-09-19, phiên năm) — template hỏi service, không chép nữa; NOT COMMITTED.** Gốc
+> chung với #24: chính sách nằm ở `TripService` nhưng template tự viết lại bằng tay rồi lệch. Sửa
+> tận gốc bằng cách phơi chính sách ra để HỎI, không thêm luật: (1) **`TripService.deleteRefusalReason(trip)`**
+> tách từ `deleteTrip()` — trả câu từ chối hoặc `null`; chính `deleteTrip()` gọi lại nó (một
+> nguồn, khuôn `editRefusalReason()` của #18); (2) **`TripService.allowedTransitionsFrom(status)`**
+> — liệt kê whitelist FSM từ chính `canTransition()` private (cùng tiền lệ public-overload của
+> `getDrivingHoursForDate()`); (3) `AdminTripManagementController.populateTripList()` (dùng chung
+> cho list + filter) tính ba `Set<Long>` `editableIds`/`cancellableIds`/`deletableIds` từ đúng ba
+> chính sách đó — nút Sửa cũng được đưa về cùng cơ chế — và `trip-list.html` chỉ còn
+> `th:if="${…Ids.contains(trip.id)}"`. Nút Hủy còn loại thêm same-state (chuyến đã `CANCELLED`
+> không được mời "Hủy" dù FSM nhận no-op — phát hiện khi đo: bản đầu mời 136 nút vô nghĩa, đã sửa
+> trước khi ghi). Nhãn "Xóa vĩnh viễn" đổi thành "Xóa chuyến (ẩn khỏi hệ thống)" cho đúng bản chất
+> xóa mềm.
+>
+> **Test:** `TripServicePolicyExposureTest` (5) — bảng `allowedTransitionsFrom` cho 5 trạng thái;
+> **tương đương với `updateTripStatus()` trên cả 25 cặp (from, to)**; luật nút Hủy; bảng
+> `deleteRefusalReason`; **tương đương với `deleteTrip()` trên 5 trạng thái × có/không vé** (cùng
+> câu từ chối ở cả hai nơi). Non-vacuous: tắt nhánh ACTIVE-có-vé → 1 đỏ. Suite **101/101**.
+>
+> **Kiểm chứng trên clone DB thật (PID 30188, 2.071 dòng render):** mọi tổng nút đối chiếu với SQL
+> viết từ chính chính sách — Hủy trên `DEPARTED` **0**, trên `CANCELLED` **0**, tổng **4** (= PENDING +
+> ACTIVE); Xóa trên `DEPARTED`/`COMPLETED` 0-vé **0**, tổng **140** = đúng `COUNT` của
+> `status ∈ {PENDING, CANCELLED} ∨ (ACTIVE ∧ 0 vé)`; Sửa trên `DEPARTED`/`COMPLETED` **0**, tổng
+> **140**. Trước fix: 9 nút Hủy (5 sai) và 9 nút Xóa (5 sai, 136 giấu). Lớp chặn thật ở service
+> không đổi; DB thật khớp tuyệt đối.
+
 > **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG cả ba chiều.** Trên bản clone,
 > gửi đúng ba POST mà các nút (hoặc chỗ nút bị giấu) sẽ gửi: (1) `cancel/3` — chuyến `DEPARTED`, nút
 > **có** hiện → flash *"Không thể hủy: Lỗi luồng vận hành: … từ [DEPARTED] sang [CANCELLED]"*, DB
@@ -2324,6 +2422,24 @@ là mới — bài học 2026-09-19 buổi sáng.
 
 ## 24. Form Sửa liệt kê đủ năm `TripStatus`; chọn một transition FSM cấm thì các trường khác ĐÃ được lưu trước đó rồi màn hình mới báo lỗi
 
+> **✅ ĐÃ SỬA (2026-09-19, phiên năm) — mời đúng đích, và kiểm TRƯỚC khi ghi; NOT COMMITTED.** Hai
+> lớp, cùng một nguồn luật (`TripService.allowedTransitionsFrom()`, xem #23): (1) **không-mời** —
+> `showEditTripForm()` đưa `statuses = allowedTransitionsFrom(trip.status)` nên select chỉ liệt kê
+> trạng thái hiện tại + các đích FSM nhận (ACTIVE → `ACTIVE/DEPARTED/CANCELLED`; CANCELLED → chỉ
+> `CANCELLED`); (2) **chặn thật** — `updateTrip()` kiểm đích **trước** `updateManualTrip()`; đích
+> không hợp lệ ⇒ flash *"Không thể đổi trạng thái chuyến #7 từ [ACTIVE] sang [COMPLETED] — chưa có
+> thay đổi nào được lưu. Các đích hợp lệ: […]"* và **không field nào chạm DB**. Hai bước vẫn là hai
+> transaction — **cố ý không gộp** vào một method service mới, vì gộp là tái cấu trúc đường bán vé
+> (§3) cho một lỗ mà pre-check đã đóng; sau pre-check, `updateTripStatus()` chỉ còn có thể từ chối
+> khi trạng thái đổi giữa hai request, và nhánh `catch` đó nay nói thẳng *"Thông tin chuyến ĐÃ được
+> lưu, nhưng không đổi được trạng thái"*. Javadoc `updateTrip()` ghi lại đúng lý lẽ này.
+>
+> **Kiểm chứng trên clone DB thật:** form sửa chuyến 7 (`ACTIVE`) render đúng **3** option
+> (`ACTIVE, DEPARTED, CANCELLED`), chuyến 2 (`CANCELLED`) render **1**; POST tự chế giá 200.000 → 111
+> kèm `status=COMPLETED` → flash "chưa có thay đổi nào được lưu", DB **`ACTIVE`, giá 200.000** (trước
+> fix: giá đã thành 123.456); POST hợp lệ giá → 222 giữ `ACTIVE` → lưu; POST hợp lệ giá → 333 kèm
+> `ACTIVE → CANCELLED` → **cả hai bước chạy**, DB `CANCELLED`/333 — đường hai bước không hỏng.
+
 > **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG.** Trên bản clone: form sửa
 > chuyến 7 (`ACTIVE`) render option `COMPLETED` (đo thật); gửi đúng form đó với **giá 200.000 →
 > 123.456** và **status = COMPLETED** → HTTP 302 về `/edit/7`, flash *"Không thể đổi trạng thái: Lỗi
@@ -2356,6 +2472,29 @@ là mới — bài học 2026-09-19 buổi sáng.
 ---
 
 ## 25. `/admin/users/new` — form tạo user cũ: trùng username ⇒ HTTP 500; và mời `ROLE_DRIVER` ⇒ tạo user tài xế không có hồ sơ `Driver`, đúng thứ `DriverService` cảnh báo là "mồ côi"
+
+> **✅ ĐÃ SỬA (2026-09-19, phiên năm) — giữ màn, đưa nó về cùng chuẩn với mọi controller khác; NOT
+> COMMITTED.** (1) **`AdminService.createNewUser()`** từ chối `ROLE_DRIVER` (câu chỉ sang
+> `/admin/drivers/create`, nơi tạo kèm hồ sơ `Driver` — đúng quyết định "một form gộp" của Phase 1),
+> và kiểm username trống/trùng **trước** khi DB kịp ném unique-violation. (2) Luật "username duy
+> nhất" nay ở **một** chỗ: `AdminService.requireUsernameAvailable(username, currentUserId)` —
+> `DriverService` **uỷ quyền** sang (bản `validateUsernameAvailable` riêng của nó bị xoá), nên tạo
+> lẫn sửa tài xế và tạo user thường không thể lệch nhau. (3) `AdminController.saveUser()` bọc
+> `try/catch` → flash "Lỗi: …" về form (form thêm khối `${error}`, không icon vì trang này không nạp
+> bootstrap-icons); `showUserForm()` không mời `ROLE_DRIVER`. Cái 500 của #21 ở cửa này cũng hết
+> theo. Kiểu ngoại lệ đổi `RuntimeException` → `IllegalArgumentException` cho khớp mọi vi phạm đầu
+> vào khác; controller tài xế bắt `Exception` nên flash không đổi.
+>
+> **Test:** `AdminServiceTest` (6) — tạo admin/user; trùng username bị chặn **trước DB** (probe: tắt
+> luật thì ngoại lệ biến thành `DataIntegrityViolationException` — đúng triệu chứng 500 cũ);
+> username trống; `ROLE_DRIVER` bị từ chối và không để lại user mồ côi; giữ tên của chính mình khi
+> sửa; và **`DriverService` đi qua cùng luật**. Non-vacuous: tắt hai luật → 4 đỏ. Suite **101/101**.
+>
+> **Kiểm chứng trên clone DB thật:** `GET /users/new` chỉ mời `ROLE_ADMIN`/`ROLE_USER`; POST trùng
+> `admin` → 302 về form + *"Lỗi: Tên đăng nhập 'admin' đã tồn tại…"* (trước: HTTP 500); POST
+> `ROLE_DRIVER` → từ chối, 0 dòng; POST `id=37` → tripwire #21, nay thành flash thay vì 500; POST
+> username trống → từ chối; POST hợp lệ → `?success=user`, users 37 → 38; POST tạo tài xế trùng
+> `admin` → cùng câu từ chối (uỷ quyền chứng minh). Log sandbox **0 ERROR** (phiên bốn còn 1).
 
 > **✅ KIỂM CHỨNG LẠI END-TO-END (2026-09-19, phiên ba) — ĐỨNG VỮNG cả hai nửa.** (a) Trên bản clone
 > lặp lại POST trùng username → **HTTP 500**, `users` không đổi (lần đầu đã đo trên app thật, log

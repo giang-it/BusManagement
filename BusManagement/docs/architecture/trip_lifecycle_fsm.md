@@ -51,6 +51,18 @@ Every `Trip` holds a `TripStatus` field that progresses through a defined set of
 | `DEPARTED`         | Admin marks completed            | `COMPLETED` | Whitelist only                         |
 | *(any)*            | Same state set again             | *(same)*    | Always allowed (`from == to` guard) — **no-op, no side effects** |
 
+> **The UI asks this table, it does not copy it (defects #23/#24, 2026-09-19).**
+> `TripService.allowedTransitionsFrom(from)` is the one public view of the whitelist — it lists
+> every `to` for which `canTransition(from, to)` holds, `from` itself included. The trip list uses it
+> to decide whether to render "Hủy" (and additionally hides it when the trip is already
+> `CANCELLED`, since a same-state cancel is a no-op), the edit form's status select lists exactly
+> it, and `updateTrip()` checks it **before** its first write so an illegal target is refused with
+> nothing saved. Before this, both templates hard-coded their own status conditions and had drifted:
+> "Hủy" was offered on `DEPARTED` rows and the select offered `COMPLETED` to an `ACTIVE` trip. The
+> same shape applies to deletion: `deleteRefusalReason(trip)` is the policy `deleteTrip()` enforces
+> and the list consults. `TripServicePolicyExposureTest` pins both against the enforcing methods on
+> every (from, to) pair and every status × ticket case.
+
 > **Setting the same state again is a no-op, not a re-entry.** It is accepted (no
 > exception), but `updateTripStatus()` returns immediately without running any of
 > the "Side effects on entry" listed in Section 2 — the side effects belong to
@@ -110,7 +122,7 @@ never consults the whitelist. Two of those four operate on an **already persiste
 | `updateTripStatus():605` | `canTransition()`; `ACTIVE → ACTIVE` already returned early at the same-status guard, so only `PENDING_APPROVAL` reaches it |
 | `confirmAutoAssignedTrip():869` | **`requirePendingApproval()`** — added by this fix |
 | `approveTrip():931` | **`requirePendingApproval()`** — added by this fix |
-| `createManualTrip():953` | **Not a transition at all** — the `Trip` is still transient (`id == null`, no row exists), so there is no source state. Note its status here is **`ACTIVE`, not the entity default**: `AdminTripManagementController.createTrip():117` sets it before calling the service |
+| `createManualTrip():953` | **Not a transition at all** — the `Trip` is still transient (`id == null`, no row exists), so there is no source state. **Since 2026-09-19 (defect #21) that `id == null` is enforced, not assumed:** the method refuses an entity carrying an id with `IllegalArgumentException`. Before that, a crafted `POST /admin/trip-management/trips/create` with `id=<existing>` reached this line with a persisted row, and `tripRepository.save()` merged the form over it — a `COMPLETED` trip became `ACTIVE` with its tickets zeroed, a `DEPARTED` one changed bus. See §8.1 below. Note its status here is **`ACTIVE`, not the entity default**: `AdminTripManagementController.createTrip():117` sets it before calling the service |
 
 > **Do not "tidy" this by moving the guard into `changeStatusToActive()` itself.** One choke point for
 > all four doors reads better than two call sites, and it is wrong: the creation path arrives with the
@@ -168,6 +180,7 @@ Because step 1 re-scans every `ACTIVE` trip on every 10-second tick, a trip that
 | Bus scheduling conflict           | Trip in `[departure−1h, arrival+1h]` exists for bus         | Reject |
 | Bus past maintenance threshold    | `kmSinceLastMaintenance >= maintenanceThreshold`            | Reject |
 | Bus near maintenance threshold    | `kmSinceLastMaintenance + routeKm >= threshold × 0.9`      | Reject |
+| Seats exceed bus capacity         | `trip.totalSeats > bus.busType.capacity` (skipped when the bus has no type) | Reject |
 
 ### Staff Validation (`validateStaffForTrip`)
 
@@ -264,6 +277,16 @@ but **no lower one**, so every `DEPARTED` trip reaches the board however old it 
 > the error: the claim was made about the *screen* the fix had just closed, and generalised into a
 > claim about **every** path. When closing a door, enumerate the others by grepping for the write,
 > not by reasoning about the screen in front of you.
+
+> **And it was false a second time until 2026-09-19 (defect #21).** The create endpoint bound a posted `id`
+> into the `Trip` and `createManualTrip()` saved it, which for an existing id is a JPA merge: `COMPLETED`,
+> `CANCELLED` and `DEPARTED` trips could all be rewritten to `ACTIVE` through `/trips/create`, with
+> `ticketsSold` reset and `bus` moved — reproduced end-to-end on a clone of the real database. The
+> fix is a tripwire at the top of `createManualTrip()` (the `BusService.saveBus()` shape from #16),
+> applied at the same time to the other five create paths (route, station, incident, driver, user).
+> Both this claim and §5.1's "createManualTrip is not a transition" now rest on an enforced
+> precondition rather than on the shape of the form. The lesson repeats #20's: enumerate the
+> **writes** (`grep repository.save`), not the screens.
 
 If a future change lets `trip.bus` move again while `DEPARTED` — by narrowing this policy, or by adding
 a new write path — the pairing breaks **silently**. There is no runtime check that would notice.

@@ -158,7 +158,8 @@ Manual trip creation bypasses the recommendation queue and sets the trip status 
 During manual creation or modification, the backend enforces the following validation checks:
 
 *   **Bus Availability Constraints:**
-    *   The bus status must not be `REPAIRING` or `TRAVELING` (unless editing the currently assigned trip).
+    *   The bus status must not be `REPAIRING`. A `TRAVELING` flag blocks only when **no `DEPARTED` trip of that bus explains it** (defect #19) — when a running trip does, the double-booking window below decides.
+    *   **Seat-capacity rule (defect #22, 2026-09-19):** the trip's `totalSeats` must not exceed the assigned bus's `busType.capacity`. Selling fewer seats than the bus has is a business choice and is allowed; selling more is rejected. A bus without a type has no capacity to compare against and is not checked. This one rule, inside `validateBusForTrip()`, covers manual create, edit, both approval doors and the Recommendation dry-run gate.
     *   **Double-Booking Check:** The bus must not be assigned to another trip overlapping with the window `[departure - 1 hour, arrival + 1 hour]` (preparation buffer).
     *   **Maintenance Block:** The bus cannot be assigned if it has already exceeded its maintenance threshold (`odometer - lastMaintenanceOdometer >= maintenanceThreshold`) or if the distance of the trip will push it into the warning band (`kmSinceLastMaintenance + distance >= maintenanceThreshold * 0.9`). *(Both clauses measure km **since the last service**, not lifetime odometer — `Bus.kmSinceLastMaintenance` is `odometer - lastMaintenanceOdometer`, which is why the first clause spells that subtraction out. Until 2026-08-11 the second clause read `odometer + distance`, which would have compared a lifetime reading against a service interval; the code, `Bus.isNearMaintenance()`, was always right.)*
 *   **Driver Availability Constraints:**
@@ -176,7 +177,7 @@ The background scheduler evaluates demand and proposes additional trips through 
 1.  **Scan for Active Trips:** Search the database for all active trips (`find ACTIVE`).
 2.  **Evaluate Demand (`isHotTrip()`):** Identify trips that exceed passenger occupancy thresholds and time constraints (occupancy $> 90\%$, departs in the future, $\ge 72$ hours remain before departure, and tickets have been on sale for $\ge 48$ hours; the sale duration requirement is bypassed if occupancy hits $\ge 95\%$).
 3.  **Check for Existing Suggestions (`hasAlreadySuggested()`):** Check whether the original trip already has an extra trip linked to it (via the `original_trip_id` self-reference) sitting in a "live" status, to prevent duplicates.
-4.  **Create Recommendation (`createExtraTrip()`):** Generate a new suggestion in `PENDING_APPROVAL` status with a departure time offset by +30 minutes from the original trip.
+4.  **Create Recommendation (`createExtraTrip()`):** Generate a new suggestion in `PENDING_APPROVAL` status with a departure time offset by +30 minutes from the original trip. The suggestion's `totalSeats` is the **capacity of the bus the AI assigns** (defect #22, 2026-09-19); only when no bus could be assigned does it keep the original trip's seat count as a placeholder, which `validateBusForTrip()` re-checks against whatever bus the Admin later picks.
 5.  **Allocate Resources (`autoAssignResources()`):** Automatically attempt to allocate a free `READY` bus and qualified drivers satisfying all safety constraints.
 6.  **Persistence (`save`):** Save the recommendation to the database.
 
