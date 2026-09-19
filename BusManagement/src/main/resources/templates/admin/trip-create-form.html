@@ -488,7 +488,7 @@
                 }
 
                 const data = await response.json();
-                renderResources(data.buses || [], data.drivers || [], durationHours);
+                renderResources(data.buses || [], data.drivers || [], data.assistants || [], durationHours);
 
             } catch (err) {
                 if (err.name === 'AbortError') return; // bỏ qua cancel
@@ -504,8 +504,12 @@
         /**
          * Render danh sách bus và driver vào các <select> tương ứng.
          * Mỗi bus option mang data-capacity để BƯỚC 4 tự điền totalSeats.
+         *
+         * `drivers` và `assistants` là HAI danh sách khác nhau do API trả về:
+         * assistants không bị lọc theo trần 8h giờ lái (phụ xe không cầm lái), nên
+         * nó luôn rộng hơn hoặc bằng drivers. Đừng dùng lẫn — xem lỗi #13.
          */
-        function renderResources(buses, drivers, durationHours) {
+        function renderResources(buses, drivers, assistants, durationHours) {
             availableDriversData = drivers; // lưu lại để dùng trong addCoDriverSlot()
 
             resourceSection.style.display = 'block';
@@ -543,11 +547,10 @@
             mainDriverSelect.innerHTML = driverOptionsHtml;
             mainDriverSelect.disabled = false;
 
-            const assistantOptionsHtml = buildDriverOptions(drivers, '-- Không có --', false);
-            assistantSelect.innerHTML = '<option value="">-- Không có --</option>' +
-                drivers.map(d =>
-                    `<option value="${d.userId}">${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}</option>`
-                ).join('');
+            // Phụ xe dùng danh sách RIÊNG (rộng hơn): vai trò này không cầm lái nên
+            // validateStaffForTrip() không áp trần 8h cho nó — dùng `drivers` ở đây
+            // sẽ giấu mất những người validator sẵn sàng chấp nhận (lỗi #13).
+            assistantSelect.innerHTML = buildDriverOptions(assistants, '-- Không có --');
             assistantSelect.disabled = false;
 
             // ── Hiện/ẩn section tài xế phụ theo thời lượng ──────────────────────────
@@ -556,7 +559,8 @@
             // ── Cập nhật summary badge ────────────────────────────────────────────────
             resourceSummary.style.display = 'block';
             resourceSummaryText.textContent =
-                `Tìm thấy ${buses.length} xe rảnh và ${drivers.length} tài xế rảnh trong khung giờ này.`;
+                `Tìm thấy ${buses.length} xe rảnh, ${drivers.length} tài xế rảnh ` +
+                `và ${assistants.length} người có thể làm phụ xe trong khung giờ này.`;
 
             priceSection.style.display = 'block';
             setStep(4);

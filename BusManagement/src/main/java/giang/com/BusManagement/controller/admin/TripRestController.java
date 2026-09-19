@@ -18,7 +18,11 @@ import java.util.Map;
  *
  * Endpoint duy nhất: GET /api/admin/trips/available-resources
  * Nhận 2 tham số thời gian (departure, arrival), trả về JSON chứa
- * danh sách xe và tài xế THỰC SỰ RẢNH trong khoảng thời gian đó.
+ * danh sách xe, tài xế và phụ xe THỰC SỰ RẢNH trong khoảng thời gian đó.
+ *
+ * Tài xế và phụ xe là HAI danh sách riêng vì hai vai trò chịu hai bộ ràng buộc
+ * khác nhau — cùng khuôn với màn Phê Duyệt, nơi AdminTripController đã đưa
+ * availableDrivers và availableAssistants vào model một cách tách bạch.
  */
 @RestController
 @RequestMapping("/api/admin/trips")
@@ -28,14 +32,17 @@ public class TripRestController {
     private final TripService tripService;
 
     /**
-     * Trả về danh sách xe và tài xế rảnh trong khoảng [departure, arrival].
+     * Trả về danh sách xe, tài xế và phụ xe rảnh trong khoảng [departure, arrival].
      *
      * JavaScript sẽ gọi endpoint này sau khi người dùng chọn đủ Tuyến đường
      * và Thời gian khởi hành (arrival được tính tự động ở frontend).
      *
+     * {@code assistants} luôn là siêu tập của {@code drivers} — nó thiếu đúng bộ
+     * lọc giờ lái mà vai trò phụ xe không phải chịu.
+     *
      * @param departure Thời gian khởi hành (ISO format: "2025-06-15T07:30")
      * @param arrival   Thời gian đến dự kiến (ISO format: "2025-06-15T14:00")
-     * @return JSON: { buses: [...], drivers: [...] }
+     * @return JSON: { buses: [...], drivers: [...], assistants: [...] }
      */
     @GetMapping("/available-resources")
     public ResponseEntity<Map<String, Object>> getAvailableResources(
@@ -54,9 +61,18 @@ public class TripRestController {
                 .map(this::toBusDto)
                 .toList();
 
-        // Lấy tài xế rảnh
+        // Lấy tài xế rảnh (dropdown Tài xế chính + Tài xế phụ — có trần 8h/ngày)
         List<Map<String, Object>> drivers = tripService
                 .getAvailableDriversForTimeRange(departure, arrival)
+                .stream()
+                .map(this::toDriverDto)
+                .toList();
+
+        // Lấy phụ xe khả dụng — danh sách RIÊNG, không áp trần giờ lái vì phụ xe
+        // không cầm lái (xem TripService.getAvailableAssistantsForTimeRange).
+        // Dùng chung một danh sách cho cả hai vai trò chính là lỗi #13.
+        List<Map<String, Object>> assistants = tripService
+                .getAvailableAssistantsForTimeRange(departure, arrival)
                 .stream()
                 .map(this::toDriverDto)
                 .toList();
@@ -64,6 +80,7 @@ public class TripRestController {
         Map<String, Object> response = new HashMap<>();
         response.put("buses", buses);
         response.put("drivers", drivers);
+        response.put("assistants", assistants);
 
         return ResponseEntity.ok(response);
     }

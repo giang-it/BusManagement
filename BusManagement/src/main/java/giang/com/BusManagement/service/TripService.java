@@ -1469,6 +1469,11 @@ public class TripService {
      * - Tổng giờ lái hôm nay + phần chia của chuyến này ≤ 8h
      * - Không bận ở chuyến khác (kể cả vai trò phụ xe)
      *
+     * CHỈ dành cho dropdown TÀI XẾ CHÍNH và TÀI XẾ PHỤ — hai vai trò thực sự cầm
+     * lái, và validateStaffForTrip() áp trần 8h cho cả hai. Dropdown PHỤ XE phải
+     * dùng getAvailableAssistantsForTimeRange() ngay dưới; đổ danh sách này vào đó
+     * chính là lỗi #13.
+     *
      * @param departure Thời gian khởi hành dự kiến
      * @param arrival   Thời gian đến dự kiến
      * @return Danh sách tài xế rảnh, sắp xếp theo tổng giờ lái ít nhất
@@ -1485,6 +1490,53 @@ public class TripService {
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
+                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
+                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Tìm tài xế hợp lệ & rảnh để làm PHỤ XE trong khoảng [departure, arrival] —
+     * bản dành cho form TẠO chuyến, nơi chuyến chưa tồn tại nên chưa có tripId.
+     *
+     * CÙNG BỘ LUẬT NGHIỆP VỤ với getAvailableAssistantsForTrip() (màn Phê Duyệt),
+     * nhưng KHÔNG phải bản sao của nó. Hai điểm khác nhau thuần cơ học, mỗi cái
+     * đúng cho ngữ cảnh của mình — ghi ra đây để không ai "hợp nhất" hai method
+     * bằng mắt, và để câu trên không bị đọc thành một khẳng định rộng hơn sự thật:
+     * <ol>
+     * <li>{@code excludeTripId = null}, vì chưa có chuyến nào để loại khỏi phép
+     * kiểm trùng lịch — bản kia truyền tripId của chính chuyến đang xét;</li>
+     * <li>nạp qua {@code findAllWithUser()} chứ không {@code findAll()}, vì
+     * TripRestController đọc {@code getUser().getFullName()} để dựng JSON nên
+     * {@code findAll()} sẽ sinh N+1 query. Bản kia trả entity ra Model, nơi
+     * open-in-view che khuất chi phí đó.</li>
+     * </ol>
+     *
+     * Khác getAvailableDriversForTimeRange() ở ĐÚNG MỘT ĐIỂM: KHÔNG áp trần "giờ
+     * lái + phần chia của chuyến ≤ 8h". Phụ xe không trực tiếp lái xe — quy ước
+     * "phụ xe = 0h" của getDrivingHoursForDate() là luật tính giờ duy nhất của hệ
+     * thống — và validateStaffForTrip() cũng KHÔNG áp trần đó cho vai trò này.
+     *
+     * Ba ràng buộc còn lại giữ nguyên và khớp MỘT-MỘT với validator (còn hoạt
+     * động, bằng lái còn hiệu lực VÀO NGÀY KHỞI HÀNH, không trùng lịch trong cửa
+     * sổ ±MIN_REST_BETWEEN_TRIPS_MINUTES), nên danh sách này không bao giờ mời một
+     * người mà validateStaffForTrip() sẽ từ chối — quy tắc một chiều ở
+     * THESIS_ROADMAP.md §8 vẫn được giữ.
+     *
+     * Hệ quả: tập trả về luôn là SIÊU TẬP của getAvailableDriversForTimeRange()
+     * với cùng tham số. Xem docs/todo/current_bugs_found.md mục #13.
+     *
+     * @param departure Thời gian khởi hành dự kiến
+     * @param arrival   Thời gian đến dự kiến
+     * @return Danh sách phụ xe khả dụng, sắp xếp theo tổng giờ lái ít nhất
+     */
+    public List<Driver> getAvailableAssistantsForTimeRange(LocalDateTime departure, LocalDateTime arrival) {
+        LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+
+        return driverRepository.findAllWithUser().stream()
+                .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
+                .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
                 .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
                 .collect(Collectors.toList());
