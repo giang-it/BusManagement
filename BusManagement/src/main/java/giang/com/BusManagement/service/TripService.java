@@ -600,8 +600,11 @@ public class TripService {
      * (validate đầy đủ) TRƯỚC khi gọi vào đây;</li>
      * <li>DispatchController.changeStatus() — chặn ACTIVE bằng allow-list
      * BOARD_ACTIONS;</li>
-     * <li>AdminTripManagementController.cancelTrip() và TripService.cancelTrip()
-     * — truyền HẰNG SỐ CANCELLED, không bao giờ chạm tới nhánh ACTIVE.</li>
+     * <li>AdminTripManagementController.cancelTrip() và TripService.rejectTrip()
+     * — truyền HẰNG SỐ CANCELLED, không bao giờ chạm tới nhánh ACTIVE. (Bản trước
+     * của dòng này gọi lối thứ tư là "TripService.cancelTrip()" — method không tồn
+     * tại; đính chính 2026-09-19. Một tên sai ngay trong tripwire đếm call site là
+     * thứ đắt nhất, vì người rà sau sẽ tin nó thay vì grep.)</li>
      * </ul>
      * Chỉ hai lối đầu mới truyền được newStatus tùy ý; hai lối sau được liệt kê để
      * lần kiểm sau đếm đủ bốn call site và không tưởng danh sách này đã lạc hậu.

@@ -2528,7 +2528,8 @@ là mới — bài học 2026-09-19 buổi sáng.
 
 ## Mục nhỏ (2026-09-19) — không phải lỗi hành vi, hoặc cần một ruling trước
 
-- **Javadoc `updateTripStatus()` (`TripService:567`) gọi tên `TripService.cancelTrip()` — method không
+- ✅ **ĐÃ SỬA 2026-09-19 (phiên sáu):** javadoc nay gọi đúng `TripService.rejectTrip()` kèm ghi chú đính chính; bốn call site đếm lại bằng `grep` — `updateTrip():424`, `cancelTrip():457`, `DispatchController:116`, `rejectTrip():1411` — vẫn đúng bốn.
+  *(Mục gốc:)* **Javadoc `updateTripStatus()` (`TripService:567`) gọi tên `TripService.cancelTrip()` — method không
   tồn tại.** Lối gọi thứ tư thật là `TripService.rejectTrip():1327`. Số đếm "đúng bốn call site" vẫn
   đúng, tên sai. Đây là chính cái javadoc-tripwire mà #10/#20 dựng để lần rà sau đếm — một câu sai
   trong tripwire thì đắt hơn một câu sai thường (§9). Sửa: đổi tên trong comment. 0 hành vi.
@@ -2547,9 +2548,11 @@ là mới — bài học 2026-09-19 buổi sáng.
   bắt đầu chuyển sang `@SpringBootApplication(exclude = …)` rồi bỏ dở. `spring.security.user.name/
   password=a` (`:27-28`) cũng chết. Hậu quả: **0**. Là rác cấu hình + một câu sai. Dọn: xoá 3 dòng
   properties + 3 import, hoặc hoàn tất `exclude` trên annotation — cách nào cũng cần chạy lại app.
-- **`docs/architecture/database_schema.md` không có bảng `cost_parameters`** (thêm 2026-07-24, Phase
+- ✅ **ĐÃ SỬA 2026-09-19 (phiên sáu):** thêm dòng Entity Overview, section `### cost_parameters` (4 cột, hợp đồng một-dòng, luật > 0 của #11, ghi chú recompute-per-view), và bổ sung vào ER summary + mermaid. **Phát hiện kèm:** mermaid ER cũng **chưa từng có `incidents`** (Phase 2 bỏ sót từ tháng 7) — thêm luôn cùng ba quan hệ của nó.
+  *(Mục gốc:)* **`docs/architecture/database_schema.md` không có bảng `cost_parameters`** (thêm 2026-07-24, Phase
   7 bước 3); có đủ 10 bảng còn lại. Tài liệu lạc hậu một bảng. Cùng loại với #3 (docs).
-- **`Proj_functions_summary.md:31` vẫn liệt kê `Route.departurePoint`/`destinationPoint` (String) là
+- ✅ **ĐÃ SỬA 2026-09-19 (phiên sáu):** dòng 31 nay mô tả đúng entity hiện tại — hai cột text đã xoá, điểm đi/đến suy từ `routeStations` theo `stopOrder` qua `getDepartureStation()`/`getDeparturePointDisplay()`… — khớp `database_schema.md:403` và `Route.java`.
+  *(Mục gốc:)* **`Proj_functions_summary.md:31` vẫn liệt kê `Route.departurePoint`/`destinationPoint` (String) là
   field hiện tại** — code chỉ còn dòng comment *"ĐÃ XÓA"* (`Route.java:31-32`), và
   `database_schema.md:403` nói rõ đã bỏ. Hai doc mâu thuẫn nhau, một cái sai với code.
 - **Loại xe ↔ `Route.suitableBusType` không phải luật ở validator, nhưng hai trong bốn đường "mời" lại

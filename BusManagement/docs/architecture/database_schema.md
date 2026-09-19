@@ -20,6 +20,7 @@ This document is derived from the JPA entity definitions in `src/main/java/giang
 | `Trip`            | `trips`           | Scheduled dispatch: route + bus + crew + status      |
 | *(join table)*    | `trip_co_drivers` | Many-to-many link between trips and co-drivers       |
 | `Incident`        | `incidents`       | Operational incidents reported against a vehicle     |
+| `CostParameters`  | `cost_parameters` | Single-row admin-configurable operating-cost rates (Phase 7 step 3) |
 
 ---
 
@@ -236,6 +237,26 @@ Operational incidents reported to the control centre.
 
 ---
 
+### `cost_parameters`
+
+Operating-cost rates the Recommendation Engine and the What-if screen use to estimate cost and profit (Phase 7 step 3, 2026-07-24). The domain holds no cost data of its own — fuel, wages and tolls are exogenous to a scheduling schema — so the rates are a **business input the operator supplies**, seeded with illustrative market-reference defaults. *(Section added 2026-09-19; the table had existed since July without an entry here.)*
+
+| Column                 | Java Type       | Constraints                      | Notes                                                                 |
+|------------------------|-----------------|----------------------------------|-----------------------------------------------------------------------|
+| `id`                   | `Long`          | PK, auto-increment               |                                                                       |
+| `fuel_cost_per_km`     | `BigDecimal`    | `DECIMAL(12,2)`, nullable in DDL | Multiplied by `routes.distance_km`. Default 6,000 đ/km when no row exists |
+| `driver_wage_per_hour` | `BigDecimal`    | `DECIMAL(12,2)`, nullable in DDL | Multiplied by trip duration (h) × required drivers. Default 50,000 đ/h |
+| `updated_at`           | `LocalDateTime` | nullable                         | `@UpdateTimestamp` — stamped on insert and on every update; shown on the Recommendation page as "rates as of" |
+
+**Relationships:** none — a standalone configuration table.
+
+**Notes:**
+- **Exactly one row by contract.** `CostParameterService.getOrDefault()` reads the first row or returns an in-memory default object (no write-on-read); `save()` overwrites that first row and never inserts a second. The defaults live in the service, not in the database.
+- Both rates must be **> 0** (`CostParameterService.validate()`, defect #11): `0` would silently turn "profit" into "revenue" on two screens, and `RouteService` already refuses `distance_km <= 0`, the other factor of the same product.
+- The Recommendation and What-if screens **recompute on every view and persist nothing**, so editing a rate is always safe. If a future phase ever persists a computed cost or profit, it must snapshot the rates used alongside the figure (Developer Note in `THESIS_ROADMAP.md`).
+
+---
+
 ## Enumerations
 
 ### `IncidentType`
@@ -302,6 +323,9 @@ bus_types (1) ──── (many) buses ──── (many) trips ──── (
                                (many-to-many)         (ordered stop list)
                                                             │
                                                        (many) stations
+
+incidents (many) ──── (1) buses          cost_parameters (1 row, standalone)
+    │  └── (0..1) trips, (0..1) drivers
 ```
 
 ---
@@ -394,6 +418,26 @@ erDiagram
     trips ||--o{ trip_co_drivers : "has co-drivers"
     drivers ||--o{ trip_co_drivers : "is co-driver"
     trips ||--o{ trips : "original trip (self-ref)"
+    incidents {
+        Long id PK
+        Long busId FK
+        Long tripId FK
+        Long driverId FK
+        String incidentType
+        String status
+        String description
+        Datetime reportedAt
+        Datetime resolvedAt
+    }
+    cost_parameters {
+        Long id PK
+        Decimal fuelCostPerKm
+        Decimal driverWagePerHour
+        Datetime updatedAt
+    }
+    buses ||--o{ incidents : "reported against"
+    trips |o--o{ incidents : "during (optional)"
+    drivers |o--o{ incidents : "involved (optional)"
 ```
 
 ---
