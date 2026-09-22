@@ -1756,7 +1756,7 @@
 
 - **Mã TC:** TC_INC_002
 - **Tên Kịch Bản:** Admin ghi sự cố có gắn cả chuyến và tài xế
-- **Điều kiện tiên quyết:** Tồn tại ít nhất 1 xe, 1 chuyến, 1 tài xế
+- **Điều kiện tiên quyết:** Tồn tại ít nhất 1 xe, 1 tài xế, và 1 chuyến **nằm trong phạm vi mời của dropdown** — `ACTIVE`/`DEPARTED` (mọi ngày) hoặc `COMPLETED`/`CANCELLED` khởi hành trong 7 ngày gần đây (từ 2026-09-21, xem TC_INC_019); một chuyến hoàn thành cũ hơn không xuất hiện trong dropdown
 - **Các bước thực hiện:**
   1. `GET /admin/incidents/create`
   2. Chọn Xe, Loại sự cố, Chuyến, Tài xế, Trạng thái; nhập Mô tả
@@ -1998,6 +1998,49 @@
 
 ---
 
+### NHÓM 7.5: PHẠM VI MỜI CỦA DROPDOWN "CHUYẾN XE LIÊN QUAN" (2026-09-21)
+
+> Dropdown không còn đổ toàn bộ lịch sử chuyến (2.222 option / 353 KB / 1,2 s mỗi
+> lần mở form trên dữ liệu 2026-09-21). Nó chỉ **mời** các chuyến còn có thật để gắn
+> một sự cố vào: `ACTIVE`/`DEPARTED` mọi ngày, `COMPLETED`/`CANCELLED` khởi hành
+> trong `AdminIncidentController.RECENT_TRIP_DAYS` = 7 ngày gần đây, mới nhất lên
+> đầu (`TripService.getRunningAndRecentTrips(since)`). Đây là **phạm vi mời, không
+> phải luật**: `IncidentService` không kiểm chuyến thuộc cửa sổ nào.
+
+### TC_INC_019 — Dropdown chuyến chỉ mời chuyến đang vận hành hoặc vừa kết thúc
+
+- **Mã TC:** TC_INC_019
+- **Tên Kịch Bản:** Nội dung dropdown khớp đúng luật chọn, đối chiếu bằng SQL
+- **Điều kiện tiên quyết:** DB có chuyến ở đủ 5 trạng thái, gồm chuyến `COMPLETED` cũ hơn 7 ngày (dữ liệu backfill) và chuyến `PENDING_APPROVAL`
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/create`, lấy tập `value` của các `<option>` trong `<select name="trip">`
+  2. Chạy SQL: `SELECT id FROM trips WHERE is_deleted = false AND (status IN ('ACTIVE','DEPARTED') OR (status IN ('COMPLETED','CANCELLED') AND departure_time >= NOW() - INTERVAL 7 DAY))`
+- **Kết quả mong đợi:**
+  - Hai tập id **bằng nhau** (đo 2026-09-21: 99 = 4 `ACTIVE` + 5 `DEPARTED` + 82 `COMPLETED` + 8 `CANCELLED`)
+  - Không có chuyến `PENDING_APPROVAL` nào; không có chuyến `COMPLETED` khởi hành trước cửa sổ
+  - Option đầu tiên là chuyến khởi hành **mới nhất** (`ORDER BY departure_time DESC`)
+  - Dòng gợi ý dưới select nêu đúng số ngày (7), lấy từ model chứ không hardcode trong template
+  - Trang nhẹ (đo 2026-09-21: 27,7 KB / 0,32 s, so với 367 KB / 1,2 s trước đó)
+
+---
+
+### TC_INC_020 — Form sửa vẫn hiện chuyến đang gắn dù đã ra khỏi phạm vi mời
+
+- **Mã TC:** TC_INC_020
+- **Tên Kịch Bản:** Chuyến hiện tại của sự cố được thêm lại vào đầu dropdown (không "mất" lựa chọn)
+- **Điều kiện tiên quyết:** Sự cố ID=X gắn với chuyến ID=T đã `COMPLETED` từ hơn 7 ngày (dữ liệu thật: sự cố 9 → chuyến 1, 19/07/2026)
+- **Các bước thực hiện:**
+  1. `GET /admin/incidents/edit/X`
+  2. So số `<option>` trong `<select name="trip">` với số option của `GET /admin/incidents/create`
+- **Kết quả mong đợi:**
+  - Form sửa có **đúng thêm 1** option so với form tạo; option đó là chuyến T, đứng **đầu** và đang `selected`, hiển thị đủ `#T — tuyến — giờ — [COMPLETED]`
+  - Các ô Xe / Tài xế / Trạng thái giữ nguyên giá trị đang lưu (đo 2026-09-21: sự cố 9 — xe 17 vẫn được chọn)
+  - Lưu lại mà không đổi gì → `trip_id` **giữ nguyên** T (khác TC_INC_018: ở đây chuyến chỉ ra khỏi cửa sổ, không bị xóa mềm)
+  - Với sự cố có chuyến còn trong phạm vi (sự cố 14 → chuyến 12 `DEPARTED`): **không** thêm option nào, chuyến 12 đang `selected`
+  - Với sự cố không có chuyến (sự cố 10): số option bằng form tạo, không option nào `selected`
+
+---
+
 ## MODULE 8 — DỰ BÁO NHU CẦU (Phase 6)
 
 Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
@@ -2218,15 +2261,17 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 | Module 4 — AI Scheduler | 18 | 5 | 13 |
 | Module 5 — Admin Approval | 10 | 4 | 6 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
-| Module 7 — Incident Management | 18 | 10 | 8 |
-| **TỔNG** | **94** | **34** | **60** |
+| Module 7 — Incident Management | 20 | 12 | 8 |
+| **TỔNG** | **96** | **36** | **60** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
 > **8** case (Phase 0 thêm `TC_SEC_005B`/`TC_SEC_005C` nhưng không cập nhật bảng này), `TC_FSM`
 > thực có **29**, và **8** case `TC_DEL` không được tính vào module nào. Chỉ dòng Module 7 và
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
-> đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng.
+> đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
+> `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

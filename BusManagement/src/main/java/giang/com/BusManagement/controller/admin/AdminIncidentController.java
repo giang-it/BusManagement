@@ -3,6 +3,7 @@ package giang.com.BusManagement.controller.admin;
 import giang.com.BusManagement.domain.Incident;
 import giang.com.BusManagement.domain.IncidentStatus;
 import giang.com.BusManagement.domain.IncidentType;
+import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.service.BusService;
 import giang.com.BusManagement.service.DriverService;
 import giang.com.BusManagement.service.IncidentService;
@@ -13,6 +14,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 @Controller
 @RequestMapping("/admin/incidents")
 @RequiredArgsConstructor
@@ -22,6 +27,17 @@ public class AdminIncidentController {
     private final BusService busService;
     private final DriverService driverService;
     private final TripService tripService;
+
+    /**
+     * Dropdown "Chuyến xe liên quan" mời các chuyến đang vận hành (ACTIVE/DEPARTED)
+     * cộng chuyến đã kết thúc (COMPLETED/CANCELLED) khởi hành trong từng này ngày
+     * gần đây. Là PHẠM VI MỜI của form — cửa sổ do controller sở hữu, service nhận
+     * mốc, cùng cách DispatchController.UPCOMING_WINDOW_HOURS ↔
+     * TripService.getDispatchBoardTrips(until) — không phải luật nghiệp vụ:
+     * IncidentService không kiểm chuyến thuộc cửa sổ nào. Form sửa luôn hiện thêm
+     * chuyến đang gắn dù đã ra khỏi cửa sổ (xem addFormOptions).
+     */
+    private static final int RECENT_TRIP_DAYS = 7;
 
     @GetMapping
     public String listIncidents(Model model) {
@@ -34,8 +50,9 @@ public class AdminIncidentController {
 
     @GetMapping("/create")
     public String showCreateForm(Model model) {
-        model.addAttribute("incident", new Incident());
-        addFormOptions(model);
+        Incident incident = new Incident();
+        model.addAttribute("incident", incident);
+        addFormOptions(model, incident);
         return "admin/incident/incident-form";
     }
 
@@ -62,7 +79,7 @@ public class AdminIncidentController {
             Incident incident = incidentService.findByIdWithDetails(id)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy sự cố với ID: " + id));
             model.addAttribute("incident", incident);
-            addFormOptions(model);
+            addFormOptions(model, incident);
             return "admin/incident/incident-form";
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());
@@ -94,10 +111,22 @@ public class AdminIncidentController {
         return "redirect:/admin/incidents";
     }
 
-    private void addFormOptions(Model model) {
+    private void addFormOptions(Model model, Incident incident) {
         model.addAttribute("buses", busService.findAllWithBusType());
         model.addAttribute("drivers", driverService.findAllWithUser());
-        model.addAttribute("trips", tripService.getAllTrips());
+
+        List<Trip> trips = new ArrayList<>(
+                tripService.getRunningAndRecentTrips(LocalDateTime.now().minusDays(RECENT_TRIP_DAYS)));
+        // Form sửa: chuyến đang gắn có thể đã ra khỏi cửa sổ — vẫn phải hiện, nếu
+        // không lựa chọn hiện tại "biến mất" khỏi chính form đang sửa nó (cùng lý do
+        // showEditTripForm force-add xe hiện tại). contains() so theo id (Trip
+        // equals id-based, Hidden Cost #9); findByIdWithDetails đã fetch trip.route
+        // nên option hiển thị được tuyến.
+        if (incident.getTrip() != null && !trips.contains(incident.getTrip())) {
+            trips.add(0, incident.getTrip());
+        }
+        model.addAttribute("trips", trips);
+        model.addAttribute("recentTripDays", RECENT_TRIP_DAYS);
         model.addAttribute("incidentTypes", IncidentType.values());
         model.addAttribute("incidentStatuses", IncidentStatus.values());
     }

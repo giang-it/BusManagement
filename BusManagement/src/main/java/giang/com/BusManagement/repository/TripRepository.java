@@ -293,6 +293,35 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("until") LocalDateTime until);
 
        /**
+        * Chuyến "đang vận hành hoặc vừa kết thúc" — phạm vi MỜI của dropdown chọn
+        * chuyến ở tầng UI (hiện tại: form ghi nhận sự cố), thay cho việc đổ toàn bộ
+        * lịch sử vào một select (findAllWithDetails: > 2.000 dòng, tăng theo mỗi
+        * lần backfill).
+        *
+        * Hai vế OR, cố ý:
+        * - liveStatuses (ACTIVE, DEPARTED): đang mở bán / đang chạy — lấy hết, không
+        *   xét ngày, vì số lượng luôn nhỏ và một sự cố có thể xảy ra trước giờ chạy.
+        * - endedStatuses (COMPLETED, CANCELLED) chỉ khi khởi hành từ mốc :since trở
+        *   đi: sự cố được ghi sau khi chuyến về bến, hoặc chuyến bị hủy VÌ sự cố
+        *   (admin hủy trước, ghi sự cố sau) — cần một cửa sổ ngắn để chuyến còn
+        *   trong danh sách; lịch sử cũ hơn không bao giờ là đích của một sự cố mới.
+        *
+        * Chỉ JOIN FETCH t.route: option của dropdown cần tuyến + giờ + trạng thái,
+        * không cần xe/tài xế/phụ xe. routeStations đã @BatchSize(20) (Route.java).
+        * Mới nhất lên đầu.
+        */
+       @Query("""
+                     SELECT t FROM Trip t
+                     LEFT JOIN FETCH t.route r
+                     WHERE t.status IN :liveStatuses
+                        OR (t.status IN :endedStatuses AND t.departureTime >= :since)
+                     ORDER BY t.departureTime DESC
+                     """)
+       List<Trip> findRunningAndRecentTrips(@Param("liveStatuses") Collection<TripStatus> liveStatuses,
+                     @Param("endedStatuses") Collection<TripStatus> endedStatuses,
+                     @Param("since") LocalDateTime since);
+
+       /**
         * Kiểm tra đã tồn tại chuyến của tuyến này khởi hành ĐÚNG mốc thời gian này
         * hay chưa.
         *

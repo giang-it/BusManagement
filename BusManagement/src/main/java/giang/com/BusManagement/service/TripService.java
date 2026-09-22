@@ -1715,12 +1715,28 @@ public class TripService {
     }
 
     /**
-     * Toàn bộ chuyến kèm quan hệ đầy đủ (mọi trạng thái) — dùng cho các dropdown
-     * chọn chuyến ở tầng UI. Giữ tên trung lập theo nghiệp vụ chuyến xe để không
-     * ràng buộc TripService vào một màn hình cụ thể nào.
+     * Chuyến đang vận hành (ACTIVE / DEPARTED, mọi ngày) cộng chuyến đã kết thúc
+     * (COMPLETED / CANCELLED) khởi hành từ mốc {@code since} trở đi, mới nhất lên
+     * đầu — phạm vi mời cho các dropdown chọn chuyến ở tầng UI (hiện tại: form ghi
+     * nhận sự cố). Cửa sổ do nơi gọi quyết định (tiền lệ
+     * {@link #getDispatchBoardTrips(LocalDateTime)}); tập trạng thái cố định ở đây
+     * vì đó là nghiệp vụ "chuyến nào còn có thật để gắn một sự cố vào": chuyến chờ
+     * duyệt chưa tồn tại thật (chưa mở bán, xe chưa chốt), chuyến đã hủy vẫn cần
+     * hiện một thời gian ngắn vì "hủy chuyến vì sự cố, rồi ghi sự cố" là thứ tự
+     * tự nhiên của admin.
+     *
+     * Thay cho {@code getAllTrips()} (Phase 2, 2026-07-16 → 2026-09-21): đổ toàn bộ
+     * lịch sử vào một select — 2.222 option / 353 KB / 1,2 s mỗi lần mở form trên
+     * dữ liệu 2026-09-21, và tăng theo mỗi lần backfill. Đây là phạm vi MỜI, không
+     * phải luật: IncidentService không kiểm chuyến thuộc cửa sổ nào, một POST gửi
+     * id chuyến cũ hơn vẫn hợp lệ (khóa ngoại thật). Giữ tên theo nội dung trả về,
+     * không theo màn hình, để TripService không bị buộc vào một form cụ thể.
      */
-    public List<Trip> getAllTrips() {
-        return tripRepository.findAllWithDetails();
+    public List<Trip> getRunningAndRecentTrips(LocalDateTime since) {
+        return tripRepository.findRunningAndRecentTrips(
+                List.of(TripStatus.ACTIVE, TripStatus.DEPARTED),
+                List.of(TripStatus.COMPLETED, TripStatus.CANCELLED),
+                since);
     }
 
     public Trip getTripById(Long id) {
