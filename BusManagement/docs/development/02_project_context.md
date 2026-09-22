@@ -12,7 +12,7 @@ The **Bus Management System** is a Spring Boot application designed to manage bu
 *   **Data Persistence:** Spring Data JPA & Hibernate, MySQL database
 *   **View Layer:** Thymeleaf (HTML templates)
 *   **Task Automation:** Spring Scheduler (`@Scheduled`)
-*   **Security Configuration:** Spring Security (Fully bypassed for development purposes)
+*   **Security Configuration:** Spring Security on the classpath, permit-all by code (`SecurityConfig`; no login, no user store — see `docs/architecture/setup_guide.md` §5)
 
 ## 4. Architecture & Package Structure
 The application follows a standard Layered Architecture. The root package is `giang.com.BusManagement`.

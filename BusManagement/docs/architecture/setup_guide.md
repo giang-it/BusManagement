@@ -128,15 +128,13 @@ Note that this file **fully shadows** `src/main/resources/application.properties
 
 ## 5. Security Configuration
 
-Spring Security is **fully disabled** in the current configuration:
+Spring Security is **on the classpath and its auto-configuration is active**; the application is **permit-all by code**, not disabled:
 
-```properties
-spring.autoconfigure.exclude=\
-  org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,\
-  org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
-```
+- `config/SecurityConfig` defines the one and only `SecurityFilterChain`: `anyRequest().permitAll()`, with CSRF, form-login and HTTP Basic all switched off. There is no login page and no user store in use.
+- `BusManagementApplication` excludes `UserDetailsServiceAutoConfiguration` (`@SpringBootApplication(exclude = …)`), so Boot does not create its default in-memory user or print `Using generated security password: …` at startup. The exclusion is on the annotation on purpose: a property-based `spring.autoconfigure.exclude` that names a class which no longer exists is ignored silently (this happened on the Spring Boot 4 upgrade — the two Boot-3 class names sat in `application.properties` doing nothing until 2026-09-21), whereas a wrong class on the annotation fails to compile.
+- `application.properties` therefore carries **no** `spring.security.*` or `spring.autoconfigure.exclude` keys. Do not add them back — the earlier `spring.security.user.name/password=a` pair only existed to silence the generated-password message.
 
-No login is required to access any endpoint. Do not deploy with this configuration in a production environment.
+No login is required to access any endpoint. Do not deploy with this configuration in a production environment. Enabling real authentication is a separate, explicitly-approved task (see `docs/development/THESIS_ROADMAP.md`, Section 4).
 
 ---
 
@@ -202,7 +200,7 @@ All configuration is in `src/main/resources/application.properties`.
 | `spring.datasource.username`         | `root` (default)           | Change before running                       |
 | `spring.datasource.password`         | *(hardcoded placeholder)*  | Change before running                       |
 | `spring.jpa.show-sql`                | `false`                    | Set to `true` to debug SQL queries          |
-| `spring.autoconfigure.exclude`       | Security disabled          | See Section 5                               |
+| *(no `spring.security.*` keys)*      | permit-all by code         | See Section 5 — `SecurityConfig` + the annotation exclude |
 
 ---
 
@@ -214,7 +212,7 @@ BusManagement/                      ← Maven project root
 ├── src/
 │   ├── main/
 │   │   ├── java/giang/com/BusManagement/
-│   │   │   ├── BusManagementApplication.java   ← Entry point (@EnableScheduling)
+│   │   │   ├── BusManagementApplication.java   ← Entry point (@EnableScheduling, excludes the default in-memory user)
 │   │   │   ├── config/                         ← Security, web config
 │   │   │   ├── controller/
 │   │   │   │   ├── helloController.java
