@@ -97,8 +97,11 @@ public class TripService {
      * unless it's already past the instant-hot threshold.
      */
     private boolean isHotTrip(Trip trip) {
-        // ── Existing occupancy gate ──────────────────────────────────────────────
-        if (trip.getOccupancyRate() <= 0.9) {
+        // ── Occupancy gate: hỏi Trip, không so số ───────────────────────────────
+        // Ngưỡng "chuyến đông" (> 0,90) sống ở Trip.needsReinforcement(). Các màn
+        // Decision Support phải khai lại con số vì không có entity Trip trong tay;
+        // ở đây có, nên gọi thẳng — đổi ngưỡng ở Trip thì scanner đổi theo.
+        if (!trip.needsReinforcement()) {
             return false;
         }
 
