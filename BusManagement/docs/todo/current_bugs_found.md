@@ -2311,6 +2311,16 @@ là mới — bài học 2026-09-19 buổi sáng.
 > sang loại nhỏ hơn khi xe đang gánh chuyến mở bán nhiều ghế hơn sẽ tạo dòng lệch mà không luật nào
 > bắt — cùng hình dạng hai-người-ghi của #15; chưa có ruling.
 >
+> ✅ **2026-09-21 — chuyến 8 đã hạ 30 → 22 qua form Sửa trên DB thật** (theo yêu cầu của chủ dự án
+> *"kiểm tra lại, nếu đúng và cần thiết thì sửa"*; PID 30692, profile mặc định): POST đúng mọi trường
+> form đang hiển thị, chỉ đổi `totalSeats` → *"Cập nhật chuyến xe thành công!"*. Chứng minh chỉ một ô
+> đổi: hash lại toàn bộ 2.072 dòng `trips` với ghế của chuyến 8 giả lập về 30 ra **đúng** MD5 gốc
+> (`group_concat_max_len` đã nâng); các bảng khác giữ nguyên chữ ký. **Vẫn để `PENDING_APPROVAL`, không
+> tự duyệt:** duyệt không cần cho tính nhất quán, chuyến khởi hành 2026-07-20 (đã qua hai tháng), và
+> đây là dòng chờ duyệt **duy nhất** trong DB — tức là dữ liệu sống để demo màn Duyệt. Nút sẽ chạy
+> (phiên bốn đã chứng minh `confirm` → `ACTIVE 22/22` trên clone cùng dữ liệu); duyệt hay từ chối là
+> một cú bấm của chủ dự án. Xem THESIS_ROADMAP §8 mục 2026-09-21.
+>
 > **Docs:** `trip_lifecycle_fsm.md` §7 (thêm dòng luật), `current_functional_spec.md` (ràng buộc xe
 > + bước tạo chuyến tăng cường), `Proj_functions_summary.md` §6.7 + §7.4 (kèm đính chính hai câu cũ
 > trong §6.7 đã lạc hậu từ trước: "TRAVELING chặn vô điều kiện" — sai từ #19; "bảo trì chỉ warning"
@@ -2533,13 +2543,42 @@ là mới — bài học 2026-09-19 buổi sáng.
   tồn tại.** Lối gọi thứ tư thật là `TripService.rejectTrip():1327`. Số đếm "đúng bốn call site" vẫn
   đúng, tên sai. Đây là chính cái javadoc-tripwire mà #10/#20 dựng để lần rà sau đếm — một câu sai
   trong tripwire thì đắt hơn một câu sai thường (§9). Sửa: đổi tên trong comment. 0 hành vi.
-- **`TripService.isHotTrip():101` so literal `0.9` trong khi đang cầm một `Trip`** — chỗ **duy nhất**
+- ✅ **ĐÃ SỬA 2026-09-21 (phiên hai):** `isHotTrip()` nay gọi `trip.needsReinforcement()`; hành vi y hệt
+  (cùng một double). **Cố ý KHÔNG đụng `DashboardService:270-271`:** hai literal đó là **biên histogram**
+  (0,5 / 0,7 / 0,9, nhãn `"70-90%"`/`">90%"` là chuỗi cứng) — phần "ĐÃ KIỂM" bên dưới đã ruling không
+  phải lỗi; buộc một biên theo hằng số trong khi nhãn đứng yên là tự tạo ra lệch nhãn-biên. §9 sửa số
+  đếm thành **bốn bản khai báo** (Trip + 3 const) và ghi hai biên bucket là thiết kế biểu đồ, không
+  phải bản sao. Ghim bằng `TripServiceScannerHotGateTest` (2 test qua `scanAndSuggestExtraTrips()`
+  public: 36/40 = 0,90 → 0 chuyến tăng cường; 37/40 → 1). Non-vacuous theo đúng kịch bản cần bắt:
+  scanner trôi về `<= 0.85` trong khi `Trip` giữ 0,90 → test biên đỏ **tại assert của scanner**
+  (`expected: <0> but was: <1>`). `mvnw clean test` 108/108.
+  *(Mục gốc:)* **`TripService.isHotTrip():101` so literal `0.9` trong khi đang cầm một `Trip`** — chỗ **duy nhất**
   trong hệ thống có thể gọi `trip.needsReinforcement()` mà không gọi. Đồng thời ghi chú §9 đếm ngưỡng
   0,90 có *"bốn bản sao"* (Trip / Dashboard / Forecast / What-if) là **đếm thiếu**: `TripService:101`
   và `DashboardService:270-271` (biên bucket) là bản 5 và 6. Hành vi y hệt (`<= 0.9` ⇔ `!(> 0.90)`).
   Sửa là một dòng trong `TripService` ⇒ **ruling** (§3 "minimize changes to TripService"), kèm sửa
   số đếm ở §9.
-- **`application.properties:30` `spring.autoconfigure.exclude` trỏ tới hai class ở package Boot-3
+- ✅ **ĐÃ SỬA 2026-09-21 (phiên hai) — theo cách khác gợi ý gốc, và có một đính chính.** Kiểm trong
+  `spring-boot-security-4.0.2.jar` (javap): `@EnableWebSecurity` — nguồn bean `HttpSecurity` mà
+  `SecurityConfig` inject — nằm ở `ServletWebSecurityAutoConfiguration$EnableWebSecurityConfiguration`,
+  **không** ở ba class đang import; nên "hoàn tất exclude trên annotation" với ba class đó không tắt
+  được security và không khớp comment — **bác**. Tắt hẳn = bỏ starter + `SecurityConfig` +
+  `thymeleaf-extras-springsecurity6`, trái §2 "permit-all by design" — **ngoài phạm vi**. **Đính chính
+  mục gốc: `spring.security.user.name/password=a` KHÔNG chết** — boot với bản properties không có
+  khối này (`spring.config.location`, không sửa repo) thì Boot in *"Using generated security password:
+  a21eec2a-…"* + WARN *"development use only"*; hai dòng đó đang bịt cái log ấy. Nhưng giữ một
+  credential giả `a/a` để bịt log là thứ phải giải thích khi bảo vệ, và file test không có hai dòng đó
+  nên mỗi `mvnw test` vẫn sinh mật khẩu. Chốt: `@SpringBootApplication(exclude =
+  UserDetailsServiceAutoConfiguration.class)` (không có login thì không có user mặc định; class sai
+  tên trên annotation thì **không biên dịch được**, còn property sai tên thì Boot **lặng** — chính là
+  lỗi này), xoá cả 4 dòng `spring.security.*`/`exclude` ở **cả hai** `application.properties` (file
+  test có cùng dòng chết ở `:29`), xoá 2 import còn lại, viết lại `setup_guide.md` §5 (từng nói "fully
+  disabled") + dòng bảng §7 + dòng cây thư mục. Kiểm: app code không đụng Spring Security ở đâu
+  (grep = 0 ngoài `SecurityConfig`); boot **0** dòng generated password; 16/16 trang 200 không redirect
+  login (gồm 5 URL của `TC_SEC_001`); POST không CSRF vẫn 302; 0 exception; output `mvnw test`
+  **0** dòng generated password lần đầu tiên. **Mục nhỏ mới, ghi không sửa:**
+  `thymeleaf-extras-springsecurity6` — `sec:` xuất hiện ở 0/27 template, dependency thừa, ruling riêng.
+  *(Mục gốc:)* **`application.properties:30` `spring.autoconfigure.exclude` trỏ tới hai class ở package Boot-3
   (`org.springframework.boot.autoconfigure.security.servlet.*`) — không tồn tại trong Boot 4.0.2**
   (đã kiểm trong jar: class thật là `org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration`).
   Boot bỏ qua **im lặng** (log không một dòng) ⇒ security auto-config **đang bật**, app sống nhờ
@@ -2569,15 +2608,44 @@ là mới — bài học 2026-09-19 buổi sáng.
   "nếu có chuyến thì xe phải là xe của chuyến". Dòng này sinh 2026-07-16 16:51 (ngày kiểm chứng
   Phase 2) — có thể là dấu vết một lần thử. **Ruling** về luật; nếu có luật thì đây là dòng dữ liệu
   cần sửa tay.
+  ✅ **RULING 2026-09-21 (phiên hai): là ưu tiên, KHÔNG phải luật — không thêm validator, dòng 9 là dữ
+  liệu hợp lệ.** Lý do từ chính project: Phase 2 (owner-approved) đặt `bus` bắt buộc và `trip` **độc
+  lập** để sự cố quy về **xe hỏng** (Phase 7 đếm theo `incident.bus`); #18 làm `trip.bus` bất biến sau
+  khi khởi hành, nên khi đổi xe giữa đường (chuyến 12 đi xe 14, xe 14 hỏng, khách sang xe 7, xe 7 lại
+  gặp sự cố) thì sự cố trên xe thay thế **chỉ** ghi đúng được nhờ trường `bus` độc lập — luật
+  `incident.bus == trip.bus` bắt ghi sai hoặc bỏ link chuyến. Không thêm JS "gắn xe theo chuyến" (form
+  điền xe trước, chuyến sau — pre-fill ngược chiều). Đã ghi ở `current_functional_spec.md` (Incident
+  business rules), `Proj_functions_summary.md`, THESIS_ROADMAP §9. Chủ dự án muốn dữ liệu demo sạch thì
+  sửa tay dòng 9; hệ thống không cần luật.
 - **Sửa `Route.distanceKm` khi tuyến đang có chuyến `DEPARTED`** (`AdminRouteController.updateRoute()`
   không guard) làm đổi số km cộng vào odometer lúc hoàn thành — `updateTripStatus():623-627` đọc
   `route.getDistanceKm()` **tại thời điểm** `COMPLETED`. Đây là đúng cạnh mà #18 đóng cho `trip.route`
   (đổi tuyến của chuyến), còn mở qua **entity tuyến**. 5 chuyến `DEPARTED` hiện tại nằm trên tuyến 1
   và 2, cả hai sửa được. **Không chắc là lỗi**: sửa một quãng đường nhập sai thì có lẽ *nên* áp vào
   chuyến đang chạy. **Ruling.**
-- **`/admin/incidents/create` nặng 343 KB** vì dropdown chuyến nạp `getAllTrips()` — 2.071 dòng, tăng
+- ✅ **ĐÃ SỬA 2026-09-21 (phiên hai) — và xếp lại loại: đây KHÔNG phải Hidden Cost #4.** Đo ở 2.221
+  chuyến: trang **367 KB / 1,2 s**, riêng `<select name="trip">` **353 KB = 96 % / 2.222 option**,
+  `findAllWithDetails` (5 fetch-join) chạy mỗi lần mở form. Pagination áp cho *danh sách*; dropdown cần
+  **phạm vi**. Sửa: `TripRepository.findRunningAndRecentTrips(live, ended, since)` (chỉ fetch `route`,
+  mới nhất lên đầu) → `TripService.getRunningAndRecentTrips(since)`: `ACTIVE`/`DEPARTED` mọi ngày ∪
+  `COMPLETED`/`CANCELLED` khởi hành từ mốc trở đi (`CANCELLED` giữ vì "hủy chuyến vì sự cố rồi ghi sự
+  cố" là thứ tự tự nhiên; `PENDING_APPROVAL` không bao giờ — chưa có thật); cửa sổ
+  `AdminIncidentController.RECENT_TRIP_DAYS = 7` do controller sở hữu (khuôn #5:
+  `DispatchController.UPCOMING_WINDOW_HOURS` ↔ `getDispatchBoardTrips(until)`); form sửa force-add
+  chuyến đang gắn khi đã ra khỏi cửa sổ (tiền lệ `showEditTripForm()` với xe; `contains()` theo id nhờ
+  Hidden Cost #9); `getAllTrips()` xoá. **Là phạm vi MỜI, không phải luật**: `IncidentService.validate()`
+  không đổi, POST gửi id chuyến cũ vẫn hợp lệ. Ghim bằng `TripServiceRunningAndRecentTripsTest` (5;
+  non-vacuous: `>=`→`>` đỏ đúng test biên, vô hiệu vế live đỏ 2). Đo trên app thật (PID 5412): form tạo
+  **27,7 KB / 0,32 s**, 99 option khớp **id-for-id** với SQL viết từ luật (4 ACTIVE + 5 DEPARTED +
+  82 COMPLETED + 8 CANCELLED); sửa sự cố 9: 100 option, chuyến 1 (tháng 7) được thêm đầu và đang
+  chọn, xe 17 giữ nguyên; sửa sự cố 14: chuyến 12 đang chọn; DB thật không đổi.
+  *(Mục gốc:)* **`/admin/incidents/create` nặng 343 KB** vì dropdown chuyến nạp `getAllTrips()` — 2.071 dòng, tăng
   theo mỗi lần backfill. Cùng họ Hidden Cost #4 (trang danh sách chuyến 7,43 MB); ghi để không bị
   bỏ quên khi làm pagination.
+- **`README.md:37` (gốc repo) ghi "Spring Boot 3.x"** trong khi `pom.xml` là **4.0.2** — phát hiện
+  2026-09-21 khi quét doc cho mục security ở trên (chính lần nâng Boot 4 là nguồn của dòng exclude
+  chết). Doc lạc hậu một phiên bản; cùng loại với các mục docs khác. Sửa: một từ. Chưa sửa vì ngoài
+  phạm vi phiên này.
 
 ## ĐÃ KIỂM ở lần rà 2026-09-19 — không phải lỗi, đừng nêu lại
 
@@ -2599,3 +2667,103 @@ là mới — bài học 2026-09-19 buổi sáng.
   71,9h đọc 71 (chặn). Biên đúng hướng bảo thủ, không lỗi.
 - **Bucket lấp đầy ở `DashboardService.buildOccupancyStats()`** `<0,5 / [0,5;0,7) / [0,7;0,9] / >0,9`
   — phủ kín, không hở, biên trên `> 0.9` khớp `needsReinforcement()`.
+
+---
+
+# Đối soát §12 + §4 của `Proj_functions_summary.md` với code (2026-09-22) — 4 câu SAI, 1 câu hỏi tồn, 1 câu đúng nửa; CHỈ SỬA DOCS
+
+Chủ dự án yêu cầu kiểm ba chỗ bị nghi *"tận gốc rễ, theo code ko chỉ đọc docs"* rồi sửa cho nhất
+quán. Mọi claim được dựng lại từ source bằng `grep`/đọc file, kèm `git log -S` để **định ngày** —
+không claim nào dựa vào một tài liệu khác. Không có dòng Java/template/config/test nào bị đụng, nên
+không có gì để drive; DB thật không được mở.
+
+## Nguyên nhân gốc: §12 chưa bao giờ là ảnh chụp của code mà nó nhận là đang tóm tắt
+
+Tiêu đề §12 ghi *"tổng hợp từ code"*, nhưng danh sách được mang nguyên từ một bản phân tích CŨ và
+commit mà không đối soát lại. Bằng chứng theo ngày:
+
+| Mục | Được sửa ở code | File docs vào repo | Chênh |
+|---|---|---|---|
+| 3 (giờ lái phụ xe) | `a06b73a` 2026-07-14 **08:30** | `07af949` 2026-07-14 **09:52** | sai trước **1h21'** |
+| 6 (Route String) | `a3b0e63` **2026-06-27** | `07af949` **2026-07-14** | sai trước **17 ngày** |
+| 1 (2 luồng tạo Bus) | — chưa bao giờ đúng | — | — |
+
+Đây là lần thứ ba project bắt đúng hình dạng này (xem `project_report.md` 🟣 #3: *"đã cũ nửa câu
+ngay từ lúc được đưa vào `docs/`"*, và THESIS_ROADMAP §9 về "câu sai trong tài liệu là loại lỗi đắt
+nhất"). **Bài học đã ghi vào §12:** một danh sách "điểm chưa nhất quán" phải được đối soát với code
+**tại thời điểm commit nó**, không phải tại thời điểm viết nó.
+
+## Bốn câu SAI, đã sửa
+
+- **§12 mục 1 — "2 luồng tạo Bus song song".** `AdminController` có đúng 3 mapping (`/dashboard`,
+  `/users/new`, `/users/save`); `AdminService` có đúng 2 method (`createNewUser`,
+  `requireUsernameAvailable`) — 0 dòng về `Bus`. Mọi lối ghi `buses`: `BusService:73/147/210` (UI),
+  `DataInitializer:311` + `HistoricalDataBackfill:274` (seeder), `TripService:660/672` (FSM đồng bộ
+  `BusStatus`). `AdminController` **có** inject `BusRepository` nhưng chỉ `count()` cho thẻ dashboard
+  (`:35`) — đó là Warn #4, không phải luồng tạo xe thứ hai. **§3 của chính file này đã đính chính
+  đúng câu đó ngày 2026-08-05** (ghi trong §8 roadmap) mà bản sao ở §12 bị bỏ sót ⇒ một file tự nói
+  ngược nhau suốt **48 ngày**.
+- **§12 mục 3 — giờ lái áp sai cho phụ xe.** Đã sửa ở `a06b73a`: `findBestAvailableDriver()` nhận
+  `boolean isAssistantRole` (`TripService:443/455`), trần 8h bị bỏ qua cho vai trò đó (`:478`),
+  `autoAssignResources()` truyền `true` đúng một lần cho phụ xe (`:271-272`). Khớp
+  `validateStaffForTrip()` — cũng không áp trần giờ cho phụ xe ⇒ một định nghĩa duy nhất.
+  `project_report.md` 🟣 #1 đã ghi "✅ ĐÃ FIX" từ đầu ⇒ hai register nói ngược nhau từ ngày đầu.
+- **§12 mục 6 — "Route dùng String tự do".** Đã xóa ở `a3b0e63`; `Route.java:31-32` chỉ còn comment
+  `// ĐÃ XÓA:`. Grep `src/`: **0** tham chiếu field cũ, 6 template dùng hai getter hiển thị. Vế "seed
+  2 bên tên không khớp" cũng hết hiệu lực (cùng commit đó seed `RouteStation`).
+- **§12 mục 9 — "Spring Security tắt hoàn toàn".** Auto-config security đang **BẬT**; permit-all đến
+  từ `SecurityConfig`. Đây là **bản sao thứ tư** của đúng câu sai mà Group B(b) đã sửa ngày
+  2026-09-21 ở `setup_guide.md` §5/§7, `02_project_context.md` §3 và cả hai `application.properties`.
+  **Vì sao sót:** lần quét tự-kiểm của Group B grep theo **tên property** đã đổi (`spring.security`,
+  `autoconfigure.exclude`), không grep theo **câu văn** — nên bản prose ở file thứ tư lọt. Vế nội
+  dung của mục thì đúng và được giữ, nay có số đo: grep `src/main` cho **0** `@PreAuthorize`/
+  `hasRole`/`hasAuthority`, **0** `SecurityContextHolder`, **0** bean `PasswordEncoder`, và **không
+  có `UserDetailsService` của riêng project** (tên đó xuất hiện 1 lần, ở vế `exclude` tại
+  `BusManagementApplication:24`); `Role` chỉ phân loại bản ghi (`AdminService:44`, `DriverService:77`,
+  `AdminController:48-49`).
+- **§4 ghi chú Station — sai cả ba vế.** Câu cũ: `DataInitializer` *"(tùy version) không seed
+  `RouteStation`"*, *"`route_stations` có thể trống"*, *"route vẫn dùng String tự do"*. Thực tế:
+  `DataInitializer.createRoute():237` gọi `linkRouteStation()` hai lần mỗi tuyến (`:244-245`), cả 6
+  tuyến seed đều qua đó; lối ghi `routes` còn lại là `RouteService.createRoute()`/`updateRoute()`,
+  bị `validateRoute()` chặn dưới 2 trạm ⇒ **không đường nào tạo được tuyến không có trạm**.
+
+## Bốn mục ĐÚNG và vẫn mở — nay tự khai trạng thái
+
+Mỗi mục nay ghi rõ "ĐÚNG, CÒN MỞ" kèm file:line, nên §12 không còn đọc như một backlog không phân
+loại. **Chỉ 4 mục này là việc còn nợ:**
+
+- **mục 2** — chuyến thủ công vào thẳng `ACTIVE` (`AdminTripManagementController:161`) = Warn #2,
+  chờ quyết định của chủ dự án.
+- **mục 4** — javadoc `Route.getSuitableBusType()` hứa "tự gợi ý dựa trên quãng đường", thân hàm
+  `return null` (`Route.java:53-66`). Cùng loại lỗi mà §9 roadmap xếp đắt nhất, nhưng nằm trong
+  javadoc. **Sửa là xóa lời hứa**, KHÔNG phải cài luật gợi ý loại xe — luật đó là Group C(a), chưa
+  ai ruling.
+- **mục 7** — `countBusyTripsAnyRole`/`findAllTripsByDriverOnDate` có **0** call site
+  (`TripRepository:207/222`) = Incon #3.
+- **mục 8** — mật khẩu plaintext (`AdminService:51` là comment, `DriverService:118`,
+  `DataInitializer:284`), không bean `PasswordEncoder` nào.
+
+## Hai chỉnh nhỏ cùng danh sách
+
+- **mục 5** vốn không phải claim mà là một câu hỏi tự đặt (*"cần verify lại trong source thật"*) —
+  **đã trả lời:** `BusType` chỉ còn `id`/`typeName`/`capacity` (`BusType.java:18/21/24`),
+  `suitableBusType` chỉ nằm ở `Route:51`, đúng chủ sở hữu của nó.
+- **mục 11** vế đầu đúng, nhưng vế cuối *"chỉ phần Admin Smart Scheduling được triển khai đầy đủ"*
+  đã sai từ Phase 1 (CRUD Tài xế/Tuyến, Bảng Điều Hành, Sự Cố, API dry-run, backfill, 5 màn Decision
+  Support) — §13 của chính file đã liệt kê đủ từ 2026-07-22. Và phần lớn danh sách còn thiếu nay là
+  **Non-Goal** tường minh ở roadmap §4, không phải nợ.
+
+## Hình thức sửa
+
+Không xóa gì. Câu sai bị gạch ngang, sự thật ghi kèm file:line, và một parenthetical in nghiêng ghi
+lại câu cũ + thời điểm nó thành sai + vì sao nó sống sót — theo Rule 7 và đúng tiền lệ §3 của chính
+file đó. Đầu §12 thêm một blockquote có ngày, nêu phương pháp, phán quyết từng mục và bài học — theo
+tiền lệ blockquote đối soát §13 ngày 2026-07-22.
+
+**Một phép đo của chính phiên này bị sai và được ghi lại thay vì lấp:** lần kiểm line-ending đầu báo
+ba file docs là CRLF — do quoting `$'\r$'` dưới Git Bash làm `grep` khớp mọi dòng. Đo lại theo byte:
+cả ba là **LF thuần, 0 CRLF**, và `Proj_functions_summary.md` không có newline cuối — trong `HEAD`
+cũng vậy, nên các edit giữ đúng quy ước sẵn có của file.
+
+**`project_report.md` không cần sửa gì** — nó đúng ở cả bốn điểm trên (🟣 #1, Incon #1, Warn #2,
+Incon #3), và chính sự đúng đó là thứ làm lộ ra các mâu thuẫn.
