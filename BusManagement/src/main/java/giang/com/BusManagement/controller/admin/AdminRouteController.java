@@ -82,8 +82,11 @@ public class AdminRouteController {
         try {
             // Truyền id riêng thay vì route.setId(id): service nạp bản ghi cũ rồi chép
             // từng field, không merge nguyên object form (xem RouteService.updateRoute).
-            routeService.updateRoute(id, route, stationIds);
+            String warning = routeService.updateRoute(id, route, stationIds);
             redirectAttributes.addFlashAttribute("success", "Cập nhật tuyến đường thành công!");
+            if (warning != null) {
+                redirectAttributes.addFlashAttribute("warning", warning);
+            }
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());
             return "redirect:/admin/routes/edit/" + id;

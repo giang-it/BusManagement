@@ -240,6 +240,15 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        boolean existsByRouteId(Long routeId);
 
        /**
+        * Đếm số chuyến của một tuyến đang ở một trạng thái cho trước.
+        * Dùng bởi RouteService.updateRoute() để cảnh báo khi quãng đường của tuyến
+        * bị sửa trong lúc tuyến còn chuyến DEPARTED (mục Group C(c)): FSM đọc
+        * route.distanceKm tại lúc COMPLETED, nên số km mới sẽ được cộng vào
+        * odometer của các chuyến đó. Chỉ đếm, không nạp entity.
+        */
+       long countByRouteIdAndStatus(Long routeId, TripStatus status);
+
+       /**
         * Kiểm tra tài xế đã từng tham gia BẤT KỲ chuyến nào chưa (mọi vai trò: tài
         * xế chính, tài xế phụ, phụ xe; mọi trạng thái).
         * Dùng bởi DriverService.deleteDriver() để chặn xóa hồ sơ đã có lịch sử vận

@@ -4,6 +4,7 @@ import giang.com.BusManagement.domain.Route;
 import giang.com.BusManagement.domain.RouteStation;
 import giang.com.BusManagement.domain.RouteStationId;
 import giang.com.BusManagement.domain.Station;
+import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.repository.RouteRepository;
 import giang.com.BusManagement.repository.RouteStationRepository;
 import giang.com.BusManagement.repository.StationRepository;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -97,13 +99,38 @@ public class RouteService {
      * RouteStation là tổ hợp (routeId, stationId) nên không thể "sửa" stationId
      * của một bản ghi — đổi trạm thực chất là xoá dòng cũ + thêm dòng mới; flush()
      * giữa hai bước để dòng mới không đụng dòng cũ trong cùng transaction.
+     *
+     * CẢNH BÁO, không chặn (mục Group C(c), chủ dự án chốt 2026-09-23): nếu quãng
+     * đường ĐỔI trong lúc tuyến còn chuyến DEPARTED, số km mới sẽ được cộng vào
+     * odometer của các chuyến đó khi chúng hoàn thành — updateTripStatus() đọc
+     * route.distanceKm tại lúc COMPLETED, không phải lúc khởi hành. Không chặn vì
+     * hệ thống không phân biệt được "sửa lỗi gõ" (nên áp cho chuyến đang chạy)
+     * với "tuyến đổi lộ trình thật"; chụp số km vào chuyến lúc khởi hành là thêm
+     * cột schema, trái §3 roadmap. Nên chỉ nói cho Admin biết, đúng kênh
+     * "warning" mà TripService.createManualTrip()/updateManualTrip() đang dùng.
+     *
+     * @return câu cảnh báo để Controller đưa ra flash "warning", hoặc null nếu
+     *         không có gì cần báo
      */
     @Transactional
-    public void updateRoute(Long id, Route form, List<Long> stationIds) {
+    public String updateRoute(Long id, Route form, List<Long> stationIds) {
         Route existing = routeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tuyến với ID: " + id));
 
         validateRoute(form, stationIds);
+
+        // Đọc TRƯỚC khi chép field: cần số km cũ để biết quãng đường có thật sự đổi.
+        String warning = null;
+        if (!Objects.equals(existing.getDistanceKm(), form.getDistanceKm())) {
+            long departedTrips = tripRepository.countByRouteIdAndStatus(id, TripStatus.DEPARTED);
+            if (departedTrips > 0) {
+                warning = String.format("Tuyến này đang có %d chuyến trên đường (DEPARTED). Quãng đường mới "
+                        + "(%s km, trước đây %s km) sẽ được cộng vào odometer của xe khi các chuyến đó hoàn thành. "
+                        + "Nếu bạn chỉ sửa lỗi nhập liệu thì đây là điều mong muốn; nếu tuyến thật sự đổi lộ trình "
+                        + "thì hãy kiểm tra lại odometer của các xe đó sau khi hoàn thành.",
+                        departedTrips, formatKm(form.getDistanceKm()), formatKm(existing.getDistanceKm()));
+            }
+        }
 
         existing.setDistanceKm(form.getDistanceKm());
         existing.setEstimatedDuration(form.getEstimatedDuration());
@@ -117,6 +144,16 @@ public class RouteService {
         routeStationRepository.flush();
 
         rebuildStops(existing, stationIds);
+
+        return warning;
+    }
+
+    /** 120.0 → "120", 120.5 → "120.5" — để câu cảnh báo không hiện "120.0 km". */
+    private static String formatKm(Double km) {
+        if (km == null) {
+            return "?";
+        }
+        return km == Math.rint(km) ? String.valueOf(km.longValue()) : String.valueOf(km);
     }
 
     /** Ghi lộ trình cho một tuyến đã có id, stopOrder đánh 1..n theo thứ tự danh sách. */
