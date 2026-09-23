@@ -2651,6 +2651,7 @@ là mới — bài học 2026-09-19 buổi sáng.
   2026-09-21 khi quét doc cho mục security ở trên (chính lần nâng Boot 4 là nguồn của dòng exclude
   chết). Doc lạc hậu một phiên bản; cùng loại với các mục docs khác. Sửa: một từ. Chưa sửa vì ngoài
   phạm vi phiên này.
+  *(Bổ sung 2026-09-23, tự rà: badge ở `README.md:4` cũng ghi `Spring%20Boot-3.x` — sửa cả hai chỗ.)*
 
 ## ĐÃ KIỂM ở lần rà 2026-09-19 — không phải lỗi, đừng nêu lại
 
@@ -2968,3 +2969,58 @@ Docs: `current_functional_spec.md`, `Proj_functions_summary.md`, `database_schem
   chứa. Luật #22 chặn đúng; chỉ là form không nhắc. Bản sửa C(a) giảm hiểu nhầm bằng cách in sức
   chứa trong từng option, nhưng không tự đổi số ghế. Chưa ruling.
 - **AI có nên coi loại xe là gợi ý** (xem trên). Chưa ruling.
+
+---
+
+# Tự rà toàn dự án sau khi đóng Group C (2026-09-23) — một lỗi #26, ba mục nhỏ; CHƯA SỬA
+
+Chủ dự án: *"bạn hãy tự kiểm tra lại toàn bộ project đi"*, rồi *"hãy ghi nó đi"*. Phạm vi rà: đọc lại
+từng dòng diff chưa commit (C(d)/C(a)/C(c)), quét docs + comment tìm câu mô tả hành vi cũ, `mvnw clean
+test` 121/121, app thật trên DB thật **chỉ GET** (38/38 trang 200, log 0 ERROR, DB byte-identical),
+và 20 câu SQL bất biến chỉ đọc (15 ra 0; 5 còn lại đều là mục đã biết: xe 19 fixture #19, chuyến 6
+lịch sử #22, các chuyến quá giờ ở nhóm "quá giờ" của Bảng Điều Hành, sự cố 9 và 14 báo trước giờ
+khởi hành — cả hai là dữ liệu thử ngày 16–17/07, không có luật nào về thời điểm này). Bốn mục dưới
+đây là **mới**; đã grep cả register này lẫn `project_report.md` trước khi ghi.
+
+## 26. Màn Duyệt (MANUAL MODE) đánh ★ lên đầu cho những xe mà luật #22 CHẮC CHẮN từ chối
+
+**Do chính bản sửa C(a) (`4def1ad`) làm lộ ra**, không phải lỗi có từ trước theo đúng hình dạng này.
+
+- Ở màn Duyệt, **số ghế của chuyến cố định** — form chỉ chọn xe/tài xế, không có ô `totalSeats`.
+- `getAvailableBusesForTrip()` (dùng chung cho màn Duyệt và form Sửa) **không lọc theo sức chứa**.
+- C(a) xếp xe đúng loại tuyến lên đầu và gắn `★ đúng loại tuyến`, kèm dòng gợi ý *"xe đúng loại
+  được đánh ★ … Chọn loại khác vẫn hợp lệ nếu xe đủ chỗ cho N ghế"*.
+
+**Kịch bản với được:** chuyến gốc chạy xe khác loại và bán nhiều ghế hơn sức chứa của loại tuyến
+(chuyến 3493: tuyến 1 Limousine 22 chỗ, xe 8 Ghế ngồi, 26 ghế). Chuyến đó đông ⇒ AI tạo chuyến tăng
+cường; `createExtraTrip()` giữ **26 ghế** làm chỗ trống khi `autoAssignResources()` không tìm được xe
+— mà AI chỉ tìm **Limousine** (`findBestAvailableBus` cố ý lọc cứng). Admin mở màn Duyệt: các xe
+Limousine 22 chỗ nằm **trên cùng, có ★**; chọn xe nào trong số đó cũng bị từ chối *"Chuyến mở bán 26
+ghế nhưng xe … chỉ có 22 chỗ"*. Đúng anti-pattern "mời thứ sẽ từ chối" mà dự án đã bác nhiều lần
+(#19 bị revert vì nó, #20, #23, #24).
+
+**So với trước C(a):** trong kịch bản này, bản cũ lọc cứng theo loại nên **mọi** option đều bị từ
+chối — tệ hơn. C(a) đã thêm các xe đủ chỗ vào danh sách; lỗi còn lại là ★ và thứ tự chỉ nhầm hướng.
+
+**Bán kính hôm nay: 0** — DB thật không có chuyến `PENDING_APPROVAL` nào thiếu xe (MANUAL MODE chỉ
+mở khi `bus == null || driver == null`). Tiềm ẩn, với được bằng một lần AI thiếu xe đúng loại.
+
+**Đề xuất sửa (chưa làm):** ở màn Duyệt, bỏ khỏi dropdown những xe có `capacity < trip.totalSeats`
+— luật #22 đã có, không bịa luật mới. Nên đặt ở tầng service (một biến thể/tham số của
+`getAvailableBusesForTrip` cho màn Duyệt) chứ không lọc trong template; form Sửa **không** dùng lọc
+này vì ở đó số ghế sửa được cùng lúc (xem mục nhỏ ngay dưới). Kèm test + sửa dòng gợi ý của
+`approve-form.html`.
+
+## Mục nhỏ (2026-09-23, tự rà)
+
+- **Form Sửa chuyến mời cả xe có sức chứa < số vé đã bán.** Ở form Sửa, số ghế sửa được nên mời xe
+  nhỏ hơn `totalSeats` là chấp nhận được — Admin hạ số ghế cùng lúc. Nhưng xe có `capacity <
+  ticketsSold` thì **không bao giờ** qua: `updateManualTrip()` đòi `totalSeats ≥ ticketsSold`
+  (`TripService:1037`) và #22 đòi `totalSeats ≤ capacity`, hai điều không thể cùng đúng. Bán kính hôm
+  nay **0** (chuyến mở bán nhiều vé nhất là 3492 với 21 vé, loại nhỏ nhất 22 chỗ). Cùng họ với mục
+  *"form Sửa không đồng bộ số ghế với xe"* ở khối Group C(a)/C(c) phía trên — nên xử lý cùng một lần.
+- **Dấu ★ ở form Sửa tính theo tuyến ĐÃ LƯU.** Đổi tuyến trong form thì ★ và cả danh sách xe không đổi
+  theo cho tới khi lưu. Danh sách xe vốn đã tính theo tuyến đã lưu từ trước (`showEditTripForm()` gọi
+  `getAvailableBusesForTrip(id)`); C(a) chỉ thêm ★ theo đúng cách đó. Nhỏ; ghi để biết.
+- **`README.md` còn "3.x" ở cả dòng 4 (badge)** — mục `README.md:37` phía trên chỉ ghi dòng 37. Xem
+  ghi chú bổ sung ở mục đó.
