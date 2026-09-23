@@ -2594,7 +2594,9 @@ là mới — bài học 2026-09-19 buổi sáng.
   *(Mục gốc:)* **`Proj_functions_summary.md:31` vẫn liệt kê `Route.departurePoint`/`destinationPoint` (String) là
   field hiện tại** — code chỉ còn dòng comment *"ĐÃ XÓA"* (`Route.java:31-32`), và
   `database_schema.md:403` nói rõ đã bỏ. Hai doc mâu thuẫn nhau, một cái sai với code.
-- **Loại xe ↔ `Route.suitableBusType` không phải luật ở validator, nhưng hai trong bốn đường "mời" lại
+- ✅ **RULING + ĐÃ SỬA 2026-09-23: là GỢI Ý, không phải luật** — xem khối *"Group C(a) và C(c) ĐÃ SỬA"*
+  cuối file. *(Mục gốc:)*
+  **Loại xe ↔ `Route.suitableBusType` không phải luật ở validator, nhưng hai trong bốn đường "mời" lại
   lọc cứng theo nó.** `findBestAvailableBus()` (AI) và `getAvailableBusesForTrip()` (dropdown Duyệt/Sửa)
   lọc `findByStatusAndBusType`; `getAvailableBusesForTimeRange()` (API form Tạo — *"không lọc loại xe
   vì form này chưa biết tuyến nào"*, javadoc `:1452`) và `validateBusForTrip()` (5 luật, §7 FSM doc)
@@ -2617,7 +2619,10 @@ là mới — bài học 2026-09-19 buổi sáng.
   điền xe trước, chuyến sau — pre-fill ngược chiều). Đã ghi ở `current_functional_spec.md` (Incident
   business rules), `Proj_functions_summary.md`, THESIS_ROADMAP §9. Chủ dự án muốn dữ liệu demo sạch thì
   sửa tay dòng 9; hệ thống không cần luật.
-- **Sửa `Route.distanceKm` khi tuyến đang có chuyến `DEPARTED`** (`AdminRouteController.updateRoute()`
+- ✅ **RULING + ĐÃ SỬA 2026-09-23: CẢNH BÁO, không chặn** — xem khối *"Group C(a) và C(c) ĐÃ SỬA"*
+  cuối file. Đính chính số liệu dưới đây: 5 chuyến `DEPARTED` nằm trên **4** tuyến (1 ×2, 2, 3, 4),
+  không phải chỉ tuyến 1 và 2 — đo lại 2026-09-22/23. *(Mục gốc:)*
+  **Sửa `Route.distanceKm` khi tuyến đang có chuyến `DEPARTED`** (`AdminRouteController.updateRoute()`
   không guard) làm đổi số km cộng vào odometer lúc hoàn thành — `updateTripStatus():623-627` đọc
   `route.getDistanceKm()` **tại thời điểm** `COMPLETED`. Đây là đúng cạnh mà #18 đóng cho `trip.route`
   (đổi tuyến của chuyến), còn mở qua **entity tuyến**. 5 chuyến `DEPARTED` hiện tại nằm trên tuyến 1
@@ -2734,7 +2739,7 @@ loại. **Chỉ 4 mục này là việc còn nợ:**
 
 - **mục 2** — chuyến thủ công vào thẳng `ACTIVE` (`AdminTripManagementController:161`) = Warn #2,
   chờ quyết định của chủ dự án.
-- **mục 4** — javadoc `Route.getSuitableBusType()` hứa "tự gợi ý dựa trên quãng đường", thân hàm
+- ✅ **mục 4 — ĐÃ SỬA 2026-09-23 cùng Group C(a)** (lời hứa đã xoá, không cài luật). *(Gốc:)* javadoc `Route.getSuitableBusType()` hứa "tự gợi ý dựa trên quãng đường", thân hàm
   `return null` (`Route.java:53-66`). Cùng loại lỗi mà §9 roadmap xếp đắt nhất, nhưng nằm trong
   javadoc. **Sửa là xóa lời hứa**, KHÔNG phải cài luật gợi ý loại xe — luật đó là Group C(a), chưa
   ai ruling.
@@ -2767,3 +2772,199 @@ cũng vậy, nên các edit giữ đúng quy ước sẵn có của file.
 
 **`project_report.md` không cần sửa gì** — nó đúng ở cả bốn điểm trên (🟣 #1, Incon #1, Warn #2,
 Incon #3), và chính sự đúng đó là thứ làm lộ ra các mâu thuẫn.
+
+---
+
+# Group C(d) ĐÃ SỬA (2026-09-23) — cửa sau của luật #22: đổi loại xe sang loại nhỏ hơn
+
+Chủ dự án chốt **CHẶN**. Trước khi sửa đã rà ảnh hưởng, và việc rà đó đổi hình dạng bản sửa
+(xem mục "vì sao so với sức chứa cũ" bên dưới) — nên phần phân tích đáng giữ hơn phần code.
+
+## Lỗi là gì
+
+Luật #22 (*"`totalSeats` của chuyến ≤ sức chứa xe"*) sống trong `validateBusForTrip()`, nên nó
+CHỈ được kiểm lúc **gán xe vào chuyến**. `BusService.updateBus()` chép thẳng `busType`:
+
+```java
+existing.setBusType(form.getBusType());   // không một dòng kiểm tra
+```
+
+Nên vào *Sửa xe*, hạ một xe Ghế ngồi (50 chỗ) xuống Limousine (22 chỗ) là **báo THÀNH CÔNG** và
+mọi chuyến đang mở của xe đó lập tức bán nhiều ghế hơn số chỗ thật — đi vòng qua #22 bằng cửa sau.
+Trong cùng method đã có guard anh em cho `REPAIRING` (#15) nhưng nó chỉ canh `status`, không canh
+`busType`.
+
+**Bán kính đo trên DB thật 2026-09-23:** 4 xe (6, 7, 14, 15) đang bán **đúng bằng** sức chứa, nên
+hạ một bậc là vỡ ngay; 0 xe không gán loại đang giữ chuyến mở.
+
+## Vì sao KHÔNG viết guard theo cách hiển nhiên — phát hiện làm đổi bản sửa
+
+Cách hiển nhiên là *"chặn khi sức chứa mới < số ghế đang mở bán"*. **Sai**, vì có đúng **1 xe**
+đã vi phạm #22 SẴN từ trước bản vá đó:
+
+| Xe | Sức chứa | Chuyến mở | Ghi chú |
+|---|---|---|---|
+| 20 `51B-MOI.00` | 22 (Limousine) | chuyến 6 `DEPARTED` bán **40** ghế | dữ liệu lịch sử, đã chốt để nguyên |
+
+Với guard hiển nhiên, **mọi** lần lưu xe 20 đều bị từ chối — kể cả khi không đổi loại xe — nên
+Admin không sửa nổi cả odometer của nó. Đó đúng là cái bẫy mà #22 đã gài cho **chuyến 8** và phải
+sửa tay: một luật mới chặn luôn dữ liệu cũ hợp lệ-theo-luật-cũ.
+
+Nên luật được phát biểu là **"KHÔNG ĐƯỢC LÀM TỆ HƠN"**: chỉ chặn khi loại mới **nhỏ hơn loại đang
+có**. Giữ nguyên loại → luôn qua. Nâng lên loại lớn hơn → luôn qua, và đó chính là đường Admin tự
+khắc phục một vi phạm tồn đọng. Xe chưa gán loại → bỏ qua, đúng cách `validateBusForTrip()` bỏ qua
+#22 khi xe chưa có loại.
+
+## Bản sửa
+
+- `TripRepository.findMaxTotalSeatsForBus(busId, statuses)` — mới, trả `MAX(t.totalSeats)`, **null**
+  khi không có chuyến khớp (không dùng 0 vì 0 sẽ bị đọc thành "có chuyến bán 0 ghế"). Chỉ một giá
+  trị vô hướng, không nạp entity (Hidden Cost #4). Là cặp đôi của `existsByBusIdAndStatusIn()` ngay
+  trên nó: cùng câu hỏi, khác chỗ cần CON SỐ thay vì có/không.
+- `BusService.UNFINISHED_TRIP_STATUSES` — gom `{PENDING_APPROVAL, ACTIVE, DEPARTED}` thành hằng số
+  vì giờ có HAI guard trong cùng một method hỏi cùng câu đó. Khuôn `DriverService.BUSY_STATUSES`,
+  vốn đã ghi chú "không định nghĩa lại khái niệm này ở tầng khác". Guard `REPAIRING` của #15 dùng
+  lại hằng số này — hành vi không đổi, `Arrays` import thành thừa nên đã xoá.
+- Guard mới đặt **trước mọi setter**, cùng lý do #14/#20: chặn muộn thì một request bị từ chối vẫn
+  đã kịp ghi các field khác. Ném `RuntimeException` như guard anh em ngay trên, để
+  `AdminBusController` hiện flash `"Lỗi: …"` sẵn có — không sửa controller.
+- Thông báo nêu đủ thứ Admin cần để hành động: biển số, loại định đổi + sức chứa, số ghế đang mở
+  bán, và ngưỡng tối thiểu phải chọn.
+
+## Kiểm chứng
+
+`BusServiceTest` **12 → 18 test**, `mvnw clean test` **114/114** (16 class). Sáu test mới gồm
+1 test chặn + 5 counterweight cho phép, theo đúng khuôn cặp test của #16/#6 (bản sửa không được đi
+quá tay thành "chặn mọi lần đổi loại xe").
+
+**Non-vacuous hai chiều** — quan trọng vì luật có hai nửa:
+
+| Probe | Kết quả |
+|---|---|
+| Vô hiệu guard (`false &&`) | đỏ **đúng 1** test: `update_toSmallerTypeIsBlockedWhenAnOpenTripSellsMoreSeats`, đỏ kiểu **Failure** (update đã *thành công*), không phải Error dựng fixture |
+| Bỏ điều kiện "không làm tệ hơn" | đỏ **đúng 1** test: `update_keepingTheSameTypeIsAllowedEvenOnABusThatAlreadyOversells` — tức điều kiện đó load-bearing, không phải phòng xa |
+
+**Drive app thật** trên clone `mysqldump` của DB thật (JVM thứ hai, port 8098; `processlist` xác
+nhận 10 kết nối vào `busmanagement_test`, **0** vào `busmanagement`):
+
+- Xe 6 (Ghế ngồi 50, chuyến 13 bán 50) → Limousine: **chặn**, flash đúng câu, và `brand` bị đổi cố
+  ý trong cùng request **không lọt** ⇒ guard chặn trước setter.
+- Xe 20 giữ nguyên loại + sửa odometer 18.940 → 19.000: **thành công** (ca chống regression).
+- Xe 20 nâng lên Giường nằm (40): **thành công** (đường tự khắc phục).
+- Xe 5 (0 chuyến mở) hạ xuống Limousine: **thành công**.
+- **Regression guard cũ:** #15 vẫn chặn xe 6 sang `REPAIRING`; #16 ô odometer để trống vẫn GIỮ
+  NGUYÊN 300 (không về 0).
+- **32/32 trang admin + REST API = 200**, log sandbox **0** ERROR, 0 exception template/SpEL/lazy.
+- **DB thật byte-identical** trước/sau (`md5_buses=cfb878…`, trips=2222).
+
+## Còn mở sau mục này
+
+Group C còn **(a)** loại xe là luật hay gợi ý, **(c)** sửa `Route.distanceKm` khi tuyến có chuyến
+`DEPARTED`. C(b) đã ruling 2026-09-21. Mục này KHÔNG chạm tới cả hai.
+
+*(Cập nhật 2026-09-23, phiên sau: (a) và (c) đã ruling và sửa — xem khối cuối file. Group C đóng.)*
+
+---
+
+# Mục nhỏ (2026-09-23) — giới hạn thiết kế, ghi để không bị quên; KHÔNG sửa code
+
+- **Chuyến chỉ biết MỘT chiếc xe — đổi xe giữa đường thì odometer và trạng thái xe đi theo xe CŨ.**
+  Phát sinh khi giải thích lại ruling C(b) cho chủ dự án (ví dụ: chuyến HN→HP đi xe 14, xe 14 nổ lốp,
+  khách sang xe 7, xe 7 hỏng điều hoà). **Phía sự cố ghi đúng và đủ:** hai sự cố (`bus = 14` và
+  `bus = 7`) đều gắn được cùng `trip = HN→HP`, vì C(b) để hai ô độc lập và chuyến `DEPARTED` luôn nằm
+  trong phạm vi mời của form sự cố. **Phía chuyến thì lệch với thực tế:** `trip.bus` vẫn là 14 (bị khoá
+  sau khi xuất phát — #18), nên:
+  - lúc `COMPLETED`, `updateTripStatus()` (`TripService:661-669`) cộng **toàn bộ** `route.distanceKm`
+    vào odometer **xe 14** và đặt xe 14 về `READY`; xe 7 không được cộng km nào dù chạy nửa sau;
+  - xe 7 không bao giờ được đánh `TRAVELING` cho chuyến đó;
+  - thông tin "xe 7 đã chở khách của chuyến này" chỉ suy ra được qua các sự cố gắn với chuyến.
+
+  **Không phải lỗi, không do C(b) gây ra:** `Trip` có đúng một cột `bus_id`, FSM không có khái niệm đổi
+  xe giữa đường — cùng giới hạn đã ghi ở #15 (*"hệ thống vốn không mô hình hoá sự cố giữa đường; thêm
+  nó là tính năng mới"*). Mô hình hoá đúng cần chia chuyến thành chặng / bảng lịch sử xe theo chuyến =
+  thay đổi schema, trái §3 roadmap khi Phase 9 chưa làm. **Ghi để:** (1) giải thích khi bảo vệ luận
+  văn; (2) chủ dự án biết odometer của cả hai xe sẽ lệch trong ca này (có thể sửa tay ở màn Sửa xe —
+  #16 cho phép). Chưa ruling, chưa có ai đề nghị sửa.
+
+---
+
+# Group C(a) và C(c) ĐÃ SỬA (2026-09-23) — theo đúng hai phương án đã bàn; Group C đóng
+
+Chủ dự án: *"còn các group C bạn hãy sửa theo như đã bàn"* — tức hai khuyến nghị của phiên 2026-09-22
+(C(a) = **gợi ý**, C(c) = **cảnh báo, không chặn**). Chưa commit, chờ chủ dự án test.
+
+## C(a) — loại xe của tuyến là GỢI Ý
+
+**Trước:** 4 nơi chọn xe hiểu `suitableBusType` theo 2 cách — AI (`findBestAvailableBus`) và dropdown
+Duyệt/Sửa (`getAvailableBusesForTrip`) lọc cứng; API form Tạo và `validateBusForTrip()` không xét. Hệ
+quả thấy được: chuyến 3492 (tuyến 1 Limousine) **tạo được** bằng xe 9 Ghế ngồi, nhưng form **Sửa**
+chỉ mời Limousine.
+
+**Sửa:**
+- `TripService.getAvailableBusesForTrip()` — bỏ `findByStatusAndBusType`, lấy mọi xe `READY` qua đúng
+  ba bộ lọc cũ (bận / quá hạn / sắp hạn bảo trì), xếp **xe đúng loại tuyến trước** rồi mới theo km từ
+  bảo trì. Helper `isOfType()` so theo id.
+- `approve-form.html` và `trip-edit-form.html` — option ghi sức chứa và `★ đúng loại tuyến`, thêm dòng
+  gợi ý dưới dropdown.
+- Form Tạo — `<option>` tuyến nay có `data-type` (comment của template đã hứa thuộc tính này từ trước
+  mà `th:attr` chưa từng render — một câu hứa sai nữa); `TripRestController` trả thêm `typeId`; JS
+  xếp đúng loại lên đầu (sort ổn định, giữ thứ tự km trong mỗi nhóm) và đánh ★. **Không lọc.**
+- `Route.getSuitableBusType()` — javadoc hứa "tự gợi ý dựa trên quãng đường" đã xoá (§12 mục 4), thân
+  hàm rút về `return this.suitableBusType`.
+- **Không đổi:** `validateBusForTrip()` (gợi ý ⇒ không có luật); **`findBestAvailableBus()` cố ý vẫn
+  lọc cứng** — đường AI không có người xem lại lựa chọn lúc chọn, và mời hẹp hơn validator là được
+  phép theo bất biến một chiều của #12; thêm comment trỏ về quyết định này. Nếu chủ dự án muốn AI
+  cũng coi là gợi ý (đúng loại trước, hết thì lấy loại khác) thì đó là một ruling riêng: nó đổi
+  đầu ra của chuyến tăng cường và màn Đề xuất tăng cường (hôm nay 17/17 RECOMMENDED nên số hiển thị
+  không đổi, nhưng hành vi khi thiếu xe đúng loại sẽ đổi).
+
+**Không nới luật nào:** rủi ro thật của xe sai loại — bán quá số chỗ — vẫn do #22 chặn. Đã kiểm.
+
+## C(c) — sửa km của tuyến có chuyến đang chạy: CẢNH BÁO
+
+- `TripRepository.countByRouteIdAndStatus(routeId, status)` (derived query, chỉ đếm).
+- `RouteService.updateRoute()` nay **trả `String`** (null = không có gì cần báo), đúng kênh "warning"
+  của `TripService.createManualTrip()/updateManualTrip()`. Đọc km cũ **trước** khi chép field; chỉ
+  cảnh báo khi km **thật sự đổi** và tuyến có ≥ 1 chuyến **`DEPARTED`** — `ACTIVE` chưa lăn bánh nên
+  chạy theo km mới là đúng, `COMPLETED` đã được cộng xong. Lưu vẫn diễn ra như cũ.
+- `AdminRouteController` đưa câu đó ra flash `warning`; `route-list.html` thêm khối
+  `alert-warning` (trước chỉ có success/error).
+
+## Kiểm chứng
+
+- `mvnw test` **121/121, 18 class** (+7: `TripServiceBusTypePreferenceTest` 3,
+  `RouteServiceDistanceWarningTest` 4). **Non-vacuous, 4 probe, mỗi probe đỏ đúng 1 test rồi khôi
+  phục md5:** bỏ xếp-đúng-loại-trước → đỏ test thứ tự; khôi phục lọc cứng → đỏ cùng test đó; tắt
+  cảnh báo → đỏ test cảnh báo; đếm mọi trạng thái thay vì chỉ `DEPARTED` → đỏ test đối trọng.
+- **Drive app trên clone `mysqldump`** (JVM thứ hai port 8098, PID 16488; processlist: 10 kết nối
+  vào clone, 0 của JVM này vào DB thật):
+  - Tuyến 1 (2 chuyến `DEPARTED`) 120 → 500 km: *success* + *warning* "đang có 2 chuyến trên đường…
+    (500 km, trước đây 120 km)…"; giữ 500 km, đổi thời lượng: chỉ success; về 120: có warning; tuyến
+    6 (chỉ có `ACTIVE`) đổi km: chỉ success. DB clone ghi đúng từng lần.
+  - Sửa chuyến 3492: dropdown = 6 Limousine ★ (23, 10, 11, 12, 1, 2) rồi 8, 9, 5, 4, 3 — **khớp từng
+    xe và thứ tự** với SQL viết từ luật (xe 16 sắp hạn, 17 quá hạn bị loại). Đổi sang xe 2 giữ 50 ghế
+    → từ chối bởi #22, không ghi gì; xe 2 + 22 ghế → thành công; xe 8 (Ghế ngồi, trước đây không được
+    mời) + 50 ghế → thành công; trả về xe 9.
+  - Màn Duyệt MANUAL MODE (trên clone gỡ xe của chuyến 8): 11 xe, Limousine ★ trước, dòng gợi ý "đủ
+    chỗ cho 22 ghế"; duyệt bằng xe 5 (Ghế ngồi) → `ACTIVE`.
+  - Form Tạo: 8/8 tuyến render `data-type`, tuyến không có loại thì thuộc tính bị bỏ; API trả
+    `typeId`. Logic JS chạy bằng node trên đúng JSON của API: đúng loại lên đầu, giữ thứ tự km, tuyến
+    không loại giữ nguyên. **Chưa bấm trên trình duyệt thật.**
+  - 31/32 trang admin + REST 200 (`approve/8` 302 vì chuyến 8 trên clone vừa được duyệt — đúng #20),
+    log 0 ERROR/exception template.
+- **DB thật byte-identical** trước/sau (`trips` 2224, `buses`, `routes`, `route_stations` md5 không đổi).
+
+## Chạm tới / không chạm tới
+
+Code: `TripService`, `TripRepository`, `RouteService`, `AdminRouteController`, `TripRestController`,
+`Route`; template `approve-form`, `trip-edit-form`, `trip-create-form`, `route-list`; 2 test mới.
+Docs: `current_functional_spec.md`, `Proj_functions_summary.md`, `database_schema.md`,
+`test_case.md` (`TC_APR_014`), file này, roadmap. **Không** đổi schema, validator, FSM, AI.
+
+## Việc liên quan còn mở (ghi, chưa sửa)
+
+- **Form Sửa chuyến không đồng bộ số ghế với xe** (ca chuyến 3492 chủ dự án gặp): ô "Tổng số ghế" là
+  input tự do, không có JS phản ứng khi đổi xe — trong khi form Tạo khoá ô đó và tự điền theo sức
+  chứa. Luật #22 chặn đúng; chỉ là form không nhắc. Bản sửa C(a) giảm hiểu nhầm bằng cách in sức
+  chứa trong từng option, nhưng không tự đổi số ghế. Chưa ruling.
+- **AI có nên coi loại xe là gợi ý** (xem trên). Chưa ruling.

@@ -104,7 +104,9 @@ Physical bus records including odometer tracking and maintenance data.
 - `needsMaintenance()` = `kmSinceLastMaintenance >= maintenanceThreshold`
 - `isNearMaintenance(additionalKm)` = `(kmSinceLastMaintenance + additionalKm) >= maintenanceThreshold * 0.9`
 
-**Deletion rule:** Cannot be deleted if the bus has any associated trip record (checked via `TripRepository.existsByBusId`). Cannot be set to `REPAIRING` if it has any **unfinished** trip — `PENDING_APPROVAL`, `ACTIVE` **or `DEPARTED`**, i.e. exactly the complement of the FSM's terminal states. `DEPARTED` was missing from this guard until 2026-08-06 (defect #15): a bus could be marked under repair while physically on the road, and the mark was then erased without warning by the `COMPLETED → READY` side effect. This line previously read "active or pending trips", which is what the code did rather than what `current_functional_spec.md` required.
+**Deletion rule:** Cannot be deleted if the bus has any associated trip record (checked via `TripRepository.existsByBusId`). Cannot be set to `REPAIRING` if it has any **unfinished** trip — `PENDING_APPROVAL`, `ACTIVE` **or `DEPARTED`**, i.e. exactly the complement of the FSM's terminal states.
+
+**Type-change rule (Group C(d), 2026-09-23):** `bus_type_id` cannot be moved to a type whose `capacity` is **smaller than the largest `total_seats` among this bus's unfinished trips** — the same status set as the `REPAIRING` guard, read via `TripRepository.findMaxTotalSeatsForBus`. This closes a back door around rule #22, which is enforced only when a bus is assigned to a trip (`validateBusForTrip`) and therefore never saw a later type change. The guard fires **only on a downgrade** (new capacity < current capacity), so keeping the type or upgrading is always allowed; the asymmetry exists because one bus already carries a pre-#22 violation and an unconditional check would have frozen that row entirely. `DEPARTED` was missing from this guard until 2026-08-06 (defect #15): a bus could be marked under repair while physically on the road, and the mark was then erased without warning by the `COMPLETED → READY` side effect. This line previously read "active or pending trips", which is what the code did rather than what `current_functional_spec.md` required.
 
 ---
 
@@ -132,7 +134,7 @@ Route definitions. Departure and destination are derived from the ordered `route
 | `id`                  | `Long`      | PK, auto-increment  |                                                |
 | `distance_km`         | `Double`    | nullable            | Total route distance in kilometers             |
 | `estimated_duration`  | `Integer`   | nullable            | Estimated duration in minutes                  |
-| `suitable_bus_type_id`| `Integer`   | FK → `bus_types.id` | Optional recommended bus type                  |
+| `suitable_bus_type_id`| `Integer`   | FK → `bus_types.id` | Optional **recommended** bus type — a preference, not a rule (Group C(a), 2026-09-23): no validator checks it; dropdowns list matching buses first, AI auto-assign filters by it |
 
 **Relationships:**
 - `OneToMany` → `route_stations` (`cascade = CascadeType.ALL`, `@BatchSize(20)`)
@@ -141,6 +143,7 @@ Route definitions. Departure and destination are derived from the ordered `route
 **Notes:**
 - No `departure_point` or `destination_point` String columns exist. These were removed. The departure station is the `RouteStation` with the lowest `stopOrder`; the destination is the one with the highest `stopOrder`.
 - Helper methods `getDeparturePointDisplay()` / `getDestinationPointDisplay()` compute names from the ordered `RouteStation` list.
+- **Editing `distance_km` while the route has `DEPARTED` trips (Group C(c), 2026-09-23):** allowed, with a warning. The odometer credit at completion reads this column at that moment, so the new value applies to trips already on the road.
 
 ---
 
