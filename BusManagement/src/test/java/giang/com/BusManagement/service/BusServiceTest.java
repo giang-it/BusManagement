@@ -2,9 +2,11 @@ package giang.com.BusManagement.service;
 
 import giang.com.BusManagement.domain.Bus;
 import giang.com.BusManagement.domain.BusStatus;
+import giang.com.BusManagement.domain.BusType;
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.repository.BusRepository;
+import giang.com.BusManagement.repository.BusTypeRepository;
 import giang.com.BusManagement.repository.TripRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,8 @@ class BusServiceTest {
     private BusRepository busRepository;
     @Autowired
     private TripRepository tripRepository;
+    @Autowired
+    private BusTypeRepository busTypeRepository;
 
     /**
      * Chuyến tối thiểu chỉ đủ để guard REPAIRING nhìn thấy: guard hỏi
@@ -284,5 +288,139 @@ class BusServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> busService.saveBus(f));
         assertEquals(8000.0, busRepository.findById(bus.getId()).orElseThrow().getOdometer(), 1e-9);
+    }
+
+    // =========================================================================
+    // SỬA: không được HẠ sức chứa xuống dưới số ghế đang mở bán (Group C(d))
+    // =========================================================================
+    //
+    // Luật #22 ("ghế mở bán <= sức chứa xe") nằm trong validateBusForTrip(), nên
+    // nó chỉ được kiểm lúc GÁN XE VÀO CHUYẾN. Đổi LOẠI XE sau đó là cửa sau đi
+    // vòng qua nó. Cặp test cốt lõi ở đây theo đúng khuôn cặp test của #16 và #6:
+    // bản sửa không được đi quá tay thành "chặn mọi lần đổi loại xe" — nên mỗi
+    // test chặn đều có một counterweight cho phép.
+
+    /** Loại xe dùng trong test; typeName là UNIQUE nên mỗi test tự đặt tên riêng. */
+    private BusType busType(String name, int capacity) {
+        BusType t = new BusType();
+        t.setTypeName(name);
+        t.setCapacity(capacity);
+        return busTypeRepository.save(t);
+    }
+
+    private Bus persistedBusWithType(BusType type) {
+        Bus bus = new Bus();
+        bus.setLicensePlate("99T-CAP.01");
+        bus.setBrand("UNIT-TEST");
+        bus.setStatus(BusStatus.READY);
+        bus.setBusType(type);
+        bus.setOdometer(8000.0);
+        bus.setLastMaintenanceOdometer(4000.0);
+        bus.setMaintenanceThreshold(5000.0);
+        return busRepository.save(bus);
+    }
+
+    /** Form hợp lệ về ba con số, chỉ thay đổi loại xe — đúng thứ form Sửa gửi lên. */
+    private Bus formWithType(BusType type) {
+        Bus f = form(8000.0, 4000.0, 5000.0);
+        f.setLicensePlate("99T-CAP.01");
+        f.setBusType(type);
+        return f;
+    }
+
+    private Trip tripFor(Bus bus, TripStatus status, int totalSeats) {
+        Trip trip = new Trip();
+        trip.setBus(bus);
+        trip.setStatus(status);
+        trip.setDepartureTime(java.time.LocalDateTime.now().plusHours(2));
+        trip.setTotalSeats(totalSeats);
+        return tripRepository.save(trip);
+    }
+
+    @Test
+    @DisplayName("Hạ loại xe xuống nhỏ hơn số ghế chuyến đang mở bán → CHẶN, không ghi gì")
+    void update_toSmallerTypeIsBlockedWhenAnOpenTripSellsMoreSeats() {
+        BusType big = busType("CAP-Ghế ngồi", 50);
+        BusType small = busType("CAP-Limousine", 22);
+        Bus bus = persistedBusWithType(big);
+        tripFor(bus, TripStatus.ACTIVE, 50);
+
+        Bus f = formWithType(small);
+        f.setBrand("ĐÃ-ĐỔI"); // cố ý đổi thêm một field: nếu guard chặn muộn, field này sẽ lọt
+
+        assertThrows(RuntimeException.class, () -> busService.updateBus(bus.getId(), f));
+
+        Bus after = busRepository.findById(bus.getId()).orElseThrow();
+        assertEquals(50, after.getBusType().getCapacity(), "loại xe phải giữ nguyên");
+        assertEquals("UNIT-TEST", after.getBrand(), "guard phải chặn TRƯỚC mọi setter");
+    }
+
+    @Test
+    @DisplayName("Counterweight: hạ loại xe khi xe KHÔNG còn chuyến chưa kết thúc → cho phép")
+    void update_toSmallerTypeIsAllowedWhenBusHasNoOpenTrips() {
+        BusType big = busType("CAP2-Ghế ngồi", 50);
+        BusType small = busType("CAP2-Limousine", 22);
+        Bus bus = persistedBusWithType(big);
+
+        assertDoesNotThrow(() -> busService.updateBus(bus.getId(), formWithType(small)));
+        assertEquals(22, busRepository.findById(bus.getId()).orElseThrow().getBusType().getCapacity());
+    }
+
+    @Test
+    @DisplayName("Chỉ chuyến CHƯA kết thúc mới tính — chuyến COMPLETED/CANCELLED không chặn")
+    void update_toSmallerTypeIgnoresFinishedTrips() {
+        BusType big = busType("CAP3-Ghế ngồi", 50);
+        BusType small = busType("CAP3-Limousine", 22);
+        Bus bus = persistedBusWithType(big);
+        tripFor(bus, TripStatus.COMPLETED, 50);
+        tripFor(bus, TripStatus.CANCELLED, 50);
+
+        assertDoesNotThrow(() -> busService.updateBus(bus.getId(), formWithType(small)));
+        assertEquals(22, busRepository.findById(bus.getId()).orElseThrow().getBusType().getCapacity());
+    }
+
+    @Test
+    @DisplayName("Biên: hạ xuống ĐÚNG BẰNG số ghế đang bán → cho phép (chỉ chặn khi nhỏ hơn)")
+    void update_toTypeExactlyMatchingOpenSeatsIsAllowed() {
+        BusType big = busType("CAP4-Ghế ngồi", 50);
+        BusType exact = busType("CAP4-Giường nằm", 40);
+        Bus bus = persistedBusWithType(big);
+        tripFor(bus, TripStatus.ACTIVE, 40);
+
+        assertDoesNotThrow(() -> busService.updateBus(bus.getId(), formWithType(exact)));
+        assertEquals(40, busRepository.findById(bus.getId()).orElseThrow().getBusType().getCapacity());
+    }
+
+    /**
+     * Hình dạng của xe 20 trên DB thật: nó ĐÃ vi phạm #22 từ trước bản vá đó
+     * (chuyến 6, DEPARTED, bán 40 ghế trên xe 22 chỗ — dữ liệu lịch sử, đã chốt để
+     * nguyên). Nếu guard chỉ hỏi "sức chứa mới < số ghế đang bán" thì mọi lần lưu
+     * xe đó đều bị từ chối, kể cả khi KHÔNG đổi loại xe — Admin không sửa nổi cả
+     * odometer. Đây là test chống đúng cái bẫy mà #22 đã gài cho chuyến 8.
+     */
+    @Test
+    @DisplayName("Xe ĐÃ vi phạm sẵn: giữ nguyên loại xe vẫn lưu được (không làm tệ hơn)")
+    void update_keepingTheSameTypeIsAllowedEvenOnABusThatAlreadyOversells() {
+        BusType small = busType("CAP5-Limousine", 22);
+        Bus bus = persistedBusWithType(small);
+        tripFor(bus, TripStatus.DEPARTED, 40); // vi phạm tồn đọng, giống xe 20
+
+        Bus f = formWithType(small);
+        f.setOdometer(9000.0); // Admin chỉ muốn sửa odometer
+
+        assertDoesNotThrow(() -> busService.updateBus(bus.getId(), f));
+        assertEquals(9000.0, busRepository.findById(bus.getId()).orElseThrow().getOdometer(), 1e-9);
+    }
+
+    @Test
+    @DisplayName("Xe ĐÃ vi phạm sẵn: NÂNG lên loại lớn hơn vẫn cho phép — đó là đường tự khắc phục")
+    void update_upgradingIsAllowedEvenOnABusThatAlreadyOversells() {
+        BusType small = busType("CAP6-Limousine", 22);
+        BusType big = busType("CAP6-Giường nằm", 40);
+        Bus bus = persistedBusWithType(small);
+        tripFor(bus, TripStatus.DEPARTED, 40);
+
+        assertDoesNotThrow(() -> busService.updateBus(bus.getId(), formWithType(big)));
+        assertEquals(40, busRepository.findById(bus.getId()).orElseThrow().getBusType().getCapacity());
     }
 }

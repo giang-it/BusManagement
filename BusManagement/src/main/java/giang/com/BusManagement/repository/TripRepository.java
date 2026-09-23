@@ -340,6 +340,25 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         */
        boolean existsByBusIdAndStatusIn(Long busId, List<TripStatus> statuses);
 
+       /**
+        * Số ghế LỚN NHẤT mà các chuyến của xe này đang mở bán, xét trên các trạng
+        * thái cho trước. Trả về {@code null} khi xe không có chuyến nào khớp —
+        * {@code MAX()} trên tập rỗng là NULL, nên tầng service phải xử lý null
+        * (không dùng 0, vì 0 sẽ bị đọc thành "có chuyến bán 0 ghế").
+        *
+        * Dùng bởi {@code BusService.updateBus()} để chặn việc hạ LOẠI XE xuống sức
+        * chứa nhỏ hơn số ghế đang mở bán — cửa sau của luật #22, vốn chỉ được kiểm
+        * lúc gán xe vào chuyến chứ không lúc đổi loại xe. Là cặp đôi với
+        * existsByBusIdAndStatusIn() ngay trên: cùng một câu hỏi "xe này còn chuyến
+        * chưa kết thúc không", chỉ khác là ở đây cần CON SỐ chứ không chỉ có/không.
+        *
+        * Chỉ trả về một giá trị vô hướng, không nạp entity Trip — cùng lý do đã ghi
+        * ở findSeatsAndSoldByStatus (THESIS_ROADMAP.md, Hidden Cost #4).
+        */
+       @Query("SELECT MAX(t.totalSeats) FROM Trip t WHERE t.bus.id = :busId AND t.status IN :statuses")
+       Integer findMaxTotalSeatsForBus(@Param("busId") Long busId,
+                     @Param("statuses") Collection<TripStatus> statuses);
+
        // =========================================================================
        // TRUY VẤN CHO DASHBOARD (Strategic Analytics / Operational KPIs)
        // =========================================================================

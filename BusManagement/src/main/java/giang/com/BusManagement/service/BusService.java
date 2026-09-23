@@ -12,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +23,21 @@ public class BusService {
     private final BusTypeRepository busTypeRepository;
     private final TripRepository tripRepository;
     private final IncidentRepository incidentRepository;
+
+    /**
+     * Các trạng thái khiến một chuyến được coi là CHƯA KẾT THÚC, tức xe vẫn còn
+     * ràng buộc với nó — đúng PHẦN BÙ của tập trạng thái cuối trong FSM (xem
+     * TripService.canTransition) và đúng bằng DriverService.BUSY_STATUSES, guard
+     * anh em chặn khóa tài xế còn chuyến dở dang.
+     *
+     * Gom thành hằng số vì trong updateBus() có HAI guard cùng hỏi câu này (trạng
+     * thái REPAIRING của lỗi #15, và loại xe nhỏ hơn của mục Group C(d)); để hai
+     * bản sao của cùng một tập trạng thái trong cùng một method là đúng thứ
+     * DriverService đã ghi chú là không nên ("không định nghĩa lại khái niệm này ở
+     * tầng khác").
+     */
+    private static final List<TripStatus> UNFINISHED_TRIP_STATUSES = List.of(
+            TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
     public List<Bus> findAllWithBusType() {
         return busRepository.findAllWithBusType();
@@ -120,11 +134,48 @@ public class BusService {
         // không còn dấu nào để bị ghi đè.
         if (form.getStatus() == BusStatus.REPAIRING) {
             boolean hasUnfinishedTrips = tripRepository.existsByBusIdAndStatusIn(
-                    id,
-                    Arrays.asList(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED));
+                    id, UNFINISHED_TRIP_STATUSES);
             if (hasUnfinishedTrips) {
                 throw new RuntimeException(
                         "Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho chuyến xe chưa kết thúc (chờ duyệt / đang bán vé / đang trên đường). Hãy hoàn thành hoặc hủy các chuyến đó trước!");
+            }
+        }
+
+        // RÀNG BUỘC (Group C(d)): không cho HẠ sức chứa của xe xuống dưới số ghế mà
+        // một chuyến CHƯA KẾT THÚC của nó đang mở bán.
+        //
+        // VÌ SAO CẦN: luật #22 ("ghế mở bán <= sức chứa xe") sống trong
+        // validateBusForTrip(), nên nó chỉ được kiểm khi GÁN XE VÀO CHUYẾN. Đổi
+        // LOẠI XE sau đó là một cửa sau đi vòng qua nó: form Sửa xe chép thẳng
+        // busType, nên hạ một xe Ghế ngồi (50) xuống Limousine (22) làm mọi chuyến
+        // đang mở của nó lập tức bán nhiều ghế hơn số chỗ thật, kèm thông báo
+        // THÀNH CÔNG. Đo trên DB thật 2026-09-23: 4 xe (6, 7, 14, 15) đang bán
+        // ĐÚNG BẰNG sức chứa, nên hạ một bậc là vỡ ngay.
+        //
+        // VÌ SAO SO VỚI SỨC CHỨA CŨ, KHÔNG CHỈ SO VỚI SỐ GHẾ ĐANG BÁN: xe 20 đã
+        // vi phạm #22 SẴN từ trước bản vá đó (chuyến 6, DEPARTED, bán 40 ghế trên
+        // xe 22 chỗ — dữ liệu lịch sử, đã chốt để nguyên). Nếu guard chỉ hỏi
+        // "sức chứa mới < số ghế đang bán" thì MỌI lần lưu xe 20 đều bị từ chối,
+        // kể cả khi không đổi loại xe — Admin không sửa nổi cả odometer của nó.
+        // Đó đúng là cái bẫy mà #22 đã gài cho chuyến 8 và phải sửa tay. Nên luật
+        // phát biểu là "KHÔNG ĐƯỢC LÀM TỆ HƠN": chỉ chặn khi loại mới NHỎ HƠN loại
+        // đang có; giữ nguyên loại hoặc nâng lên loại lớn hơn thì luôn cho qua (và
+        // nâng lên chính là đường Admin tự khắc phục một vi phạm tồn đọng).
+        //
+        // Xe chưa gán loại (null ở một trong hai phía) thì không có sức chứa để so
+        // — bỏ qua thay vì đoán, đúng cách validateBusForTrip() bỏ qua luật #22 khi
+        // xe chưa có loại. Đo cùng ngày: 0 xe không gán loại đang giữ chuyến mở.
+        Integer newCapacity = form.getBusType() != null ? form.getBusType().getCapacity() : null;
+        Integer oldCapacity = existing.getBusType() != null ? existing.getBusType().getCapacity() : null;
+        if (newCapacity != null && oldCapacity != null && newCapacity < oldCapacity) {
+            Integer maxOpenSeats = tripRepository.findMaxTotalSeatsForBus(id, UNFINISHED_TRIP_STATUSES);
+            if (maxOpenSeats != null && newCapacity < maxOpenSeats) {
+                throw new RuntimeException(String.format(
+                        "Không thể đổi xe %s sang loại %s (%d chỗ) vì xe đang có chuyến chưa kết thúc mở bán tới %d ghế "
+                                + "(chờ duyệt / đang bán vé / đang trên đường). Hãy giảm số ghế của các chuyến đó, "
+                                + "hoặc chọn loại xe có sức chứa từ %d chỗ trở lên!",
+                        existing.getLicensePlate(), form.getBusType().getTypeName(), newCapacity,
+                        maxOpenSeats, maxOpenSeats));
             }
         }
 
