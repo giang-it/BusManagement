@@ -95,6 +95,8 @@ public class TripRestController {
         Map<String, Object> dto = new HashMap<>();
         dto.put("id", bus.getId());
         dto.put("licensePlate", bus.getLicensePlate());
+        // typeId để form Tạo so với loại xe gợi ý của tuyến (data-type) — Group C(a)
+        dto.put("typeId", bus.getBusType() != null ? bus.getBusType().getId() : null);
         dto.put("typeName", bus.getBusType() != null ? bus.getBusType().getTypeName() : "Không rõ");
         dto.put("capacity", bus.getBusType() != null ? bus.getBusType().getCapacity() : 0);
         dto.put("brand", bus.getBrand());

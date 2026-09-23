@@ -77,13 +77,23 @@
                             chối, và nút Sửa ở trip-list.html đã ẩn). Ô khoá đặt ở đây sẽ là code
                             không bao giờ chạy tới.
                         -->
-                            <select name="busId" class="form-select" required>
+                            <!-- Loại xe của tuyến là GỢI Ý, không phải luật (Group C(a)): dropdown mời mọi
+                                 loại, xe đúng loại tuyến được xếp đầu và đánh ★. Kèm sức chứa vì ô
+                                 "Tổng số ghế" bên dưới phải vừa xe được chọn (luật #22). -->
+                            <select name="busId" class="form-select" required
+                                th:with="preferredType=${trip.route?.suitableBusType}">
                                 <option value="">-- Chọn xe --</option>
                                 <option th:each="bus : ${buses}" th:value="${bus.id}"
-                                    th:text="${bus.licensePlate} + ' (' + ${bus.busType?.typeName} + ')'"
+                                    th:text="${bus.licensePlate
+                                            + (bus.busType != null ? ' (' + bus.busType.typeName + ' · ' + bus.busType.capacity + ' chỗ)' : ' (Không rõ loại)')
+                                            + (preferredType != null and bus.busType != null and bus.busType.id == preferredType.id ? ' ★ đúng loại tuyến' : '')}"
                                     th:selected="${bus.id == trip.bus?.id}">
                                 </option>
                             </select>
+                            <div class="form-text" th:if="${trip.route?.suitableBusType != null}">
+                                Tuyến gợi ý loại <strong th:text="${trip.route.suitableBusType.typeName}"></strong>;
+                                chọn loại khác vẫn hợp lệ nếu đủ chỗ.
+                            </div>
                         </div>
 
                         <div class="col-md-4 mb-3">

@@ -136,13 +136,16 @@
                             <!--
                             Mỗi <option> mang 2 data-attribute:
                               data-duration = estimatedDuration (phút)
-                              data-type     = suitableBusType.id (để lọc xe theo tuyến nếu cần mở rộng)
+                              data-type     = suitableBusType.id (rỗng nếu tuyến không quy định) — loại
+                                              xe GỢI Ý của tuyến, dùng để xếp đầu và đánh ★ ở dropdown
+                                              xe; KHÔNG lọc, vì loại xe là gợi ý chứ không phải luật
+                                              (Group C(a))
                         -->
                             <select id="routeSelect" name="routeId" class="form-select" required>
                                 <option value="">-- Chọn tuyến --</option>
                                 <option th:each="route : ${routes}" th:value="${route.id}" th:text="${route.departurePointDisplay} + ' → ' + ${route.destinationPointDisplay}
                                               + ' (' + ${route.estimatedDuration} + ' phút)'"
-                                    th:attr="data-duration=${route.estimatedDuration}">
+                                    th:attr="data-duration=${route.estimatedDuration},data-type=${route.suitableBusType?.id}">
                                 </option>
                             </select>
                             <div class="form-text text-muted" id="routeHint">
@@ -532,11 +535,21 @@
             }
 
             // ── Render Bus select ────────────────────────────────────────────────────
+            // Loại xe của tuyến là GỢI Ý (Group C(a)): xe đúng loại được xếp lên đầu và
+            // đánh ★, xe khác loại vẫn chọn được — cùng cách màn Duyệt/Sửa hiển thị.
+            // sort() của JS ổn định, nên trong mỗi nhóm vẫn giữ thứ tự km-từ-bảo-trì
+            // mà API trả về.
+            const routeOpt = routeSelect.options[routeSelect.selectedIndex];
+            const preferredTypeId = routeOpt ? routeOpt.getAttribute('data-type') : null;
+            const isPreferred = bus => !!preferredTypeId && String(bus.typeId) === preferredTypeId;
+            buses = [...buses].sort((a, b) => Number(isPreferred(b)) - Number(isPreferred(a)));
+
             busSelect.innerHTML = '<option value="">-- Chọn xe --</option>';
             buses.forEach(bus => {
                 const opt = document.createElement('option');
                 opt.value = bus.id;
-                opt.textContent = `${bus.licensePlate} — ${bus.typeName} (${bus.capacity} ghế)${bus.brand ? ' | ' + bus.brand : ''}`;
+                opt.textContent = `${bus.licensePlate} — ${bus.typeName} (${bus.capacity} ghế)${bus.brand ? ' | ' + bus.brand : ''}`
+                    + (isPreferred(bus) ? ' ★ đúng loại tuyến' : '');
                 opt.setAttribute('data-capacity', bus.capacity);
                 busSelect.appendChild(opt);
             });

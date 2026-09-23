@@ -1591,6 +1591,25 @@
 
 ---
 
+### TC_APR_014 — Loại xe của tuyến là GỢI Ý: dropdown xe mời mọi loại, đúng loại xếp đầu (Group C(a))
+
+- **Mã TC:** TC_APR_014
+- **Tên Kịch Bản:** `Route.suitableBusType` không lọc cứng dropdown xe; xe khác loại đủ chỗ được nhận
+- **Điều kiện tiên quyết:** Tuyến quy định loại Limousine (22 chỗ); có xe `READY` rảnh thuộc cả Limousine lẫn Ghế ngồi (50) / Giường nằm (40); một chuyến `PENDING_APPROVAL` **chưa có xe** (MANUAL MODE) trên tuyến đó, `totalSeats ≤ 22`
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/approve/{id}` — đọc dropdown "Chọn xe"
+  2. `GET /admin/trip-management/trips/edit/{id}` của một chuyến `ACTIVE` trên cùng tuyến — đọc dropdown xe
+  3. Form Tạo chuyến: chọn tuyến đó + giờ khởi hành — đọc dropdown xe do JS dựng từ `/api/admin/trips/available-resources`
+  4. `POST /admin/trips/approve` với một xe **khác loại** nhưng đủ chỗ
+- **Kết quả mong đợi:**
+  - Bước 1–3: dropdown có **cả** xe khác loại; mọi xe Limousine đứng **trước** và có nhãn `★ đúng loại tuyến` (trong mỗi nhóm vẫn xếp theo km từ bảo trì tăng dần); mỗi option hiện sức chứa; màn Duyệt/Sửa có dòng gợi ý "Tuyến gợi ý loại Limousine…"
+  - Bước 4: `flash[success]`, chuyến `ACTIVE` với xe khác loại — validator không kiểm loại xe
+  - Đối trọng: chọn một xe có sức chứa **nhỏ hơn** `totalSeats` vẫn bị từ chối bởi luật #22 (câu "chỉ có N chỗ")
+- **Tự động hoá:** `TripServiceBusTypePreferenceTest` (3 test). Đã kiểm trên clone ngày 2026-09-23: chuyến 3492 (tuyến 1 Limousine) được mời 6 Limousine ★ rồi 5 xe khác loại, khớp từng xe với SQL; duyệt chuyến 8 bằng xe 5 (Ghế ngồi) → `ACTIVE`
+- **Ghi chú:** AI tự phân công (`findBestAvailableBus`) **cố ý** vẫn lọc cứng theo loại — TC_AI_010 giữ nguyên
+
+---
+
 <a name="module-6"></a>
 ## MODULE 6: TẦNG BẢO MẬT & CẤU HÌNH (Security & Configuration)
 **Config:** `SecurityConfig`, `DataInitializer`
@@ -2259,10 +2278,10 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 | Module 2 — Station Management | 6 | 3 | 3 |
 | Module 3 — Trip FSM & CRUD | 25 | 6 | 19 |
 | Module 4 — AI Scheduler | 18 | 5 | 13 |
-| Module 5 — Admin Approval | 10 | 4 | 6 |
+| Module 5 — Admin Approval | 11 | 5 | 6 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **96** | **36** | **60** |
+| **TỔNG** | **97** | **37** | **60** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2271,7 +2290,7 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

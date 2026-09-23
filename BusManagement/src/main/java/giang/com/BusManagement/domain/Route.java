@@ -51,18 +51,20 @@ public class Route {
     private BusType suitableBusType;
 
     /**
-     * Hàm lấy loại xe phù hợp (Smart Logic)
-     * Nếu Admin chưa gán loại xe cụ thể, hệ thống tự gợi ý dựa trên quãng đường
+     * Loại xe GỢI Ý cho tuyến, do Admin chọn ở form tuyến; null = tuyến không quy
+     * định ("Không giới hạn").
+     *
+     * Là GỢI Ý, không phải luật (Group C(a), chủ dự án chốt 2026-09-23):
+     * validateBusForTrip() không kiểm; dropdown Duyệt/Sửa/Tạo xếp xe đúng loại lên
+     * đầu và đánh ★ nhưng vẫn mời loại khác; riêng AI tự phân công
+     * (findBestAvailableBus) áp nó như bộ lọc.
+     *
+     * (Javadoc cũ hứa "nếu Admin chưa gán loại xe, hệ thống tự gợi ý dựa trên quãng
+     * đường" trong khi thân hàm luôn trả null ở nhánh đó — lời hứa đã được xoá thay
+     * vì cài một luật gợi ý chưa ai chốt. Xem Proj_functions_summary.md §12 mục 4.)
      */
     public BusType getSuitableBusType() {
-        if (this.suitableBusType != null) {
-            return this.suitableBusType;
-        }
-
-        // Logic AI đơn giản: Nếu đi trên 300km thì ưu tiên xe giường nằm (giả định)
-        // Lưu ý: Logic này cần được xử lý ở tầng Service nếu cần truy vấn DB tìm
-        // BusType giường nằm
-        return null;
+        return this.suitableBusType;
     }
 
     // =====================================================================

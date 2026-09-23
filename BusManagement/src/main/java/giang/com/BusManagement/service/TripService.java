@@ -307,7 +307,9 @@ public class TripService {
             AvailabilityContext ctx) {
         BusType requiredType = trip.getRoute().getSuitableBusType();
 
-        // Lấy tất cả xe READY (và đúng loại nếu tuyến quy định)
+        // Lấy tất cả xe READY (và đúng loại nếu tuyến quy định). Loại xe của tuyến
+        // là GỢI Ý chứ không phải luật (Group C(a)); AI cố ý áp gợi ý đó như bộ lọc
+        // cứng vì không có người xem lại lựa chọn — xem getAvailableBusesForTrip().
         List<Bus> candidates = (requiredType != null)
                 ? busRepository.findByStatusAndBusType(BusStatus.READY, requiredType)
                 : busRepository.findByStatus(BusStatus.READY);
@@ -1427,12 +1429,25 @@ public class TripService {
      * chuyến (dùng cho form phân công thủ công — AdminTripController approve
      * form). Áp dụng cùng ràng buộc bảo trì với validateBusForTrip() để dropdown
      * không bao giờ hiển thị một xe mà hệ thống sẽ từ chối khi submit.
+     *
+     * LOẠI XE CỦA TUYẾN LÀ GỢI Ý, KHÔNG PHẢI LUẬT (mục Group C(a), chủ dự án chốt
+     * 2026-09-23): validateBusForTrip() không kiểm loại xe, form Tạo không lọc
+     * loại xe, nên dropdown này trước đây lọc cứng theo route.suitableBusType là
+     * mời HẸP hơn thứ hệ thống nhận — cùng một chuyến, form Tạo cho chọn xe Ghế
+     * ngồi, form Sửa thì không. Nay mời mọi loại, xe ĐÚNG loại tuyến được xếp
+     * lên đầu (rồi mới tới km kể từ bảo trì) và template gắn nhãn cho chúng.
+     * Rủi ro thật của việc chọn sai loại — bán nhiều ghế hơn số chỗ — đã do luật
+     * sức chứa #22 trong validateBusForTrip() chặn.
+     *
+     * findBestAvailableBus() (AI tự phân công) CỐ Ý vẫn lọc cứng: đường tự động
+     * không có người xem lại lựa chọn lúc chọn, và mời hẹp hơn validator là được
+     * phép theo bất biến một chiều của #12.
      */
     public List<Bus> getAvailableBusesForTrip(Long tripId) {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new RuntimeException("Trip not found"));
 
-        BusType requiredType = trip.getRoute().getSuitableBusType();
+        BusType preferredType = trip.getRoute().getSuitableBusType();
         LocalDateTime departure = trip.getDepartureTime();
         LocalDateTime arrival = trip.getArrivalTimeExpected() != null
                 ? trip.getArrivalTimeExpected()
@@ -1445,16 +1460,21 @@ public class TripService {
                 ? trip.getRoute().getDistanceKm()
                 : 0.0;
 
-        List<Bus> candidates = (requiredType != null)
-                ? busRepository.findByStatusAndBusType(BusStatus.READY, requiredType)
-                : busRepository.findByStatus(BusStatus.READY);
+        // false xếp trước true: xe đúng loại tuyến (không phải "khác loại") lên đầu.
+        Comparator<Bus> suitableTypeFirst = Comparator.comparing(
+                bus -> !isOfType(bus, preferredType));
 
-        return candidates.stream()
+        return busRepository.findByStatus(BusStatus.READY).stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, tripId))
                 .filter(bus -> !bus.needsMaintenance())
                 .filter(bus -> !bus.isNearMaintenance(tripDistance))
-                .sorted(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
+                .sorted(suitableTypeFirst.thenComparingDouble(Bus::getKmSinceLastMaintenance))
                 .collect(Collectors.toList());
+    }
+
+    /** Xe có đúng loại này không (so theo id; tuyến không quy định loại thì không xe nào "đúng loại"). */
+    private static boolean isOfType(Bus bus, BusType type) {
+        return type != null && bus.getBusType() != null && type.getId().equals(bus.getBusType().getId());
     }
 
     /**

@@ -233,15 +233,25 @@
                             <span class="badge bg-secondary ms-1"
                                 th:text="${#lists.size(availableBuses)} + ' xe sẵn sàng'"></span>
                         </label>
-                        <select name="busId" class="form-select" required>
+                        <!-- Loại xe của tuyến là GỢI Ý, không phải luật (Group C(a)): dropdown mời mọi
+                             loại, xe đúng loại tuyến được xếp đầu và đánh ★. Kèm sức chứa vì số ghế
+                             của chuyến phải vừa xe (luật #22). -->
+                        <select name="busId" class="form-select" required
+                            th:with="preferredType=${trip.route.suitableBusType}">
                             <option value="">-- Chọn xe --</option>
                             <option th:each="bus : ${availableBuses}" th:value="${bus.id}"
                                 th:text="${bus.licensePlate
                                         + ' | ' + bus.brand
-                                        + ' | ' + (bus.busType != null ? bus.busType.typeName : 'N/A')
-                                        + ' | ' + #numbers.formatDecimal(bus.kmSinceLastMaintenance, 0, 'COMMA', 0, 'POINT') + ' km'}">
+                                        + ' | ' + (bus.busType != null ? bus.busType.typeName + ' (' + bus.busType.capacity + ' chỗ)' : 'N/A')
+                                        + ' | ' + #numbers.formatDecimal(bus.kmSinceLastMaintenance, 0, 'COMMA', 0, 'POINT') + ' km'
+                                        + (preferredType != null and bus.busType != null and bus.busType.id == preferredType.id ? ' ★ đúng loại tuyến' : '')}">
                             </option>
                         </select>
+                        <div class="form-text" th:if="${trip.route.suitableBusType != null}">
+                            Tuyến gợi ý loại <strong th:text="${trip.route.suitableBusType.typeName}"></strong>
+                            — xe đúng loại được đánh ★ và xếp lên đầu. Chọn loại khác vẫn hợp lệ nếu xe đủ chỗ cho
+                            <strong th:text="${trip.totalSeats}"></strong> ghế của chuyến.
+                        </div>
                         <div th:if="${#lists.isEmpty(availableBuses)}" class="text-danger mt-1">
                             <small>⛔ Không có xe nào phù hợp trong khung giờ này!</small>
                         </div>
