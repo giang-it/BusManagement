@@ -190,7 +190,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 - Departure mới = departure gốc + 30 phút.
 - Arrival mới = departure mới + `route.estimatedDuration` (phút; fallback 240 phút nếu null).
 - Trip mới: copy `route`, `price` từ gốc; `status = PENDING_APPROVAL`; `isExtraTrip = true`; `originalTrip` = trip gốc. `totalSeats` chỉ **tạm** chép từ gốc.
-- Gọi `autoAssignResources(extraTrip)` (mục 7.5) — nếu thành công gán bus/driver/assistant/coDrivers vào trip mới **và đặt `totalSeats` = sức chứa của xe được gán** (`busType.capacity`; lỗi #22, 2026-09-19 — trước đây chép nguyên số ghế của chuyến gốc, vốn là số Admin gõ tay, nên đã sinh chuyến bán 40 ghế trên xe 22 chỗ); nếu fail, log lý do, giữ số ghế của gốc làm chỗ trống (validator sẽ so lại khi Admin phân công tay), **vẫn save trip** (ở trạng thái `PENDING_APPROVAL` không có resource — chờ Admin xử lý thủ công qua `AdminTripController`).
+- Gọi `autoAssignResources(extraTrip)` (mục 7.5) — nếu thành công gán bus/driver/assistant/coDrivers vào trip mới **và đặt `totalSeats` = sức chứa của xe được gán** (`busType.capacity`; lỗi #22, 2026-09-19 — trước đây chép nguyên số ghế của chuyến gốc, vốn là số Admin gõ tay, nên đã sinh chuyến bán 40 ghế trên xe 22 chỗ); nếu fail, log lý do, giữ số ghế của gốc làm chỗ trống (`approveTrip()` đặt lại theo sức chứa xe Admin chọn — mục #26, 2026-09-24), **vẫn save trip** (ở trạng thái `PENDING_APPROVAL` không có resource — chờ Admin xử lý thủ công qua `AdminTripController`).
 
 ### 7.5. `autoAssignResources(trip)` — Thuật toán AI trung tâm
 1. Tính `tripDurationHours`.
@@ -202,7 +202,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 7. Trả `AutoAssignResult.success(bus, driver, assistant, coDrivers)` hoặc `.failure(reason)`.
 
 ### 7.6. `findBestAvailableBus(trip, departure, arrival)`
-- Lấy candidate: nếu route có `suitableBusType` thì lọc theo đúng loại + `READY`; ngược lại lấy tất cả `READY`. *(Cố ý giữ sau Group C(a), 2026-09-23: loại xe là **gợi ý** — validator không kiểm, dropdown Duyệt/Sửa/Tạo mời mọi loại và xếp đúng loại lên đầu — nhưng đường AI không có người xem lại lựa chọn lúc chọn nên áp gợi ý như bộ lọc; mời hẹp hơn validator là được phép.)*
+- Lấy candidate: mọi xe `READY`; xếp **xe đúng `route.suitableBusType` trước**, rồi theo `kmSinceLastMaintenance` — comparator `preferredTypeThenLeastWorn()`, dùng chung với dropdown Duyệt/Sửa. Hết xe đúng loại thì chọn xe loại khác, không trả null. *(Chủ dự án chốt 2026-09-24, mục #26. Câu dưới đây là trạng thái trước đó, giữ để thấy lịch sử:)* ~~nếu route có `suitableBusType` thì lọc theo đúng loại + `READY`; ngược lại lấy tất cả `READY`.~~ *(Ghi chú cũ, hết hiệu lực từ 2026-09-24 — Cố ý giữ sau Group C(a), 2026-09-23: loại xe là **gợi ý** — validator không kiểm, dropdown Duyệt/Sửa/Tạo mời mọi loại và xếp đúng loại lên đầu — nhưng đường AI không có người xem lại lựa chọn lúc chọn nên áp gợi ý như bộ lọc; mời hẹp hơn validator là được phép.)*
 - Cửa sổ bận mở rộng `±BUS_PREP_BUFFER_HOURS (1h)`.
 - Ưu tiên xe **chưa** bận và **sau chuyến này vẫn chưa vượt** `maintenanceThreshold`, chọn xe có `kmSinceLastMaintenance` nhỏ nhất (xe "mới" nhất).
 - Fallback: nếu không có xe nào thỏa ngưỡng bảo trì, vẫn chọn xe ít km nhất trong số xe không bận, kèm log cảnh báo "SÁT/QUÁ NGƯỠNG BẢO TRÌ".
@@ -243,6 +243,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 ### 8.4. Phê duyệt thủ công (AI không tự gán được)
 - `POST /approve` (`tripId, busId, driverId, assistantId?, coDriverIds?`) → `tripService.approveTrip(...)`:
   - Resolve bus/driver/assistant/coDrivers theo ID Admin chọn.
+  - **Đặt `totalSeats` = sức chứa xe được chọn** (mục #26, 2026-09-24 — cùng luật với AI; số ghế đang lưu chỉ là chỗ trống chép từ chuyến gốc). Xe chưa gán loại: giữ số cũ. Xe nhỏ hơn số vé đã bán: từ chối.
   - `validateBusForTrip` + `validateStaffForTrip`.
   - `changeStatusToActive()` + save.
   - Bắt riêng `IllegalArgumentException` (lỗi vi phạm ràng buộc nghiệp vụ, hiển thị rõ cho Admin) và `Exception` chung.
@@ -273,7 +274,7 @@ Hai hàm `...Assistants...` áp **ba** điều kiện đầu trừ trần 8h —
 
 - **`TripRepository`**: nhiều query JOIN FETCH tránh N+1 (`findAllWithDetails`, `findByStatusWithDetails`, `findByIdWithDetails`); các query kiểm tra trùng lịch theo từng vai trò riêng (`existsOverlappingTripForDriver`, `existsOverlappingTripForAssistant`, `existsOverlappingTripForBus`); `findTripsForDriverOnDate` dùng để tính giờ lái/ngày; `existsByOriginalTripAndStatusIn` cho `hasAlreadySuggested`; `existsByBusId`/`existsByBusIdAndStatusIn` cho ràng buộc xóa/sửa bus.
 - **Dead code đã ghi nhận:** `countBusyTripsAnyRole` và `findAllTripsByDriverOnDate` là một cặp query khác (dùng `Long driverId` thay vì `Driver` entity) **được định nghĩa nhưng không được gọi ở đâu trong TripService** — trùng lặp logic với cặp `existsOverlappingTripForDriver`/`findTripsForDriverOnDate` đang dùng thật.
-- **`BusRepository`**: `findByStatus`, `findByStatusAndBusType`, `findAllWithBusType` (JOIN FETCH busType).
+- **`BusRepository`**: `findByStatus`, `findAllWithBusType` (JOIN FETCH busType). *(`findByStatusAndBusType` đã xoá 2026-09-24 — nơi gọi cuối cùng là bộ lọc cứng của AI, mục #26.)*
 - **`DriverRepository`**: `findAllWithUser` (JOIN FETCH user).
 - **`RouteStationRepository`**: `findByRouteIdOrderByStopOrderAsc`.
 - **`StationRepository`**: `findByStationNameContainingIgnoreCase`.

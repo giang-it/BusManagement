@@ -2968,7 +2968,7 @@ Docs: `current_functional_spec.md`, `Proj_functions_summary.md`, `database_schem
   input tự do, không có JS phản ứng khi đổi xe — trong khi form Tạo khoá ô đó và tự điền theo sức
   chứa. Luật #22 chặn đúng; chỉ là form không nhắc. Bản sửa C(a) giảm hiểu nhầm bằng cách in sức
   chứa trong từng option, nhưng không tự đổi số ghế. Chưa ruling.
-- **AI có nên coi loại xe là gợi ý** (xem trên). Chưa ruling.
+- **AI có nên coi loại xe là gợi ý** (xem trên). Chưa ruling. *(✅ **RULING 2026-09-24: CÓ** — hết xe đúng loại thì AI lấy loại khác theo km thấp nhất (phương án (a)); đã sửa cùng #26, xem mục #26.)*
 
 ---
 
@@ -2983,6 +2983,60 @@ khởi hành — cả hai là dữ liệu thử ngày 16–17/07, không có lu�
 đây là **mới**; đã grep cả register này lẫn `project_report.md` trước khi ghi.
 
 ## 26. Màn Duyệt (MANUAL MODE) đánh ★ lên đầu cho những xe mà luật #22 CHẮC CHẮN từ chối
+
+> **✅ ĐÃ GIẢI QUYẾT TẬN GỐC (2026-09-24) — KHÔNG theo "đề xuất sửa" ở cuối mục này, mà theo hai ý
+> kiến của chủ dự án. Test lại 2026-09-24 trước khi commit: `mvnw clean test` 126/126; drive trên clone — AI fallback (3494, xe 9 Ghế ngồi, 50 ghế), duyệt tay chuyến 50 ghế tạm bằng Limousine ★ → ACTIVE 22 ghế, chuyến 22 ghế tạm bằng Ghế ngồi → ACTIVE 50 ghế, chốt số vé từ chối và rollback; DB thật checksum trùng khớp. Chủ dự án duyệt commit.**
+>
+> Chủ dự án: *"nếu chuyến đó dùng xe ghế ngồi và chỉ bán 26 ghế thì chỉ áp dụng cho chuyến đó thôi,
+> nếu có tăng cường thì tiếp tục dùng ghế ngồi và số ghế là 50 như mặc định… việc tuyến đường có gợi ý
+> loại xe thì nó chỉ làm tăng mức độ ưu tiên… AI ko tìm được limousine thì nó sẽ tiếp tục chuyển qua xe
+> ghế ngồi"*; chọn phương án (a) cho thứ tự dự phòng (km thấp nhất, không phân biệt loại).
+>
+> **Gốc rễ được xử lý (hai nhánh của cùng một lỗi):**
+> 1. **Số ghế tạm lọt tới luật #22.** Khi AI không gán được xe, `createExtraTrip()` chép số ghế chuyến
+>    gốc làm chỗ trống; màn Duyệt không có ô số ghế, nên chỗ trống đó bị so với mọi xe Admin chọn.
+>    **Sửa:** `approveTrip()` đặt `totalSeats` = sức chứa xe được chọn — **cùng luật** mà đường AI
+>    (`createExtraTrip`, #22) và form Tạo (ô số ghế khoá, tự điền) đã dùng. Xe chưa gán loại: giữ số cũ
+>    (#22 cũng bỏ qua ca này). Xe có sức chứa < số vé đã bán: từ chối (chuyến chờ duyệt luôn 0 vé, đây
+>    là chốt phòng thủ). Muốn bán ít hơn sức chứa: sửa ở form Sửa sau khi kích hoạt.
+>    *(Phiên 2026-09-24 trước đó đã bác phương án này với lý do "đè lên quyết định Admin" — ví dụ chủ
+>    dự án hạ chuyến 8 từ 30 xuống 22. Đính chính: lần hạ đó chính là để lách #26, không phải quyết
+>    định kinh doanh.)*
+> 2. **AI lọc cứng theo loại** làm chuyến tăng cường rơi vào MANUAL MODE chỉ vì hết xe đúng loại.
+>    **Sửa:** `findBestAvailableBus()` lấy mọi xe `READY` (3 bộ lọc giữ nguyên) và chọn theo comparator
+>    `preferredTypeThenLeastWorn()` — xe đúng loại trước, rồi km — **dùng chung** với dropdown Duyệt/Sửa
+>    (`getAvailableBusesForTrip`), nên người và AI hiểu "ưu tiên" theo một cách. `findByStatusAndBusType`
+>    hết nơi gọi ⇒ xoá (không để query chết mới — cùng lý do Incon #3).
+>
+> **Vì sao không làm "đề xuất sửa" gốc (lọc xe `capacity < totalSeats` ở màn Duyệt):** nó giữ nguyên số
+> ghế tạm — vốn chỉ là con số chép từ chuyến gốc — làm tiêu chuẩn chọn xe, tức coi quyết định của
+> chuyến gốc là của chuyến tăng cường; và khi không có xe nào ≥ số đó thì màn Duyệt thành ngõ cụt.
+>
+> **Chạm tới:** `TripService` (`findBestAvailableBus`, comparator mới, `getAvailableBusesForTrip`,
+> `approveTrip`, câu báo lỗi AI, javadoc/comment), `BusRepository` (xoá 1 query), `Route` (javadoc),
+> `RecommendationService` (câu ghi chú "đúng loại"), `approve-form.html` + `pending-trips.html` (không
+> hiện số ghế tạm như số thật). **Không đổi:** `validateBusForTrip`/#22, `validateStaffForTrip`, FSM,
+> `confirmAutoAssignedTrip`, form Sửa, form Tạo, What-if, backfill.
+>
+> **Kiểm chứng:**
+> - `mvnw clean test` **126/126, 18 class** (121 + 5: `TripServiceBusTypePreferenceTest` +2 — AI chọn
+>   đúng loại trước dù km cao hơn; hết đúng loại thì lấy loại khác; `TripServiceSeatCapacityTest` +3 —
+>   duyệt tay đặt 22 cho xe 22 và 50 cho xe 50, xe không loại giữ số, xe nhỏ hơn số vé bị từ chối).
+>   Test "chỗ trống" cũ vẫn đúng, chỉ phải cho cả xe 50 chỗ đi bảo trì vì tiền đề "hết xe đúng loại ⇒
+>   AI bó tay" không còn.
+> - **Non-vacuous, 3 probe, mỗi probe đỏ đúng 1 test rồi khôi phục md5:** đưa AI về lọc cứng → đỏ
+>   `theAiFallsBackToAnotherType…`; bỏ `setTotalSeats(capacity)` → `manualApproval_setsTheSeats…` lỗi
+>   đúng câu #22 *"mở bán 40 ghế… chỉ có 22 chỗ"* (tái hiện #26); tắt chốt số vé → đỏ
+>   `manualApproval_refusesABusSmaller…`.
+> - **Drive trên clone `mysqldump` mới** (JVM 8098, PID 26568; 10 kết nối vào clone): (A) mọi Limousine
+>   `REPAIRING`, chuyến 3493 (tuyến 1 Limousine, 26/26 vé) → scanner tạo **3494 trên xe 9 Ghế ngồi,
+>   50 ghế** (không phải 26); xác nhận 1-click → `ACTIVE`. (B) Limousine hoạt động lại, chuyến 8 (tuyến
+>   2, 26 ghế tạm, chưa có xe): danh sách chờ hiện *"Số ghế: theo xe khi phân công"*, màn Duyệt hiện
+>   *"theo sức chứa xe được chọn"*; duyệt bằng xe Limousine đứng đầu có ★ → **`ACTIVE`, 22 ghế** — đúng
+>   ca trước đây bị từ chối. 7 trang phân tích/vận hành 200, log 0 exception. **DB thật byte-identical.**
+> - Docs: `current_functional_spec.md`, `Proj_functions_summary.md` (§7.4, §7.6, BusRepository, duyệt
+>   thủ công), `test_case.md` (`TC_AI_010`/`011` cập nhật, `TC_APR_014` ghi chú, `TC_APR_016` mới),
+>   roadmap.
 
 **Do chính bản sửa C(a) (`4def1ad`) làm lộ ra**, không phải lỗi có từ trước theo đúng hình dạng này.
 
@@ -3024,3 +3078,141 @@ này vì ở đó số ghế sửa được cùng lúc (xem mục nhỏ ngay dư
   `getAvailableBusesForTrip(id)`); C(a) chỉ thêm ★ theo đúng cách đó. Nhỏ; ghi để biết.
 - **`README.md` còn "3.x" ở cả dòng 4 (badge)** — mục `README.md:37` phía trên chỉ ghi dòng 37. Xem
   ghi chú bổ sung ở mục đó.
+
+---
+
+# Rà soát toàn dự án lần năm (2026-09-24) — bốn lỗi mới #27–#30, hai mục cần ruling; CHƯA SỬA
+
+Chủ dự án: *"hãy đọc kỹ project xem hiện tại đang tồn đọng các lỗi gì… đọc tận gốc code thay vì
+docs"*, rồi *"rà soát lại, kiểm tra tận gốc vấn đề; đảm bảo lỗi 1 là chỉ cần sửa template… sau đó
+ghi lại"*. Phương pháp: đọc lại toàn bộ 112 file Java + 27 template; mỗi ứng viên được grep trong
+register này **và** `project_report.md` trước khi coi là mới; cả bốn lỗi dưới đây được **tái hiện
+bằng HTTP thật trên clone `mysqldump`** (JVM riêng cổng 8098, PID 27760 rồi 17188; processlist: 10
+kết nối vào `busmanagement_test`, 2 kết nối vào DB thật thuộc một tiến trình khác — PID 20304 — có từ
+trước). **DB thật byte-identical trước/sau** (`trips` 2225 / md5 `6e39d4ae…`, `buses` 20 / md5
+`71cb7d45…`). Không sửa dòng code nào.
+
+## 27. Màn Duyệt (MANUAL MODE): nút "❌ Từ chối" thực chất **DUYỆT và KÍCH HOẠT** chuyến
+
+> **✅ ĐÃ SỬA (2026-09-24) — chỉ template, 0 dòng Java. Chủ dự án duyệt commit 2026-09-24.**
+> `approve-form.html`: nút Từ chối giữ nguyên chỗ trong hàng nút, thêm `form="rejectTripForm"`;
+> `<form id="rejectTripForm" … onsubmit="return confirm(…)">` rỗng đặt **sau** `</form>` của form
+> Phân công, kèm comment trỏ về mục này. **Kiểm trên clone mới (JVM 8098, PID 17576, 10 kết nối
+> vào clone):** trang render 200; DOM do Edge headless parse: `forms=2 | reject->/admin/trips/reject/8
+> confirm=true | approve->/admin/trips/approve busId=true driverId=true tripId=8`; request của nút Từ
+> chối → *"Đã từ chối chuyến tăng cường #8."*, `CANCELLED`, `bus_id`/`sale_opened_at` NULL; đối trọng
+> nút Phân công → *"đã được phân công và kích hoạt thành công"*, `ACTIVE`; MODE A (AUTO) vẫn 2 form
+> `/confirm` + `/reject/8`; log 0 lỗi template. Thêm `TC_APR_015` vào `test_case.md`. Không có test
+> tự động: hành vi nằm ở trình duyệt, không ở Java (`mvnw test` không chạm tới).
+
+- **Gốc — thuần template:** `approve-form.html:324-327` đặt `<form …/reject/{id}>` **lồng bên trong**
+  `<form …/approve>` (`:227`–`:331`). HTML không cho form lồng: parser bỏ thẻ `<form>` bên trong
+  (mất luôn `action` và `onsubmit="return confirm(…)"`), `</form>` ở `:327` đóng form **ngoài**, còn
+  `</form>` ở `:331` bị bỏ qua. Nút "Từ chối" (`type="submit"`, không `name`) thành nút submit của
+  form Phân công.
+- **Bằng chứng:**
+  - DOM do Edge headless parse (`--dump-dom`) trang `/admin/trips/approve/8` (clone, chuyến 8 gỡ xe
+    để vào MANUAL MODE): chỉ **1** `<form>` — `/admin/trips/approve`; nút Từ chối nằm trong nó; không
+    còn `onsubmit`.
+  - Gửi đúng request mà nút đó sinh ra (xe + tài xế đầu dropdown: `busId=23&driverId=3`):
+    *"✅ Chuyến xe #8 đã được phân công và kích hoạt thành công!"* → `ACTIVE`, `sale_opened_at` được
+    đóng dấu.
+- **Hậu quả:** chưa chọn xe/tài xế thì không từ chối được (trình duyệt đòi các `select required`);
+  đã chọn rồi đổi ý bấm Từ chối thì chuyến bị **mở bán**, không hộp xác nhận. Có từ commit gốc
+  `de42615` (2026-04-19). **Không** ảnh hưởng: MODE A (AUTO — `:189` và `:196` là hai form anh em),
+  `pending-trips.html:142` (form riêng). Quét cả 27 template: đây là chỗ form lồng **duy nhất**.
+- **Vì sao chỉ cần sửa template — đã kiểm tận gốc:**
+  1. Backend nhận đúng thứ nó được gửi: `approveTrip()` chạy đủ `requirePendingApproval` +
+     `validateBusForTrip` + `validateStaffForTrip`. Lỗi là trình duyệt gửi nhầm endpoint.
+  2. Endpoint Từ chối đúng: `POST /admin/trips/reject/8` trên chuyến MANUAL MODE (clone) →
+     *"Đã từ chối chuyến tăng cường #8."*, `CANCELLED`, `bus_id` vẫn NULL, `sale_opened_at` vẫn NULL
+     (`rejectTrip()` → `updateTripStatus(CANCELLED)`; FSM cho `PENDING_APPROVAL → CANCELLED`).
+  3. JS của trang (`:349-423`) không truy cập form nào, không có handler submit — chỉ dựng dropdown
+     tài xế phụ theo `id`.
+- **Bản sửa đề xuất (chưa làm):** đưa `<form id="rejectTripForm" … onsubmit="…">` ra **sau**
+  `</form>` của form Phân công; nút giữ nguyên chỗ trong hàng nút, thêm `form="rejectTripForm"` (giữ
+  bố cục, giữ `confirm()`). Đã thử trên bản sao HTML render thật trong scratchpad, Edge parse ra:
+  `forms=2 | reject.form.action=/admin/trips/reject/8 | reject.onsubmit=return confirm(…) |
+  approve.form.action=/admin/trips/approve | approve has busId=true`. Form Từ chối không có ô nào
+  nên không bị các `required` của form Phân công chặn. Không đụng Java; nên thêm một TC vào
+  `test_case.md` (bấm Từ chối ở MANUAL MODE → `CANCELLED`, không phải `ACTIVE`).
+
+## 28. Tạo/Sửa chuyến không kiểm dữ liệu đầu vào ở tầng service — giờ đến NULL làm chuyến **vô hình** với mọi kiểm tra trùng lịch
+
+- **Gốc:** `createManualTrip()` (`TripService:1006`) và `updateManualTrip()` (`:1031`) chỉ kiểm
+  "giờ đến trước giờ khởi hành" **khi giờ đến khác null**; không kiểm giờ đến bắt buộc,
+  `totalSeats ≥ 1`, `price` khác null và `≥ 0`. `createManualTrip()` không kiểm
+  `totalSeats ≥ ticketsSold` (bản sửa thì có). `AdminTripManagementController.createTrip()` (`:121`)
+  bind `@ModelAttribute Trip` nên POST mang được cả `ticketsSold` và `saleOpenedAt`; controller chỉ
+  đặt cứng `status`/`isExtraTrip` (`:161-162`). Mọi ràng buộc trên hiện chỉ là `required`/`min` của
+  HTML — trái tiền lệ #11/#16 và `RouteService.validateRoute()`: *"form chỉ là hàng rào phía client"*.
+- **Hệ quả nặng nhất:** ba câu kiểm trùng lịch (`existsOverlappingTripForBus/Driver/Assistant`,
+  `TripRepository:159/123/141`) có vế `t.arrivalTimeExpected > :start`; gặp NULL thì so sánh ra
+  UNKNOWN ⇒ chuyến có giờ đến NULL **không bao giờ bị coi là bận**. Validator của chính chuyến đó thì
+  dùng `departure + 5h` nên nó lưu được.
+- **Bằng chứng (clone, POST tự chế tới `/admin/trip-management/trips/create`, cả ba đều *"Tạo chuyến
+  xe thành công!"*):**
+  - 3494: tuyến 1, xe 5, tài xế 3, 10/10 10:00, **không gửi `arrivalTimeExpected`** → `ACTIVE`,
+    `arrival_time_expected = NULL`.
+  - 3495: **cùng xe 5, cùng tài xế 3, cùng 10:00**, có giờ đến → cũng lưu ⇒ trùng lịch cả xe lẫn
+    tài xế.
+  - 3496: `totalSeats=-5&price=-1&ticketsSold=999` → lưu nguyên `-5` ghế, `999` vé, giá `-1`.
+- **Bán kính hôm nay:** DB thật **0** dòng giờ đến NULL, **0** dòng ghế ≤ 0 / giá NULL hoặc ≤ 0 —
+  form thật không sinh ra được; chỉ với tới bằng POST tự chế (cùng tư thế #21). Phase 9 (Booking) sẽ
+  đọc `ticketsSold`/`totalSeats` nên cần đóng trước.
+- **Bản sửa đề xuất (chưa làm):** một `validateTripInput(Trip)` private trong `TripService`, gọi đầu
+  cả hai method: giờ khởi hành + giờ đến bắt buộc, giờ đến **sau** giờ khởi hành (khớp
+  `TripRestController`, vốn đã từ chối trường hợp bằng nhau), `totalSeats ≥ 1`, `price` khác null và
+  `≥ 0`; `createManualTrip()` kiểm thêm `totalSeats ≥ ticketsSold` như bản sửa. Ở controller, đặt
+  `ticketsSold = 0` và `saleOpenedAt = null` ngay cạnh `setStatus`/`setExtraTrip` (chuyến mới chưa
+  bán vé nào; `changeStatusToActive()` chỉ đóng dấu khi `saleOpenedAt == null`). Kèm test.
+
+## 29. Xuất phát chuyến thứ hai khi xe còn chuyến `DEPARTED` — hoàn thành chuyến đầu đặt xe về `READY` trong lúc chuyến sau đang chạy
+
+- **Gốc:** `updateTripStatus()` vào `DEPARTED` (`TripService:660`) không xét xe còn chuyến
+  `DEPARTED` khác; nhánh `COMPLETED` (`:663`) đặt `READY` vô điều kiện. Hai chuyến không giao giờ
+  được phép dùng chung một xe — register (mục #14, phương án (b)) đã tự ghi: *"trả xe cũ về READY khi
+  đó sẽ xoá nhầm dấu TRAVELING hợp lệ của chuyến kia"* — nhưng chưa ai nối điều đó với chính nhánh
+  `COMPLETED`.
+- **Với được trên DB thật ngay hôm nay:** xe 7 có chuyến 3 `DEPARTED` (20/07) và chuyến 14 `ACTIVE`
+  quá giờ (01/08); Bảng Điều Hành đang mời nút "Xuất phát" cho chuyến 14 (nhóm "Trễ giờ"). Xe 20 có
+  hình dạng tương tự (chuyến 6 `DEPARTED`, chuyến 8 chờ duyệt).
+- **Bằng chứng (clone, hai cú bấm):** Xuất phát 14 → *"Đã cập nhật chuyến #14 sang trạng thái
+  DEPARTED."*; Hoàn thành 3 → xe 7 `READY` (odometer 14620 → 14920) trong khi chuyến 14 vẫn
+  `DEPARTED`. Câu bất biến *"DEPARTED mà xe không TRAVELING"* (lần rà 2026-09-19 đo = 0) trả về
+  `14 | 7 | READY`.
+- **Hậu quả:** trạng thái xe sai (màn Quản lý xe, KPI "Đang chạy"/tỉ lệ sử dụng của Dashboard); hệ
+  thống đã cho một xe "chạy" hai chuyến cùng lúc. Không mất dữ liệu: #15 vẫn chặn `REPAIRING`, hoàn
+  thành chuyến 14 sau đó đặt lại `READY` và cộng km đúng.
+- **Bản sửa đề xuất (chưa làm; đụng `TripService` ⇒ cần ruling):** trong nhánh vào `DEPARTED`, từ
+  chối nếu xe còn chuyến `DEPARTED` khác — *"Xe X vẫn đang chạy chuyến #N, hãy Hoàn thành chuyến đó
+  trước"*. Chặn trạng thái vô lý thay vì vá hậu quả (khuôn #15). Không cần vế loại trừ: chuyến đang
+  chuyển còn là `ACTIVE`. `DispatchController` và `updateTrip()` đã bắt `IllegalStateException`; câu
+  flash của form Sửa (*"ĐÃ được lưu, nhưng không đổi được trạng thái"*) vẫn đúng. Phương án ngược
+  lại — giữ `TRAVELING` khi `COMPLETED` nếu còn chuyến `DEPARTED` — vá được cờ nhưng vẫn cho một xe
+  chạy hai chuyến; không đề xuất.
+
+## 30. API form Tạo mời những xe mà bước lưu CHẮC CHẮN từ chối vì ngưỡng bảo trì
+
+- **Gốc:** `getAvailableBusesForTimeRange()` (`TripService:1557`) lọc `isNearMaintenance(0)`
+  (`:1566`) với lý do ở javadoc (`:1544-1550`) *"route/distanceKm CHƯA được biết"* — **đã sai**: JS
+  form Tạo bắt buộc chọn tuyến trước khi gọi API (cần `data-duration` để tính giờ đến), và C(a) còn
+  đọc `data-type` của tuyến. `validateBusForTrip()` thì kiểm `isNearMaintenance(route.distanceKm)`.
+- **Bằng chứng (clone):** tuyến 9 (4.500 km), khung 12/10 06:00 → 15/10 09:00: API mời 12 xe
+  `[23, 8, 9, 10, 11, 12, 5, 7, 4, 1, 3, 2]`; lưu với xe 5 → *"Xe 29A-001.05 (Odo: 300km) sẽ SẮP/QUÁ
+  ngưỡng bảo trì (5000km) sau chuyến này"*. Trên DB thật, SQL viết từ luật: 11/11 xe `READY` bị tuyến
+  9 đẩy qua ngưỡng; các tuyến ≤ 1.800 km hôm nay chưa chạm xe nào, nhưng bán kính lớn dần theo km
+  tích luỹ.
+- **Cùng họ** "mời thứ sẽ từ chối" với #12/#13/#19/#26.
+- **Bản sửa đề xuất (chưa làm):** `available-resources` nhận thêm `routeId` (JS có sẵn
+  `routeSelect.value`), service dùng `distanceKm` của tuyến trong `isNearMaintenance`; sửa javadoc cũ.
+
+## Cần ruling (2026-09-24) — chưa phải lỗi, không tự sửa
+
+- **Duyệt / tạo chuyến có giờ khởi hành trong quá khứ vẫn được.** Không lối nào kiểm
+  `departureTime > now` (chỉ scanner AI có gate này). Trên clone, chuyến 8 (khởi hành 20/07) được
+  kích hoạt và mở bán. Không tài liệu nào phát biểu luật ⇒ ruling: chặn, cảnh báo, hay để nguyên.
+- **MODE A (AUTO) của màn Duyệt không có lối sửa khi Xác nhận thất bại.** Nếu tài nguyên AI chọn đã
+  thành không hợp lệ (tài xế bị khoá, xe quá hạn…), `confirmAutoAssigned()` báo lỗi rồi quay lại đúng
+  trang đó — chỉ có Xác nhận (sẽ lại thất bại) hoặc Từ chối; form Sửa chuyến sửa được chuyến
+  `PENDING_APPROVAL` nhưng trang Duyệt không link sang. **Mới đọc code, chưa chạy thử.**

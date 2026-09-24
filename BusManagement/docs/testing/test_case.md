@@ -1231,6 +1231,7 @@
   - `findBestAvailableBus`: lọc xe READY đúng loại Limousine → 3 xe đủ điều kiện
   - Sắp xếp theo `kmSinceLastMaintenance` tăng dần → xe "29A-001.10" (70km) được chọn
   - Log: `"✅ [AI] Phân công thành công: Xe 29A-001.10 | Tài xế chính: ... | ..."`
+- **Cập nhật 2026-09-24 (mục #26 — AI coi loại xe là GỢI Ý):** `findBestAvailableBus` không còn lọc theo loại; nó xếp xe **đúng loại trước**, rồi theo km. Kết quả của ca trên không đổi (còn xe Limousine thì Limousine ít km nhất được chọn). **Nhánh mới phải kiểm thêm:** cho mọi xe Limousine đi bảo trì/bận → AI chọn xe loại khác ít km nhất (không phải `null`), và chuyến tăng cường mở bán **đúng sức chứa xe đó** (vd Ghế ngồi → 50 ghế, không chép số ghế chuyến gốc). Tự động hoá: `TripServiceBusTypePreferenceTest` (`theAiPicksThePreferredType…`, `theAiFallsBackToAnotherType…`). Đã kiểm trên clone: mọi Limousine `REPAIRING`, chuyến 3493 (tuyến 1, 26/26 vé) → scanner tạo chuyến 3494 trên xe 9 (Ghế ngồi) **50 ghế**; xác nhận 1-click → `ACTIVE`.
 
 ---
 
@@ -1241,11 +1242,11 @@
 - **Điều kiện tiên quyết:**
   - Xe "51B-QUA.BT": `kmSinceLastMaintenance = 6000 >= 5000` → `needsMaintenance() = true`
 - **Các bước thực hiện:**
-  1. Gọi `autoAssignResources()` khi xe "51B-QUA.BT" là xe duy nhất đúng loại
+  1. Gọi `autoAssignResources()` khi xe "51B-QUA.BT" là xe `READY` rảnh **duy nhất** *(trước 2026-09-24 chỉ cần là xe duy nhất đúng loại; nay AI lấy cả xe loại khác — mục #26)*
 - **Kết quả mong đợi:**
   - `.filter(bus -> !bus.needsMaintenance())` → xe "51B-QUA.BT" bị loại
   - `findBestAvailableBus` trả về `null`
-  - `autoAssignResources` trả về `AutoAssignResult.failure("Không có xe nào sẵn sàng / đúng loại / không bận trong khung giờ này")`
+  - `autoAssignResources` trả về `AutoAssignResult.failure("Không có xe nào sẵn sàng / không bận / chưa tới ngưỡng bảo trì trong khung giờ này")`
   - Log: `"⚠️ [AI] Không tự phân công được: Không có xe nào sẵn sàng... → Admin xử lý thủ công."`
   - Chuyến tăng cường vẫn được lưu vào DB nhưng `bus = null`, `driver = null`
 
@@ -1606,8 +1607,39 @@
   - Bước 4: `flash[success]`, chuyến `ACTIVE` với xe khác loại — validator không kiểm loại xe
   - Đối trọng: chọn một xe có sức chứa **nhỏ hơn** `totalSeats` vẫn bị từ chối bởi luật #22 (câu "chỉ có N chỗ")
 - **Tự động hoá:** `TripServiceBusTypePreferenceTest` (3 test). Đã kiểm trên clone ngày 2026-09-23: chuyến 3492 (tuyến 1 Limousine) được mời 6 Limousine ★ rồi 5 xe khác loại, khớp từng xe với SQL; duyệt chuyến 8 bằng xe 5 (Ghế ngồi) → `ACTIVE`
-- **Ghi chú:** AI tự phân công (`findBestAvailableBus`) **cố ý** vẫn lọc cứng theo loại — TC_AI_010 giữ nguyên
+- **Ghi chú:** ~~AI tự phân công (`findBestAvailableBus`) **cố ý** vẫn lọc cứng theo loại — TC_AI_010 giữ nguyên~~ Từ 2026-09-24 (mục #26) AI dùng cùng thứ tự ưu tiên này — xem cập nhật ở TC_AI_010. Ở màn Duyệt, chuyến mở bán đúng sức chứa xe được chọn (TC_APR_016)
 
+### TC_APR_015 — MANUAL MODE: nút "Từ chối" TỪ CHỐI chuyến, không kích hoạt nó (lỗi #27)
+
+- **Mã TC:** TC_APR_015
+- **Tên Kịch Bản:** Nút Từ chối ở form phân công thủ công gửi tới `/admin/trips/reject/{id}`, có hộp xác nhận, kể cả khi đã chọn xe + tài xế
+- **Điều kiện tiên quyết:** Một chuyến `PENDING_APPROVAL` **chưa có xe** (MANUAL MODE); có ít nhất một xe và một tài xế trong dropdown
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/approve/{id}`, chọn một xe và một tài xế chính (để các ô `required` đều hợp lệ)
+  2. Bấm "❌ Từ chối" → hộp xác nhận hiện ra → bấm OK
+- **Kết quả mong đợi:**
+  - Có hộp xác nhận *"Xác nhận từ chối chuyến tăng cường này?"* (bấm Cancel thì không gửi gì)
+  - `flash[success]` *"Đã từ chối chuyến tăng cường #{id}."*; chuyến `CANCELLED`, `bus_id` vẫn NULL, `sale_opened_at` vẫn NULL
+  - **Sai nếu:** flash *"đã được phân công và kích hoạt thành công"* / chuyến `ACTIVE` — đó chính là lỗi #27 (form Từ chối từng bị lồng trong form Phân công; trình duyệt bỏ form lồng nên nút thành nút submit của form Phân công)
+  - Đối trọng: nút "🚀 Phân công & Kích hoạt" trên cùng trang vẫn kích hoạt chuyến (TC_APR_007)
+- **Tự động hoá:** chưa — hành vi nằm ở tầng parse HTML của trình duyệt, không ở Java. Đã kiểm 2026-09-24 trên clone: DOM do Edge headless parse có **2** form; nút Từ chối → `/admin/trips/reject/8` kèm `onsubmit`; nút Phân công → `/admin/trips/approve` đủ `busId`/`driverId`/`tripId`; hai request tương ứng lần lượt cho `CANCELLED` và `ACTIVE`
+
+
+### TC_APR_016 — MANUAL MODE: số ghế theo xe được chọn, không theo số tạm chép từ chuyến gốc (mục #26)
+
+- **Mã TC:** TC_APR_016
+- **Tên Kịch Bản:** Duyệt thủ công một chuyến tăng cường có số ghế tạm lớn hơn sức chứa xe đúng loại tuyến
+- **Điều kiện tiên quyết:** Chuyến `PENDING_APPROVAL` chưa có xe (AI không gán được), `totalSeats = 26` (chép từ chuyến gốc), `ticketsSold = 0`; tuyến gợi ý Limousine (22 chỗ); có xe Limousine rảnh
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/pending` và `GET /admin/trips/approve/{id}` — đọc dòng "Số ghế"
+  2. Chọn xe Limousine đứng đầu (★) + một tài xế → "🚀 Phân công & Kích hoạt"
+  3. Lặp lại trên một chuyến khác với xe Ghế ngồi (50 chỗ)
+- **Kết quả mong đợi:**
+  - Bước 1: danh sách chờ hiện *"Số ghế: theo xe khi phân công"*; màn Duyệt hiện *"theo sức chứa xe được chọn"* (không hiện 26 như số thật)
+  - Bước 2: `flash[success]`, chuyến `ACTIVE`, `totalSeats = 22` — **trước bản sửa:** ⛔ *"Chuyến mở bán 26 ghế nhưng xe … chỉ có 22 chỗ"* (lỗi #26)
+  - Bước 3: `totalSeats = 50` (bằng sức chứa, không phải "giữ số cũ nếu vừa")
+  - Đối trọng: xe chưa gán loại → giữ nguyên số ghế; xe có sức chứa < số vé đã bán → ⛔ *"… chỉ có N chỗ nhưng chuyến đã bán M vé"*, chuyến vẫn `PENDING_APPROVAL`
+- **Tự động hoá:** `TripServiceSeatCapacityTest` (3 test `manualApproval_*`). Đã kiểm trên clone 2026-09-24: chuyến 8 (26 ghế tạm) duyệt bằng xe 20 (Limousine) → `ACTIVE`, **22** ghế
 ---
 
 <a name="module-6"></a>
@@ -2278,10 +2310,10 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 | Module 2 — Station Management | 6 | 3 | 3 |
 | Module 3 — Trip FSM & CRUD | 25 | 6 | 19 |
 | Module 4 — AI Scheduler | 18 | 5 | 13 |
-| Module 5 — Admin Approval | 11 | 5 | 6 |
+| Module 5 — Admin Approval | 13 | 6 | 7 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **97** | **37** | **60** |
+| **TỔNG** | **99** | **38** | **61** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2290,7 +2322,7 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
