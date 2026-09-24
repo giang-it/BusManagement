@@ -321,14 +321,17 @@
                             🚀 Phân công & Kích hoạt
                         </button>
 
-                        <form th:action="@{/admin/trips/reject/{id}(id=${trip.id})}" method="post"
-                            onsubmit="return confirm('Xác nhận từ chối chuyến tăng cường này?')">
-                            <button type="submit" class="btn btn-outline-danger btn-lg">❌ Từ chối</button>
-                        </form>
+                        <!-- Nút này thuộc form rejectTripForm ĐẶT BÊN NGOÀI form phân công (thuộc tính
+                             form=…). Không được lồng <form> vào đây: HTML cấm form lồng nhau, trình duyệt
+                             bỏ thẻ form bên trong, nút Từ chối thành nút submit của form phân công và
+                             KÍCH HOẠT chuyến thay vì từ chối — lỗi #27. -->
+                        <button type="submit" form="rejectTripForm" class="btn btn-outline-danger btn-lg">❌ Từ chối</button>
 
                         <a href="/admin/trips/pending" class="btn btn-secondary btn-lg">Quay lại</a>
                     </div>
                 </form>
+                <form id="rejectTripForm" th:action="@{/admin/trips/reject/{id}(id=${trip.id})}" method="post"
+                    onsubmit="return confirm('Xác nhận từ chối chuyến tăng cường này?')"></form>
             </div>
         </div>
 
