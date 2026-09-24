@@ -80,8 +80,11 @@
                     </p>
                 </div>
                 <div class="col-md-6">
+                    <!-- MANUAL MODE: số đang lưu chỉ là chỗ trống chép từ chuyến gốc;
+                         approveTrip() đặt số ghế theo sức chứa xe được chọn (#26). -->
                     <p class="mb-1"><strong>Số ghế:</strong>
-                        <span th:text="${trip.totalSeats}"></span> ghế
+                        <span th:if="${isAutoAssigned}"><span th:text="${trip.totalSeats}"></span> ghế</span>
+                        <span th:unless="${isAutoAssigned}">theo sức chứa xe được chọn</span>
                     </p>
                     <p class="mb-1"><strong>Giá vé:</strong>
                         <span th:text="${#numbers.formatDecimal(trip.price, 0, 'COMMA', 0, 'POINT')} + ' VNĐ'"></span>
@@ -249,8 +252,8 @@
                         </select>
                         <div class="form-text" th:if="${trip.route.suitableBusType != null}">
                             Tuyến gợi ý loại <strong th:text="${trip.route.suitableBusType.typeName}"></strong>
-                            — xe đúng loại được đánh ★ và xếp lên đầu. Chọn loại khác vẫn hợp lệ nếu xe đủ chỗ cho
-                            <strong th:text="${trip.totalSeats}"></strong> ghế của chuyến.
+                            — xe đúng loại được đánh ★ và xếp lên đầu. Chọn loại khác vẫn hợp lệ; chuyến sẽ mở bán
+                            đúng số chỗ của xe được chọn.
                         </div>
                         <div th:if="${#lists.isEmpty(availableBuses)}" class="text-danger mt-1">
                             <small>⛔ Không có xe nào phù hợp trong khung giờ này!</small>

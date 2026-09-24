@@ -56,8 +56,9 @@ public class Route {
      *
      * Là GỢI Ý, không phải luật (Group C(a), chủ dự án chốt 2026-09-23):
      * validateBusForTrip() không kiểm; dropdown Duyệt/Sửa/Tạo xếp xe đúng loại lên
-     * đầu và đánh ★ nhưng vẫn mời loại khác; riêng AI tự phân công
-     * (findBestAvailableBus) áp nó như bộ lọc.
+     * đầu và đánh ★ nhưng vẫn mời loại khác; AI tự phân công (findBestAvailableBus)
+     * chọn xe đúng loại trước, hết thì lấy loại khác (chủ dự án chốt 2026-09-24, mục
+     * #26 — trước đó AI áp loại xe như bộ lọc cứng).
      *
      * (Javadoc cũ hứa "nếu Admin chưa gán loại xe, hệ thống tự gợi ý dựa trên quãng
      * đường" trong khi thân hàm luôn trả null ở nhánh đó — lời hứa đã được xoá thay

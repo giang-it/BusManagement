@@ -186,7 +186,7 @@ public class RecommendationService {
         Bus bus = tripService.selectBestAvailableBus(candidate, departure, arrival, availability);
         if (bus == null) {
             card.setStatus(RecommendationStatus.NO_RESOURCE);
-            card.setNote("Không có xe rảnh, đúng loại và chưa tới ngưỡng bảo dưỡng cho khung giờ này");
+            card.setNote("Không có xe rảnh và chưa tới ngưỡng bảo dưỡng cho khung giờ này");
             return card;
         }
         card.setBusPlate(bus.getLicensePlate());

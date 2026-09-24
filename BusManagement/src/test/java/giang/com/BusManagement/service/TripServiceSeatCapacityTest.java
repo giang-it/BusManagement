@@ -42,8 +42,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <li>{@code createExtraTrip()} (chạy trong {@code scanAndSuggestExtraTrips()}) đặt số
  * ghế của chuyến tăng cường theo xe AI chọn, KHÔNG chép của chuyến gốc — đây là nơi
  * sinh ra chuyến 40 ghế trên xe 22 chỗ trên DB thật. Khi không có xe nào để gán,
- * số của chuyến gốc được giữ làm chỗ trống, và luật ở validator sẽ so lại lúc Admin
- * phân công thủ công.</li>
+ * số của chuyến gốc được giữ làm chỗ trống.</li>
+ * <li>{@code approveTrip()} (phân công thủ công ở màn Duyệt) đặt số ghế theo xe Admin
+ * chọn — cùng luật với đường AI; chỗ trống không bao giờ tới được luật #22 để bị từ
+ * chối (mục #26, chủ dự án chốt 2026-09-24). Xe chưa gán loại thì giữ số cũ.</li>
  * </ul>
  *
  * Non-vacuous: bỏ luật trong validateBusForTrip() → 2 test đỏ; đổi
@@ -62,6 +64,7 @@ class TripServiceSeatCapacityTest {
 
     private BusType limousine22;
     private Bus bus22;
+    private Bus bus50;
     private Bus untypedBus;
     private Driver driver;
     /** Rảnh hoàn toàn, để AI có người mà gán cho chuyến tăng cường (tài xế của chuyến gốc bận đúng khung đó). */
@@ -77,6 +80,11 @@ class TripServiceSeatCapacityTest {
         limousine22 = busTypeRepository.save(limousine22);
 
         bus22 = cleanBus("CAP-22", limousine22);
+
+        BusType seater50 = new BusType();
+        seater50.setTypeName("Cap-50");
+        seater50.setCapacity(50);
+        bus50 = cleanBus("CAP-50", busTypeRepository.save(seater50));
         untypedBus = cleanBus("CAP-NULL", null);
 
         driver = saveDriver("cap-driver");
@@ -155,9 +163,13 @@ class TripServiceSeatCapacityTest {
 
     @Test
     void aiExtraTrip_withNoBusAvailable_keepsTheOriginalCountAsAPlaceholder() {
-        // Không còn xe READY nào đúng loại của tuyến: xe 22 chỗ đi bảo trì.
+        // Không còn xe READY nào rảnh: xe 22 và 50 chỗ đi bảo trì, xe không loại đang
+        // chạy chính chuyến gốc. (Từ 2026-09-24 AI lấy cả xe khác loại — mục #26 — nên
+        // chỉ cho xe đúng loại đi bảo trì là không còn đủ để AI bó tay.)
         bus22.setStatus(BusStatus.REPAIRING);
         busRepository.save(bus22);
+        bus50.setStatus(BusStatus.REPAIRING);
+        busRepository.save(bus50);
 
         Trip hot = hotOriginalTrip(40, 39);
 
@@ -166,7 +178,47 @@ class TripServiceSeatCapacityTest {
         Trip extra = extraTripOf(hot);
         assertEquals(null, extra.getBus(), "không có xe nào để gán");
         assertEquals(40, extra.getTotalSeats(),
-                "chưa có xe để so thì giữ số của chuyến gốc; validateBusForTrip() sẽ so lại khi phân công tay");
+                "chưa có xe để so thì giữ số của chuyến gốc làm chỗ trống; approveTrip() sẽ đặt lại theo xe");
+    }
+
+    // =====================================================================
+    // Phân công thủ công ở màn Duyệt: số ghế theo xe được chọn (mục #26)
+    // =====================================================================
+
+    @Test
+    void manualApproval_setsTheSeatsToTheChosenBus_notThePlaceholderCopiedFromTheOriginal() {
+        // 40 = chỗ trống chép từ chuyến gốc. Trước bản sửa, xe 22 chỗ (đúng loại tuyến,
+        // đứng đầu dropdown có ★) bị luật #22 từ chối: "mở bán 40 ghế… chỉ có 22 chỗ".
+        Trip smaller = pendingPlaceholderTrip(40, 0, departure);
+        tripService.approveTrip(smaller.getId(), bus22.getId(), driver.getUserId(), null, null);
+        Trip saved = tripRepository.findById(smaller.getId()).orElseThrow();
+        assertEquals(TripStatus.ACTIVE, saved.getStatus());
+        assertEquals(22, saved.getTotalSeats(), "xe 22 chỗ ⇒ mở bán 22 ghế");
+
+        // Đối trọng: là "bằng sức chứa", không phải "không vượt số cũ" — xe 50 chỗ mở bán 50.
+        Trip bigger = pendingPlaceholderTrip(40, 0, departure.plusDays(1));
+        tripService.approveTrip(bigger.getId(), bus50.getId(), driver.getUserId(), null, null);
+        assertEquals(50, tripRepository.findById(bigger.getId()).orElseThrow().getTotalSeats());
+    }
+
+    @Test
+    void manualApproval_withAnUntypedBus_keepsTheSeatCount_becauseThereIsNoCapacityToUse() {
+        Trip trip = pendingPlaceholderTrip(40, 0, departure);
+
+        tripService.approveTrip(trip.getId(), untypedBus.getId(), driver.getUserId(), null, null);
+
+        assertEquals(40, tripRepository.findById(trip.getId()).orElseThrow().getTotalSeats());
+    }
+
+    @Test
+    void manualApproval_refusesABusSmallerThanTheTicketsAlreadySold() {
+        Trip trip = pendingPlaceholderTrip(40, 25, departure);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> tripService.approveTrip(trip.getId(), bus22.getId(), driver.getUserId(), null, null));
+
+        assertTrue(ex.getMessage().contains("đã bán 25 vé"), ex.getMessage());
+        assertEquals(TripStatus.PENDING_APPROVAL, tripRepository.findById(trip.getId()).orElseThrow().getStatus());
     }
 
     // =====================================================================
@@ -183,6 +235,20 @@ class TripServiceSeatCapacityTest {
         trip.setTotalSeats(seats);
         trip.setPrice(new BigDecimal("100000"));
         return trip;
+    }
+
+    /** Chuyến tăng cường chờ duyệt mà AI không gán được xe: số ghế là chỗ trống. */
+    private Trip pendingPlaceholderTrip(int seats, int sold, LocalDateTime at) {
+        Trip t = new Trip();
+        t.setRoute(route);
+        t.setDepartureTime(at);
+        t.setArrivalTimeExpected(at.plusHours(2));
+        t.setTotalSeats(seats);
+        t.setTicketsSold(sold);
+        t.setPrice(new BigDecimal("100000"));
+        t.setStatus(TripStatus.PENDING_APPROVAL);
+        t.setExtraTrip(true);
+        return tripRepository.save(t);
     }
 
     /**

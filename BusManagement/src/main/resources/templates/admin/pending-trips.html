@@ -86,7 +86,9 @@
                     <div class="text-muted small"
                         th:text="'Khởi hành: ' + ${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}">
                     </div>
-                    <div class="text-muted small" th:text="'Số ghế: ' + ${trip.totalSeats}">
+                    <!-- Chưa có xe thì số ghế chưa chốt: lúc duyệt thủ công nó theo sức chứa xe được chọn (#26). -->
+                    <div class="text-muted small"
+                        th:text="${trip.bus != null and trip.driver != null} ? 'Số ghế: ' + ${trip.totalSeats} : 'Số ghế: theo xe khi phân công'">
                     </div>
                 </div>
 

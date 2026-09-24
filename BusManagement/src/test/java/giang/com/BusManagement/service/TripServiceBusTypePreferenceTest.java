@@ -25,6 +25,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -39,6 +41,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * người biến gợi ý thành luật ở validator, test này đỏ và buộc họ quay lại ruling.</li>
  * </ul>
  * Tuyến không quy định loại thì không có ưu tiên — thứ tự thuần theo km, như cũ.
+ *
+ * Nửa thứ ba (chủ dự án chốt 2026-09-24, mục #26): AI tự phân công
+ * ({@code findBestAvailableBus}, qua {@code selectBestAvailableBus}) cũng coi loại xe là
+ * gợi ý — chọn xe đúng loại trước, hết thì lấy loại khác thay vì trả null.
  */
 @SpringBootTest
 @Transactional
@@ -102,6 +108,34 @@ class TripServiceBusTypePreferenceTest {
     }
 
     // =====================================================================
+    // AI tự phân công cũng coi loại xe là gợi ý (chủ dự án chốt 2026-09-24, mục #26)
+    // =====================================================================
+
+    @Test
+    void theAiPicksThePreferredType_evenWhenAnotherTypeHasFewerKm() {
+        Trip candidate = candidateOn(routeWithType(limousine));
+
+        Bus picked = tripService.selectBestAvailableBus(candidate,
+                candidate.getDepartureTime(), candidate.getArrivalTimeExpected(), null);
+
+        assertEquals(preferredButWorn.getId(), picked.getId(),
+                "còn xe đúng loại thì AI chọn nó trước, như thứ tự của dropdown");
+    }
+
+    @Test
+    void theAiFallsBackToAnotherType_whenNoBusOfThePreferredTypeIsAvailable() {
+        preferredButWorn.setStatus(BusStatus.REPAIRING);
+        busRepository.save(preferredButWorn);
+        Trip candidate = candidateOn(routeWithType(limousine));
+
+        Bus picked = tripService.selectBestAvailableBus(candidate,
+                candidate.getDepartureTime(), candidate.getArrivalTimeExpected(), null);
+
+        assertNotNull(picked, "hết xe đúng loại thì AI lấy loại khác, không bỏ cuộc (trước đây: null)");
+        assertEquals(otherTypeButFresh.getId(), picked.getId());
+    }
+
+    // =====================================================================
 
     private BusType saveType(String name, int capacity) {
         BusType t = new BusType();
@@ -142,6 +176,16 @@ class TripServiceBusTypePreferenceTest {
         t.setPrice(new BigDecimal("100000"));
         t.setStatus(TripStatus.PENDING_APPROVAL);
         return tripRepository.save(t);
+    }
+
+    /** Chuyến ứng viên chưa lưu, như RecommendationService/createExtraTrip dựng trước khi chọn xe. */
+    private Trip candidateOn(Route route) {
+        Trip t = new Trip();
+        t.setRoute(route);
+        LocalDateTime departure = LocalDate.now().plusDays(1).atTime(8, 0);
+        t.setDepartureTime(departure);
+        t.setArrivalTimeExpected(departure.plusHours(2));
+        return t;
     }
 
     private List<Long> idsOf(List<Bus> buses) {

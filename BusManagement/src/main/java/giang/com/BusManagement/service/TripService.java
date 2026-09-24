@@ -165,9 +165,10 @@ public class TripService {
         extraTrip.setArrivalTimeExpected(extraArrival);
         extraTrip.setStatus(TripStatus.PENDING_APPROVAL);
         // Số ghế tạm lấy theo chuyến gốc; nếu AI phân công được xe thì bên dưới sẽ
-        // thay bằng sức chứa THẬT của xe đó (lỗi #22). Giữ số của chuyến gốc chỉ
-        // cho trường hợp không tìm được xe — lúc đó chuyến chưa có xe nào để mà so,
-        // và validateBusForTrip() sẽ đối chiếu lại khi Admin phân công thủ công.
+        // thay bằng sức chứa THẬT của xe đó (lỗi #22). Số của chuyến gốc chỉ là CHỖ
+        // TRỐNG khi không tìm được xe: số ghế Admin sửa tay ở chuyến gốc là quyết định
+        // cho RIÊNG chuyến đó, không truyền sang chuyến tăng cường — approveTrip()
+        // đặt lại theo sức chứa xe Admin chọn lúc phân công thủ công (mục #26).
         extraTrip.setTotalSeats(trip.getTotalSeats());
         extraTrip.setPrice(trip.getPrice());
         extraTrip.setExtraTrip(true);
@@ -228,7 +229,7 @@ public class TripService {
         Bus bus = findBestAvailableBus(trip, departure, arrival);
         if (bus == null) {
             return AutoAssignResult.failure(
-                    "Không có xe nào sẵn sàng / đúng loại / không bận trong khung giờ này");
+                    "Không có xe nào sẵn sàng / không bận / chưa tới ngưỡng bảo trì trong khung giờ này");
         }
 
         // Tính toán số tài xế cần thiết
@@ -283,8 +284,9 @@ public class TripService {
     // =========================================================================
 
     /**
-     * Tìm xe READY, đúng loại, không bận, chưa quá hạn/sắp đến hạn bảo trì.
-     * Sắp xếp ưu tiên: xe ít km kể từ bảo trì nhất (xe "mới nhất") được chọn trước.
+     * Tìm xe READY, không bận, chưa quá hạn/sắp đến hạn bảo trì.
+     * Thứ tự ưu tiên: xe ĐÚNG LOẠI GỢI Ý của tuyến trước, rồi xe ít km kể từ bảo
+     * trì nhất (xe "mới nhất") — xem {@link #preferredTypeThenLeastWorn}.
      *
      * Dùng CHUNG ràng buộc bảo trì với validateBusForTrip()/Bus.isNearMaintenance()
      * (>= 90% maintenanceThreshold sau khi cộng quãng đường chuyến này) để AI
@@ -305,14 +307,15 @@ public class TripService {
      */
     private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival,
             AvailabilityContext ctx) {
-        BusType requiredType = trip.getRoute().getSuitableBusType();
-
-        // Lấy tất cả xe READY (và đúng loại nếu tuyến quy định). Loại xe của tuyến
-        // là GỢI Ý chứ không phải luật (Group C(a)); AI cố ý áp gợi ý đó như bộ lọc
-        // cứng vì không có người xem lại lựa chọn — xem getAvailableBusesForTrip().
-        List<Bus> candidates = (requiredType != null)
-                ? busRepository.findByStatusAndBusType(BusStatus.READY, requiredType)
-                : busRepository.findByStatus(BusStatus.READY);
+        // Loại xe của tuyến là GỢI Ý, không phải luật (Group C(a)) — với AI cũng vậy
+        // (chủ dự án chốt 2026-09-24, mục #26): xe đúng loại được chọn TRƯỚC, hết xe
+        // đúng loại thì AI lấy xe loại khác thay vì bỏ cuộc. Trước đây AI lọc cứng
+        // theo loại, nên chỉ cần hết Limousine là chuyến tăng cường rơi vào phân công
+        // thủ công mang số ghế tạm của chuyến gốc — đúng đường dẫn tới #26. Rủi ro
+        // thật của xe khác loại (bán quá chỗ) không phát sinh: createExtraTrip() đặt
+        // số ghế theo xe được chọn, và luật #22 vẫn kiểm ở mọi lối.
+        BusType preferredType = trip.getRoute().getSuitableBusType();
+        List<Bus> candidates = busRepository.findByStatus(BusStatus.READY);
 
         // Mở rộng cửa sổ thời gian để đảm bảo xe kịp chuẩn bị
         LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
@@ -324,8 +327,22 @@ public class TripService {
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null, ctx))
                 .filter(bus -> !bus.needsMaintenance())
                 .filter(bus -> !bus.isNearMaintenance(tripDistance))
-                .min(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
+                .min(preferredTypeThenLeastWorn(preferredType))
                 .orElse(null);
+    }
+
+    /**
+     * Thứ tự ưu tiên xe DUY NHẤT của hệ thống khi đã biết tuyến: xe đúng loại gợi ý
+     * của tuyến trước (false xếp trước true), rồi xe ít km kể từ bảo trì nhất.
+     *
+     * Dùng chung cho AI tự phân công (findBestAvailableBus lấy phần tử đầu) và
+     * dropdown Duyệt/Sửa (getAvailableBusesForTrip xếp cả danh sách), để người và
+     * AI hiểu "ưu tiên" theo cùng một cách — form Tạo xếp y hệt ở phía JS. Tuyến
+     * không quy định loại thì vế đầu bằng nhau với mọi xe ⇒ thuần theo km.
+     */
+    private static Comparator<Bus> preferredTypeThenLeastWorn(BusType preferredType) {
+        return Comparator.comparing((Bus bus) -> !isOfType(bus, preferredType))
+                .thenComparingDouble(Bus::getKmSinceLastMaintenance);
     }
 
     /**
@@ -952,6 +969,22 @@ public class TripService {
         trip.setBus(bus);
         trip.setDriver(driver);
 
+        // SỐ GHẾ THEO XE ĐƯỢC CHỌN — cùng luật với đường AI tự phân công
+        // (createExtraTrip đặt totalSeats = sức chứa xe AI chọn). Chuyến chờ duyệt đi
+        // tới đây mang số ghế TẠM chép từ chuyến gốc, mà màn Duyệt không có ô số ghế;
+        // giữ nguyên số đó thì mọi xe nhỏ hơn trong dropdown đều bị luật #22 từ chối
+        // — kể cả xe đúng loại tuyến đứng đầu có ★ (lỗi #26). Muốn bán ít hơn sức
+        // chứa là quyết định kinh doanh, làm ở form Sửa chuyến sau khi kích hoạt.
+        // Xe chưa gán loại thì không biết sức chứa: giữ số cũ, #22 cũng bỏ qua ca đó.
+        Integer capacity = seatCapacityOf(bus);
+        if (capacity != null) {
+            if (capacity < trip.getTicketsSold()) {
+                throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " chỉ có " + capacity
+                        + " chỗ nhưng chuyến đã bán " + trip.getTicketsSold() + " vé — hãy chọn xe lớn hơn!");
+            }
+            trip.setTotalSeats(capacity);
+        }
+
         trip.getCoDrivers().clear();
         if (coDriverIds != null) {
             for (Long cdId : coDriverIds) {
@@ -1180,7 +1213,8 @@ public class TripService {
     /**
      * Sức chứa (số chỗ thật) của xe theo loại xe, hoặc null nếu xe chưa được gán
      * loại. Dùng chung cho luật sức chứa trong validateBusForTrip() và cho việc
-     * đặt số ghế của chuyến tăng cường trong createExtraTrip() — một định nghĩa.
+     * đặt số ghế theo xe được gán — createExtraTrip() (AI) và approveTrip() (phân
+     * công thủ công) — một định nghĩa.
      */
     private static Integer seatCapacityOf(Bus bus) {
         return bus.getBusType() != null ? bus.getBusType().getCapacity() : null;
@@ -1439,9 +1473,12 @@ public class TripService {
      * Rủi ro thật của việc chọn sai loại — bán nhiều ghế hơn số chỗ — đã do luật
      * sức chứa #22 trong validateBusForTrip() chặn.
      *
-     * findBestAvailableBus() (AI tự phân công) CỐ Ý vẫn lọc cứng: đường tự động
-     * không có người xem lại lựa chọn lúc chọn, và mời hẹp hơn validator là được
-     * phép theo bất biến một chiều của #12.
+     * Thứ tự nằm ở {@link #preferredTypeThenLeastWorn} — cùng thứ tự mà
+     * findBestAvailableBus() (AI) dùng để chọn xe đầu tiên. (Đến 2026-09-24 AI còn
+     * lọc cứng theo loại; chủ dự án chốt AI cũng coi loại xe là gợi ý — mục #26.)
+     *
+     * Không lọc theo sức chứa: ở form Sửa số ghế sửa được cùng lúc; ở màn Duyệt,
+     * approveTrip() đặt số ghế theo xe được chọn nên xe nào cũng hợp với luật #22.
      */
     public List<Bus> getAvailableBusesForTrip(Long tripId) {
         Trip trip = tripRepository.findById(tripId)
@@ -1460,15 +1497,11 @@ public class TripService {
                 ? trip.getRoute().getDistanceKm()
                 : 0.0;
 
-        // false xếp trước true: xe đúng loại tuyến (không phải "khác loại") lên đầu.
-        Comparator<Bus> suitableTypeFirst = Comparator.comparing(
-                bus -> !isOfType(bus, preferredType));
-
         return busRepository.findByStatus(BusStatus.READY).stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, tripId))
                 .filter(bus -> !bus.needsMaintenance())
                 .filter(bus -> !bus.isNearMaintenance(tripDistance))
-                .sorted(suitableTypeFirst.thenComparingDouble(Bus::getKmSinceLastMaintenance))
+                .sorted(preferredTypeThenLeastWorn(preferredType))
                 .collect(Collectors.toList());
     }
 
