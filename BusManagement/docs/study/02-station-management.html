@@ -1,0 +1,1283 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 02 Quản lý bến xe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</a></li>
+<li><a href="#2-ban-do-tong-quan">§2. Bản đồ tổng quan</a></li>
+<li><a href="#3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</a></li>
+<li><a href="#4-luong-loi-xoa-ben-dang-thuoc-lo-trinh">§4. Luồng lỗi — xóa bến đang thuộc lộ trình</a></li>
+<li><a href="#5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</a></li>
+<li><a href="#6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</a></li>
+<li><a href="#7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</a></li>
+<li><a href="#8-vi-du-tinh-tay">§8. Ví dụ tính tay</a></li>
+<li><a href="#9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</a></li>
+<li><a href="#10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</a></li>
+<li><a href="#11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 02 · CHỨC NĂNG</span>
+      <h1>Bài 02 — Station Management (Quản lý bến xe)</h1>
+    </header>
+<aside class="callout"><p>Bài chức năng thứ hai, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN B), ngày 2026-09-30.
+Học sau Bài 00a, 00b và 01. Số dòng là ảnh chụp ngày viết — lệch thì grep lại.</p>
+<p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết
+ra · <span class="tag tag-guess">SUY LUẬN</span> suy luận của người viết (&quot;chưa kiểm chứng&quot; nếu chưa chạy thử).</p>
+<p>Viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>, <code>test/</code> =
+<code>src/test/java/giang/com/BusManagement/</code>, <code>tpl/</code> = <code>src/main/resources/templates/</code>.</p>
+<p>Chức năng này có <strong>cùng khung</strong> với Bài 01 (Quản lý xe): cùng 6 endpoint, cùng kiểu form, cùng
+cách báo lỗi. Bài này <strong>không giảng lại</strong> phần giống nhau — chỉ dẫn &quot;(xem Bài 01 §x)&quot; — và tập
+trung vào ba chỗ khác: bến xe <strong>không có luật số nào</strong>, guard xóa đọc một <strong>collection LAZY</strong>, và
+bến là <strong>nguyên liệu của tuyến</strong>.</p>
+</aside>
+<hr>
+<h2 id="1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</h2>
+<p><strong>Vấn đề thật của nhà xe.</strong> Một tuyến xe khách là một chuỗi điểm dừng: &quot;Bến xe Mỹ Đình → Bến xe
+Niệm Nghĩa&quot;. Nếu mỗi lần tạo tuyến người ta lại gõ tay tên bến, sẽ có &quot;BX Mỹ Đình&quot;, &quot;Bến Mỹ Đình&quot;,
+&quot;Mỹ Đình (HN)&quot; — ba cách viết cho một chỗ, và không ai trả lời được câu &quot;có bao nhiêu tuyến đi qua
+Mỹ Đình?&quot;. Màn Quản lý bến xe là <strong>danh bạ địa điểm dùng chung</strong>: mỗi bến ghi một lần (tên + địa
+chỉ), rồi mọi tuyến chọn từ danh bạ đó.</p>
+<p>Dự án từng gặp đúng vấn đề này: <code>Route</code> trước đây có hai ô chữ tự do <code>departurePoint</code> /
+<code>destinationPoint</code> song song với bảng <code>stations</code>, &quot;gây bất nhất dữ liệu&quot;, nên đã bị xóa — nguồn sự
+thật duy nhất giờ là bảng nối <code>RouteStation</code> <span class="tag tag-code">CODE</span> <code>…/domain/Route.java:31-35</code>.</p>
+<p>Không có màn này thì: không tạo được tuyến (form tuyến chọn bến từ danh sách), và mọi màn hiện
+&quot;điểm đi → điểm đến&quot; (danh sách tuyến, danh sách chuyến, Dashboard) không có gì để hiện.</p>
+<p><strong>Một kịch bản cụ thể.</strong> Nhà xe mở tuyến mới đi Vũng Tàu. Anh admin vào Dashboard, bấm &quot;Quản lý
+bến xe&quot;, thấy 11 bến. Anh bấm <strong>Thêm Bến Xe Mới</strong>, gõ &quot;Bến xe Vũng Tàu&quot;, địa chỉ &quot;192 Nam Kỳ Khởi
+Nghĩa, Vũng Tàu&quot;, bấm <strong>Lưu Lại</strong> → quay về danh sách, khung xanh <em>&quot;Thêm mới bến xe thành công!&quot;</em>.
+Giờ bến mới đã xuất hiện trong dropdown của form tạo tuyến.</p>
+<p>Hôm sau anh thấy gõ sai địa chỉ → bấm <strong>Sửa</strong>, chữa lại, lưu. Anh thử <strong>Xóa</strong> &quot;Bến xe Mỹ Đình&quot; →
+trình duyệt hỏi trước <em>&quot;Hệ thống sẽ chặn xóa nếu bến xe này đang nằm trên lộ trình tuyến đường.
+Bạn có muốn tiếp tục?&quot;</em>; bấm OK → khung đỏ <em>&quot;Lỗi: Không thể xóa bến xe này vì đang thuộc lộ trình
+của một số tuyến đường hiện hành!&quot;</em>.</p>
+<hr>
+<h2 id="2-ban-do-tong-quan">§2. Bản đồ tổng quan</h2>
+<h3 id="2-1-cac-manh-ghep">2.1. Các mảnh ghép</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Loại</th>
+<th>File</th>
+<th>Trách nhiệm (1 dòng)</th>
+</tr>
+</thead><tbody><tr>
+<td>Template</td>
+<td><code>tpl/admin/station/station-list.html</code></td>
+<td>Bảng bến xe, flash, nút Sửa/Xóa (có <code>confirm()</code> báo trước luật chặn)</td>
+</tr>
+<tr>
+<td>Template + JS</td>
+<td><code>tpl/admin/station/station-form.html</code></td>
+<td>Form Thêm/Sửa 2 ô; khối <code>&lt;script&gt;</code> <code>:47-58</code> chặn submit khi ô trống</td>
+</tr>
+<tr>
+<td>Template (lối vào)</td>
+<td><code>tpl/admin/dashboard.html:76</code></td>
+<td>Nút &quot;Quản lý bến xe&quot; trên Dashboard</td>
+</tr>
+<tr>
+<td>Controller</td>
+<td><code>…/controller/admin/AdminStationController.java</code></td>
+<td>6 endpoint <code>/admin/stations/*</code>; chỉ inject <code>StationService</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>…/service/StationService.java</code></td>
+<td>Tạo (tripwire id), sửa (chép 2 field), xóa (guard lộ trình)</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>…/repository/StationRepository.java</code></td>
+<td><code>JpaRepository</code> + một derived query <strong>chưa ai gọi</strong></td>
+</tr>
+<tr>
+<td>Entity</td>
+<td><code>…/domain/Station.java</code></td>
+<td>Bảng <code>stations</code>: <code>stationName</code>, <code>address</code>, + collection <code>routeStations</code></td>
+</tr>
+<tr>
+<td>Entity (liên quan)</td>
+<td><code>…/domain/RouteStation.java</code>, <code>RouteStationId.java</code></td>
+<td>Bảng nối tuyến ↔ bến, khoá kép <code>(routeId, stationId)</code>, có <code>stopOrder</code></td>
+</tr>
+<tr>
+<td>Người dùng bến</td>
+<td><code>…/service/RouteService.java:50-52, :160-173</code></td>
+<td>Đổ dropdown bến cho form tuyến; dựng <code>RouteStation</code> khi lưu tuyến</td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/service/CreatePathIdTripwireTest.java:281, :321</code></td>
+<td>2 test cho bến: tripwire tạo, và sửa chép field</td>
+</tr>
+<tr>
+<td>Seed</td>
+<td><code>…/config/DataInitializer.java:166-172</code></td>
+<td>7 bến mẫu (profile <code>demo</code>)</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-2-bang-endpoint-du-moi-diem-bat-dau">2.2. Bảng endpoint — đủ mọi điểm bắt đầu</h3>
+<p>Không có <code>@Scheduled</code>, REST/<code>fetch()</code> hay <code>CommandLineRunner</code> riêng. Số dòng controller thuộc
+<code>…/controller/admin/AdminStationController.java</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>HTTP</th>
+<th>URL</th>
+<th>Controller method</th>
+<th>Được gọi từ đâu</th>
+<th>Service chính</th>
+<th>Kết quả</th>
+</tr>
+</thead><tbody><tr>
+<td>GET</td>
+<td><code>/admin/stations</code></td>
+<td><code>listStations()</code> <code>:18-22</code></td>
+<td>nút <code>dashboard.html:76</code>; mọi redirect của màn này</td>
+<td><code>findAll()</code></td>
+<td>view <code>admin/station/station-list</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/stations/create</code></td>
+<td><code>showCreateForm()</code> <code>:24-28</code></td>
+<td>nút &quot;Thêm Bến Xe Mới&quot; <code>station-list.html:20-21</code></td>
+<td>—</td>
+<td>view <code>station-form</code> với <code>new Station()</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/stations/create</code></td>
+<td><code>createStation()</code> <code>:30-39</code></td>
+<td>nút &quot;Lưu Lại&quot; khi <code>station.id == null</code> (<code>station-form.html:22</code>)</td>
+<td><code>createStation()</code></td>
+<td>redirect <code>/admin/stations</code> + flash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/stations/edit/{id}</code></td>
+<td><code>showEditForm()</code> <code>:41-52</code></td>
+<td>nút &quot;Sửa&quot; <code>station-list.html:52-53</code></td>
+<td><code>findById()</code></td>
+<td>view <code>station-form</code>, hoặc redirect + flash <code>error</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/stations/edit/{id}</code></td>
+<td><code>updateStation()</code> <code>:54-66</code></td>
+<td>nút &quot;Lưu Lại&quot; khi <code>station.id != null</code></td>
+<td><code>updateStation(id, form)</code></td>
+<td>redirect <code>/admin/stations</code> + flash</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/stations/delete/{id}</code></td>
+<td><code>deleteStation()</code> <code>:68-77</code></td>
+<td>nút &quot;Xóa&quot; + <code>confirm()</code> <code>station-list.html:54-57</code></td>
+<td><code>deleteById()</code></td>
+<td>redirect <code>/admin/stations</code> + flash</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-3-so-do-toan-canh">2.3. Sơ đồ toàn cảnh</h3>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    subgraph UI["Trình duyệt"]
+        L["station-list.html"]
+        F["station-form.html&lt;br/&gt;JS checkValidity"]
+    end
+    subgraph C["AdminStationController /admin/stations"]
+        C1["listStations / showCreateForm / showEditForm"]
+        C2["createStation / updateStation / deleteStation"]
+    end
+    subgraph S["StationService"]
+        S1["findAll / findById"]
+        S2["createStation - tripwire id"]
+        S3["updateStation - chép 2 field"]
+        S4["deleteById - guard routeStations"]
+    end
+    SR["StationRepository"]
+    DB[("MySQL&lt;br/&gt;stations, route_stations")]
+    L --&gt; C1 --&gt; S1 --&gt; SR
+    F --&gt; C2
+    C2 --&gt; S2 --&gt; SR
+    C2 --&gt; S3 --&gt; SR
+    C2 --&gt; S4 --&gt; SR
+    SR --&gt; DB
+    RS["RouteService&lt;br/&gt;form tuyến + rebuildStops"] --&gt;|đọc danh sách bến, tạo RouteStation| DB
+    RV["Route.getDeparturePointDisplay&lt;br/&gt;danh sách tuyến, chuyến, Dashboard"] -.-&gt;|đọc tên bến qua RouteStation| DB</pre></figure>
+<p>Quan hệ dữ liệu — bến không trỏ tới ai; <strong>tuyến trỏ tới bến</strong> qua bảng nối:</p>
+<figure class="diagram"><pre class="mermaid">erDiagram
+    STATIONS ||--o{ ROUTE_STATIONS : "có mặt trong"
+    ROUTES ||--o{ ROUTE_STATIONS : "gồm các điểm dừng"
+    ROUTES ||--o{ TRIPS : "được chạy bởi"
+    STATIONS {
+        bigint id PK
+        varchar station_name "NOT NULL, tối đa 100"
+        text address
+    }
+    ROUTE_STATIONS {
+        bigint route_id PK
+        bigint station_id PK
+        int stop_order
+    }</pre></figure>
+<h3 id="2-4-dieu-cot-loi-can-nho">2.4. Điều cốt lõi cần nhớ</h3>
+<ol>
+<li><strong>Bến là danh bạ dùng chung</strong>; tên tuyến không được lưu ở đâu cả — nó được <strong>suy ra</strong> từ bến
+đầu và bến cuối của lộ trình (<code>Route.java:126-140</code>). Đổi tên một bến là đổi nhãn của mọi tuyến
+và mọi chuyến đi qua nó, kể cả chuyến trong quá khứ.</li>
+<li><strong>Tạo và Sửa tách riêng</strong> (khuôn Bài 01 §2.4): <code>createStation()</code> từ chối entity có id (lỗi #21),
+<code>updateStation(id, form)</code> nạp bản ghi cũ rồi chép đúng <strong>hai</strong> field.</li>
+<li><strong>Guard xóa duy nhất:</strong> bến đang nằm trong lộ trình của <strong>bất kỳ</strong> tuyến nào thì không xóa được.
+Guard đọc collection <code>routeStations</code> — một quan hệ LAZY — nên chạm DB thêm một câu.</li>
+<li><strong>Không có luật kiểm dữ liệu nào ở server</strong> cho tên/địa chỉ; chỉ có <code>required</code> ở HTML và JS.</li>
+<li>Muốn xóa một bến đang dùng, phải <strong>sửa hoặc xóa các tuyến</strong> chứa nó trước — mà tuyến đã có
+chuyến thì không xóa được (Bài 03).</li>
+</ol>
+<hr>
+<h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
+<p><strong>Chọn luồng nào và vì sao.</strong> Luồng xem danh sách giống hệt Bài 00a §4.2 (chỉ khác là
+<code>findAll()</code> thường, không cần <code>JOIN FETCH</code> vì template chỉ in hai cột chữ). Hai luồng được chọn:</p>
+<ul>
+<li><strong>Luồng A — Xóa bến</strong>: chứa luật nghiệp vụ duy nhất của chức năng, và là chỗ có cơ chế ngầm đáng
+giảng (LAZY load trong transaction, <code>cascade = ALL</code>).</li>
+<li><strong>Luồng B — Sửa bến</strong>: ngắn, nhưng là nơi lỗi #21 đã được sửa bằng cách tách upsert.</li>
+</ul>
+<h3 id="3-1-luong-a-xoa-ben-ca-thanh-cong-ben-moi-tao-chua-thuoc-tuyen-nao">3.1. Luồng A — Xóa bến (ca thành công: bến mới tạo, chưa thuộc tuyến nào)</h3>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant JS as JavaScript confirm
+    participant C as AdminStationController
+    participant P as Proxy Transactional
+    participant S as StationService
+    participant R as StationRepository
+    participant H as Hibernate
+    participant DB as MySQL
+    A-&gt;&gt;JS: bấm Xóa ở dòng bến 12
+    JS-&gt;&gt;A: confirm - hệ thống sẽ chặn nếu bến nằm trên tuyến
+    A-&gt;&gt;JS: OK
+    JS-&gt;&gt;C: GET /admin/stations/delete/12
+    C-&gt;&gt;P: stationService.deleteById(12)
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;R: findById(12)
+    R-&gt;&gt;DB: SELECT stations WHERE id = 12
+    DB--&gt;&gt;S: Station 12 - routeStations còn là proxy LAZY chưa nạp
+    S-&gt;&gt;H: station.getRouteStations().isEmpty()
+    Note over H,DB: Chạm vào collection LAZY lần đầu&lt;br/&gt;nên Hibernate phát sinh một câu truy vấn phụ
+    H-&gt;&gt;DB: SELECT route_stations WHERE station_id = 12
+    DB--&gt;&gt;S: danh sách rỗng
+    alt danh sách KHÔNG rỗng
+        S--&gt;&gt;P: ném RuntimeException
+        P--&gt;&gt;C: rollback
+        C--&gt;&gt;A: flash error rồi redirect:/admin/stations
+    else rỗng
+        S-&gt;&gt;R: delete(station)
+        S--&gt;&gt;P: return
+        P-&gt;&gt;DB: commit - DELETE FROM stations WHERE id = 12
+        C--&gt;&gt;A: flash success rồi redirect:/admin/stations
+    end</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Trình duyệt</td>
+<td><code>station-list.html:54-57</code></td>
+<td>thẻ <code>&lt;a&gt;</code> &quot;Xóa&quot;</td>
+<td>—</td>
+<td><code>href</code> = <code>/admin/stations/delete/12</code>; <code>onclick=&quot;return confirm(&#39;Hệ thống sẽ chặn xóa nếu …&#39;)&quot;</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>JavaScript</td>
+<td><code>:56</code></td>
+<td><code>confirm()</code></td>
+<td>—</td>
+<td>OK ⇒ đi theo link; Cancel ⇒ <code>return false</code>, không có request nào</td>
+<td>GET</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Spring</td>
+<td>—</td>
+<td>DispatcherServlet</td>
+<td>URL</td>
+<td>khớp <code>@GetMapping(&quot;/delete/{id}&quot;)</code>, <code>id = 12</code></td>
+<td><code>deleteStation(12, ra)</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Controller</td>
+<td><code>AdminStationController.java:71</code></td>
+<td><code>deleteStation()</code></td>
+<td>12</td>
+<td>gọi service trong <code>try</code></td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Proxy</td>
+<td><code>StationService.java:60</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td><strong>mở transaction</strong></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Service → DB</td>
+<td><code>:62-63</code></td>
+<td><code>stationRepository.findById(12)</code></td>
+<td>12</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT id, station_name, address FROM stations WHERE id = 12</code>; không thấy ⇒ <code>RuntimeException(&quot;Không tìm thấy bến xe cần xóa với ID: 12&quot;)</code></td>
+<td><code>Station</code> managed; <code>routeStations</code> <strong>chưa nạp</strong></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Service</td>
+<td><code>:67</code></td>
+<td><code>station.getRouteStations()</code></td>
+<td>—</td>
+<td><code>@OneToMany</code> mặc định <strong>LAZY</strong> (<code>Station.java:36</code>): lần đầu gọi <code>isEmpty()</code> trên collection, Hibernate mới đi lấy dữ liệu</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Hibernate → DB</td>
+<td>—</td>
+<td>nạp collection</td>
+<td>—</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT route_id, station_id, stop_order FROM route_stations WHERE station_id = 12</code></td>
+<td><code>List&lt;RouteStation&gt;</code> rỗng</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Service</td>
+<td><code>:67-70</code></td>
+<td>guard</td>
+<td>danh sách</td>
+<td><code>!= null &amp;&amp; !isEmpty()</code> ⇒ ném lỗi. Ở đây rỗng ⇒ đi tiếp</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service</td>
+<td><code>:72</code></td>
+<td><code>stationRepository.delete(station)</code></td>
+<td>entity</td>
+<td>đánh dấu xóa; <code>cascade = ALL</code> (<code>Station.java:36</code>) sẽ xóa kèm mọi <code>RouteStation</code> trong collection — ở đây không có gì</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Proxy</td>
+<td>—</td>
+<td>commit</td>
+<td>—</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>DELETE FROM stations WHERE id = 12</code> — <strong>đóng transaction</strong></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Controller</td>
+<td><code>:72</code>, <code>:76</code></td>
+<td>flash + redirect</td>
+<td>—</td>
+<td><code>success</code> = &quot;Xóa bến xe thành công!&quot;; <code>redirect:/admin/stations</code></td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Controller → View</td>
+<td><code>:18-22</code>, <code>station-list.html:25-28, :47</code></td>
+<td><code>listStations()</code></td>
+<td>—</td>
+<td><code>findAll()</code> → bảng không còn bến 12, khung xanh</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Ranh giới transaction:</strong> một transaction, bao trọn <code>deleteById()</code> (bước 5 → 11). Bước 7–8 <strong>bắt
+buộc</strong> nằm trong phiên Hibernate còn mở — ở đây có cả transaction lẫn OSIV nên luôn an toàn. Nếu
+gọi <code>getRouteStations()</code> trên một <code>Station</code> đã tách khỏi phiên (ví dụ trong một job nền), sẽ gặp
+<code>LazyInitializationException</code> (Bài 00b §4.5).</p>
+<p><strong>(c) Code then chốt</strong> — <code>…/service/StationService.java:60-73</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Transactional                                              // cả method là một giao dịch
+public void deleteById(Long id) {
+    Station station = stationRepository.findById(id)        // nạp bến; routeStations CHƯA nạp
+            .orElseThrow(() -&gt; new RuntimeException("Không tìm thấy bến xe cần xóa với ID: " + id));
+
+    // RÀNG BUỘC 3A: bến thuộc lộ trình của bất kỳ tuyến nào thì không cho xóa
+    if (station.getRouteStations() != null                  // an toàn nếu collection null
+            &amp;&amp; !station.getRouteStations().isEmpty()) {     // ← dòng này làm Hibernate chạy SELECT phụ
+        throw new RuntimeException(
+                "Không thể xóa bến xe này vì đang thuộc lộ trình của một số tuyến đường hiện hành!");
+    }
+
+    stationRepository.delete(station);                      // DELETE thật (không soft delete)
+}</code></pre></div>
+<p>Và phía entity — <code>…/domain/Station.java:35-37</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@ToString.Exclude                                           // không in collection khi log (Hidden Cost #9)
+@OneToMany(mappedBy = "station", cascade = CascadeType.ALL) // "mappedBy": khoá ngoại nằm ở RouteStation.station
+private List&lt;RouteStation&gt; routeStations;                   // mặc định LAZY</code></pre></div>
+<p><code>mappedBy = &quot;station&quot;</code> nghĩa là &quot;cột khoá ngoại không nằm ở bảng <code>stations</code>, mà ở field <code>station</code>
+của <code>RouteStation</code>&quot; — bến chỉ là <strong>phía đọc ngược</strong> của quan hệ (Bài 00b §1.3).</p>
+<h3 id="3-2-luong-b-sua-ben">3.2. Luồng B — Sửa bến</h3>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant JS as JavaScript station-form
+    participant C as AdminStationController
+    participant P as Proxy Transactional
+    participant S as StationService
+    participant R as StationRepository
+    participant DB as MySQL
+    A-&gt;&gt;C: GET /admin/stations/edit/1
+    C-&gt;&gt;R: stationService.findById(1)
+    C--&gt;&gt;A: view station-form, 2 ô điền sẵn
+    A-&gt;&gt;JS: sửa địa chỉ, bấm Lưu Lại
+    JS-&gt;&gt;JS: checkValidity - 2 ô required đều có chữ
+    JS-&gt;&gt;C: POST /admin/stations/edit/1 (stationName, address)
+    Note over C: Spring dựng new Station() từ form&lt;br/&gt;id và routeStations đều null
+    C-&gt;&gt;P: stationService.updateStation(1, form)
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;R: findById(1) - bản ghi thật, managed
+    S-&gt;&gt;S: chép stationName, address
+    S-&gt;&gt;R: save(existing)
+    P-&gt;&gt;DB: commit - UPDATE stations SET address, station_name WHERE id = 1
+    C--&gt;&gt;A: flash success rồi redirect:/admin/stations</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Controller</td>
+<td><code>AdminStationController.java:41-47</code></td>
+<td><code>showEditForm()</code></td>
+<td><code>id = 1</code></td>
+<td><code>findById(id).orElseThrow(...)</code>; đặt <code>station</code> vào Model</td>
+<td><code>station-form</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>View</td>
+<td><code>station-form.html:22-23</code></td>
+<td><code>th:action</code>, <code>th:object</code></td>
+<td><code>station.id = 1</code></td>
+<td>form trỏ về <code>/admin/stations/edit/1</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>View</td>
+<td><code>:27-28</code>, <code>:33-34</code></td>
+<td><code>th:field</code></td>
+<td>—</td>
+<td>điền sẵn tên và địa chỉ; cả hai <code>required</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>JavaScript</td>
+<td><code>:51-56</code></td>
+<td>listener <code>submit</code></td>
+<td>form</td>
+<td><code>checkValidity()</code> sai ⇒ <code>preventDefault()</code> + tô đỏ; đúng ⇒ cho gửi</td>
+<td>POST</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Spring</td>
+<td><code>AdminStationController.java:55</code></td>
+<td><code>@ModelAttribute Station station</code></td>
+<td>body</td>
+<td><code>new Station()</code> + <code>setStationName</code>, <code>setAddress</code>; <code>id</code> và <code>routeStations</code> = <code>null</code> vì form không gửi</td>
+<td>object rời</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Controller</td>
+<td><code>:60</code></td>
+<td><code>updateStation()</code></td>
+<td><code>id</code> từ URL</td>
+<td>gọi <code>stationService.updateStation(id, station)</code> — <strong>không</strong> <code>station.setId(id)</code> (comment <code>:58-59</code>)</td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Proxy</td>
+<td><code>StationService.java:51</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td>mở transaction</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Service → DB</td>
+<td><code>:53-54</code></td>
+<td><code>findById(1)</code></td>
+<td>—</td>
+<td>nạp bản ghi thật; không thấy ⇒ <code>RuntimeException</code></td>
+<td><code>existing</code> managed</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Service</td>
+<td><code>:55-56</code></td>
+<td>chép field</td>
+<td>form</td>
+<td><code>setStationName</code>, <code>setAddress</code> — chép nguyên, kể cả null/rỗng</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service</td>
+<td><code>:57</code></td>
+<td><code>save(existing)</code></td>
+<td>managed</td>
+<td>merge trên entity đang managed: không làm gì thêm</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Proxy</td>
+<td>—</td>
+<td>commit</td>
+<td>—</td>
+<td>dirty checking ⇒ <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>UPDATE stations SET address=?, station_name=? WHERE id=1</code>. <code>routeStations</code> <strong>không bị đụng</strong></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Controller</td>
+<td><code>:61</code>, <code>:65</code></td>
+<td>flash + redirect</td>
+<td>—</td>
+<td><code>success</code> = &quot;Cập nhật thông tin bến xe thành công!&quot;</td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>View (các màn khác)</td>
+<td><code>Route.java:126-140</code></td>
+<td><code>getDeparturePointDisplay()</code></td>
+<td>—</td>
+<td>từ giờ mọi màn hiện tuyến qua bến 1 đều đọc tên mới — không có bản sao tên nào để cập nhật</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>(c) Code then chốt</strong> — <code>…/service/StationService.java:46-58</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">/**
+ * CẬP NHẬT một bến xe: nạp bản ghi theo id từ URL rồi chép hai field của form
+ * ... Không merge nguyên object form, để routeStations (form không gửi) không bị đụng.
+ */
+@Transactional
+public void updateStation(Long id, Station form) {
+    Station existing = stationRepository.findById(id)        // bản ghi thật trong DB
+            .orElseThrow(() -&gt; new RuntimeException("Không tìm thấy bến xe với ID: " + id));
+    existing.setStationName(form.getStationName());         // chỉ chép 2 field form có
+    existing.setAddress(form.getAddress());
+    stationRepository.save(existing);                        // dirty checking cũng đã đủ
+}</code></pre></div>
+<p>Vì sao javadoc nói tới <code>routeStations</code>: nếu làm kiểu cũ (<code>form.setId(id)</code> rồi <code>save(form)</code>), JPA
+<strong>merge</strong> object form vào bản ghi — mà object form có <code>routeStations = null</code>. Với <code>cascade = ALL</code>
+(bao gồm MERGE), <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> việc merge một collection null lên entity thật là
+đúng loại thao tác dễ gây hậu quả khó đoán cho quan hệ; tách &quot;nạp rồi chép field&quot; loại bỏ hẳn câu
+hỏi đó. Điều <strong>đã được đo</strong> là phía tuyến: merge nguyên form từng xóa <code>suitable_bus_type_id</code> của
+tuyến 1 thành NULL (lỗi #21).</p>
+<hr>
+<h2 id="4-luong-loi-xoa-ben-dang-thuoc-lo-trinh">§4. Luồng lỗi — xóa bến đang thuộc lộ trình</h2>
+<p>Tình huống: Admin xóa bến 1 &quot;Bến xe Mỹ Đình&quot;, đang là điểm đầu của vài tuyến.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Bước</th>
+<th>Chuyện gì xảy ra</th>
+<th>Vị trí</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Bước 1–8 như luồng A; câu truy vấn phụ trả về các dòng <code>route_stations</code> của bến 1</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>!isEmpty()</code> đúng ⇒ <strong>ném <code>RuntimeException</code></strong> &quot;Không thể xóa bến xe này vì đang thuộc lộ trình của một số tuyến đường hiện hành!&quot;</td>
+<td><code>StationService.java:67-70</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>delete()</code> ở <code>:72</code> <strong>không bao giờ chạy</strong> — nhờ vậy <code>cascade = ALL</code> không có cơ hội xóa kèm các dòng lộ trình</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Unchecked exception ⇒ proxy <strong>rollback</strong>; không có gì để hoàn tác vì chưa ghi gì</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Controller bắt bằng <code>catch (Exception e)</code> chung</td>
+<td><code>AdminStationController.java:73-74</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Flash <code>error</code> = <code>&quot;Lỗi: &quot; + e.getMessage()</code> → <code>redirect:/admin/stations</code></td>
+<td><code>:74</code>, <code>:76</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Danh sách bến với khung đỏ <code>station-list.html:29-32</code>; bến 1 vẫn còn</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p>Kịch bản này có trong test tay chính thức <code>docs/testing/test_case.md</code> TC_STA_004. Câu báo lỗi
+<strong>không</strong> nói bến thuộc tuyến nào — Admin phải tự tìm ở màn Quản lý tuyến.</p>
+<p><strong>Các lỗi khác cùng đường về:</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>Nguyên nhân</th>
+<th>Ném ở</th>
+<th>Loại</th>
+<th>Ghi chú</th>
+</tr>
+</thead><tbody><tr>
+<td>POST tạo mang sẵn <code>id</code></td>
+<td><code>StationService.java:38-42</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>câu báo gồm id: &quot;…Bến #1 đã tồn tại — muốn sửa thì dùng chức năng Sửa bến xe.&quot;</td>
+</tr>
+<tr>
+<td>Bến không tồn tại (POST sửa / xóa)</td>
+<td><code>:54</code>, <code>:63</code></td>
+<td><code>RuntimeException</code></td>
+<td>flash có tiền tố &quot;Lỗi: &quot;</td>
+</tr>
+<tr>
+<td>Bến không tồn tại (GET form sửa)</td>
+<td><code>AdminStationController.java:45</code></td>
+<td><code>RuntimeException</code></td>
+<td>flash <strong>không</strong> có &quot;Lỗi: &quot; (<code>:49</code>) — cùng bất nhất nhỏ như màn xe</td>
+</tr>
+<tr>
+<td>Tên rỗng hẳn (<code>null</code>) hoặc dài quá 100 ký tự</td>
+<td>từ DB khi ghi</td>
+<td>lỗi Hibernate/JDBC</td>
+<td><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> form thật không gửi được <code>null</code> (ô <code>required</code>); nhưng ô tên <strong>không có <code>maxlength</code></strong>, nên gõ quá 100 ký tự sẽ vượt <code>length = 100</code> (<code>Station.java:24</code>) và MySQL từ chối — Admin sẽ thấy một thông điệp kỹ thuật sau chữ &quot;Lỗi: &quot;</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</h2>
+<ul>
+<li><strong>Xem danh sách</strong> — <code>[dashboard.html:76]</code> → <code>listStations()</code> <code>:18-22</code> →
+<code>StationService.findAll()</code> <code>:18-20</code> → <code>JpaRepository.findAll()</code> → view <code>station-list</code>. Template
+chỉ in <code>id</code>, <code>stationName</code>, <code>address</code> (<code>station-list.html:47-50</code>) nên <strong>không</strong> chạm
+<code>routeStations</code> ⇒ không có truy vấn phụ, không cần <code>JOIN FETCH</code>. Bảng rỗng có dòng nhắc <code>:60-64</code>.</li>
+<li><strong>Mở form Thêm</strong> — <code>[nút Thêm Bến Xe Mới]</code> → <code>showCreateForm()</code> <code>:24-28</code> → <code>new Station()</code> →
+view <code>station-form</code>, <code>th:action</code> trỏ về <code>/create</code>. Không gọi service nào.</li>
+<li><strong>Lưu bến mới</strong> — <code>[JS checkValidity]</code> → <code>createStation()</code> <code>:30-39</code> →
+<code>StationService.createStation()</code> <code>:36-44</code> → tripwire <code>id != null</code> → <code>stationRepository.save()</code>.
+Với <code>GenerationType.IDENTITY</code>, Hibernate phải chạy <code>INSERT</code> <strong>ngay</strong> lúc <code>save()</code> để lấy id do
+MySQL sinh (không đợi tới commit) <span class="tag tag-spring">SPRING</span>. Không có <code>validate()</code> nào.</li>
+</ul>
+<hr>
+<h2 id="6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</h2>
+<h3 id="6-1-bang-khong-moi-chan-that">6.1. Bảng &quot;không-mời / chặn thật&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Luật</th>
+<th>Lớp không-mời (UI)</th>
+<th>Lớp chặn thật (server)</th>
+<th>POST tự chế vượt lớp đầu thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td>Tên bến phải có</td>
+<td><code>required</code> <code>station-form.html:27</code> + JS <code>checkValidity()</code> <code>:53</code></td>
+<td><strong>Không có</strong> trong service. Cột <code>NOT NULL</code> (<code>Station.java:24</code>) chỉ chặn <code>null</code>, không chặn chuỗi rỗng</td>
+<td><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> gửi <code>stationName=</code> (rỗng) thì Spring bind chuỗi <code>&quot;&quot;</code> (dự án không cấu hình cắt chuỗi rỗng thành null) ⇒ lưu được bến không tên</td>
+</tr>
+<tr>
+<td>Địa chỉ phải có</td>
+<td><code>required</code> <code>:33</code></td>
+<td><strong>Không có</strong> — cột <code>address</code> cho phép null</td>
+<td>Lọt: bến không địa chỉ</td>
+</tr>
+<tr>
+<td>Tên tối đa 100 ký tự</td>
+<td><strong>Không có</strong> <code>maxlength</code></td>
+<td>Chỉ DB (<code>length = 100</code>)</td>
+<td>Lỗi kỹ thuật từ DB (xem §4)</td>
+</tr>
+<tr>
+<td>Không xóa bến đang thuộc tuyến</td>
+<td><code>confirm()</code> <strong>báo trước</strong> luật (<code>station-list.html:56</code>) nhưng nút Xóa luôn hiện, không lọc</td>
+<td><code>deleteById()</code> <code>StationService.java:67-70</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>&quot;Tạo&quot; không ghi đè bến có sẵn</td>
+<td>form tạo không có ô <code>id</code></td>
+<td>tripwire <code>createStation()</code> <code>:38-42</code></td>
+<td>Bị chặn; bản ghi nạn nhân không đổi (test <code>:281</code>)</td>
+</tr>
+<tr>
+<td>&quot;Sửa&quot; chỉ sửa đúng bến trên URL</td>
+<td>—</td>
+<td><code>updateStation(id, form)</code> lấy id từ URL</td>
+<td><code>id</code> gửi kèm bị lờ đi</td>
+</tr>
+<tr>
+<td>Không trùng tên bến</td>
+<td><strong>Không có</strong></td>
+<td><strong>Không có</strong> — không <code>unique</code>, không kiểm</td>
+<td>Tạo được hai &quot;Bến xe Mỹ Đình&quot;</td>
+</tr>
+</tbody></table></div>
+<p>Nhận xét: đây là chức năng có <strong>lớp chặn thật mỏng nhất</strong> trong các màn danh mục. Bài 01 có
+<code>validate()</code> 4 luật số; <code>RouteService</code> có <code>validateRoute()</code>; còn <code>StationService</code> không có hàm
+validate nào. <span class="tag tag-guess">SUY LUẬN</span> Lý do có thể là tên/địa chỉ không tham gia phép tính nào — cùng lập luận
+javadoc <code>BusService.java:109-114</code> dùng cho bốn ô chữ của xe — nhưng không tìm thấy tài liệu nào
+phát biểu quyết định này cho bến xe.</p>
+<h3 id="6-2-bang-thay-doi-gi-trong-db">6.2. Bảng &quot;thay đổi gì trong DB&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Thao tác</th>
+<th>Bảng / cột</th>
+<th>Từ → sang</th>
+</tr>
+</thead><tbody><tr>
+<td>Xem danh sách, mở form</td>
+<td>—</td>
+<td>Không ghi DB</td>
+</tr>
+<tr>
+<td>Thêm bến</td>
+<td><code>stations</code></td>
+<td>thêm 1 dòng (<code>station_name</code>, <code>address</code>)</td>
+</tr>
+<tr>
+<td>Sửa bến</td>
+<td><code>stations</code> — dòng <code>id</code> trên URL</td>
+<td><code>station_name</code>, <code>address</code> đổi theo form. <code>route_stations</code> không đổi, nhưng <strong>nhãn hiển thị</strong> của mọi tuyến/chuyến đi qua bến đổi theo</td>
+</tr>
+<tr>
+<td>Xóa bến</td>
+<td><code>stations</code></td>
+<td><code>DELETE</code> 1 dòng. <code>route_stations</code> không đổi (guard bảo đảm không còn dòng nào trỏ tới)</td>
+</tr>
+<tr>
+<td><em>(Bài 03)</em> lưu tuyến</td>
+<td><code>route_stations</code></td>
+<td>xóa hết rồi dựng lại các dòng <code>(route_id, station_id, stop_order)</code> — đây là nơi bến được <strong>gắn</strong> vào tuyến</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</h2>
+<p>Các annotation giống hệt Bài 01 §7 (<code>@Controller</code>, <code>@RequestMapping</code>, <code>@RequiredArgsConstructor</code>,
+<code>@PathVariable</code>, <code>@ModelAttribute</code>, <code>RedirectAttributes</code>, <code>@Transactional</code>, dirty checking,
+<code>th:field</code>, <code>needs-validation</code>…) không nhắc lại. Chỉ ghi phần <strong>mới</strong> ở chức năng này:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation / cơ chế</th>
+<th>Nghĩa đời thường</th>
+<th>Tác dụng ở đây</th>
+<th>Bỏ đi thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@OneToMany(mappedBy = &quot;station&quot;)</code></td>
+<td>&quot;Danh sách các lần bến này xuất hiện trong lộ trình; khoá ngoại nằm ở phía bên kia&quot; (00b §1.3)</td>
+<td><code>Station.java:36</code> — cho phép guard hỏi <code>getRouteStations()</code></td>
+<td>Guard phải gọi một query riêng qua <code>RouteStationRepository</code></td>
+</tr>
+<tr>
+<td>LAZY (mặc định của <code>@OneToMany</code>)</td>
+<td>&quot;Chưa cần thì chưa lấy&quot;</td>
+<td>collection chỉ nạp khi guard chạm vào (bước 7–8)</td>
+<td>EAGER: mỗi lần đọc danh sách bến sẽ kéo cả lộ trình</td>
+</tr>
+<tr>
+<td><code>cascade = CascadeType.ALL</code></td>
+<td>&quot;Làm gì với bến thì làm y hệt với các dòng lộ trình của nó&quot;</td>
+<td><code>Station.java:36</code> — kể cả REMOVE</td>
+<td>Không ảnh hưởng hôm nay vì guard chặn trước; nhưng <strong>nếu bỏ guard</strong>, xóa bến sẽ âm thầm xóa luôn các điểm dừng khỏi mọi tuyến</td>
+</tr>
+<tr>
+<td><code>@EmbeddedId</code> + <code>@MapsId</code></td>
+<td>Khoá chính gồm hai cột, mỗi cột cũng là khoá ngoại (00b §1.3)</td>
+<td><code>RouteStation.java:16-18, :24, :30</code></td>
+<td>— ; hệ quả nghiệp vụ: một bến chỉ xuất hiện <strong>một lần</strong> mỗi tuyến (spec: không biểu diễn được A→B→A)</td>
+</tr>
+<tr>
+<td><code>@Column(nullable = false, length = 100)</code></td>
+<td>&quot;Cột bắt buộc, tối đa 100 ký tự&quot; — ràng buộc ở mức DB</td>
+<td><code>Station.java:24</code></td>
+<td>Hibernate sinh cột cho phép null / dài hơn</td>
+</tr>
+<tr>
+<td><code>@Column(columnDefinition = &quot;TEXT&quot;)</code></td>
+<td>&quot;Kiểu cột ghi đúng như chuỗi này&quot;</td>
+<td><code>Station.java:27</code> — địa chỉ dài tùy ý</td>
+<td>Mặc định <code>VARCHAR(255)</code></td>
+</tr>
+<tr>
+<td><code>GenerationType.IDENTITY</code></td>
+<td>&quot;Để MySQL tự đánh số id&quot; (00b §1.2)</td>
+<td><code>Station.java:20</code> — buộc <code>INSERT</code> chạy ngay khi <code>save()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Derived query <code>findByStationNameContainingIgnoreCase</code></td>
+<td>tên method ⇒ <code>WHERE LOWER(station_name) LIKE LOWER(&#39;%x%&#39;)</code> (00b §2.2)</td>
+<td><code>StationRepository.java:13</code> — <strong>0 nơi gọi</strong></td>
+<td>Không ảnh hưởng gì</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="8-vi-du-tinh-tay">§8. Ví dụ tính tay</h2>
+<p>Không áp dụng — chức năng này không có công thức hay phép tính nào.</p>
+<hr>
+<h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>
+<h3 id="9-1-cac-quyet-dinh-thiet-ke">9.1. Các quyết định thiết kế</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Quyết định</th>
+<th>Tránh được gì</th>
+<th>Vì sao không làm cách đơn giản hơn</th>
+<th>Nguồn</th>
+</tr>
+</thead><tbody><tr>
+<td>Bến là entity riêng, tuyến nối tới bến qua <code>RouteStation</code> có <code>stopOrder</code></td>
+<td>Mỗi tuyến gõ tên bến một kiểu, không thống kê được</td>
+<td>Cách &quot;hai ô chữ điểm đi/đến trên tuyến&quot; đã từng có và bị xóa vì bất nhất; bảng nối còn cho tuyến <strong>nhiều điểm dừng</strong></td>
+<td><code>Route.java:31-35</code>; roadmap Phase 1 (owner duyệt &quot;full dynamic multi-stop editor&quot;)</td>
+</tr>
+<tr>
+<td>Tên tuyến không lưu, suy ra từ bến đầu/cuối</td>
+<td>Hai nguồn sự thật lệch nhau</td>
+<td>Lưu tên riêng thì đổi tên bến phải nhớ đổi cả tên tuyến</td>
+<td><code>current_functional_spec.md</code> (Route: &quot;no name field&quot;)</td>
+</tr>
+<tr>
+<td>Tách <code>createStation()</code> / <code>updateStation(id, form)</code></td>
+<td>POST tự chế tới <code>/create</code> mang <code>id=1</code> từng đổi tên bến 1 thành <code>HIJACKED-STATION</code> (đo thật, lỗi #21)</td>
+<td>Chặn bằng <code>@InitBinder</code> chỉ là lớp không-mời; lời gọi nội bộ vẫn lọt — dự án đã ba lần chọn &quot;chặn ở service&quot;</td>
+<td>#21</td>
+</tr>
+<tr>
+<td>Guard xóa theo &quot;có trong lộ trình nào không&quot;</td>
+<td>Xóa bến làm tuyến mất điểm dừng, nhãn tuyến thành &quot;(Chưa gán trạm)&quot;</td>
+<td>—</td>
+<td><code>StationService.java:65-70</code></td>
+</tr>
+<tr>
+<td>Không có soft delete cho bến</td>
+<td>—</td>
+<td><span class="tag tag-guess">SUY LUẬN</span> không cần: bến đang dùng thì guard đã chặn, bến chưa dùng thì xóa hẳn không mất lịch sử gì</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<h3 id="9-2-bug-that-da-tung-xay-ra-o-chuc-nang-nay">9.2. Bug thật đã từng xảy ra ở chức năng này</h3>
+<p><strong>Lỗi #21 (phần bến) — form &quot;Thêm bến&quot; ghi đè được bến có sẵn.</strong></p>
+<ul>
+<li><em>Hiểu sai điều gì:</em> cho rằng &quot;form tạo không có ô <code>id</code> nên request tạo không bao giờ mang <code>id</code>&quot;.
+Đúng với form thật, sai với request: controller bind thẳng vào entity bằng <code>@ModelAttribute</code> và
+<strong>không có <code>@InitBinder</code></strong>, nên ai gửi <code>id=1</code> là Spring gán <code>station.id = 1</code>. Hàm <code>save()</code> cũ khi
+đó là một <strong>upsert</strong> (tạo hoặc sửa tùy có id) — <code>JpaRepository.save()</code> thấy id khác null thì
+<strong>merge</strong>, tức <code>UPDATE</code> bến 1 (Bài 00b §3).</li>
+<li><em>Đo trên bản sao DB thật (2026-09-19):</em> <code>POST /stations/create</code> với id của bến 1 ⇒ tên bến 1
+thành <code>HIJACKED-STATION</code>, số bến vẫn 11 → 11 (không có dòng mới), báo <strong>thành công</strong>.</li>
+<li><em>Sửa:</em> tách thành <code>createStation()</code> có tripwire và <code>updateStation(id, form)</code> nạp-rồi-chép. Cùng
+lần sửa áp cho sáu cửa tạo khác (tuyến, chuyến, sự cố, tài xế, user).</li>
+<li><em>Chưa từng gây hại trên dữ liệu thật</em> — form thật không gửi <code>id</code> (bán kính UI = 0), nhưng một
+request tự chế là đủ.</li>
+</ul>
+<p>Ngoài #21, sổ lỗi <strong>không có lỗi nào riêng cho bến xe</strong>. Mục &quot;xóa bằng GET&quot; (áp cho cả
+<code>AdminStationController</code>) đã bị <strong>rút</strong> — xem Bài 01 §9.2.</p>
+<h3 id="9-3-cam-bay-va-diem-la-ghi-lai-khong-sua">9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)</h3>
+<ol>
+<li><strong>Đổi tên bến là sửa lịch sử.</strong> Chuyến không chép tên bến; mọi nhãn tuyến được suy ra lúc hiển
+thị (<code>Route.java:126-140</code>). Đổi &quot;Bến xe Mỹ Đình&quot; thành &quot;Bến xe Mỹ Đình (Mới)&quot; thì các chuyến đã
+hoàn thành từ tháng trước cũng hiện tên mới. <span class="tag tag-guess">SUY LUẬN</span> Với MVP đây là chấp nhận được (không có
+hoá đơn/vé in ra cần giữ nguyên văn), nhưng nên nói được khi bị hỏi.</li>
+<li><strong>Không kiểm gì ở server cho tên/địa chỉ; không chống trùng tên.</strong> Xem bảng §6.1. Không tìm thấy
+ghi chép nào trong sổ lỗi về điểm này.</li>
+<li><strong>Muốn xóa bến đang dùng phải đi đường vòng.</strong> Phải sửa từng tuyến chứa bến để bỏ nó ra (hoặc xóa
+tuyến). Tuyến đã có chuyến thì không xóa được (Bài 03), nên thực tế chỉ còn cách sửa tuyến — và
+sửa lộ trình của tuyến có chuyến lịch sử lại làm đổi nhãn của các chuyến đó (điểm 1). Câu báo lỗi
+cũng không nói bến thuộc tuyến nào.</li>
+<li><strong>Mâu thuẫn tài liệu ↔ code (code thắng):</strong><ul>
+<li><code>docs/testing/test_case.md</code> TC_STA_002 ghi <em>&quot;<code>stationService.save(station)</code> gọi
+<code>stationRepository.save(station)</code>&quot;</em> và TC_STA_003 ghi <em>&quot;<code>station.setId(1L)</code> được gọi trước khi
+save (merge UPDATE)&quot;</em> — <strong>đã cũ</strong> từ bản sửa #21: code hiện gọi <code>createStation()</code> và
+<code>updateStation(id, form)</code>, không còn <code>save()</code> hay <code>setId()</code>
+(<code>AdminStationController.java:33, :58-60</code>).</li>
+<li>Tiêu đề lỗi #11 trong <code>current_bugs_found.md</code> gọi <code>CostParameterService.save()</code> là <em>&quot;service
+DUY NHẤT không validate đầu vào&quot;</em>; <code>StationService</code> cũng không có hàm validate nào. <span class="tag tag-guess">SUY LUẬN</span>
+tiêu đề đó có lẽ chỉ xét các service nhận <strong>số</strong>; ghi lại để khỏi trích nguyên văn khi bảo vệ.</li>
+<li>Comment <code>StationRepository.java:12</code> nói query tìm theo tên &quot;phục vụ tính năng gợi ý khi khách
+đặt vé&quot; — tính năng đặt vé (Phase 9) <strong>chưa triển khai</strong>; query có 0 nơi gọi.</li>
+<li>Test tay TC_STA_001 kỳ vọng 7 bến (đúng với seed <code>demo</code>, <code>DataInitializer.java:166-172</code>); DB
+thật hiện có 11 bến (roadmap §8 ghi <code>stations 11</code>). Không mâu thuẫn — chỉ là hai bộ dữ liệu.</li>
+</ul>
+</li>
+<li><strong>Bến trùng trong một tuyến không biểu diễn được</strong> — khoá chính <code>(routeId, stationId)</code>
+(<code>RouteStation.java:16-18</code>, <code>RouteStationId.java:13-16</code>), nên tuyến vòng A→B→A không tạo được.
+Spec đã ghi đây là giới hạn (<code>current_functional_spec.md:55</code>).</li>
+</ol>
+<h3 id="9-4-test-dang-giu-chuc-nang-nay">9.4. Test đang giữ chức năng này</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Test</th>
+<th>Chốt luật gì</th>
+</tr>
+</thead><tbody><tr>
+<td><code>CreatePathIdTripwireTest.createStation_refusesAnEntityThatAlreadyHasAnId_andLeavesTheRowUntouched</code> (<code>test/service/CreatePathIdTripwireTest.java:281</code>)</td>
+<td>Tạo mang id ⇒ ném <code>IllegalArgumentException</code>, tên bến A <strong>vẫn là &quot;Bến A&quot;</strong>, số bến không đổi. Roadmap ghi đã thử không rỗng: tắt tripwire bến ⇒ đúng 1 test đỏ</td>
+</tr>
+<tr>
+<td><code>CreatePathIdTripwireTest.updateStation_copiesFieldsOntoTheExistingRow</code> (<code>:321</code>)</td>
+<td>Sửa chép đúng tên + địa chỉ lên bản ghi cũ, <strong>không đẻ dòng mới</strong></td>
+</tr>
+</tbody></table></div>
+<p>Test chạy bằng <code>@SpringBootTest</code> + <code>@Transactional</code> trên DB <code>busmanagement_test</code>, gọi
+<code>flushAndClear()</code> trước khi đọc lại để chắc chắn đọc từ DB chứ không từ bộ nhớ đệm của Hibernate.</p>
+<p><strong>Chưa có test tự động</strong> cho guard xóa <code>deleteById()</code> và cho màn danh sách. Các ca này có trong
+test tay <code>docs/testing/test_case.md</code> TC_STA_001 → TC_STA_005 (lưu ý hai ca đã cũ ở §9.3).</p>
+<h3 id="9-5-lien-ket">9.5. Liên kết</h3>
+<ul>
+<li><strong>Màn này ảnh hưởng tới:</strong> form tuyến (Bài 03 — <code>AdminRouteController.java:109</code> đổ
+<code>routeService.findAllStations()</code>; <code>RouteService.rebuildStops()</code> <code>:160-173</code> tra từng bến theo id);
+mọi màn hiện nhãn tuyến qua <code>getDeparturePointDisplay()</code>/<code>getDestinationPointDisplay()</code>: danh sách
+tuyến, danh sách chuyến, form chuyến, Bảng điều hành, Dashboard, Dự báo…</li>
+<li><strong>Màn này bị ảnh hưởng bởi:</strong> tuyến (quyết định bến nào xóa được); <code>DataInitializer</code> (bến mẫu).
+Bến <strong>không</strong> liên quan trực tiếp tới xe, tài xế hay chuyến.</li>
+</ul>
+<hr>
+<h2 id="10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</h2>
+<h3 id="10-1-tom-tat-1-phut">10.1. Tóm tắt 1 phút</h3>
+<aside class="callout"><p>Màn Quản lý bến xe là danh bạ địa điểm dùng chung cho cả hệ thống. Mỗi bến có tên và địa chỉ;
+tuyến không lưu tên mà ghép các bến theo thứ tự qua bảng nối <code>RouteStation</code>, nên điểm đi và điểm
+đến của mọi tuyến đều suy ra từ đây. Chức năng đi đúng kiến trúc phân lớp:
+<code>AdminStationController</code> chỉ gọi <code>StationService</code>. Em tách tạo và sửa: tạo thì từ chối nếu request
+mang sẵn id, vì trước đây một POST tự chế đã ghi đè được bến có sẵn; sửa thì nạp bản ghi cũ rồi chỉ
+chép tên và địa chỉ. Luật nghiệp vụ duy nhất là không cho xóa bến đang nằm trong lộ trình của bất
+kỳ tuyến nào — service kiểm bằng cách đọc danh sách điểm dừng của bến trước khi xóa.</p>
+</aside>
+<h3 id="10-2-cau-hoi-hoi-dong-goi-y-tra-loi">10.2. Câu hỏi hội đồng + gợi ý trả lời</h3>
+<p><strong>1. (Cái gì) Bến xe dùng để làm gì trong hệ thống?</strong>
+Là danh bạ điểm dừng dùng chung. Tuyến được dựng từ một danh sách bến có thứ tự (<code>RouteStation</code>
+với <code>stopOrder</code>); bến đầu là điểm đi, bến cuối là điểm đến (<code>Route.java:100-140</code>). Trước đây tuyến
+có hai ô chữ tự do song song với bảng bến và bị bất nhất, nên đã bỏ (<code>Route.java:31-35</code>).</p>
+<p><strong>2. (Thế nào) Quan hệ giữa bến và tuyến được lưu thế nào?</strong>
+Bằng bảng <code>route_stations</code> với khoá kép <code>(route_id, station_id)</code> và cột <code>stop_order</code>. Trong code là
+<code>@EmbeddedId RouteStationId</code> cộng hai <code>@ManyToOne</code> có <code>@MapsId</code> (<code>RouteStation.java:16-32</code>). Phía
+bến có <code>@OneToMany(mappedBy = &quot;station&quot;)</code> để đọc ngược &quot;bến này nằm trên những tuyến nào&quot;
+(<code>Station.java:36-37</code>).</p>
+<p><strong>3. (Thế nào) Khi xóa bến, hệ thống kiểm tra gì?</strong>
+Service nạp bến, gọi <code>getRouteStations().isEmpty()</code> (<code>StationService.java:67</code>). Collection này là
+LAZY nên Hibernate chạy thêm một câu <code>SELECT</code> vào <code>route_stations</code>. Có dòng nào thì ném lỗi, không
+thì <code>DELETE</code>. Mọi thứ trong một transaction nên nếu bị chặn thì không có gì được ghi.</p>
+<p><strong>4. (Vì sao) Sao không để DB tự chặn bằng khoá ngoại?</strong>
+URL kết nối DB đặt <code>foreign_key_checks=0</code> (<code>application.properties:19</code>), nên MySQL không ngăn bản
+ghi mồ côi; mọi guard toàn vẹn dữ liệu của dự án nằm ở service (Bài 00b §5.3). Thêm nữa, entity khai
+<code>cascade = ALL</code> phía bến: nếu không có guard, xóa bến sẽ <strong>xóa luôn</strong> các điểm dừng khỏi tuyến chứ
+không báo lỗi.</p>
+<p><strong>5. (Vì sao) Sao sửa bến lại phải nạp bản ghi cũ rồi chép, không lưu thẳng object form?</strong>
+Vì lưu thẳng object có id là merge — ghi đè mọi thứ bằng nội dung form, kể cả phần form không gửi.
+Và vì form tạo cũng từng dùng chung một hàm <code>save()</code>, một POST tự chế mang <code>id</code> đã đổi được tên bến
+có sẵn (lỗi #21). Giờ <code>createStation()</code> từ chối id, <code>updateStation(id, form)</code> chỉ chép hai field.</p>
+<p><strong>6. (Nếu… thì sao) Nếu em đổi tên một bến thì các chuyến cũ hiện thế nào?</strong>
+Hiện tên mới — chuyến không lưu bản sao tên bến, nhãn tuyến được tính lúc hiển thị. Đó là hệ quả
+của việc chỉ có một nguồn sự thật. Nếu cần giữ tên lịch sử (ví dụ in vé), phải chụp tên vào chuyến
+lúc bán — hiện hệ thống không có vé thật nên chưa cần.</p>
+<p><strong>7. (Hạn chế) Có chống trùng tên bến hay kiểm dữ liệu không?</strong>
+Trung thực: không. Chỉ có <code>required</code> ở form và JavaScript; service không validate, cột tên không
+<code>unique</code>. Tên/địa chỉ không tham gia phép tính nào nên rủi ro là hiển thị, không làm sai số liệu.
+Nếu làm tiếp em sẽ thêm kiểm tra rỗng và trùng tên (không phân biệt hoa thường) ở service.</p>
+<p><strong>8. (Hạn chế) Một tuyến đi qua cùng một bến hai lần được không?</strong>
+Không, vì khoá chính của <code>route_stations</code> là <code>(route_id, station_id)</code>. Tuyến vòng A→B→A không biểu
+diễn được; spec đã ghi đây là giới hạn (<code>current_functional_spec.md:55</code>). Muốn hỗ trợ phải đổi khoá
+chính thành <code>(route_id, stop_order)</code>.</p>
+<p><strong>9. (Vì sao) Sao xóa bến dùng GET?</strong>
+Như màn xe (Bài 01 câu 7): quy ước chung của các màn danh mục, có trong test tay chính thức; CSRF
+tắt có chủ đích nên POST không an toàn hơn; guard ở service chặn thiệt hại. Ở màn này <code>confirm()</code>
+còn <strong>báo trước luật</strong> (&quot;hệ thống sẽ chặn nếu…&quot;).</p>
+<p><strong>10. (Thế nào) Em kiểm thử màn này ra sao?</strong>
+Có 2 test tự động trong <code>CreatePathIdTripwireTest</code>: tạo mang id bị từ chối và bến nạn nhân giữ
+nguyên tên; sửa chép đúng hai field mà không tạo dòng mới. Guard xóa và danh sách được kiểm bằng
+test tay TC_STA_001–005 và chạy app thật; bản sửa #21 được kiểm bằng cách phát lại nguyên văn request
+phá hoại trên bản sao DB.</p>
+<h3 id="10-3-diem-phai-noi-that">10.3. Điểm phải nói thật</h3>
+<ul>
+<li><strong>Không có đăng nhập / phân quyền, CSRF tắt</strong> (roadmap §4): ai vào được URL là sửa/xóa bến được.</li>
+<li><strong>Không có kiểm tra dữ liệu ở server</strong> cho bến; không chống trùng tên.</li>
+<li><strong>Query tìm bến theo tên cho khách đặt vé chưa ai dùng</strong> — Customer Portal (Phase 9) chưa làm;
+comment trong code nói về tính năng chưa tồn tại.</li>
+<li><strong>Đổi tên bến làm đổi nhãn của cả chuyến lịch sử.</strong></li>
+<li>Bến <strong>không</strong> có tọa độ, giờ mở cửa hay thông tin nào khác ngoài tên + địa chỉ.</li>
+</ul>
+<hr>
+<h2 id="11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Trang danh sách bến có phát sinh truy vấn vào <code>route_stations</code> không? Vì sao?</li>
+<li>Trong <code>deleteById()</code>, dòng nào làm Hibernate chạy câu <code>SELECT</code> thứ hai?</li>
+<li><code>mappedBy = &quot;station&quot;</code> trong <code>Station.java</code> nghĩa là gì — cột khoá ngoại nằm ở bảng nào?</li>
+<li>Admin gửi POST <code>/admin/stations/edit/3</code> với body có thêm <code>id=7</code>. Bến nào bị sửa?</li>
+<li>Bến 5 chỉ nằm trên một tuyến đã có 400 chuyến lịch sử. Admin làm cách nào để xóa được bến 5, và
+cái giá là gì?</li>
+<li>Nếu xóa guard ở <code>StationService.java:67-70</code>, xóa bến 1 sẽ gây ra điều gì với dữ liệu?</li>
+</ol>
+<p><strong>Bài tự trace.</strong> Admin mở &quot;Thêm Bến Xe Mới&quot;, để <strong>trống</strong> ô Địa chỉ, gõ tên &quot;Bến xe Vũng Tàu&quot;,
+bấm Lưu Lại. Hãy viết chuỗi <code>[JS] → Controller → Service → Repository → view</code> và kết quả trên màn
+hình. Sau đó làm lại với một POST tự chế (bỏ qua trình duyệt) có <code>stationName=Bến xe Vũng Tàu</code> và
+<strong>không có</strong> <code>address</code>.</p>
+<p><strong>Câu đọc code.</strong> <code>StationService.java:38-43</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">if (station.getId() != null) {
+    throw new IllegalArgumentException(
+            "createStation() chỉ dùng để tạo bến xe mới (id phải trống). Bến #" + station.getId()
+                    + " đã tồn tại — muốn sửa thì dùng chức năng Sửa bến xe.");
+}
+stationRepository.save(station);</code></pre></div>
+<p>Đoạn này làm gì? Bỏ khối <code>if</code> thì một POST <code>/admin/stations/create</code> với <code>id=1&amp;stationName=X</code> gây ra
+điều gì, và người dùng thấy thông báo gì?</p>
+<details><summary>Đáp án</summary>
+
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Không. Template chỉ in <code>id</code>, <code>stationName</code>, <code>address</code> (<code>station-list.html:47-50</code>); collection
+<code>routeStations</code> là LAZY và không ai chạm tới, nên Hibernate không nạp nó.</li>
+<li><code>station.getRouteStations().isEmpty()</code> ở <code>StationService.java:67</code> — lần đầu truy cập collection
+LAZY trong phiên còn mở.</li>
+<li>Nghĩa là quan hệ được &quot;sở hữu&quot; bởi field <code>station</code> của <code>RouteStation</code>; khoá ngoại <code>station_id</code>
+nằm ở bảng <code>route_stations</code>, bảng <code>stations</code> không có cột nào cho quan hệ này.</li>
+<li>Bến 3. <code>updateStation(id, form)</code> dùng id từ URL; <code>id</code> trong form bị bỏ qua
+(<code>AdminStationController.java:58-60</code>, <code>StationService.java:53</code>).</li>
+<li>Không xóa được tuyến (đã có chuyến). Phải <strong>sửa tuyến</strong> thay bến 5 bằng bến khác, rồi mới xóa bến<ol start="5">
+<li>Cái giá: 400 chuyến lịch sử của tuyến đó sẽ hiện theo lộ trình mới (nhãn điểm đi/đến có thể
+đổi), vì nhãn được suy ra lúc hiển thị.</li>
+</ol>
+</li>
+<li><code>cascade = ALL</code> sẽ xóa luôn các dòng <code>route_stations</code> của bến 1 — các tuyến chứa bến 1 mất điểm
+dừng đó, không có thông báo lỗi. <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> nếu tuyến chỉ còn một bến hoặc
+không còn bến nào, nhãn tuyến sẽ thành sai hoặc &quot;(Chưa gán trạm)&quot; (<code>Route.java:131</code>).</li>
+</ol>
+<p><strong>Bài tự trace</strong></p>
+<ul>
+<li><em>Qua trình duyệt:</em> <code>[JS]</code> <code>station-form.html:51-56</code> — ô Địa chỉ <code>required</code> đang trống ⇒
+<code>checkValidity()</code> sai ⇒ <code>preventDefault()</code>, form tô đỏ, <strong>không có request nào</strong> tới server.
+Màn hình vẫn là form, ô Địa chỉ viền đỏ.</li>
+<li><em>POST tự chế:</em> <code>AdminStationController.createStation()</code> <code>:30-33</code> → bind <code>new Station()</code>: tên
+&quot;Bến xe Vũng Tàu&quot;, <code>address = null</code>, <code>id = null</code> → proxy mở transaction →
+<code>StationService.createStation()</code> qua tripwire → <code>stationRepository.save()</code> → <code>INSERT</code> ngay
+(IDENTITY) → cột <code>address</code> cho phép null nên <strong>thành công</strong> → commit → flash &quot;Thêm mới bến xe thành
+công!&quot; → <code>redirect:/admin/stations</code> → danh sách có bến mới với ô địa chỉ trống. Đây là ví dụ luật
+chỉ có một lớp (§6.1).</li>
+</ul>
+<p><strong>Câu đọc code</strong></p>
+<p>Đoạn này là tripwire: chỉ cho <code>createStation()</code> tạo bến <strong>mới</strong>. Bỏ <code>if</code> thì <code>save()</code> gặp entity có
+id = 1 ⇒ Spring Data coi là &quot;không mới&quot; ⇒ <code>merge</code> ⇒ <code>UPDATE stations SET station_name=&#39;X&#39;, address=NULL WHERE id=1</code> — bến 1 bị đổi tên và <strong>mất địa chỉ</strong> (form tự chế không gửi address), số
+bến không đổi, và người dùng thấy <strong>&quot;Thêm mới bến xe thành công!&quot;</strong>. Đúng lỗi #21; test
+<code>createStation_refusesAnEntityThatAlreadyHasAnId_andLeavesTheRowUntouched</code> sẽ đỏ.</p>
+</details>
+
+<hr>
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li>Bến là <strong>danh bạ dùng chung</strong>; nhãn mọi tuyến/chuyến được suy ra từ bến đầu và bến cuối qua
+<code>RouteStation</code> — đổi tên bến là đổi nhãn cả lịch sử.</li>
+<li><strong>Tạo ≠ Sửa</strong>: <code>createStation()</code> có tripwire id (lỗi #21), <code>updateStation(id, form)</code> nạp bản ghi
+cũ và chép đúng hai field.</li>
+<li>Luật duy nhất: <strong>không xóa bến đang thuộc lộ trình</strong> — guard đọc collection LAZY <code>routeStations</code>
+trong transaction, và đứng chắn trước <code>cascade = ALL</code>.</li>
+<li>Đây là màn có <strong>lớp chặn thật mỏng nhất</strong>: không validate tên/địa chỉ, không chống trùng tên.</li>
+<li>Bến chỉ xuất hiện <strong>một lần</strong> mỗi tuyến vì khoá kép <code>(routeId, stationId)</code> — chuẩn bị sẵn câu trả
+lời về giới hạn này và về tuyến vòng.</li>
+</ol>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>
