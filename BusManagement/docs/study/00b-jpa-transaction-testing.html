@@ -1,0 +1,1335 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 00b JPA và Transaction</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-orm-va-entity">§1. ORM và Entity</a></li>
+<li><a href="#2-repository-spring-data-jpa">§2. Repository — Spring Data JPA</a></li>
+<li><a href="#3-save-la-persist-hay-merge-goc-cua-mot-nhom-loi">§3. save() là persist hay merge — gốc của một nhóm lỗi</a></li>
+<li><a href="#4-transaction-proxy-persistence-context">§4. Transaction, proxy, persistence context</a></li>
+<li><a href="#5-xu-ly-loi-va-hai-lop-bao-ve">§5. Xử lý lỗi và hai lớp bảo vệ</a></li>
+<li><a href="#6-nhung-gi-du-an-khong-dung-va-tra-loi-the-nao-khi-bi-hoi">§6. Những gì dự án KHÔNG dùng — và trả lời thế nào khi bị hỏi</a></li>
+<li><a href="#7-kiem-thu">§7. Kiểm thử</a></li>
+<li><a href="#8-bang-tra-cuu-thuat-ngu">§8. Bảng tra cứu thuật ngữ</a></li>
+<li><a href="#9-cau-hoi-hoi-dong-goi-y-tra-loi">§9. Câu hỏi hội đồng + gợi ý trả lời</a></li>
+<li><a href="#10-bai-tap-tu-kiem-tra">§10. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 00b · NỀN TẢNG</span>
+      <h1>Bài 00b — JPA/Hibernate, Transaction, xử lý lỗi và kiểm thử</h1>
+    </header>
+<aside class="callout"><p>Bài nền thứ hai, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN A2), ngày 2026-09-27. Học
+sau Bài 00a. Mọi ví dụ lấy từ code thật; số dòng là ảnh chụp ngày viết — lệch thì grep lại.</p>
+<p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết
+ra · <span class="tag tag-guess">SUY LUẬN</span> suy luận của người viết.</p>
+<p>Viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>, <code>test/</code> =
+<code>src/test/java/giang/com/BusManagement/</code>, <code>tpl/</code> = <code>src/main/resources/templates/</code>.</p>
+</aside>
+<h2 id="1-orm-va-entity">§1. ORM và Entity</h2>
+<h3 id="1-1-orm-la-gi">1.1. ORM là gì</h3>
+<p>Database lưu dữ liệu thành <strong>bảng và dòng</strong>; Java làm việc với <strong>object</strong>. Mỗi lần đọc/ghi, phải
+có ai đó &quot;phiên dịch&quot; giữa hai thế giới. <strong>ORM</strong> (Object-Relational Mapping — ánh xạ object ↔ bảng)
+là người phiên dịch đó. Bạn làm việc với object <code>Trip</code>, ORM lo viết câu SQL.</p>
+<ul>
+<li><strong>JPA</strong> = bộ <strong>quy tắc chuẩn</strong> (các annotation <code>@Entity</code>, <code>@Id</code>...) mà Java đặt ra cho ORM.</li>
+<li><strong>Hibernate</strong> = <strong>phần mềm cụ thể</strong> làm theo quy tắc đó; Spring Boot dùng Hibernate mặc định
+<span class="tag tag-spring">SPRING</span>.</li>
+<li><strong>Spring Data JPA</strong> = lớp trên cùng, cho phép viết repository chỉ bằng interface (§2).</li>
+</ul>
+<h3 id="1-2-cac-annotation-co-ban">1.2. Các annotation cơ bản</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/domain/Trip.java:20-28</code>, <code>:82-83</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@SQLDelete(sql = "UPDATE trips SET is_deleted = true WHERE id = ?")  // xem §1.5
+@SQLRestriction("is_deleted = false")                                 // xem §1.5
+@Entity                     // class này là một bảng trong DB
+@Table(name = "trips")      // tên bảng là "trips"
+public class Trip {
+    @Id                                                   // khóa chính
+    @GeneratedValue(strategy = GenerationType.IDENTITY)   // MySQL tự tăng id (AUTO_INCREMENT)
+    private Long id;
+    ...
+    @Enumerated(EnumType.STRING)   // lưu enum dạng chữ "ACTIVE", không lưu số thứ tự 0,1,2
+    @Column(name = "status")       // tên cột
+    private TripStatus status = TripStatus.PENDING_APPROVAL;</code></pre></div>
+<p>Vì sao <code>EnumType.STRING</code> quan trọng <span class="tag tag-spring">SPRING</span>: nếu lưu theo số thứ tự (<code>ORDINAL</code>), chỉ cần chèn một
+giá trị mới vào giữa enum là mọi dòng cũ đổi nghĩa. Lưu chữ thì không bị vậy. Dự án dùng <code>STRING</code>
+cho mọi enum (<code>Trip.status</code>, <code>Bus.status</code> <code>Bus.java:39</code>, <code>Incident.incidentType</code>...).</p>
+<p><code>ddl-auto=update</code> (Bài 00a §8.2) nghĩa là Hibernate <strong>đọc các annotation này để tự tạo/bổ sung
+bảng</strong>. Dự án không có công cụ migration (Flyway/Liquibase) — cấu trúc DB tiến hóa theo entity (§6).</p>
+<h3 id="1-3-quan-he-giua-cac-entity">1.3. Quan hệ giữa các entity</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Quan hệ</th>
+<th>Nghĩa</th>
+<th>Ví dụ thật</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@ManyToOne</code></td>
+<td>Nhiều object bên này trỏ tới một object bên kia (lưu một cột khóa ngoại)</td>
+<td><code>Trip.route</code>, <code>Trip.bus</code>, <code>Trip.driver</code>, <code>Trip.assistant</code> (<code>Trip.java:39-58</code>)</td>
+</tr>
+<tr>
+<td><code>@OneToMany(mappedBy = &quot;...&quot;)</code></td>
+<td>Chiều ngược của <code>@ManyToOne</code>, <strong>không</strong> tạo cột; <code>mappedBy</code> chỉ ra field bên kia đang giữ khóa ngoại</td>
+<td><code>Route.routeStations</code> (<code>Route.java:44</code>)</td>
+</tr>
+<tr>
+<td><code>@ManyToMany</code> + <code>@JoinTable</code></td>
+<td>Nhiều–nhiều, cần bảng nối riêng</td>
+<td><code>Trip.coDrivers</code> → bảng <code>trip_co_drivers(trip_id, user_id)</code> (<code>Trip.java:63-64</code>)</td>
+</tr>
+<tr>
+<td><code>@OneToOne</code> + <code>@MapsId</code></td>
+<td>Một–một, <strong>dùng chung khóa chính</strong></td>
+<td><code>Driver.user</code> (<code>Driver.java:25-26</code>): khóa chính của <code>drivers</code> chính là <code>users.id</code></td>
+</tr>
+<tr>
+<td><code>@EmbeddedId</code> + <code>@Embeddable</code></td>
+<td>Khóa chính gồm <strong>nhiều cột</strong></td>
+<td><code>RouteStation</code> có khóa <code>(routeId, stationId)</code> (<code>RouteStation.java:16</code>, <code>RouteStationId.java:9-13</code>)</td>
+</tr>
+<tr>
+<td>Tự tham chiếu</td>
+<td>Entity trỏ tới chính loại của nó</td>
+<td><code>Trip.originalTrip</code> (<code>Trip.java:88-90</code>): chuyến tăng cường trỏ về chuyến gốc</td>
+</tr>
+</tbody></table></div>
+<figure class="diagram"><pre class="mermaid">erDiagram
+    USERS ||--o| DRIVERS : "@MapsId: drivers.user_id = users.id"
+    ROUTES ||--o{ ROUTE_STATIONS : "routeStations"
+    STATIONS ||--o{ ROUTE_STATIONS : "routeStations"
+    BUS_TYPES ||--o{ BUSES : "busType"
+    BUS_TYPES ||--o{ ROUTES : "suitableBusType (gợi ý)"
+    ROUTES ||--o{ TRIPS : "route"
+    BUSES ||--o{ TRIPS : "bus"
+    DRIVERS ||--o{ TRIPS : "driver (tài xế chính)"
+    DRIVERS ||--o{ TRIPS : "assistant (phụ xe)"
+    TRIPS ||--o{ TRIP_CO_DRIVERS : "coDrivers"
+    DRIVERS ||--o{ TRIP_CO_DRIVERS : "tài xế phụ"
+    TRIPS |o--o{ TRIPS : "originalTrip (chuyến tăng cường)"
+    BUSES ||--o{ INCIDENTS : "bus (bắt buộc)"
+    TRIPS |o--o{ INCIDENTS : "trip (tùy chọn)"
+    DRIVERS |o--o{ INCIDENTS : "driver (tùy chọn)"
+    ROUTE_STATIONS {
+        bigint route_id PK
+        bigint station_id PK
+        int stop_order
+    }
+    TRIPS {
+        bigint id PK
+        varchar status
+        int total_seats
+        int tickets_sold
+        decimal price
+        boolean is_extra_trip
+        boolean is_deleted
+    }</pre></figure>
+<p>Bảng <code>cost_parameters</code> đứng riêng, không quan hệ với bảng nào (một dòng cấu hình duy nhất —
+<code>CostParameterService</code>).</p>
+<p><strong>Vì sao <code>Driver</code> dùng <code>@MapsId</code></strong> <span class="tag tag-code">CODE</span> javadoc <code>…/service/DriverService.java</code> đầu class: tài xế
+<strong>là</strong> một người dùng, nên khóa chính của <code>Driver</code> chính là <code>User.id</code> — không thể có <code>Driver</code> thiếu
+<code>User</code>. Hệ quả: form tạo tài xế tạo <strong>cả cặp</strong> <code>User</code> + <code>Driver</code> (<code>DriverService.createDriver()</code>),
+và xóa tài xế là xóa <code>User</code>, <code>cascade = ALL</code> ở <code>User.driver</code> (<code>User.java:72</code>) xóa kèm <code>Driver</code>.</p>
+<p><strong>Vì sao <code>RouteStation</code> dùng khóa kép</strong> <span class="tag tag-code">CODE</span> comment <code>RouteService.updateRoute()</code>: khóa là
+<code>(routeId, stationId)</code>, nên &quot;đổi trạm&quot; của một điểm dừng thực chất là <strong>đổi khóa chính</strong> — không
+update được, phải <strong>xóa hết điểm dừng cũ rồi dựng lại</strong>. Cũng vì khóa kép mà một trạm không thể
+xuất hiện hai lần trên cùng tuyến (<code>RouteService.validateRoute()</code> chặn sớm để báo lỗi dễ hiểu).</p>
+<h3 id="1-4-entity-co-method-nghiep-vu">1.4. Entity có method nghiệp vụ</h3>
+<p>Entity không chỉ là &quot;túi dữ liệu&quot;. Một số luật <strong>thuộc về chính đối tượng</strong> được đặt ngay trong
+entity <span class="tag tag-code">CODE</span>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Method</th>
+<th>Luật</th>
+<th>Vị trí</th>
+</tr>
+</thead><tbody><tr>
+<td><code>Trip.getOccupancyRate()</code></td>
+<td>tỉ lệ lấp đầy = vé đã bán ÷ tổng ghế</td>
+<td><code>Trip.java:130</code></td>
+</tr>
+<tr>
+<td><code>Trip.needsReinforcement()</code></td>
+<td>&quot;chuyến đông&quot; = lấp đầy &gt; 0,90</td>
+<td><code>Trip.java:137</code></td>
+</tr>
+<tr>
+<td><code>Bus.needsMaintenance()</code></td>
+<td>km kể từ bảo trì ≥ ngưỡng</td>
+<td><code>Bus.java:48</code></td>
+</tr>
+<tr>
+<td><code>Bus.isNearMaintenance(km)</code></td>
+<td>km hiện tại + km chuyến ≥ 90% ngưỡng</td>
+<td><code>Bus.java:72</code></td>
+</tr>
+<tr>
+<td><code>Driver.isLicenseValid(ngày)</code></td>
+<td>bằng lái còn hạn <strong>vào ngày đó</strong></td>
+<td><code>Driver.java:47</code></td>
+</tr>
+<tr>
+<td><code>Route.getDepartureStation()</code></td>
+<td>trạm có <code>stopOrder</code> nhỏ nhất</td>
+<td><code>Route.java:100</code></td>
+</tr>
+</tbody></table></div>
+<p>Lợi ích: mọi nơi (scheduler, validator, dashboard, template) <strong>hỏi</strong> cùng một method, nên ngưỡng
+chỉ nằm một chỗ. Ví dụ <code>TripService.isHotTrip()</code> gọi <code>trip.needsReinforcement()</code> thay vì tự so 0,9
+(comment trong <code>isHotTrip</code>). Ngoại lệ đã biết: các service Decision Support không có entity <code>Trip</code>
+trong tay (chỉ có con số dự báo) nên phải <strong>khai báo lại</strong> 0,90 kèm comment trỏ về nguồn
+(<code>ForecastService.REINFORCEMENT_THRESHOLD</code>, <code>WhatIfSimulationService.REINFORCEMENT_THRESHOLD</code>).</p>
+<h3 id="1-5-soft-delete-xoa-ma-khong-xoa">1.5. Soft delete — &quot;xóa&quot; mà không xóa</h3>
+<p><span class="tag tag-code">CODE</span> <code>Trip.java:20-21</code>:</p>
+<ul>
+<li><code>@SQLDelete(sql = &quot;UPDATE trips SET is_deleted = true WHERE id = ?&quot;)</code> — khi code gọi
+<code>tripRepository.delete(trip)</code>, Hibernate <strong>không</strong> chạy <code>DELETE</code>, mà chạy đúng câu <code>UPDATE</code> này.</li>
+<li><code>@SQLRestriction(&quot;is_deleted = false&quot;)</code> — Hibernate <strong>tự thêm</strong> điều kiện này vào mọi câu
+<code>SELECT</code> trên bảng <code>trips</code>, nên chuyến đã &quot;xóa&quot; biến mất khỏi mọi màn hình.</li>
+</ul>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as AdminTripManagementController
+    participant S as TripService.deleteTrip()
+    participant R as TripRepository
+    participant H as Hibernate
+    participant DB as MySQL
+    C-&gt;&gt;S: deleteTrip(id)
+    S-&gt;&gt;S: deleteRefusalReason(trip) — null thì được xóa
+    S-&gt;&gt;R: delete(trip)
+    R-&gt;&gt;H: remove entity
+    H-&gt;&gt;DB: UPDATE trips SET is_deleted = true WHERE id = ?
+    Note over H,DB: Lần SELECT sau: Hibernate tự thêm "WHERE is_deleted = false"</pre></figure>
+<p>Vì sao dùng soft delete <span class="tag tag-code">CODE</span> javadoc <code>Trip.java:13-19</code>: giữ toàn vẹn khóa ngoại và lịch sử (chuyến
+đã có sự cố, có chuyến tăng cường trỏ về...). Chỉ <code>Trip</code> có soft delete; xe, tài xế, tuyến... bị
+<strong>chặn xóa</strong> nếu còn lịch sử (§5.5).</p>
+<h3 id="1-6-dau-thoi-gian-tu-dong">1.6. Dấu thời gian tự động</h3>
+<ul>
+<li><code>@CreationTimestamp</code> — Hibernate tự ghi thời điểm lúc INSERT: <code>Trip.createdAt</code> (<code>Trip.java:115</code>),
+<code>Incident.reportedAt</code> (<code>Incident.java:76</code>).</li>
+<li><code>@UpdateTimestamp</code> — tự ghi lại mỗi lần UPDATE: <code>CostParameters.updatedAt</code>
+(<code>CostParameters.java:56</code>).</li>
+</ul>
+<p>Chú ý <span class="tag tag-code">CODE</span> javadoc <code>Trip.createdAt</code>: dữ liệu backfill mang <code>createdAt</code> = ngày <strong>chạy script</strong>, vì
+<code>@CreationTimestamp</code> không cho lùi về quá khứ. Mọi phân tích theo thời gian dùng <code>departureTime</code>, không
+dùng <code>createdAt</code>.</p>
+<h3 id="1-7-equals-hashcode-chi-theo-id">1.7. <code>equals</code> / <code>hashCode</code> chỉ theo id</h3>
+<p>Đã học ở Bài 00a §9. Nhắc lại lý do từ góc JPA: hai object Java cùng đại diện <strong>một dòng DB</strong> thì
+phải &quot;bằng nhau&quot;, và phép so sánh không được chạm vào quan hệ LAZY (§2.4) — nếu không, gọi
+<code>hashCode()</code> có thể bắn truy vấn ngầm hoặc ném lỗi. Quy ước ghi ở javadoc <code>User.java:42-70</code>.</p>
+<h2 id="2-repository-spring-data-jpa">§2. Repository — Spring Data JPA</h2>
+<h3 id="2-1-jparepository-cho-san-gi">2.1. <code>JpaRepository</code> cho sẵn gì</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/repository/TripRepository.java:18</code>: <code>public interface TripRepository extends JpaRepository&lt;Trip, Long&gt;</code> — <code>Trip</code> là entity, <code>Long</code> là kiểu khóa chính. Chỉ cần <code>extends</code>, bạn có
+sẵn <span class="tag tag-spring">SPRING</span>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Method</th>
+<th>Làm gì</th>
+</tr>
+</thead><tbody><tr>
+<td><code>findById(id)</code></td>
+<td>Tìm theo khóa → <code>Optional&lt;Trip&gt;</code></td>
+</tr>
+<tr>
+<td><code>findAll()</code></td>
+<td>Lấy tất cả</td>
+</tr>
+<tr>
+<td><code>save(entity)</code></td>
+<td>Thêm mới <strong>hoặc</strong> ghi đè — xem §3</td>
+</tr>
+<tr>
+<td><code>delete(entity)</code></td>
+<td>Xóa (với <code>Trip</code>: soft delete)</td>
+</tr>
+<tr>
+<td><code>count()</code></td>
+<td>Đếm</td>
+</tr>
+<tr>
+<td><code>existsById(id)</code></td>
+<td>Có tồn tại không</td>
+</tr>
+</tbody></table></div>
+<p>Lúc khởi động, Spring Data sinh một <strong>proxy</strong> cài đặt interface này (Bài 00a §3.3) <span class="tag tag-spring">SPRING</span>.</p>
+<h3 id="2-2-ba-kieu-truy-van-du-an-dung">2.2. Ba kiểu truy vấn dự án dùng</h3>
+<p>Dự án <strong>không có native SQL</strong>: mọi truy vấn là một trong ba kiểu dưới [CODE, grep toàn bộ
+<code>repository/</code>].</p>
+<p><strong>Kiểu 1 — Derived query: tên method chính là câu truy vấn.</strong> Spring Data đọc tên method, cắt thành
+từng phần, dựng câu truy vấn <span class="tag tag-spring">SPRING</span>.</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">boolean existsByBusIdAndStatusIn(Long busId, List&lt;TripStatus&gt; statuses);   // TripRepository.java:350
+//      exists | By | Bus.Id = ? | And | Status IN (?)
+// [SUY LUẬN — SQL tương đương]:
+// SELECT COUNT(*) &gt; 0 FROM trips WHERE bus_id = ? AND status IN (?, ?, ?) AND is_deleted = false
+
+List&lt;Trip&gt; findByDepartureTimeBetweenAndStatus(LocalDateTime start, LocalDateTime end, TripStatus status); // :194</code></pre></div>
+<p>Để ý <code>is_deleted = false</code> tự xuất hiện — đó là <code>@SQLRestriction</code> (§1.5).</p>
+<p><strong>Kiểu 2 — JPQL với <code>@Query</code> và <code>@Param</code>.</strong> Khi điều kiện quá phức tạp để đặt tên.</p>
+<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:117-129</code> (<code>existsOverlappingTripForDriver</code>):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT COUNT(t) &gt; 0 FROM Trip t " +
+       "LEFT JOIN t.coDrivers cd " +
+       "WHERE (t.driver = :driver OR cd = :driver) " +                 // tài xế chính HOẶC tài xế phụ
+       "AND t.status IN :statuses " +
+       "AND (:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId) " +     // bỏ qua chính chuyến đang sửa
+       "AND (t.departureTime &lt; :windowEnd AND t.arrivalTimeExpected &gt; :windowStart)") // hai khoảng giao nhau
+boolean existsOverlappingTripForDriver(
+        @Param("driver") Driver driver,               // @Param nối tên ":driver" với tham số Java
+        @Param("statuses") List&lt;TripStatus&gt; statuses,
+        @Param("windowStart") LocalDateTime windowStart,
+        @Param("windowEnd") LocalDateTime windowEnd,
+        @Param("excludeTripId") Long excludeTripId);</code></pre></div>
+<p>Điều kiện &quot;trùng lịch&quot; <code>departureTime &lt; windowEnd AND arrivalTimeExpected &gt; windowStart</code> là công
+thức chuẩn để kiểm <strong>hai khoảng thời gian có giao nhau không</strong>; chạm đúng biên thì <strong>không</strong> tính
+là trùng.</p>
+<p><strong>Kiểu 3 — Projection: chỉ lấy vài cột, trả <code>Object[]</code>.</strong> <span class="tag tag-code">CODE</span> <code>TripRepository.java:440-442</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT t.route.id, t.departureTime, t.ticketsSold, t.totalSeats FROM Trip t " +
+       "WHERE t.status = :status AND t.totalSeats &gt; 0 ORDER BY t.departureTime")
+List&lt;Object[]&gt; findDemandHistoryByStatus(@Param("status") TripStatus status);
+// mỗi phần tử: [routeId, departureTime, ticketsSold, totalSeats]</code></pre></div>
+<p>Service tự bóc từng ô và ép kiểu, ví dụ <code>ForecastService.toObservation()</code>:
+<code>long routeId = ((Number) row[0]).longValue();</code>.</p>
+<h3 id="2-3-jpql-khac-sql-the-nao">2.3. JPQL khác SQL thế nào</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>JPQL</th>
+<th>SQL</th>
+</tr>
+</thead><tbody><tr>
+<td>viết trên <strong>entity và field Java</strong>: <code>FROM Trip t WHERE t.bus = :bus</code></td>
+<td>viết trên <strong>bảng và cột</strong>: <code>FROM trips WHERE bus_id = ?</code></td>
+</tr>
+<tr>
+<td>đi theo quan hệ bằng dấu chấm: <code>t.route.id</code>, <code>t.driver.userId</code></td>
+<td>phải tự <code>JOIN</code></td>
+</tr>
+<tr>
+<td>so sánh cả object: <code>t.driver = :driver</code></td>
+<td>so sánh khóa: <code>driver_id = ?</code></td>
+</tr>
+<tr>
+<td>Hibernate dịch sang SQL của MySQL</td>
+<td>chạy thẳng</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-4-lazy-vs-eager-va-van-de-n-1">2.4. LAZY vs EAGER, và vấn đề N+1</h3>
+<ul>
+<li><strong>EAGER</strong> (&quot;háo hức&quot;) = nạp quan hệ <strong>ngay</strong> cùng lúc với object chính.</li>
+<li><strong>LAZY</strong> (&quot;lười&quot;) = <strong>chưa</strong> nạp; chỉ khi code thật sự gọi <code>trip.getRoute()...</code> thì Hibernate mới
+chạy thêm một truy vấn. Trước lúc đó, field chứa một <strong>proxy</strong> giữ chỗ <span class="tag tag-spring">SPRING</span>.</li>
+</ul>
+<p>Mặc định của JPA <span class="tag tag-spring">SPRING</span>: <code>@ManyToOne</code> và <code>@OneToOne</code> là EAGER; <code>@OneToMany</code> và <code>@ManyToMany</code> là
+LAZY. Dự án <strong>chủ động ghi <code>fetch = FetchType.LAZY</code></strong> trên mọi <code>@ManyToOne</code> của <code>Trip</code>
+(<code>Trip.java:39-63</code>), <code>Bus.busType</code>, <code>Incident</code>... Ngoại lệ: <code>Driver.user</code> (<code>Driver.java:25</code>) ghi
+<code>@OneToOne</code> không kèm <code>fetch</code> ⇒ EAGER theo mặc định.</p>
+<p><strong>Vấn đề N+1</strong>: lấy danh sách N chuyến bằng 1 truy vấn, rồi template in tuyến của từng chuyến ⇒
+mỗi chuyến phát sinh thêm 1 truy vấn nạp tuyến ⇒ tổng <strong>1 + N</strong> truy vấn.</p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    participant T as Template (th:each)
+    participant H as Hibernate
+    participant DB as MySQL
+    rect rgba(200, 120, 60, 0.12)
+    Note over T,DB: Không JOIN FETCH → 1 + N truy vấn
+    T-&gt;&gt;H: findAll()
+    H-&gt;&gt;DB: SELECT * FROM trips (1 truy vấn)
+    loop mỗi chuyến trong N chuyến
+        T-&gt;&gt;H: trip.getRoute().getDistanceKm()
+        H-&gt;&gt;DB: SELECT * FROM routes WHERE id = ? (thêm 1)
+    end
+    end
+    rect rgba(40, 140, 100, 0.12)
+    Note over T,DB: Có JOIN FETCH → 1 truy vấn
+    T-&gt;&gt;H: findAllWithDetails()
+    H-&gt;&gt;DB: SELECT ... FROM trips LEFT JOIN routes LEFT JOIN buses ... (1 truy vấn)
+    end</pre></figure>
+<p>Cách dự án tránh <span class="tag tag-code">CODE</span>:</p>
+<ul>
+<li><strong><code>JOIN FETCH</code></strong> — ép nạp quan hệ ngay trong câu truy vấn. <code>TripRepository.findAllWithDetails()</code>
+(<code>:46-57</code>) nạp một lần route, bus, busType, driver + user, assistant + user, coDrivers. Có
+<code>DISTINCT</code> để khử dòng trùng khi join với danh sách <code>coDrivers</code>.</li>
+<li><strong><code>@BatchSize(size = 20)</code></strong> trên <code>Route.routeStations</code> (<code>Route.java:44-45</code>) — khi cần nạp điểm
+dừng của nhiều tuyến, Hibernate gom <strong>20 tuyến một lần</strong> thay vì từng tuyến.</li>
+</ul>
+<p>Vì sao <code>routeStations</code> dùng <code>@BatchSize</code> mà không JOIN FETCH chung với <code>coDrivers</code> — <span class="tag tag-code">CODE</span> comment
+<code>Route.java:74-78</code>: Hibernate <strong>không cho JOIN FETCH hai collection kiểu <code>List</code></strong> trong cùng một
+câu (lỗi <code>MultipleBagFetchException</code>), mà <code>Trip.coDrivers</code> đã là một <code>List</code> được fetch rồi.</p>
+<h3 id="2-5-cai-bay-cua-projection-nhieu-cot-khong-group-by">2.5. Cái bẫy của projection nhiều cột không <code>GROUP BY</code></h3>
+<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:402-403</code> và <code>DashboardService.java:184-185</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT SUM(t.ticketsSold), SUM(t.price * t.ticketsSold) FROM Trip t WHERE t.status IN :statuses")
+List&lt;Object[]&gt; sumTicketsSoldAndRevenueByStatuses(...);        // trả List, dù chỉ có 1 dòng
+
+List&lt;Object[]&gt; aggRows = tripRepository.sumTicketsSoldAndRevenueByStatuses(OPERATIONAL_STATUSES);
+Object[] agg = aggRows.isEmpty() ? null : aggRows.get(0);        // service tự lấy dòng đầu</code></pre></div>
+<p>Bài học ghi ở <code>Proj_functions_summary.md</code> mục 10 <span class="tag tag-code">CODE</span>: khai báo kiểu trả về <code>Object[]</code> trực tiếp
+khiến Spring Data hiểu nhầm, gây <code>ClassCastException</code> <strong>lúc chạy</strong> — biên dịch và test khởi động
+không bắt được, chỉ lộ khi gọi qua HTTP thật. Cách chuẩn: trả <code>List&lt;Object[]&gt;</code> rồi lấy phần tử đầu.</p>
+<h3 id="2-6-vi-sao-decision-support-doc-bang-projection">2.6. Vì sao Decision Support đọc bằng projection</h3>
+<p>Roadmap Hidden Cost #4 <span class="tag tag-code">CODE</span>: trang danh sách chuyến nạp <strong>toàn bộ entity</strong> và đã lên tới ~8 MB HTML
+(2.222 chuyến), trong khi các trang Dự báo / Đề xuất / What-if chỉ 16–46 KB vì đọc qua projection
+vài cột. Bài học roadmap ghi lại: <em>code phân tích mới không dùng <code>findAll()</code> hay stream entity</em>.</p>
+<h2 id="3-save-la-persist-hay-merge-goc-cua-mot-nhom-loi">§3. <code>save()</code> là persist hay merge — gốc của một nhóm lỗi</h2>
+<h3 id="3-1-hai-che-do-cua-save">3.1. Hai chế độ của <code>save()</code></h3>
+<p><span class="tag tag-spring">SPRING</span> <code>save(entity)</code> kiểm entity có phải <strong>mới</strong> không — với khóa <code>Long</code>, &quot;mới&quot; nghĩa là
+<code>id == null</code>:</p>
+<figure class="diagram"><pre class="mermaid">flowchart TD
+    A["repository.save(entity)"] --&gt; B{"entity.id == null?"}
+    B -- "có (mới)" --&gt; C["persist → INSERT một dòng mới&lt;br/&gt;DB cấp id"]
+    B -- "không (đã có id)" --&gt; D["merge → tìm dòng có id đó&lt;br/&gt;GHI ĐÈ MỌI CỘT bằng giá trị của object"]
+    D --&gt; E["Cột nào object để null&lt;br/&gt;→ DB cũng thành null"]</pre></figure>
+<p>Nhánh <strong>merge</strong> là chỗ nguy hiểm. Object từ form (<code>@ModelAttribute</code>, Bài 00a §4.3) là object <strong>mới
+toanh</strong> do Spring dựng từ các ô form: ô nào form không gửi thì field đó <code>null</code>. Merge object này
+xuống DB = xóa trắng mọi cột form không gửi.</p>
+<h3 id="3-2-he-qua-thiet-ke-tach-tao-khoi-sua-o-moi-service">3.2. Hệ quả thiết kế: tách <strong>tạo</strong> khỏi <strong>sửa</strong> ở mọi service</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/service/BusService.java</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Transactional
+public void saveBus(Bus bus) {                 // :65 — CHỈ để TẠO
+    if (bus.getId() != null) {                 // :70 — "tripwire": có id nghĩa là ai đó đang muốn ghi đè
+        throw new IllegalArgumentException(
+                "saveBus() chỉ dùng để tạo xe mới. Cập nhật phải gọi updateBus(id, form).");
+    }
+    ... // điền mặc định odometer, validate
+    busRepository.save(bus);                   // :87 — chắc chắn là INSERT
+}
+
+@Transactional
+public void updateBus(Long id, Bus form) {     // :117 — id lấy từ URL, không tin id trong form
+    Bus existing = busRepository.findById(id)  // :118 — nạp bản ghi THẬT từ DB
+            .orElseThrow(...);
+    ... // các guard
+    existing.setLicensePlate(form.getLicensePlate());   // :182 — chép TỪNG field được phép sửa
+    ...
+    if (form.getOdometer() != null) { existing.setOdometer(form.getOdometer()); } // ô trống = giữ nguyên
+    ...
+    busRepository.save(existing);              // :198
+}</code></pre></div>
+<p>Cùng khuôn này áp cho mọi entity có form: <code>StationService.createStation()/updateStation()</code>,
+<code>RouteService.createRoute()/updateRoute()</code>, <code>DriverService.createDriver()/updateDriver()</code>,
+<code>IncidentService.createIncident()/updateIncident()</code>, <code>AdminService.createNewUser()</code>,
+<code>TripService.createManualTrip()</code>. Test canh cả loạt: <code>test/service/CreatePathIdTripwireTest.java</code>
+(9 test).</p>
+<h3 id="3-3-hai-loi-that-da-day-bai-hoc-nay">3.3. Hai lỗi thật đã dạy bài học này</h3>
+<ul>
+<li><strong>Lỗi #16</strong> (<code>current_bugs_found.md</code>): trước đây xóa trắng ô odometer rồi bấm Lưu thì null bị điền
+mặc định 0 → mất số km trọn đời, báo THÀNH CÔNG. Sửa: &quot;ô trống = giữ nguyên&quot; trong <code>updateBus</code>.</li>
+<li><strong>Lỗi #21</strong>: controller bind form thẳng vào entity bằng <code>@ModelAttribute</code> <strong>không có
+<code>@InitBinder</code></strong> (cơ chế khai báo field nào được phép bind) ⇒ một POST tự chế tới <code>/create</code> gửi kèm
+<code>id=5</code> sẽ khiến <code>save()</code> thành <strong>merge</strong> và ghi đè bản ghi số 5. Javadoc <code>DriverService.createDriver()</code>
+ghi ca đã tái hiện thật: tài khoản admin duy nhất bị đổi mật khẩu và hạ xuống <code>ROLE_DRIVER</code>. Sửa:
+tripwire <code>id != null → từ chối</code> ở mọi lối tạo.</li>
+</ul>
+<h2 id="4-transaction-proxy-persistence-context">§4. Transaction, proxy, persistence context</h2>
+<h3 id="4-1-transaction-la-gi">4.1. Transaction là gì</h3>
+<p><strong>Transaction</strong> = một nhóm thao tác DB được làm <strong>trọn gói</strong>: hoặc tất cả thành công (<strong>commit</strong> —
+chốt), hoặc có lỗi thì <strong>rollback</strong> (hoàn tác sạch như chưa từng làm). Ví dụ <code>approveTrip()</code> gán xe,
+gán tài xế, đổi số ghế, chuyển <code>ACTIVE</code>: nếu validate thất bại giữa chừng thì không được để chuyến ở
+trạng thái &quot;đã gán xe nhưng chưa duyệt&quot;.</p>
+<p>Trong Spring chỉ cần đặt <code>@Transactional</code> lên method của bean <span class="tag tag-spring">SPRING</span>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Dạng</th>
+<th>Nghĩa</th>
+<th>Ví dụ</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@Transactional</code></td>
+<td>Mở transaction trước khi method chạy, commit khi method kết thúc bình thường, rollback khi method ném lỗi</td>
+<td><code>TripService.approveTrip()</code> <code>:955-956</code></td>
+</tr>
+<tr>
+<td><code>@Transactional(readOnly = true)</code></td>
+<td>Transaction chỉ đọc — báo cho Hibernate không cần theo dõi thay đổi để ghi</td>
+<td>mọi service Decision Support: <code>ForecastService.java:147</code>, <code>DashboardService.java:72</code>...</td>
+</tr>
+</tbody></table></div>
+<p><strong>Lỗi nào gây rollback?</strong> <span class="tag tag-spring">SPRING</span> Mặc định: <code>RuntimeException</code> (và các lớp con) cùng <code>Error</code> →
+rollback; checked exception (loại phải khai báo <code>throws</code>) → <strong>không</strong> rollback. Dự án chỉ ném
+<code>RuntimeException</code> và các lớp con (<code>IllegalArgumentException</code>, <code>IllegalStateException</code>,
+<code>EntityNotFoundException</code>) nên mọi lỗi nghiệp vụ đều rollback.</p>
+<h3 id="4-2-proxy-transactional-thuc-su-chay-o-dau">4.2. Proxy — <code>@Transactional</code> thực sự chạy ở đâu</h3>
+<p>Spring không sửa code của bạn. Nó tạo một <strong>proxy</strong> — một &quot;người đứng cửa&quot; bọc ngoài bean
+<code>TripService</code>. Controller tưởng đang gọi <code>TripService</code>, thực ra gọi proxy; proxy mở transaction rồi
+mới chuyển vào method thật <span class="tag tag-spring">SPRING</span>.</p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as AdminTripController
+    participant P as Proxy của TripService
+    participant T as TripService (object thật)
+    participant DB as MySQL
+    C-&gt;&gt;P: approveTrip(...)
+    P-&gt;&gt;DB: BEGIN (mở transaction)
+    P-&gt;&gt;T: approveTrip(...)
+    T-&gt;&gt;T: gọi this.validateBusForTrip(...)
+    Note right of T: Gọi nội bộ qua "this"&lt;br/&gt;→ KHÔNG đi qua proxy
+    alt method chạy xong
+        T--&gt;&gt;P: return
+        P-&gt;&gt;DB: COMMIT
+    else method ném RuntimeException
+        T--&gt;&gt;P: exception
+        P-&gt;&gt;DB: ROLLBACK
+        P--&gt;&gt;C: ném tiếp exception
+    end</pre></figure>
+<p><strong>Self-invocation</strong> (&quot;tự gọi mình&quot;): khi một method trong <code>TripService</code> gọi method khác <strong>của chính
+nó</strong> (<code>this.x()</code>), lời gọi đi thẳng vào object thật, <strong>không qua proxy</strong> ⇒ <code>@Transactional</code> đặt trên
+method được gọi <strong>không có tác dụng</strong> <span class="tag tag-spring">SPRING</span>.</p>
+<p>Dự án ghi rõ điều này ở javadoc <code>TripService.java:69-75</code>, phía trên <code>scanAndSuggestExtraTrips()</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java"> * @Transactional BẮT BUỘC ở đây vì:
+ *   1. Giữ Hibernate session mở suốt vòng lặp → trip.getRoute() (lazy) không bị
+ *      LazyInitializationException.
+ *   2. Khi gọi createExtraTrip() từ cùng class (self-invocation), Spring AOP KHÔNG
+ *      tạo proxy → @Transactional trên method đó bị bỏ qua.
+@Scheduled(fixedRate = 10_000)
+@Transactional
+public void scanAndSuggestExtraTrips() { ... createExtraTrip(trip); ... }</code></pre></div>
+<p>Đọc hiểu: <code>createExtraTrip()</code> là method <code>private</code> được gọi nội bộ, nên muốn nó chạy trong
+transaction thì transaction phải được mở <strong>ở method ngoài cùng</strong> — <code>scanAndSuggestExtraTrips()</code> —
+nơi Spring gọi từ bên ngoài (qua proxy). Cả vòng quét là <strong>một</strong> transaction.</p>
+<h3 id="4-3-persistence-context-va-dirty-checking">4.3. Persistence context và dirty checking</h3>
+<ul>
+<li><strong>Persistence context</strong> (&quot;sổ theo dõi&quot;) = trong một phiên làm việc với DB, Hibernate ghi sổ mọi
+entity nó đã nạp. Entity nằm trong sổ gọi là <strong>managed</strong> (đang được quản lý) <span class="tag tag-spring">SPRING</span>.</li>
+<li><strong>Dirty checking</strong> (&quot;kiểm tra vết bẩn&quot;) = lúc commit, Hibernate so từng entity managed với bản
+chụp lúc nạp; field nào đổi thì <strong>tự sinh <code>UPDATE</code></strong>, kể cả khi code không gọi <code>save()</code> <span class="tag tag-spring">SPRING</span>.</li>
+<li>Rollback = không có <code>UPDATE</code> nào được ghi, dù object trong RAM đã bị đổi.</li>
+</ul>
+<p>Áp vào <code>TripService.approveTrip()</code> <span class="tag tag-code">CODE</span>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Transactional
+public String approveTrip(Long tripId, Long busId, ...) {        // :955-956
+    Trip trip = tripRepository.findById(tripId).orElseThrow(...); // trip giờ là entity MANAGED
+    requirePendingApproval(trip);                                 // :961 — kiểm trạng thái TRƯỚC
+    ...
+    trip.setBus(bus);                                             // :969 — đổi entity managed
+    trip.setDriver(driver);
+    ...
+    String warning = validateBusForTrip(bus, trip, tripId);       // :1007 — có thể ném lỗi
+    validateStaffForTrip(trip, tripId);
+    changeStatusToActive(trip);                                   // :1010
+    tripRepository.save(trip);
+    return warning;
+}</code></pre></div>
+<ul>
+<li><code>setBus()</code> rồi mới validate vẫn <strong>an toàn</strong>: nếu validate ném <code>IllegalArgumentException</code>, proxy
+rollback, thay đổi xe <strong>không bao giờ xuống DB</strong> <span class="tag tag-spring">SPRING</span>.</li>
+<li>Nhưng <code>requirePendingApproval()</code> <strong>vẫn phải đứng trước</strong> <code>setBus()</code> — javadoc <code>approveTrip()</code> ghi
+lý do <span class="tag tag-code">CODE</span>: để một chuyến sai trạng thái (vd <code>DEPARTED</code>) bị chặn <strong>trước khi</strong> con trỏ xe bị dời,
+và báo đúng lý do &quot;sai trạng thái&quot; thay vì một lỗi validate khác (lỗi #20).</li>
+</ul>
+<h3 id="4-4-controller-khong-co-transactional-goi-hai-service-la-hai-transaction">4.4. Controller <strong>không</strong> có <code>@Transactional</code> ⇒ gọi hai service là hai transaction</h3>
+<p><span class="tag tag-code">CODE</span> <code>AdminTripManagementController.updateTrip()</code> (<code>:340-452</code>) gọi <strong>hai</strong> method service:</p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant C as AdminTripManagementController.updateTrip()
+    participant S as TripService (qua proxy)
+    participant DB as MySQL
+    C-&gt;&gt;C: nạp existingTrip, kiểm editRefusalReason()
+    C-&gt;&gt;C: pre-check allowedTransitionsFrom(...).contains(newStatus) (:373)
+    alt đích trạng thái không hợp lệ
+        C--&gt;&gt;C: flash error "chưa có thay đổi nào được lưu" → redirect (chưa ghi gì)
+    else hợp lệ
+        C-&gt;&gt;C: chép route, bus, driver, giờ, giá, ghế vào existingTrip
+        C-&gt;&gt;S: updateManualTrip(existingTrip) (:418)
+        S-&gt;&gt;DB: TRANSACTION 1: validate + UPDATE → COMMIT
+        C-&gt;&gt;S: updateTripStatus(id, newStatus) (:424)
+        S-&gt;&gt;DB: TRANSACTION 2: FSM + đồng bộ Bus → COMMIT
+    end</pre></figure>
+<p>Nếu transaction 2 thất bại thì transaction 1 <strong>đã commit</strong> — không có gì hoàn tác nó. Đó chính là
+<strong>lỗi #24</strong>: trước đây chọn một trạng thái FSM cấm thì các trường khác đã được lưu, còn màn hình báo
+như thể chưa lưu gì. Bản sửa: <strong>hỏi trước</strong> bằng <code>allowedTransitionsFrom()</code> (<code>:373</code>) khi chưa ghi gì;
+và nếu bước 2 vẫn thất bại (chỉ còn xảy ra khi trạng thái đổi giữa hai request), câu báo nói thật
+<em>&quot;Thông tin chuyến ĐÃ được lưu, nhưng không đổi được trạng thái&quot;</em> (<code>catch</code> ở <code>:433</code>) <span class="tag tag-code">CODE</span>.</p>
+<h3 id="4-5-open-session-in-view-osiv">4.5. Open Session In View (OSIV)</h3>
+<p><strong>OSIV</strong> — Spring Boot mặc định bật <code>spring.jpa.open-in-view</code> <span class="tag tag-spring">SPRING</span>: phiên làm việc với DB
+(<code>EntityManager</code>) được <strong>mở suốt cả request web</strong>, từ lúc vào controller tới lúc Thymeleaf render
+xong. Dự án không tắt nó; log khởi động có cảnh báo mặc định về OSIV (roadmap Session Log ghi &quot;the
+two benign WARNs (open-in-view default; ...)&quot;).</p>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    subgraph WEB["Request web — OSIV mở phiên suốt request"]
+        direction LR
+        W1[Controller] --&gt; W2["Service&lt;br/&gt;@Transactional"] --&gt; W3["Thymeleaf đọc&lt;br/&gt;trip.route.departurePointDisplay"]
+        W3 --&gt; W4["✅ LAZY nạp được&lt;br/&gt;(phiên còn mở)"]
+    end
+    subgraph BG["CommandLineRunner / @Scheduled — KHÔNG có request"]
+        direction LR
+        B1["run() / job"] --&gt; B2["đọc bus.getBusType()&lt;br/&gt;ngoài transaction"]
+        B2 --&gt; B3["❌ LazyInitializationException"]
+    end</pre></figure>
+<p>Hệ quả thực tế <span class="tag tag-code">CODE</span>:</p>
+<ul>
+<li>Template đọc được quan hệ LAZY (<code>trip.route...</code>) dù service đã trả về — nhờ OSIV. Đây cũng là lý
+do chi phí N+1 ở các màn Model &quot;bị che khuất&quot; (javadoc
+<code>TripService.getAvailableAssistantsForTimeRange()</code>).</li>
+<li>Job nền và <code>CommandLineRunner</code> <strong>không có request</strong> nên <strong>không có OSIV</strong>. Roadmap Phase 5 ghi lỗi
+thật: lần chạy đầu của <code>HistoricalDataBackfill</code> chết với <code>LazyInitializationException</code> khi đọc
+<code>bus.getBusType()</code>; sửa bằng <code>findAllWithBusType()</code> (JOIN FETCH) — comment
+<code>HistoricalDataBackfill.java</code> trong <code>run()</code>. Scheduler thì giữ phiên bằng <code>@Transactional</code> (§4.2).</li>
+<li>Câu hỏi &quot;controller sửa entity managed rồi service ném lỗi thì thay đổi có bị ghi không?&quot; đã được
+rà và <strong>kết luận là không</strong> — <code>current_bugs_found.md</code>, mục &quot;ĐÃ KIỂM ở lần rà 2026-09-19&quot;: OSIV giữ
+phiên mở nhưng <strong>không có transaction</strong> nên Hibernate không flush; các phiên sửa #14/#15/#18 đã
+chứng minh bằng thực nghiệm.</li>
+</ul>
+<h2 id="5-xu-ly-loi-va-hai-lop-bao-ve">§5. Xử lý lỗi và &quot;hai lớp bảo vệ&quot;</h2>
+<h3 id="5-1-quy-uoc-exception-cua-du-an">5.1. Quy ước exception của dự án</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Exception</th>
+<th>Ý nghĩa trong dự án</th>
+<th>Ví dụ</th>
+</tr>
+</thead><tbody><tr>
+<td><code>IllegalArgumentException</code></td>
+<td>Vi phạm <strong>luật nghiệp vụ / dữ liệu đầu vào</strong></td>
+<td>&quot;Xe ... đang bận trong khoảng thời gian này!&quot; (<code>validateBusForTrip</code>)</td>
+</tr>
+<tr>
+<td><code>IllegalStateException</code></td>
+<td>Vi phạm <strong>chính sách theo trạng thái</strong> (FSM, xóa, duyệt)</td>
+<td><code>updateTripStatus()</code> <code>:642-646</code>; <code>requirePendingApproval()</code> <code>:892</code>; <code>deleteTrip()</code> <code>:1827</code></td>
+</tr>
+<tr>
+<td><code>EntityNotFoundException</code></td>
+<td>Không tìm thấy bản ghi</td>
+<td><code>updateTripStatus()</code> <code>:639</code>, <code>deleteTrip()</code> <code>:1825</code></td>
+</tr>
+<tr>
+<td><code>RuntimeException</code></td>
+<td>Không tìm thấy / lỗi chung ở các service danh mục</td>
+<td><code>BusService.updateBus()</code> &quot;Không tìm thấy xe...&quot;</td>
+</tr>
+</tbody></table></div>
+<p>Controller <strong>bắt riêng từng loại</strong> để báo đúng giọng. <span class="tag tag-code">CODE</span> <code>AdminTripController.processManualApproval()</code>
+(<code>:167-201</code>):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">try {
+    String warning = tripService.approveTrip(tripId, busId, driverId, assistantId, coDriverIds);
+    ... flash "success" ...
+} catch (IllegalArgumentException e) {        // :180 — vi phạm ràng buộc → quay lại form duyệt
+    redirectAttributes.addFlashAttribute("error", "⛔ Vi phạm ràng buộc: " + e.getMessage());
+    return "redirect:/admin/trips/approve/" + tripId;
+} catch (IllegalStateException e) {           // :184 — sai trạng thái → về hàng chờ
+    redirectAttributes.addFlashAttribute("error", "⛔ " + e.getMessage());
+    return "redirect:/admin/trips/pending";
+} catch (Exception e) {                       // :196 — lỗi hệ thống thật
+    redirectAttributes.addFlashAttribute("error", "Lỗi hệ thống: " + e.getMessage());
+    return "redirect:/admin/trips/approve/" + tripId;
+}</code></pre></div>
+<p>Lưu ý thứ tự <code>catch</code> [SPRING/Java]: lớp con phải đứng trước lớp cha, <code>Exception</code> luôn đứng cuối.</p>
+<p>Dự án <strong>không có <code>@ControllerAdvice</code></strong> (nơi xử lý lỗi tập trung cho mọi controller) — grep <code>src/main</code>
+ra 0. Mỗi controller tự <code>try/catch</code>. Ưu: mỗi màn chọn được trang quay về. Nhược <span class="tag tag-guess">SUY LUẬN</span>: code
+<code>catch</code> lặp lại ở nhiều nơi, và một controller quên <code>try/catch</code> sẽ trả trang lỗi 500 — đó chính là
+lỗi #25 (<code>/admin/users/save</code> từng không bắt lỗi trùng username).</p>
+<h3 id="5-2-hai-lop-bao-ve-khong-moi-va-chan-that">5.2. Hai lớp bảo vệ: &quot;không-mời&quot; và &quot;chặn thật&quot;</h3>
+<p>Pattern xuyên suốt dự án [CODE, các javadoc nêu tên hai lớp này nhiều lần]:</p>
+<ul>
+<li><strong>Lớp không-mời</strong> — giao diện <strong>không đưa ra</strong> thao tác sẽ bị từ chối: ẩn nút, dropdown chỉ liệt kê
+lựa chọn hợp lệ, JS kiểm trước.</li>
+<li><strong>Lớp chặn thật</strong> — server <strong>từ chối</strong> request sai, kể cả request tự chế bỏ qua giao diện.</li>
+</ul>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    U["Admin / request tự chế"] --&gt; L1{"Lớp KHÔNG-MỜI&lt;br/&gt;template · dropdown · JS"}
+    L1 -- "người dùng bình thường:&lt;br/&gt;không thấy nút sai" --&gt; OK["Chỉ gửi thao tác hợp lệ"]
+    L1 -. "POST tự chế vượt qua" .-&gt; L2{"Lớp CHẶN THẬT&lt;br/&gt;controller · service"}
+    OK --&gt; L2
+    L2 -- "hợp lệ" --&gt; W["Ghi DB"]
+    L2 -- "vi phạm" --&gt; X["Ném exception → flash error&lt;br/&gt;không ghi gì"]</pre></figure>
+<div class="table-wrap"><table><thead><tr>
+<th>Luật</th>
+<th>Lớp không-mời</th>
+<th>Lớp chặn thật</th>
+</tr>
+</thead><tbody><tr>
+<td>Chỉ xóa chuyến theo chính sách trạng thái</td>
+<td>nút Xóa chỉ hiện khi <code>deletableIds.contains(trip.id)</code> (<code>trip-list.html:472</code>; tập tính ở <code>populateTripList()</code> <code>AdminTripManagementController.java:80-93</code>)</td>
+<td><code>TripService.deleteTrip()</code> → <code>deleteRefusalReason()</code> (<code>:1823-1830</code>)</td>
+</tr>
+<tr>
+<td>Chỉ đổi trạng thái theo FSM</td>
+<td>select trạng thái ở form Sửa chỉ liệt kê <code>allowedTransitionsFrom()</code></td>
+<td>pre-check <code>:373</code> + <code>canTransition()</code> trong <code>updateTripStatus()</code> (<code>:642</code>)</td>
+</tr>
+<tr>
+<td>Bảng điều phối không được kích hoạt chuyến</td>
+<td>chỉ có 3 nút Xuất phát / Hủy / Hoàn thành</td>
+<td><code>BOARD_ACTIONS</code> (<code>DispatchController.java:59</code>, kiểm ở <code>:108</code>)</td>
+</tr>
+<tr>
+<td>Chỉ duyệt chuyến đang chờ duyệt</td>
+<td><code>showApproveForm()</code> không mở form cho chuyến khác <code>PENDING_APPROVAL</code> (<code>AdminTripController.java:75</code>)</td>
+<td><code>requirePendingApproval()</code> (<code>TripService.java:892</code>)</td>
+</tr>
+<tr>
+<td>Không trùng nhân sự trên một chuyến</td>
+<td><code>validateNoDriverConflict()</code> ở JS (<code>trip-create-form.html:721</code>)</td>
+<td>&quot;Nhân sự trùng lặp&quot; trong <code>validateStaffForTrip()</code> (<code>TripService.java:1283</code>)</td>
+</tr>
+</tbody></table></div>
+<p><strong>Quy tắc một chiều</strong> của dự án (roadmap §8, nhắc trong nhiều javadoc): lớp không-mời được phép mời
+<strong>ít hơn</strong> thứ server chấp nhận, nhưng <strong>không bao giờ được mời thứ server sẽ từ chối</strong> — vì mời rồi
+từ chối là trải nghiệm tệ và che giấu lỗi. Lỗi #23 và #24 chính là vi phạm quy tắc này (nút Hủy hiện
+trên chuyến <code>DEPARTED</code>, select liệt kê đủ 5 trạng thái).</p>
+<h3 id="5-3-toan-ven-du-lieu-nam-o-service-khong-o-db">5.3. Toàn vẹn dữ liệu nằm ở service, không ở DB</h3>
+<p><span class="tag tag-code">CODE</span> <code>application.properties:19</code>: URL kết nối có <code>sessionVariables=foreign_key_checks=0</code> — MySQL
+<strong>không kiểm khóa ngoại</strong>. Xóa một xe còn bản ghi sự cố trỏ tới, DB sẽ im lặng để lại &quot;tham chiếu
+mồ côi&quot;. Vì vậy các guard nằm trong service — comment <code>BusService.java:248-255</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">boolean hasAnyTrip = tripRepository.existsByBusId(id);          // :242 — xe đã từng chạy chuyến
+if (hasAnyTrip) throw new RuntimeException("Không thể xóa xe này vì xe đã có dữ liệu lịch sử...");
+...
+// Kiểm tra ở tầng service là bắt buộc, KHÔNG thể dựa vào FK: JDBC URL đặt
+// sessionVariables=foreign_key_checks=0 nên MySQL không chặn ...
+if (incidentRepository.existsByBusId(id)) throw new RuntimeException("... đang có bản ghi sự cố ...");  // :256</code></pre></div>
+<p>Cùng khuôn: <code>DriverService.deleteDriver()</code>, <code>RouteService.deleteRoute()</code>, <code>StationService.deleteById()</code>.</p>
+<h2 id="6-nhung-gi-du-an-khong-dung-va-tra-loi-the-nao-khi-bi-hoi">§6. Những gì dự án KHÔNG dùng — và trả lời thế nào khi bị hỏi</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Kỹ thuật</th>
+<th>Có dùng? (bằng chứng)</th>
+<th>Dự án làm gì thay</th>
+<th>Trả lời gợi ý</th>
+</tr>
+</thead><tbody><tr>
+<td>Bean Validation <code>@Valid</code>, <code>@NotNull</code>...</td>
+<td>❌ grep <code>src/main</code> = 0; starter có trong <code>pom.xml:51</code></td>
+<td>validate viết tay ở service (<code>BusService.validate()</code>, <code>RouteService.validateRoute()</code>, <code>CostParameterService.validate()</code>)</td>
+<td>Luật của hệ thống phụ thuộc DB và trạng thái (xe bận, giờ lái 8h...) — annotation trên field không diễn tả được; em gom vào service để có một chỗ duy nhất và câu báo lỗi nghiệp vụ tiếng Việt. Với ràng buộc đơn giản (không âm, bắt buộc) thì Bean Validation là hướng cải tiến. <span class="tag tag-guess">SUY LUẬN</span></td>
+</tr>
+<tr>
+<td><code>@ControllerAdvice</code> / <code>@ExceptionHandler</code></td>
+<td>❌ grep = 0</td>
+<td><code>try/catch</code> ở từng controller → flash</td>
+<td>§5.1</td>
+</tr>
+<tr>
+<td>DTO riêng cho form, <code>@InitBinder</code></td>
+<td>❌ form bind thẳng entity</td>
+<td>tripwire <code>id != null</code> + &quot;nạp bản ghi cũ rồi chép từng field&quot; (§3)</td>
+<td>Rủi ro mass-assignment đã được đóng ở tầng service sau lỗi #21; DTO form là cách triệt để hơn</td>
+</tr>
+<tr>
+<td>Phân trang</td>
+<td>❌</td>
+<td>danh sách chuyến nạp toàn bộ</td>
+<td>Roadmap Hidden Cost #4: trang danh sách chuyến ~8 MB với 2.222 chuyến; phân trang là việc cần làm đầu tiên</td>
+</tr>
+<tr>
+<td>Flyway / Liquibase</td>
+<td>❌</td>
+<td><code>ddl-auto=update</code></td>
+<td>Hibernate tự bổ sung bảng/cột; hạn chế: không có lịch sử thay đổi schema, không tự đổi tên/xóa cột</td>
+</tr>
+<tr>
+<td>Đăng nhập, phân quyền theo <code>Role</code>, BCrypt</td>
+<td>❌ <code>SecurityConfig</code> permit-all; <code>AdminService</code> còn dòng comment <code>passwordEncoder</code></td>
+<td><code>Role</code> chỉ để phân loại tài khoản</td>
+<td>Non-Goal có chủ đích (roadmap §4); mật khẩu đang lưu thô — phải làm trước khi triển khai thật</td>
+</tr>
+<tr>
+<td>Gửi mail</td>
+<td>❌ không có <code>JavaMailSender</code>; starter <code>pom.xml:39</code></td>
+<td>—</td>
+<td>Non-Goal (roadmap §4)</td>
+</tr>
+<tr>
+<td>Khóa ngoại được DB kiểm</td>
+<td>❌ <code>foreign_key_checks=0</code></td>
+<td>guard ở service (§5.3)</td>
+<td>Nói thật đây là điểm yếu; toàn vẹn phụ thuộc vào việc mọi lối ghi đều đi qua service</td>
+</tr>
+<tr>
+<td>Test controller bằng MockMvc, test đơn vị bằng Mockito</td>
+<td>❌ grep <code>src/test</code> = 0</td>
+<td>test tích hợp <code>@SpringBootTest</code> trên MySQL thật + chạy app thật (§7)</td>
+<td>§7.4</td>
+</tr>
+<tr>
+<td>Native SQL</td>
+<td>❌</td>
+<td>derived query + JPQL</td>
+<td>Không phụ thuộc cú pháp riêng của MySQL</td>
+</tr>
+</tbody></table></div>
+<h2 id="7-kiem-thu">§7. Kiểm thử</h2>
+<h3 id="7-1-buc-tranh-chung">7.1. Bức tranh chung</h3>
+<p><span class="tag tag-code">CODE</span> <code>src/test/java</code>: <strong>18 class, 126 method <code>@Test</code></strong> (đếm 2026-09-27).</p>
+<ul>
+<li><strong>16 class</strong> là test tích hợp: <code>@SpringBootTest</code> (khởi động <strong>cả ứng dụng thật</strong>, kết nối MySQL
+thật). 15 trong số đó kèm <code>@Transactional</code> (trừ <code>BusManagementApplicationTests</code> — chỉ kiểm ứng dụng
+khởi động được).</li>
+<li><strong>2 class</strong> là JUnit thuần, không khởi động Spring: <code>TripServiceDriverShareTest</code>,
+<code>WhatIfCoverageTest</code> — kiểm các hàm tính toán thuần (<code>TripService.driverShareHours()</code>,
+<code>WhatIfSimulationService.coverableSlots()</code>), vốn được để <code>package-private</code> (không <code>private</code>) chính
+để test gọi trực tiếp được.</li>
+<li>Database riêng: <code>busmanagement_test</code>, <code>create-drop</code> (<code>src/test/resources/application.properties:22-23</code>)
+— chạy test <strong>không đụng</strong> dữ liệu thật (Phase 0 đã sửa lỗi trước đây <code>mvnw test</code> xóa DB thật).</li>
+</ul>
+<p><strong><code>@Transactional</code> trên class test</strong> <span class="tag tag-spring">SPRING</span> mang nghĩa khác trên code chính: mỗi test chạy trong
+một transaction và <strong>luôn rollback khi test kết thúc</strong> ⇒ dữ liệu test dựng lên tự biến mất, các test
+không ảnh hưởng nhau.</p>
+<p>Khác biệt nhỏ với code chính: test dùng <code>@Autowired</code> trên field (Spring tiêm thẳng vào field), còn
+code chính dùng constructor injection (Bài 00a §3.2). Với class test, cách này phổ biến và chấp nhận
+được <span class="tag tag-spring">SPRING</span>.</p>
+<h3 id="7-2-doc-mot-test-tieu-bieu-tripservicestatustransitiontest">7.2. Đọc một test tiêu biểu: <code>TripServiceStatusTransitionTest</code></h3>
+<p><span class="tag tag-code">CODE</span> <code>test/service/TripServiceStatusTransitionTest.java</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@SpringBootTest                 // :72 — khởi động cả app, TripService là bean thật
+@Transactional                  // :73 — mỗi test rollback
+class TripServiceStatusTransitionTest {
+    @Autowired private TripService tripService;
+    @Autowired private BusRepository busRepository;
+    ...
+    private static final double DISTANCE_KM = 120.0;
+    private static final double START_ODOMETER = 1000.0;
+
+    @BeforeEach                 // :101 — chạy TRƯỚC MỖI test: dựng dữ liệu sạch
+    void setUp() {
+        bus = new Bus();  ... bus.setOdometer(START_ODOMETER); bus.setStatus(BusStatus.TRAVELING);
+        bus = busRepository.save(bus);
+        Route route = new Route(); route.setDistanceKm(DISTANCE_KM); ...
+        trip = new Trip(); ... trip.setStatus(TripStatus.DEPARTED);   // chuyến đang chạy
+        trip = tripRepository.save(trip);
+    }
+
+    @Test                                                        // :158-176
+    void completingAnAlreadyCompletedTrip_doesNotAddOdometerAgain() {
+        tripService.updateTripStatus(trip.getId(), TripStatus.COMPLETED);   // hoàn thành lần 1
+        double afterFirstCompletion = odometer();
+        assertEquals(START_ODOMETER + DISTANCE_KM, afterFirstCompletion, 0.0001); // 1000 + 120
+
+        tripService.updateTripStatus(trip.getId(), TripStatus.COMPLETED);   // "bấm lần 2"
+        tripService.updateTripStatus(trip.getId(), TripStatus.COMPLETED);   // "bấm lần 3"
+
+        assertEquals(afterFirstCompletion, odometer(), 0.0001);             // vẫn 1120, không cộng thêm
+    }
+}</code></pre></div>
+<p>Đọc theo mẫu <strong>Arrange – Act – Assert</strong> (Chuẩn bị – Hành động – Kiểm tra):</p>
+<ol>
+<li><strong>Arrange</strong> (<code>setUp</code>): xe odometer 1.000 km, tuyến 120 km, chuyến <code>DEPARTED</code>.</li>
+<li><strong>Act</strong>: gọi <code>updateTripStatus(..., COMPLETED)</code> ba lần.</li>
+<li><strong>Assert</strong>: odometer chỉ tăng <strong>đúng một lần</strong> (1.120 km).</li>
+</ol>
+<p>Test này là &quot;regression&quot; cho <strong>lỗi #6</strong>: trước đây double-click nút &quot;Hoàn thành&quot; cộng km hai lần, vì
+khối đồng bộ Bus chỉ xét trạng thái mới. Bản sửa là guard <code>if (trip.getStatus() == newStatus) return;</code>
+(<code>TripService.java:663</code>). Class này còn nhóm test thứ hai cho <strong>lỗi #20</strong> (<code>:275-375</code>): duyệt một
+chuyến <code>CANCELLED</code>/<code>COMPLETED</code>/<code>DEPARTED</code> phải bị từ chối <strong>và DB không đổi gì</strong>.</p>
+<p>Test đi thành cặp có chủ đích (javadoc <code>:47-49</code>): một test chặn lỗi cộng lặp, một test
+(<code>departedToCompleted_addsRouteDistanceExactlyOnce</code>, <code>:145</code>) chứng minh luồng đúng <strong>vẫn</strong> cộng km —
+để bản sửa không &quot;quá tay&quot; thành không bao giờ cộng.</p>
+<h3 id="7-3-test-chua-du-du-an-con-chay-app-that">7.3. Test chưa đủ — dự án còn chạy app thật</h3>
+<p>Quy ước của dự án (<code>.claude/skills/verify/SKILL.md</code>, roadmap Session Log): mỗi thay đổi được kiểm
+chứng bằng cách <strong>chạy app thật trên MySQL thật</strong> (profile mặc định, không bao giờ <code>demo</code>), gọi các
+trang qua HTTP và đối chiếu DB trước/sau. Vì sao cần cả hai [CODE + SUY LUẬN]:</p>
+<ul>
+<li>Test tự động giữ luật <strong>không bị hỏng lại</strong> sau này (regression).</li>
+<li>Chạy app thật bắt những lỗi mà test service không thấy: lỗi template Thymeleaf, lỗi LAZY/OSIV, lỗi
+ép kiểu projection (§2.5 — &quot;chỉ lộ khi gọi qua HTTP thật&quot;), lỗi JS.</li>
+</ul>
+<h3 id="7-4-cau-tra-loi-mau-em-kiem-thu-he-thong-the-nao">7.4. Câu trả lời mẫu: &quot;Em kiểm thử hệ thống thế nào?&quot;</h3>
+<aside class="callout"><p>Em kiểm thử hai tầng. Thứ nhất, 126 test tự động trong 18 class — chủ yếu là test tích hợp
+<code>@SpringBootTest</code> chạy trên một MySQL riêng cho test, mỗi test tự rollback. Test tập trung vào luật
+nghiệp vụ của <code>TripService</code> và các service: FSM, giờ lái 8h, sức chứa xe, phân công phụ xe... Mỗi
+lỗi thật em sửa đều kèm một test tái hiện đúng lỗi đó, ví dụ <code>TripServiceStatusTransitionTest</code> chặn
+lỗi cộng odometer hai lần. Thứ hai, mỗi thay đổi em chạy app thật trên dữ liệu thật, gọi các màn qua
+HTTP và so DB trước/sau, vì có loại lỗi chỉ lộ khi render trang. Hạn chế em thừa nhận: chưa có test
+tầng controller bằng MockMvc và chưa có test giao diện tự động.</p>
+</aside>
+<h2 id="8-bang-tra-cuu-thuat-ngu">§8. Bảng tra cứu thuật ngữ</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Thuật ngữ</th>
+<th>Nghĩa đời thường</th>
+<th>Ví dụ trong dự án</th>
+</tr>
+</thead><tbody><tr>
+<td>ORM</td>
+<td>Người phiên dịch object ↔ bảng</td>
+<td>Hibernate</td>
+</tr>
+<tr>
+<td>JPA / Hibernate / Spring Data JPA</td>
+<td>Bộ quy tắc / phần mềm làm theo quy tắc / lớp repository trên cùng</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td><code>@Entity</code> / <code>@Table</code></td>
+<td>Class này là một bảng / tên bảng</td>
+<td><code>Trip.java:22-23</code></td>
+</tr>
+<tr>
+<td><code>@Id</code> / <code>@GeneratedValue(IDENTITY)</code></td>
+<td>Khóa chính / DB tự tăng</td>
+<td><code>Trip.java:27-28</code></td>
+</tr>
+<tr>
+<td><code>@Column</code></td>
+<td>Cấu hình cột</td>
+<td><code>Trip.java:83</code></td>
+</tr>
+<tr>
+<td><code>@Enumerated(STRING)</code></td>
+<td>Lưu enum dạng chữ</td>
+<td><code>Trip.java:82</code></td>
+</tr>
+<tr>
+<td><code>@ManyToOne</code> / <code>@OneToMany(mappedBy)</code></td>
+<td>Nhiều → một / chiều ngược, không tạo cột</td>
+<td><code>Trip.route</code>, <code>Route.routeStations</code></td>
+</tr>
+<tr>
+<td><code>@ManyToMany</code> + <code>@JoinTable</code></td>
+<td>Nhiều – nhiều qua bảng nối</td>
+<td><code>Trip.coDrivers</code> (<code>Trip.java:63-64</code>)</td>
+</tr>
+<tr>
+<td><code>@OneToOne</code> + <code>@MapsId</code></td>
+<td>Một – một dùng chung khóa chính</td>
+<td><code>Driver.user</code> (<code>Driver.java:25-26</code>)</td>
+</tr>
+<tr>
+<td><code>@EmbeddedId</code> / <code>@Embeddable</code></td>
+<td>Khóa chính nhiều cột</td>
+<td><code>RouteStation</code>, <code>RouteStationId</code></td>
+</tr>
+<tr>
+<td><code>cascade = ALL</code></td>
+<td>Thao tác trên cha lan xuống con</td>
+<td><code>User.driver</code> (<code>User.java:72</code>)</td>
+</tr>
+<tr>
+<td><code>@SQLDelete</code> / <code>@SQLRestriction</code></td>
+<td>Xóa = UPDATE cờ / tự lọc dòng đã xóa</td>
+<td><code>Trip.java:20-21</code></td>
+</tr>
+<tr>
+<td><code>@CreationTimestamp</code> / <code>@UpdateTimestamp</code></td>
+<td>Tự ghi giờ tạo / giờ sửa</td>
+<td><code>Trip.java:115</code>, <code>CostParameters.java:56</code></td>
+</tr>
+<tr>
+<td><code>ddl-auto</code></td>
+<td>Hibernate tự tạo/bổ sung bảng theo entity</td>
+<td><code>application.properties:18</code></td>
+</tr>
+<tr>
+<td><code>JpaRepository</code></td>
+<td>Interface cho sẵn CRUD</td>
+<td><code>TripRepository.java:18</code></td>
+</tr>
+<tr>
+<td>Derived query</td>
+<td>Tên method thành câu truy vấn</td>
+<td><code>existsByBusIdAndStatusIn</code> (<code>:350</code>)</td>
+</tr>
+<tr>
+<td>JPQL / <code>@Query</code> / <code>@Param</code></td>
+<td>Truy vấn trên entity / khai báo nó / nối tham số</td>
+<td><code>existsOverlappingTripForDriver</code> (<code>:117-129</code>)</td>
+</tr>
+<tr>
+<td>Projection</td>
+<td>Chỉ lấy vài cột, trả <code>Object[]</code></td>
+<td><code>findDemandHistoryByStatus</code> (<code>:440-442</code>)</td>
+</tr>
+<tr>
+<td>LAZY / EAGER</td>
+<td>Nạp khi cần / nạp ngay</td>
+<td><code>Trip.java:39</code></td>
+</tr>
+<tr>
+<td>Proxy (Hibernate)</td>
+<td>Object giữ chỗ cho quan hệ LAZY</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>N+1</td>
+<td>1 truy vấn danh sách + N truy vấn phụ</td>
+<td>§2.4</td>
+</tr>
+<tr>
+<td><code>JOIN FETCH</code></td>
+<td>Ép nạp quan hệ trong cùng truy vấn</td>
+<td><code>findAllWithDetails</code> (<code>:46-57</code>)</td>
+</tr>
+<tr>
+<td><code>@BatchSize</code></td>
+<td>Gom nạp LAZY theo lô</td>
+<td><code>Route.java:45</code></td>
+</tr>
+<tr>
+<td><code>MultipleBagFetchException</code></td>
+<td>Lỗi JOIN FETCH hai <code>List</code> cùng lúc</td>
+<td>comment <code>Route.java:74-78</code></td>
+</tr>
+<tr>
+<td>persist / merge</td>
+<td>INSERT dòng mới / ghi đè dòng có sẵn</td>
+<td>§3.1</td>
+</tr>
+<tr>
+<td>Tripwire</td>
+<td>Chốt chặn &quot;có id thì từ chối tạo&quot;</td>
+<td><code>BusService.java:70</code></td>
+</tr>
+<tr>
+<td>Mass assignment</td>
+<td>Form gửi thêm field không được phép (vd <code>id</code>)</td>
+<td>lỗi #21</td>
+</tr>
+<tr>
+<td><code>@InitBinder</code></td>
+<td>Khai báo field nào được bind từ form</td>
+<td>không dùng</td>
+</tr>
+<tr>
+<td>Transaction / commit / rollback</td>
+<td>Trọn gói / chốt / hoàn tác</td>
+<td>§4.1</td>
+</tr>
+<tr>
+<td><code>@Transactional(readOnly = true)</code></td>
+<td>Transaction chỉ đọc</td>
+<td><code>ForecastService.java:147</code></td>
+</tr>
+<tr>
+<td>Proxy (Spring AOP)</td>
+<td>Người đứng cửa bọc bean, mở/đóng transaction</td>
+<td>§4.2</td>
+</tr>
+<tr>
+<td>Self-invocation</td>
+<td>Gọi method của chính mình, không qua proxy</td>
+<td>javadoc <code>TripService.java:69-75</code></td>
+</tr>
+<tr>
+<td>Persistence context / managed entity</td>
+<td>Sổ theo dõi entity đã nạp / entity trong sổ</td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td>Dirty checking / flush</td>
+<td>Tự phát hiện field đổi / đẩy thay đổi xuống DB</td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td>OSIV</td>
+<td>Giữ phiên DB mở suốt request web</td>
+<td>§4.5</td>
+</tr>
+<tr>
+<td><code>LazyInitializationException</code></td>
+<td>Đọc quan hệ LAZY khi phiên đã đóng</td>
+<td>lỗi Phase 5 backfill</td>
+</tr>
+<tr>
+<td><code>IllegalArgumentException</code> / <code>IllegalStateException</code></td>
+<td>Vi phạm luật đầu vào / vi phạm chính sách trạng thái</td>
+<td>§5.1</td>
+</tr>
+<tr>
+<td><code>@ControllerAdvice</code></td>
+<td>Xử lý lỗi tập trung</td>
+<td>không dùng</td>
+</tr>
+<tr>
+<td>Lớp không-mời / lớp chặn thật</td>
+<td>UI không đưa ra / server từ chối</td>
+<td>§5.2</td>
+</tr>
+<tr>
+<td><code>foreign_key_checks=0</code></td>
+<td>MySQL không kiểm khóa ngoại</td>
+<td><code>application.properties:19</code></td>
+</tr>
+<tr>
+<td><code>@SpringBootTest</code></td>
+<td>Test khởi động cả app thật</td>
+<td><code>TripServiceStatusTransitionTest.java:72</code></td>
+</tr>
+<tr>
+<td><code>@Transactional</code> trên test</td>
+<td>Mỗi test tự rollback</td>
+<td><code>:73</code></td>
+</tr>
+<tr>
+<td><code>@BeforeEach</code> / <code>@Test</code> / <code>assertEquals</code></td>
+<td>Chạy trước mỗi test / đánh dấu test / so kết quả</td>
+<td><code>:101</code>, <code>:158</code></td>
+</tr>
+<tr>
+<td>Regression test</td>
+<td>Test chặn một lỗi cũ quay lại</td>
+<td>lỗi #6</td>
+</tr>
+<tr>
+<td>Arrange – Act – Assert</td>
+<td>Chuẩn bị – hành động – kiểm tra</td>
+<td>§7.2</td>
+</tr>
+</tbody></table></div>
+<h2 id="9-cau-hoi-hoi-dong-goi-y-tra-loi">§9. Câu hỏi hội đồng + gợi ý trả lời</h2>
+<p><strong>Q1. <code>@Transactional</code> hoạt động thế nào?</strong>
+Spring bọc bean bằng một proxy. Khi controller gọi method có <code>@Transactional</code>, proxy mở transaction,
+gọi method thật, method xong thì commit, ném <code>RuntimeException</code> thì rollback. Ví dụ
+<code>TripService.approveTrip()</code>: gán xe rồi validate, nếu validate ném lỗi thì cả việc gán xe cũng bị hoàn
+tác. Cần nhớ: gọi nội bộ trong cùng class không qua proxy, nên dự án đặt <code>@Transactional</code> ở method
+ngoài cùng như <code>scanAndSuggestExtraTrips()</code>.</p>
+<p><strong>Q2. N+1 là gì, em xử lý ra sao?</strong>
+Lấy danh sách N bản ghi bằng một truy vấn rồi truy cập quan hệ LAZY của từng bản ghi thì phát sinh N
+truy vấn phụ. Em dùng <code>JOIN FETCH</code> trong các truy vấn như <code>TripRepository.findAllWithDetails()</code> để nạp
+route, xe, tài xế trong một truy vấn, và <code>@BatchSize(20)</code> cho <code>Route.routeStations</code> vì Hibernate không
+cho JOIN FETCH hai danh sách cùng lúc. Các màn phân tích thì đọc bằng projection vài cột.</p>
+<p><strong>Q3. Soft delete em làm thế nào? Sao không xóa hẳn?</strong>
+<code>Trip</code> có <code>@SQLDelete</code> để lệnh xóa thành <code>UPDATE is_deleted = true</code>, và <code>@SQLRestriction</code> để mọi
+<code>SELECT</code> tự lọc chuyến đã xóa. Giữ lại vì chuyến gắn với lịch sử doanh thu, sự cố, chuyến tăng cường.
+Việc được xóa hay không còn theo chính sách trạng thái ở <code>deleteRefusalReason()</code>: chuyến đã chạy
+hoặc đã hoàn thành thì không xóa được.</p>
+<p><strong>Q4. Sao em không dùng <code>@Valid</code>?</strong>
+Phần lớn luật của em phụ thuộc DB và trạng thái — xe có bận không, tài xế còn giờ lái không — nên đặt
+ở service, một chỗ duy nhất, ném <code>IllegalArgumentException</code> kèm câu tiếng Việt. Ràng buộc đơn giản
+(không âm, bắt buộc) cũng viết ở service, ví dụ <code>BusService.validate()</code>. Bean Validation cho các ràng
+buộc đơn giản là hướng cải tiến; starter đã có sẵn trong <code>pom.xml</code>.</p>
+<p><strong>Q5. Nếu admin gửi request có sẵn <code>id</code> vào form tạo mới thì sao?</strong>
+Đây đúng là lỗi #21 em đã sửa. <code>save()</code> với entity có id sẽ thành merge và ghi đè bản ghi cũ. Mọi
+method tạo mới giờ đều có tripwire: <code>id != null</code> thì từ chối, ví dụ <code>BusService.saveBus()</code>. Còn sửa
+thì nạp bản ghi theo id trên URL rồi chép từng field được phép, không merge object từ form. Có
+<code>CreatePathIdTripwireTest</code> canh toàn bộ các lối tạo.</p>
+<p><strong>Q6. Controller gọi hai method service thì có trọn gói không?</strong>
+Không, vì controller không có <code>@Transactional</code> nên đó là hai transaction. <code>updateTrip()</code> là ví dụ:
+lưu thông tin rồi mới đổi trạng thái. Em đã gặp lỗi #24 vì vậy và sửa bằng cách kiểm trạng thái đích
+hợp lệ trước khi ghi gì, và nếu bước hai vẫn lỗi thì báo thật rằng thông tin đã được lưu.</p>
+<p><strong>Q7. Nếu hai admin cùng sửa một chuyến một lúc thì sao?</strong>
+Trả lời thật: hệ thống chưa có khóa lạc quan (<code>@Version</code>) hay khóa bi quan, nên người lưu sau sẽ ghi
+đè người lưu trước [SUY LUẬN, grep <code>@Version</code> = 0]. Roadmap chỉ đặt kế hoạch khóa bi quan cho việc
+trừ ghế khi đặt vé ở Phase 9. Hướng cải tiến: thêm <code>@Version</code> vào <code>Trip</code> để phát hiện xung đột.</p>
+<p><strong>Q8. Toàn vẹn dữ liệu được đảm bảo ở đâu?</strong>
+Chủ yếu ở service. Kết nối MySQL đang tắt kiểm khóa ngoại (<code>foreign_key_checks=0</code>), nên các guard
+&quot;không xóa được vì còn lịch sử/sự cố&quot; nằm trong <code>BusService.deleteBus()</code>, <code>DriverService.deleteDriver()</code>...
+Em thừa nhận đây là điểm yếu: toàn vẹn phụ thuộc vào việc mọi lối ghi đều đi qua service.</p>
+<p><strong>Q9. Vì sao template đọc được <code>trip.route...</code> dù quan hệ là LAZY?</strong>
+Nhờ Open Session In View, Spring Boot bật mặc định: phiên DB mở suốt request, nên Thymeleaf vẫn nạp
+được. Nhưng job nền và <code>CommandLineRunner</code> không có request nên không có OSIV — em đã gặp
+<code>LazyInitializationException</code> ở bộ sinh dữ liệu lịch sử và sửa bằng truy vấn <code>JOIN FETCH</code>.</p>
+<p><strong>Q10. Test của em chạy trên dữ liệu nào, có làm hỏng dữ liệu thật không?</strong>
+Test chạy trên database riêng <code>busmanagement_test</code>, tạo mới mỗi lần; mỗi test có <code>@Transactional</code>
+nên tự rollback. Dữ liệu thật không bị đụng — đây là việc em sửa ngay từ Phase 0, vì trước đó chạy
+test từng xóa database thật.</p>
+<h2 id="10-bai-tap-tu-kiem-tra">§10. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li><code>@ManyToOne</code> và <code>@OneToMany(mappedBy = ...)</code> — bên nào tạo cột khóa ngoại trong bảng?</li>
+<li><code>tripRepository.delete(trip)</code> sinh ra câu SQL gì? Vì sao?</li>
+<li><code>Driver.user</code> có <code>fetch = LAZY</code> không? Hệ quả là gì?</li>
+<li>Viết SQL tương đương cho derived query <code>countByRouteIdAndStatus(Long routeId, TripStatus status)</code>.</li>
+<li><code>busRepository.save(bus)</code> với <code>bus.getId() == 7</code> làm gì với dòng số 7?</li>
+<li>Một method <code>@Transactional</code> ném <code>IllegalArgumentException</code> — dữ liệu đã <code>set</code> trước đó có được ghi
+xuống DB không?</li>
+<li>Vì sao <code>@Transactional</code> phải đặt ở <code>scanAndSuggestExtraTrips()</code> mà không đặt ở <code>createExtraTrip()</code>?</li>
+<li>Vì sao <code>WhatIfCoverageTest</code> chạy được mà không cần <code>@SpringBootTest</code>?</li>
+</ol>
+<p><strong>Bài tự trace</strong></p>
+<ol start="9">
+<li>Admin mở màn Sửa chuyến #50 (<code>ACTIVE</code>), đổi giá vé, chọn trạng thái <code>COMPLETED</code> rồi bấm Lưu.
+Trace: pre-check nào chạy, ở dòng nào, kết quả gì; có transaction nào được mở không; màn hình
+hiện gì; giá vé mới có được lưu không.</li>
+</ol>
+<p><strong>Câu đọc code</strong></p>
+<ol start="10">
+<li>Trong <code>approveTrip()</code>, nếu chuyển dòng <code>requirePendingApproval(trip);</code> xuống <strong>sau</strong>
+<code>trip.setBus(bus);</code> thì với một chuyến <code>DEPARTED</code>, DB có bị đổi không? Và thông báo lỗi Admin thấy
+có còn đúng bản chất không?</li>
+</ol>
+<div class="code-wrap"><pre class="code"><code class="language-java">Trip trip = tripRepository.findById(tripId).orElseThrow(...);
+requirePendingApproval(trip);          // :961
+Bus bus = busRepository.findById(busId).orElseThrow(...);
+Driver driver = driverRepository.findById(driverId).orElseThrow(...);
+trip.setBus(bus);                      // :969
+trip.setDriver(driver);</code></pre></div>
+<details><summary>Đáp án</summary>
+
+<ol>
+<li><code>@ManyToOne</code> — ví dụ <code>Trip.route</code> tạo cột <code>route_id</code> trong bảng <code>trips</code>. <code>@OneToMany(mappedBy)</code>
+chỉ là chiều ngược, không tạo cột.</li>
+<li><code>UPDATE trips SET is_deleted = true WHERE id = ?</code> — do <code>@SQLDelete</code> trên <code>Trip</code> (<code>Trip.java:20</code>).
+Soft delete để giữ lịch sử và khóa ngoại.</li>
+<li>Không. <code>Driver.user</code> ghi <code>@OneToOne</code> không kèm <code>fetch</code>, mà mặc định của <code>@OneToOne</code> là EAGER ⇒ nạp
+<code>Driver</code> là nạp luôn <code>User</code>.</li>
+<li><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span>
+<code>SELECT COUNT(*) FROM trips WHERE route_id = ? AND status = ? AND is_deleted = false</code>
+(vế <code>is_deleted = false</code> do <code>@SQLRestriction</code>).</li>
+<li>Merge: ghi đè <strong>mọi cột</strong> của dòng 7 bằng giá trị trong object, field nào <code>null</code> thì cột thành
+<code>NULL</code>. Vì vậy <code>BusService.saveBus()</code> từ chối entity có id, còn sửa phải qua <code>updateBus()</code>.</li>
+<li>Không. <code>RuntimeException</code> (lớp cha của <code>IllegalArgumentException</code>) làm proxy rollback; mọi thay
+đổi trên entity managed bị bỏ.</li>
+<li><code>createExtraTrip()</code> là <code>private</code> và được gọi <strong>nội bộ</strong> từ <code>scanAndSuggestExtraTrips()</code> — lời gọi
+đó không qua proxy nên <code>@Transactional</code> ở đó vô tác dụng. Method ngoài cùng do Spring gọi (qua
+proxy) mới mở được transaction, và transaction đó còn giữ phiên mở để đọc <code>trip.getRoute()</code> LAZY.</li>
+<li>Nó chỉ kiểm hàm tính toán thuần <code>WhatIfSimulationService.coverableSlots()</code> — một method <code>static</code>
+package-private, không cần bean, không cần DB.</li>
+<li><code>updateTrip()</code> nạp chuyến, <code>editRefusalReason()</code> cho qua (<code>ACTIVE</code> sửa được). Pre-check ở
+<code>AdminTripManagementController.java:373</code>: <code>allowedTransitionsFrom(ACTIVE)</code> = <code>[ACTIVE, DEPARTED, CANCELLED]</code>, không chứa <code>COMPLETED</code> ⇒ flash <code>error</code> &quot;Không thể đổi trạng thái chuyến #50 từ
+[ACTIVE] sang [COMPLETED] — chưa có thay đổi nào được lưu. Các đích hợp lệ: [...]&quot; và redirect về
+form sửa. <strong>Chưa transaction nào được mở</strong> (chưa gọi service). Giá vé mới <strong>không</strong> được lưu.
+(Bình thường select trạng thái đã không liệt kê <code>COMPLETED</code> — đây là lớp không-mời; pre-check là
+lớp chặn thật cho POST tự chế.)</li>
+<li><strong>DB vẫn không bị đổi</strong>: <code>validateBusForTrip</code>/<code>validateStaffForTrip</code> hoặc <code>requirePendingApproval</code>
+ném lỗi thì transaction rollback, <code>setBus()</code> không bao giờ xuống DB. Nhưng <strong>thông báo có thể sai
+bản chất</strong>: validate chạy trước có thể báo &quot;xe đang bận&quot; hay &quot;tài xế quá giờ&quot; thay vì &quot;chuyến
+không ở trạng thái chờ duyệt&quot;. Javadoc <code>confirmAutoAssignedTrip()</code> ghi đúng lý do đặt guard lên
+đầu: &quot;rẻ nhất, và báo đúng bệnh&quot;. (Trong bản hiện tại <code>requirePendingApproval</code> đứng trước
+<code>setBus</code>, nên với chuyến <code>DEPARTED</code>, ngay cả object trong RAM cũng không bị đổi.)</li>
+</ol>
+</details>
+
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li>Entity là bảng; quan hệ <code>@ManyToOne</code> tạo cột khóa ngoại. Dự án chủ động dùng LAZY và chống N+1
+bằng <code>JOIN FETCH</code> / <code>@BatchSize</code> / projection. Chỉ <code>Trip</code> có soft delete.</li>
+<li><code>save()</code> với id có sẵn là <strong>merge — ghi đè mọi cột</strong>. Vì vậy mọi service tách <strong>tạo</strong> (tripwire
+<code>id != null</code>) khỏi <strong>sửa</strong> (nạp bản ghi cũ, chép từng field).</li>
+<li><code>@Transactional</code> chạy qua <strong>proxy</strong>: gọi nội bộ không qua proxy; <code>RuntimeException</code> → rollback;
+controller không có transaction nên gọi hai service là hai transaction (lỗi #24).</li>
+<li>OSIV giúp template đọc được LAZY trong request web, nhưng job nền và <code>CommandLineRunner</code> không có
+nó.</li>
+<li>Mọi luật có <strong>hai lớp</strong>: giao diện không mời thao tác sai, service/controller chặn thật. Toàn vẹn
+dữ liệu nằm ở service vì MySQL đang tắt kiểm khóa ngoại. Test: 126 test trên DB riêng, cộng chạy
+app thật.</li>
+</ol>
+<p><strong>Điểm đáng ngờ / chưa đủ căn cứ ghi lại khi viết bài:</strong></p>
+<ul>
+<li>Không có <code>@Version</code> (grep = 0) ⇒ hai người cùng sửa một chuyến thì người sau ghi đè — suy luận từ
+code, chưa thấy tài liệu dự án nào nhắc (Q7).</li>
+<li><code>Driver.user</code> là <code>@OneToOne</code> không ghi <code>fetch</code> ⇒ EAGER theo mặc định JPA, trong khi mọi quan hệ
+khác đều LAZY tường minh. Có thể là cố ý (tài xế hầu như luôn cần tên từ <code>User</code>), nhưng không thấy
+comment nào giải thích.</li>
+</ul>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>

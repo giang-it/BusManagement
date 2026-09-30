@@ -1,0 +1,1710 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 00a Java và Spring MVC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-buc-tranh-toan-canh">§1. Bức tranh toàn cảnh</a></li>
+<li><a href="#2-java-hien-dai-ma-code-du-an-dung">§2. Java hiện đại mà code dự án dùng</a></li>
+<li><a href="#3-ioc-container-bean-va-dependency-injection">§3. IoC Container, Bean và Dependency Injection</a></li>
+<li><a href="#4-vong-doi-mot-http-request-trong-spring-mvc">§4. Vòng đời một HTTP request trong Spring MVC</a></li>
+<li><a href="#5-rest-va-json">§5. REST và JSON</a></li>
+<li><a href="#6-thymeleaf-phia-giao-dien">§6. Thymeleaf — phía giao diện</a></li>
+<li><a href="#7-javascript-phia-trinh-duyet">§7. JavaScript phía trình duyệt</a></li>
+<li><a href="#8-chay-nen-cau-hinh-bao-mat">§8. Chạy nền, cấu hình, bảo mật</a></li>
+<li><a href="#9-lombok">§9. Lombok</a></li>
+<li><a href="#10-bang-tra-cuu-thuat-ngu">§10. Bảng tra cứu thuật ngữ</a></li>
+<li><a href="#11-cau-hoi-hoi-dong-goi-y-tra-loi">§11. Câu hỏi hội đồng + gợi ý trả lời</a></li>
+<li><a href="#12-bai-tap-tu-kiem-tra">§12. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 00a · NỀN TẢNG</span>
+      <h1></h1>
+    </header>
+<h1 id="bai-00a-java-hien-dai-spring-core-spring-mvc-thymeleaf-javascript">BÀI 00a — JAVA HIỆN ĐẠI + SPRING CORE + SPRING MVC + THYMELEAF/JAVASCRIPT</h1>
+<aside class="callout"><p>Bài nền thứ nhất, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN A1), ngày 2026-09-26.
+Mọi ví dụ lấy từ code thật của BusManagement. Số dòng là ảnh chụp ngày viết — nếu lệch, grep lại.</p>
+<p><strong>Nhãn dùng trong bài:</strong></p>
+<ul>
+<li><strong><span class="tag tag-code">CODE</span></strong> — đọc trực tiếp từ code, có <code>file:dòng</code>.</li>
+<li><strong><span class="tag tag-spring">SPRING</span></strong> — hành vi chuẩn của framework/thư viện mà code không viết ra.</li>
+<li><strong><span class="tag tag-guess">SUY LUẬN</span></strong> — suy luận của người viết; &quot;chưa kiểm chứng&quot; nếu chưa chạy thử.</li>
+</ul>
+<p>Đường dẫn Java viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>.
+Template viết tắt: <code>tpl/</code> = <code>src/main/resources/templates/</code>.</p>
+</aside>
+<hr>
+<h2 id="1-buc-tranh-toan-canh">§1. Bức tranh toàn cảnh</h2>
+<h3 id="1-1-spring-boot-la-gi-noi-kieu-doi-thuong">1.1. Spring Boot là gì — nói kiểu đời thường</h3>
+<p>Viết một web app bằng Java thuần, bạn phải tự làm rất nhiều việc &quot;tạp vụ&quot;: mở cổng mạng nhận
+request, đọc chuỗi HTTP, tự tạo từng object và nối chúng với nhau, tự mở kết nối database, tự đóng
+kết nối, tự biến dữ liệu thành HTML...</p>
+<p><strong>Spring</strong> là một bộ khung (framework) làm hộ phần tạp vụ đó. Bạn chỉ viết phần <strong>nghiệp vụ</strong> (xe
+nào được gán, tài xế lái bao nhiêu giờ), còn Spring lo &quot;đường ống&quot;. <strong>Spring Boot</strong> là Spring kèm
+cấu hình mặc định hợp lý: chỉ cần khai báo &quot;tôi cần web, cần database, cần giao diện Thymeleaf&quot; là
+nó tự dựng sẵn — không phải viết hàng trăm dòng cấu hình.</p>
+<p>Ví von: Java thuần là tự xây nhà từ gạch; Spring Boot là mua nhà khung có sẵn điện nước, bạn chỉ lo
+nội thất.</p>
+<h3 id="1-2-pom-xml-danh-sach-nguyen-lieu">1.2. <code>pom.xml</code> — danh sách &quot;nguyên liệu&quot;</h3>
+<p><strong>Maven</strong> là công cụ tự tải thư viện và build dự án. File <code>pom.xml</code> là danh sách thư viện cần dùng.
+<strong>Starter</strong> là một &quot;gói combo&quot; của Spring Boot: khai báo một starter là kéo về cả nhóm thư viện đi
+kèm cấu hình sẵn.</p>
+<p><span class="tag tag-code">CODE</span> Dự án dùng <strong>Spring Boot 4.0.8</strong> (<code>pom.xml:8</code>) và <strong>Java 17</strong> (<code>pom.xml:30</code>).</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Starter / thư viện (<code>pom.xml</code>)</th>
+<th>Dùng để làm gì</th>
+<th>Dự án có thật sự dùng?</th>
+</tr>
+</thead><tbody><tr>
+<td><code>spring-boot-starter-webmvc</code> (:55)</td>
+<td>Web: nhận request, controller</td>
+<td>✅ mọi controller</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-thymeleaf</code> (:47)</td>
+<td>Sinh HTML từ template</td>
+<td>✅ 27 template</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-data-jpa</code> (:35)</td>
+<td>Làm việc với database qua object</td>
+<td>✅ mọi repository</td>
+</tr>
+<tr>
+<td><code>mysql-connector-j</code> (:70)</td>
+<td>Driver nói chuyện với MySQL</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><code>lombok</code> (:75)</td>
+<td>Tự sinh getter/setter/constructor</td>
+<td>✅ khắp nơi (§9)</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-security</code> (:43)</td>
+<td>Bảo mật, đăng nhập</td>
+<td>⚠️ có bật nhưng cho qua mọi request (§8.3)</td>
+</tr>
+<tr>
+<td><code>spring-boot-devtools</code> (:64, <code>runtime</code>, <code>optional</code>)</td>
+<td>Tự khởi động lại khi sửa code lúc dev</td>
+<td>✅ chỉ lúc phát triển <span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-validation</code> (:51)</td>
+<td>Kiểm tra dữ liệu bằng <code>@Valid</code>, <code>@NotNull</code></td>
+<td>❌ không có <code>@Valid</code>/<code>@NotNull</code> nào trong <code>src/main</code> — kiểm tra viết tay ở service (Bài 00b)</td>
+</tr>
+<tr>
+<td><code>spring-boot-starter-mail</code> (:39)</td>
+<td>Gửi email</td>
+<td>❌ không có <code>JavaMailSender</code> nào; roadmap §4 ghi là cố ý chưa dùng</td>
+</tr>
+<tr>
+<td><code>thymeleaf-extras-springsecurity6</code> (:59)</td>
+<td>Cú pháp <code>sec:</code> trong template</td>
+<td>❌ không template nào dùng <code>sec:</code></td>
+</tr>
+</tbody></table></div>
+<aside class="callout"><p>Câu hội đồng có thể hỏi: <em>&quot;Sao pom có validation/mail mà không thấy dùng?&quot;</em> — trả lời thật:
+starter được khai báo sẵn từ đầu; mail là Non-Goal có chủ đích (roadmap §4), còn kiểm tra dữ
+liệu được viết tay ở tầng service để trả về câu báo lỗi nghiệp vụ tiếng Việt.</p>
+</aside>
+<h3 id="1-3-ung-dung-khoi-dong-the-nao">1.3. Ứng dụng khởi động thế nào</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/BusManagementApplication.java:24-30</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class) // (1)
+@EnableScheduling                                                          // (2)
+public class BusManagementApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BusManagementApplication.class, args);       // (3)
+    }
+}</code></pre></div>
+<ol>
+<li><code>@SpringBootApplication</code> — &quot;đây là điểm gốc của ứng dụng&quot;. Nó bảo Spring: <em>quét mọi class trong
+package <code>giang.com.BusManagement</code> và các package con, class nào có đánh dấu (<code>@Controller</code>,
+<code>@Service</code>...) thì tự tạo object cho nó; đồng thời bật cấu hình tự động</em> <span class="tag tag-spring">SPRING</span>.
+Vế <code>exclude = UserDetailsServiceAutoConfiguration.class</code> tắt đúng một phần cấu hình tự động:
+user mặc định mà Spring Security tự sinh (dòng &quot;Using generated security password&quot; lúc khởi
+động). Hệ thống không có đăng nhập nên không cần user đó. Javadoc cùng file (dòng 8-22) giải
+thích vì sao loại bằng annotation chứ không bằng property: property ghi sai tên class thì Boot
+<strong>im lặng bỏ qua</strong>, còn annotation ghi sai thì <strong>không biên dịch được</strong> <span class="tag tag-code">CODE</span>.</li>
+<li><code>@EnableScheduling</code> — bật khả năng chạy việc định kỳ; chính nhờ nó mà job quét chuyến đông
+<code>@Scheduled</code> ở <code>TripService</code> chạy được (§8.1).</li>
+<li><code>SpringApplication.run(...)</code> — khởi động toàn bộ: dựng các object, kết nối MySQL, mở web server
+(mặc định cổng 8080 <span class="tag tag-spring">SPRING</span>).</li>
+</ol>
+<h3 id="1-4-kien-truc-phan-lop">1.4. Kiến trúc phân lớp</h3>
+<p>Ví von một văn phòng nhà xe:</p>
+<ul>
+<li><strong>Template HTML + JavaScript</strong> = quầy giao dịch, nơi khách (Admin) nhìn và bấm.</li>
+<li><strong>Controller</strong> = <strong>lễ tân</strong>: nhận yêu cầu, chuyển cho người xử lý, rồi chọn trang để trả về.
+Không tự quyết nghiệp vụ.</li>
+<li><strong>Service</strong> = <strong>nhân viên nghiệp vụ</strong>: kiểm tra luật (xe có bận không, tài xế có quá 8h không),
+quyết định, ra lệnh ghi.</li>
+<li><strong>Repository</strong> = <strong>thủ kho</strong>: chỉ biết lấy/cất dữ liệu, không biết luật.</li>
+<li><strong>Domain (Entity)</strong> = <strong>hồ sơ</strong> trong kho: mỗi class là một loại hồ sơ (Xe, Chuyến, Tài xế...).</li>
+<li><strong>MySQL</strong> = <strong>cái kho</strong>.</li>
+</ul>
+<figure class="diagram"><pre class="mermaid">flowchart TB
+    B["Trình duyệt&lt;br/&gt;HTML + JavaScript&lt;br/&gt;&lt;i&gt;templates/admin/*.html&lt;/i&gt;"]
+    C["controller/ · controller/admin/&lt;br/&gt;@Controller · @RestController&lt;br/&gt;&lt;i&gt;lễ tân&lt;/i&gt;"]
+    S["service/&lt;br/&gt;@Service · @Transactional&lt;br/&gt;&lt;i&gt;nhân viên nghiệp vụ&lt;/i&gt;"]
+    R["repository/&lt;br/&gt;interface JpaRepository&lt;br/&gt;&lt;i&gt;thủ kho&lt;/i&gt;"]
+    DB[("MySQL&lt;br/&gt;busmanagement")]
+    D["domain/&lt;br/&gt;@Entity: object ↔ dòng trong bảng"]
+    T["dto/&lt;br/&gt;gói dữ liệu cho màn hình"]
+    G["config/&lt;br/&gt;SecurityConfig · DataInitializer · HistoricalDataBackfill"]
+
+    B -- "HTTP request (GET/POST, fetch)" --&gt; C
+    C -- "gọi method" --&gt; S
+    S -- "gọi method" --&gt; R
+    R -- "JPQL → SQL (Hibernate)" --&gt; DB
+    DB -. "dòng dữ liệu → Entity" .-&gt; R
+    S -. "Entity / DTO" .-&gt; C
+    C -. "HTML hoặc JSON" .-&gt; B
+    D --- R
+    T --- S
+    G --- S</pre></figure>
+<div class="table-wrap"><table><thead><tr>
+<th>Package</th>
+<th>Vai trò</th>
+<th>File tiêu biểu</th>
+</tr>
+</thead><tbody><tr>
+<td><code>controller</code></td>
+<td>Trang chủ <code>/</code></td>
+<td><code>helloController.java</code> (trả <code>hello.html</code>)</td>
+</tr>
+<tr>
+<td><code>controller.admin</code></td>
+<td>Mọi màn Admin + 1 REST API</td>
+<td><code>AdminBusController.java</code>, <code>TripRestController.java</code></td>
+</tr>
+<tr>
+<td><code>service</code></td>
+<td>Luật nghiệp vụ</td>
+<td><code>TripService.java</code> (~1.900 dòng, lõi hệ thống), <code>BusService.java</code></td>
+</tr>
+<tr>
+<td><code>repository</code></td>
+<td>Truy vấn DB</td>
+<td><code>TripRepository.java</code>, <code>BusRepository.java</code></td>
+</tr>
+<tr>
+<td><code>domain</code></td>
+<td>Entity + enum</td>
+<td><code>Trip.java</code>, <code>Bus.java</code>, <code>TripStatus.java</code></td>
+</tr>
+<tr>
+<td><code>dto</code></td>
+<td>Gói dữ liệu cho màn hình</td>
+<td><code>DashboardOverviewDto.java</code>, <code>ForecastPointDto.java</code></td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>Cấu hình + nạp dữ liệu</td>
+<td><code>SecurityConfig.java</code>, <code>DataInitializer.java</code></td>
+</tr>
+<tr>
+<td><code>resources/templates</code></td>
+<td>Giao diện Thymeleaf</td>
+<td><code>admin/bus/bus-list.html</code>, <code>admin/trip-create-form.html</code></td>
+</tr>
+</tbody></table></div>
+<p>Ghi chú nhỏ: tên class <code>helloController</code> viết thường chữ đầu (<code>…/controller/helloController.java:7</code>),
+lệch quy ước đặt tên Java (class viết hoa chữ đầu). Không ảnh hưởng chạy, nhưng đừng bắt chước.</p>
+<hr>
+<h2 id="2-java-hien-dai-ma-code-du-an-dung">§2. Java hiện đại mà code dự án dùng</h2>
+<p>Đây là phần <strong>bắt buộc phải vững trước</strong> — nếu không, bạn sẽ không đọc được <code>TripService</code> hay các
+service Decision Support. Mỗi mục: nghĩa đời thường → code thật → viết lại kiểu Java cũ.</p>
+<h3 id="2-1-lambda-va-method-reference">2.1. Lambda và method reference</h3>
+<p><strong>Lambda</strong> = &quot;một hàm nhỏ viết tại chỗ, không cần đặt tên&quot;. Cú pháp <code>tham_số -&gt; kết_quả</code>.</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">d -&gt; Boolean.TRUE.equals(d.getIsActive())
+// đọc là: "với mỗi d, trả về true nếu d đang hoạt động"</code></pre></div>
+<p><strong>Method reference</strong> = cách viết gọn của lambda khi lambda chỉ gọi đúng một method:
+<code>Bus::getKmSinceLastMaintenance</code> tương đương <code>bus -&gt; bus.getKmSinceLastMaintenance()</code>.</p>
+<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:345</code> — <code>.thenComparingDouble(Bus::getKmSinceLastMaintenance)</code>.</p>
+<h3 id="2-2-stream-api-day-chuyen-xu-ly-danh-sach">2.2. Stream API — &quot;dây chuyền xử lý danh sách&quot;</h3>
+<p><strong>Stream</strong> = biến một danh sách thành một <strong>dây chuyền</strong>: phần tử đi qua từng trạm (lọc, biến đổi,
+sắp xếp) rồi được gom lại ở cuối. Các trạm hay gặp:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Trạm</th>
+<th>Nghĩa</th>
+</tr>
+</thead><tbody><tr>
+<td><code>filter(điều kiện)</code></td>
+<td>Giữ lại phần tử thỏa điều kiện</td>
+</tr>
+<tr>
+<td><code>map(biến đổi)</code></td>
+<td>Biến mỗi phần tử thành thứ khác</td>
+</tr>
+<tr>
+<td><code>sorted(comparator)</code></td>
+<td>Sắp xếp</td>
+</tr>
+<tr>
+<td><code>min(comparator)</code> / <code>max(...)</code></td>
+<td>Lấy phần tử nhỏ/lớn nhất (trả <code>Optional</code>)</td>
+</tr>
+<tr>
+<td><code>count()</code></td>
+<td>Đếm</td>
+</tr>
+<tr>
+<td><code>anyMatch</code> / <code>noneMatch</code></td>
+<td>Có phần tử nào thỏa / không phần tử nào thỏa</td>
+</tr>
+<tr>
+<td><code>mapToDouble(...).sum()</code> / <code>.average()</code></td>
+<td>Biến thành số rồi cộng / lấy trung bình</td>
+</tr>
+<tr>
+<td><code>collect(Collectors.toList())</code> / <code>.toList()</code></td>
+<td>Gom thành List</td>
+</tr>
+<tr>
+<td><code>collect(Collectors.toMap(k, v))</code></td>
+<td>Gom thành Map</td>
+</tr>
+<tr>
+<td><code>collect(Collectors.groupingBy(k, Collectors.counting()))</code></td>
+<td>Chia nhóm theo khóa, đếm mỗi nhóm</td>
+</tr>
+</tbody></table></div>
+<p><strong>Ví dụ 1 — lọc tài xế hợp lệ</strong> <span class="tag tag-code">CODE</span> <code>…/service/TripService.java:482-499</code>
+(trong <code>findBestAvailableDriver()</code>; đã rút bớt comment):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;Driver&gt; availableDrivers = driverRepository.findAll().stream()   // lấy mọi tài xế, đưa lên dây chuyền
+        .filter(d -&gt; Boolean.TRUE.equals(d.getIsActive()))            // trạm 1: đang hoạt động
+        .filter(d -&gt; excludeDrivers == null
+                || excludeDrivers.stream().noneMatch(ex -&gt; ex.getUserId().equals(d.getUserId())))
+                                                                      // trạm 2: chưa bị chọn ở vai trò khác
+        .filter(d -&gt; d.isLicenseValid(departure.toLocalDate()))       // trạm 3: bằng còn hạn vào ngày chạy
+        .filter(d -&gt; isAssistantRole
+                || getDrivingHoursForDate(d, departure, null, ctx) + effectiveHours &lt;= 8.0)
+                                                                      // trạm 4: không vượt 8h (phụ xe được miễn)
+        .filter(d -&gt; !isDriverBusyInWindow(d, windowStart, windowEnd, null, ctx))
+                                                                      // trạm 5: không trùng lịch
+        .collect(Collectors.toList());                                // gom lại thành List</code></pre></div>
+<p>Viết lại bằng Java kiểu cũ (cùng ý nghĩa):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;Driver&gt; availableDrivers = new ArrayList&lt;&gt;();
+for (Driver d : driverRepository.findAll()) {
+    if (!Boolean.TRUE.equals(d.getIsActive())) continue;
+
+    boolean daBiChon = false;
+    if (excludeDrivers != null) {
+        for (Driver ex : excludeDrivers) {
+            if (ex.getUserId().equals(d.getUserId())) { daBiChon = true; break; }
+        }
+    }
+    if (daBiChon) continue;
+
+    if (!d.isLicenseValid(departure.toLocalDate())) continue;
+    if (!isAssistantRole
+            &amp;&amp; getDrivingHoursForDate(d, departure, null, ctx) + effectiveHours &gt; 8.0) continue;
+    if (isDriverBusyInWindow(d, windowStart, windowEnd, null, ctx)) continue;
+
+    availableDrivers.add(d);
+}</code></pre></div>
+<p>Mẹo đọc: <strong>mỗi <code>.filter(...)</code> là một câu <code>if (...) continue;</code> đảo ngược.</strong></p>
+<p><strong>Ví dụ 2 — chọn người ít giờ lái nhất</strong> <span class="tag tag-code">CODE</span> <code>…/service/TripService.java:503-507</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">Driver best = availableDrivers.stream()
+        .filter(d -&gt; d.getLicenseExpiryDate() != null
+                &amp;&amp; d.getLicenseExpiryDate().isAfter(departure.toLocalDate().plusDays(7))) // bằng còn &gt; 7 ngày
+        .min(Comparator.comparingDouble(d -&gt; getDrivingHoursForDate(d, departure, null, ctx))) // ít giờ nhất
+        .orElse(null);                                                                        // không ai → null</code></pre></div>
+<p><strong>Ví dụ 3 — đếm và chia nhóm</strong> <span class="tag tag-code">CODE</span> <code>…/service/DashboardService.java:156</code> và <code>:166-169</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">long readyCount = allBuses.stream().filter(b -&gt; b.getStatus() == BusStatus.READY).count();
+
+Map&lt;String, Long&gt; busTypeCounts = allBuses.stream()
+        .collect(Collectors.groupingBy(
+                b -&gt; b.getBusType() != null ? b.getBusType().getTypeName() : "Chưa phân loại", // khóa nhóm
+                Collectors.counting()));                                                     // đếm mỗi nhóm
+// Kết quả dạng: {"Limousine"=5, "Giường nằm"=8, "Ghế ngồi"=7}</code></pre></div>
+<p>Kiểu cũ của <code>groupingBy</code>: tạo <code>HashMap</code>, duyệt từng xe, lấy tên loại, <code>map.put(ten, map.getOrDefault(ten, 0L) + 1)</code>.</p>
+<h3 id="2-3-comparator-noi-chuoi-sap-theo-tieu-chi-1-hoa-thi-xet-tieu-chi-2">2.3. <code>Comparator</code> nối chuỗi — &quot;sắp theo tiêu chí 1, hòa thì xét tiêu chí 2&quot;</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:343-346</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">private static Comparator&lt;Bus&gt; preferredTypeThenLeastWorn(BusType preferredType) {
+    return Comparator.comparing((Bus bus) -&gt; !isOfType(bus, preferredType)) // tiêu chí 1: đúng loại gợi ý lên trước
+            .thenComparingDouble(Bus::getKmSinceLastMaintenance);          // tiêu chí 2: ít km kể từ bảo trì lên trước
+}</code></pre></div>
+<p>Mẹo: <code>!isOfType(...)</code> cho <code>false</code> với xe đúng loại, mà <code>false</code> xếp trước <code>true</code>, nên xe đúng loại
+đứng đầu. <code>.reversed()</code> (gặp ở <code>RecommendationService</code>, <code>VehicleReplacementService</code>) đảo thứ tự,
+dùng để xếp &quot;lớn nhất lên đầu&quot;.</p>
+<h3 id="2-4-optional-va-orelsethrow-hop-co-the-rong">2.4. <code>Optional</code> và <code>orElseThrow</code> — &quot;hộp có thể rỗng&quot;</h3>
+<p><code>Optional&lt;T&gt;</code> = một cái hộp có thể chứa một object, hoặc rỗng. Nó thay cho việc trả <code>null</code>, buộc
+người gọi phải xử lý trường hợp &quot;không tìm thấy&quot;.</p>
+<p><span class="tag tag-code">CODE</span> <code>…/controller/admin/AdminBusController.java:47-48</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">Bus bus = busService.findById(id)                  // trả Optional&lt;Bus&gt;
+        .orElseThrow(() -&gt; new RuntimeException("Không tìm thấy xe với ID: " + id));
+        // có xe → lấy ra; hộp rỗng → ném exception</code></pre></div>
+<p>Kiểu cũ:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">Bus bus = busRepository.findById(id) ... // giả sử trả null nếu không có
+if (bus == null) throw new RuntimeException("Không tìm thấy xe với ID: " + id);</code></pre></div>
+<p>Mẫu <code>findById(...).orElseThrow(...)</code> xuất hiện ở gần như <strong>mọi</strong> service và controller. Biến thể:
+<code>.orElse(null)</code> (rỗng thì trả null), <code>.orElseGet(() -&gt; ...)</code> (rỗng thì tạo mới — xem
+<code>CostParameterService.getOrDefault()</code>).</p>
+<h3 id="2-5-record-class-chi-de-cho-du-lieu-viet-mot-dong">2.5. <code>record</code> — &quot;class chỉ để chở dữ liệu, viết một dòng&quot;</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/service/ForecastService.java:140</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">private record Observation(long routeId, int hour, LocalDate date, double occupancy) { }</code></pre></div>
+<p>Một dòng này tương đương một class có 4 field <code>final</code>, constructor 4 tham số, 4 method đọc
+(<code>routeId()</code>, <code>hour()</code>, <code>date()</code>, <code>occupancy()</code> — <strong>không có chữ <code>get</code></strong>), cùng <code>equals</code>,
+<code>hashCode</code>, <code>toString</code>. Dự án dùng <code>record</code> cho dữ liệu trung gian trong tính toán:
+<code>ForecastService.SeriesKey</code> (:144), <code>WhatIfSimulationService.HotSlot</code> (:134), <code>Derivation</code> (:138).</p>
+<p>Vì <code>record</code> có sẵn <code>equals/hashCode</code> theo các field, nó dùng được làm <strong>khóa của Map</strong> — đúng như
+<code>ForecastService.java:164</code> nhóm quan sát theo <code>new SeriesKey(o.routeId(), o.hour())</code>.</p>
+<h3 id="2-6-switch-expression-va-vi-sao-co-y-khong-co-default">2.6. Switch expression — và vì sao cố ý <strong>không có <code>default</code></strong></h3>
+<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1855-1876</code> (rút gọn):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">public String deleteRefusalReason(Trip trip) {
+    return switch (trip.getStatus()) {                 // switch TRẢ VỀ một giá trị
+        case DEPARTED  -&gt; "Chuyến ... đang trên đường ...";
+        case COMPLETED -&gt; "Chuyến ... đã hoàn thành ...";
+        case ACTIVE    -&gt; trip.getTicketsSold() &gt; 0 ? "... đã có vé ..." : null;
+        case PENDING_APPROVAL, CANCELLED -&gt; null;      // một case gom nhiều giá trị
+    };                                                 // KHÔNG có default
+}</code></pre></div>
+<p>Khác switch cũ: dùng <code>-&gt;</code>, không cần <code>break</code>, và cả khối <strong>trả về một giá trị</strong>.</p>
+<p>Vì sao không có <code>default</code>: khi switch trên enum phủ <strong>đủ mọi giá trị</strong>, trình biên dịch chấp nhận
+không cần <code>default</code>. Nếu sau này ai thêm một <code>TripStatus</code> mới, switch không còn phủ đủ nữa → <strong>lỗi
+biên dịch</strong> → người thêm bắt buộc phải quyết định chính sách cho trạng thái mới. Javadoc nói rõ ý
+đồ này <span class="tag tag-code">CODE</span> (<code>TripService.java</code> javadoc của <code>deleteRefusalReason</code>; cùng kiểu ở
+<code>AdminTripManagementController.editRefusalReason()</code> <code>:232-245</code>).</p>
+<h3 id="2-7-text-block-chuoi-nhieu-dong">2.7. Text block <code>&quot;&quot;&quot;</code> — chuỗi nhiều dòng</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/repository/TripRepository.java:46-56</code>: câu truy vấn dài được viết giữa hai dấu <code>&quot;&quot;&quot;</code>
+thay vì nối nhiều chuỗi bằng <code>+</code>. Chỉ là cách viết chuỗi cho dễ đọc, không có ý nghĩa gì khác.</p>
+<h3 id="2-8-cac-kieu-du-lieu-hay-gap">2.8. Các kiểu dữ liệu hay gặp</h3>
+<ul>
+<li><strong><code>BigDecimal</code></strong> — số thập phân chính xác, dùng cho <strong>tiền</strong> (<code>Trip.price</code>,
+<code>CostParameters.fuelCostPerKm</code>). Không dùng <code>double</code> cho tiền vì <code>double</code> làm tròn sai kiểu
+<code>0.1 + 0.2 = 0.30000000000000004</code>. Phép tính viết bằng method: <code>a.multiply(b)</code>, <code>a.add(b)</code>,
+<code>a.subtract(b)</code>, <code>setScale(0, RoundingMode.HALF_UP)</code> (làm tròn về đồng) — xem
+<code>RecommendationService.estimateCost()</code>.</li>
+<li><strong><code>LocalDate</code></strong> (ngày), <strong><code>LocalDateTime</code></strong> (ngày + giờ), <strong><code>Duration</code></strong> (khoảng thời gian):
+<code>Duration.between(departure, arrival).toMinutes() / 60.0</code> = số giờ của chuyến
+(<code>Trip.getTripDurationHours()</code>). <code>departure.minusMinutes(30)</code>, <code>.plusHours(1)</code>,
+<code>.isBefore(...)</code>, <code>.isAfter(...)</code> dùng khắp nơi để tính &quot;cửa sổ bận&quot;.</li>
+<li><strong><code>EnumSet.of(...)</code></strong> — một tập các giá trị enum; ví dụ <code>DispatchController.BOARD_ACTIONS</code>.</li>
+<li><strong><code>String.format(&quot;%.1f&quot;, x)</code></strong> — định dạng số trong câu thông báo (1 chữ số thập phân).</li>
+<li><strong>Toán tử ba ngôi</strong> <code>điều_kiện ? a : b</code> — gặp liên tục, ví dụ
+<code>bus.getBusType() != null ? bus.getBusType().getCapacity() : null</code>.</li>
+</ul>
+<hr>
+<h2 id="3-ioc-container-bean-va-dependency-injection">§3. IoC Container, Bean và Dependency Injection</h2>
+<h3 id="3-1-bean-va-ioc-spring-la-nguoi-tuyen-dung-va-phan-cong">3.1. Bean và IoC — &quot;Spring là người tuyển dụng và phân công&quot;</h3>
+<ul>
+<li><strong>Bean</strong> = một object do Spring tạo ra và quản lý (thường chỉ <strong>một</strong> object cho cả ứng dụng).</li>
+<li><strong>IoC Container</strong> (Inversion of Control — &quot;đảo quyền điều khiển&quot;) = cái kho nơi Spring giữ các
+bean. Bình thường code của bạn tự <code>new</code> object; ở đây <strong>Spring</strong> tạo, bạn chỉ khai báo &quot;tôi cần&quot;.</li>
+<li><strong>Dependency Injection (DI)</strong> — &quot;tiêm phụ thuộc&quot;: khi class A cần class B, Spring tự đưa B vào A.</li>
+</ul>
+<p>Đánh dấu một class để Spring tạo bean cho nó:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation</th>
+<th>Nghĩa</th>
+<th>Ví dụ trong dự án</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@Controller</code></td>
+<td>Bean xử lý web, trả trang HTML</td>
+<td><code>AdminBusController.java:12</code></td>
+</tr>
+<tr>
+<td><code>@RestController</code></td>
+<td>Bean xử lý web, trả JSON</td>
+<td><code>TripRestController.java:27</code></td>
+</tr>
+<tr>
+<td><code>@Service</code></td>
+<td>Bean nghiệp vụ</td>
+<td><code>BusService.java:18</code></td>
+</tr>
+<tr>
+<td><code>@Repository</code></td>
+<td>Bean truy cập dữ liệu</td>
+<td><code>BusRepository.java:12</code></td>
+</tr>
+<tr>
+<td><code>@Component</code></td>
+<td>Bean chung chung</td>
+<td><code>DataInitializer.java:26</code></td>
+</tr>
+<tr>
+<td><code>@Configuration</code> + <code>@Bean</code></td>
+<td>Class cấu hình; method <code>@Bean</code> trả về một bean</td>
+<td><code>SecurityConfig.java:8</code>, <code>:11</code></td>
+</tr>
+</tbody></table></div>
+<p>Cả bốn <code>@Controller</code>, <code>@Service</code>, <code>@Repository</code>, <code>@RestController</code> thực chất đều là dạng đặc biệt
+của <code>@Component</code> <span class="tag tag-spring">SPRING</span> — khác nhau ở ý nghĩa và vài hành vi phụ.</p>
+<h3 id="3-2-constructor-injection-qua-lombok-cach-du-an-lam-nhat-quan">3.2. Constructor injection qua Lombok — cách dự án làm nhất quán</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/controller/admin/AdminBusController.java:12-17</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Controller
+@RequestMapping("/admin/buses")
+@RequiredArgsConstructor           // Lombok: tự sinh constructor nhận mọi field final
+public class AdminBusController {
+    private final BusService busService;   // "tôi cần một BusService"
+    ...
+}</code></pre></div>
+<p>Lombok sinh ra (bạn không thấy trong file, nhưng nó có ở bytecode):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">public AdminBusController(BusService busService) {
+    this.busService = busService;
+}</code></pre></div>
+<p>Khi khởi động, Spring thấy constructor cần một <code>BusService</code> → lấy bean <code>BusService</code> trong kho →
+truyền vào <span class="tag tag-spring">SPRING</span>. Mẫu này (<code>@RequiredArgsConstructor</code> + field <code>private final</code>) được dùng ở
+<strong>mọi</strong> controller, service và config của dự án — grep ra 33 chỗ.</p>
+<p>Vì sao không <code>new BusService()</code> bằng tay: <code>BusService</code> lại cần <code>BusRepository</code>,
+<code>TripRepository</code>... (<code>BusService.java:22-25</code>); tự <code>new</code> thì phải tự dựng cả cây phụ thuộc, và mỗi
+nơi <code>new</code> một bản riêng. Để Spring làm thì cả ứng dụng dùng chung một bản, và Spring còn &quot;bọc&quot; thêm
+tính năng (ví dụ transaction — Bài 00b) vào đúng bean đó.</p>
+<h3 id="3-3-repository-la-interface-ai-viet-phan-than">3.3. Repository là interface — ai viết phần thân?</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/repository/BusRepository.java:12-17</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Repository
+public interface BusRepository extends JpaRepository&lt;Bus, Long&gt; {
+    List&lt;Bus&gt; findByStatus(BusStatus status);
+    @Query("SELECT DISTINCT b FROM Bus b LEFT JOIN FETCH b.busType")
+    List&lt;Bus&gt; findAllWithBusType();
+    ...
+}</code></pre></div>
+<p>Đây là <strong>interface</strong> — không có class nào trong dự án <code>implements BusRepository</code>. Vậy mà
+<code>BusService</code> vẫn gọi <code>busRepository.findAllWithBusType()</code> được. Lý do: lúc khởi động, <strong>Spring Data
+JPA tự sinh ra một class cài đặt</strong> interface này (một &quot;proxy&quot;) dựa trên tên method và <code>@Query</code>, rồi
+đăng ký nó thành bean <span class="tag tag-spring">SPRING</span>. Chi tiết các kiểu truy vấn ở <strong>Bài 00b §2</strong>.</p>
+<hr>
+<h2 id="4-vong-doi-mot-http-request-trong-spring-mvc">§4. Vòng đời một HTTP request trong Spring MVC</h2>
+<h3 id="4-1-duong-di-tong-quat">4.1. Đường đi tổng quát</h3>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    participant B as Trình duyệt
+    participant F as Security filter
+    participant DS as DispatcherServlet
+    participant C as Controller
+    participant V as ViewResolver + Thymeleaf
+    B-&gt;&gt;F: GET /admin/buses
+    F-&gt;&gt;DS: permitAll → cho qua [SPRING]
+    DS-&gt;&gt;DS: HandlerMapping: URL nào → method nào [SPRING]
+    DS-&gt;&gt;C: Binding tham số rồi gọi method [SPRING]
+    C--&gt;&gt;DS: trả về String [CODE]
+    alt String là tên view, vd "admin/bus/bus-list"
+        DS-&gt;&gt;V: tìm templates/admin/bus/bus-list.html
+        V--&gt;&gt;B: HTML (template + dữ liệu trong Model)
+    else String bắt đầu bằng "redirect:"
+        DS--&gt;&gt;B: HTTP 302 → trình duyệt tự gửi GET tới URL mới
+    end</pre></figure>
+<h3 id="4-2-minh-hoa-tron-ven-get-admin-buses-xem-danh-sach-xe">4.2. Minh hoạ trọn vẹn: <code>GET /admin/buses</code> (xem danh sách xe)</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Việc xảy ra</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Trình duyệt</td>
+<td>—</td>
+<td>Admin mở <code>http://localhost:8080/admin/buses</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Spring</td>
+<td>—</td>
+<td>DispatcherServlet ghép <code>/admin/buses</code> (từ <code>@RequestMapping(&quot;/admin/buses&quot;)</code> ở class + <code>@GetMapping</code> không tham số ở method) → <code>listBuses()</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Controller</td>
+<td><code>AdminBusController.java:19-23</code></td>
+<td><code>listBuses(Model model)</code>: Spring tự tạo sẵn một <code>Model</code> rỗng và truyền vào</td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Controller → Service</td>
+<td><code>:21</code></td>
+<td>gọi <code>busService.findAllWithBusType()</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Service → Repository</td>
+<td><code>BusService.java:42-44</code></td>
+<td>chuyển tiếp <code>busRepository.findAllWithBusType()</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Repository → DB</td>
+<td><code>BusRepository.java:16-17</code></td>
+<td>JPQL <code>SELECT DISTINCT b FROM Bus b LEFT JOIN FETCH b.busType</code> → Hibernate dịch sang SQL</td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>DB</td>
+<td>—</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT DISTINCT b.*, bt.* FROM buses b LEFT JOIN bus_types bt ON b.bus_type_id = bt.id</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Chiều về</td>
+<td>—</td>
+<td>Hibernate biến mỗi dòng thành object <code>Bus</code> (kèm <code>BusType</code> đã nạp sẵn) → <code>List&lt;Bus&gt;</code> đi ngược lên service → controller</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Controller</td>
+<td><code>:21</code></td>
+<td><code>model.addAttribute(&quot;buses&quot;, ...)</code> — bỏ danh sách vào Model với tên <code>&quot;buses&quot;</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Controller</td>
+<td><code>:22</code></td>
+<td><code>return &quot;admin/bus/bus-list&quot;</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>View</td>
+<td><code>tpl/admin/bus/bus-list.html:52</code></td>
+<td><code>&lt;tr th:each=&quot;bus : ${buses}&quot;&gt;</code> — lặp qua đúng key <code>&quot;buses&quot;</code>, mỗi xe một dòng bảng</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Trình duyệt</td>
+<td>—</td>
+<td>Nhận HTML, hiện bảng</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p>Vì sao câu truy vấn có <code>JOIN FETCH b.busType</code>: template in <code>bus.busType.typeName</code> (dòng 57). Nếu
+không nạp sẵn loại xe, mỗi dòng bảng sẽ phát sinh thêm một truy vấn riêng — vấn đề &quot;N+1&quot;, giảng ở
+<strong>Bài 00b §2</strong>.</p>
+<h3 id="4-3-cac-cach-controller-nhan-du-lieu">4.3. Các cách controller nhận dữ liệu</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Cách</th>
+<th>Nghĩa</th>
+<th>Ví dụ thật</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@PathVariable Long id</code></td>
+<td>Lấy giá trị nằm <strong>trong đường dẫn</strong> <code>/edit/{id}</code></td>
+<td><code>AdminBusController.java:45</code></td>
+</tr>
+<tr>
+<td><code>@RequestParam Long routeId</code></td>
+<td>Lấy tham số <code>?routeId=...</code> hoặc ô form tên <code>routeId</code></td>
+<td><code>AdminTripManagementController.java:122</code></td>
+</tr>
+<tr>
+<td><code>@RequestParam(required = false) List&lt;Long&gt; coDriverIds</code></td>
+<td>Tùy chọn; nhiều ô cùng tên gom thành List</td>
+<td><code>AdminTripManagementController.java:126</code></td>
+</tr>
+<tr>
+<td><code>@ModelAttribute Bus bus</code></td>
+<td>Gom <strong>mọi ô form</strong> thành một object, khớp theo tên</td>
+<td><code>AdminBusController.java:34</code></td>
+</tr>
+<tr>
+<td><code>@DateTimeFormat(iso = ...)</code></td>
+<td>Chỉ rõ định dạng ngày giờ khi đổi chuỗi thành <code>LocalDateTime</code></td>
+<td><code>TripRestController.java:49-50</code></td>
+</tr>
+<tr>
+<td><code>Model model</code></td>
+<td>&quot;Cái khay&quot; để đặt dữ liệu cho template</td>
+<td><code>AdminBusController.java:20</code></td>
+</tr>
+<tr>
+<td><code>RedirectAttributes</code></td>
+<td>Gửi thông báo sang trang sau khi redirect</td>
+<td><code>AdminBusController.java:34</code></td>
+</tr>
+</tbody></table></div>
+<p><strong><code>@ModelAttribute</code> bind thẳng vào entity.</strong> Form tạo xe có các ô <code>name=&quot;licensePlate&quot;</code>,
+<code>name=&quot;brand&quot;</code>... Spring tạo một <code>new Bus()</code> rồi gọi <code>setLicensePlate(...)</code>, <code>setBrand(...)</code> theo
+tên ô <span class="tag tag-spring">SPRING</span>. Dự án bind thẳng vào <strong>entity</strong> chứ không qua một class DTO riêng cho form — hệ quả
+bảo mật (POST tự chế gửi kèm <code>id</code>) là gốc của lỗi #21, giảng ở <strong>Bài 00b §3</strong>.</p>
+<p><strong><code>DomainClassConverter</code> — id tự biến thành entity.</strong> Ô chọn loại xe gửi lên <strong>id</strong> của loại xe
+(<code>bus-form.html:40-43</code>: <code>&lt;select th:field=&quot;*{busType}&quot;&gt;</code> với <code>th:value=&quot;${type.id}&quot;</code>), nhưng field
+<code>Bus.busType</code> là object <code>BusType</code>. Spring Data có bộ chuyển đổi tự tra DB đổi id → entity
+<span class="tag tag-spring">SPRING</span>. Javadoc <code>AdminIncidentController.java:58-63</code> ghi rõ cơ chế này cho sự cố (<code>bus</code>, <code>trip</code>,
+<code>driver</code> gửi lên là id; chuỗi rỗng → <code>null</code> cho trường tùy chọn) <span class="tag tag-code">CODE</span>.</p>
+<p><strong>Ngày giờ trong form.</strong> Ô <code>&lt;input type=&quot;datetime-local&quot; name=&quot;departureTime&quot;&gt;</code>
+(<code>trip-create-form.html:162</code>) gửi chuỗi dạng <code>2026-10-01T07:30</code>, được bind vào
+<code>Trip.departureTime</code> (kiểu <code>LocalDateTime</code>) mà không có <code>@DateTimeFormat</code> trên entity.
+<span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng cơ chế cụ thể</span> bộ chuyển đổi mặc định của Spring nhận định dạng ISO
+này; việc form tạo chuyến chạy được là bằng chứng gián tiếp.</p>
+<h3 id="4-4-model-flash-message-va-mau-prg">4.4. <code>Model</code>, flash message và mẫu PRG</h3>
+<p>Luồng <strong>thêm xe</strong> — <span class="tag tag-code">CODE</span> <code>AdminBusController.java:33-42</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@PostMapping("/create")
+public String createBus(@ModelAttribute Bus bus, RedirectAttributes redirectAttributes) {
+    try {
+        busService.saveBus(bus);                                                      // (1) ghi
+        redirectAttributes.addFlashAttribute("success", "Thêm mới xe thành công!");  // (2a)
+    } catch (Exception e) {
+        redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());     // (2b)
+    }
+    return "redirect:/admin/buses";                                                   // (3)
+}</code></pre></div>
+<ul>
+<li><strong>Flash attribute</strong> = một thông báo &quot;sống qua đúng một lần chuyển trang&quot;: đặt ở request POST,
+đọc được ở request GET kế tiếp, rồi tự mất <span class="tag tag-spring">SPRING</span>.</li>
+<li><strong>PRG — Post/Redirect/Get</strong>: sau khi POST ghi dữ liệu, <strong>không</strong> trả HTML ngay mà bảo trình duyệt
+chuyển sang một GET. Lợi ích: bấm F5 ở trang kết quả chỉ tải lại danh sách, không gửi lại form
+(không tạo trùng xe).</li>
+<li>Dự án dùng <strong>ba</strong> key flash thống nhất: <code>success</code>, <code>error</code>, <code>warning</code>. Template hiện chúng bằng
+<code>th:if</code> — <span class="tag tag-code">CODE</span> <code>tpl/admin/bus/bus-list.html:24-31</code>:</li>
+</ul>
+<div class="code-wrap"><pre class="code"><code class="language-html">&lt;div th:if="${success}" class="alert alert-success ..."&gt; &lt;span th:text="${success}"&gt;&lt;/span&gt; ... &lt;/div&gt;
+&lt;div th:if="${error}"   class="alert alert-danger ..."&gt;  &lt;span th:text="${error}"&gt;&lt;/span&gt;   ... &lt;/div&gt;</code></pre></div>
+<ul>
+<li>Controller bọc <code>try/catch</code> rồi biến exception thành flash <code>error</code> — đây là cách <strong>mọi</strong> controller
+của dự án báo lỗi (không có <code>@ControllerAdvice</code> tập trung — Bài 00b §5).</li>
+</ul>
+<h3 id="4-5-canh-bao-xoa-bang-get-va-xoa-bang-post">4.5. Cảnh báo: xóa bằng GET và xóa bằng POST</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Màn</th>
+<th>Cách xóa</th>
+<th>Vị trí</th>
+</tr>
+</thead><tbody><tr>
+<td>Xe, tài xế, bến, tuyến, sự cố</td>
+<td><strong>GET</strong> <code>/.../delete/{id}</code> qua thẻ <code>&lt;a href&gt;</code> + <code>confirm()</code> của JS</td>
+<td><code>AdminBusController.java:72</code> (<code>@GetMapping</code>), <code>bus-list.html:81-83</code></td>
+</tr>
+<tr>
+<td>Chuyến (xóa, hủy), duyệt/từ chối</td>
+<td><strong>POST</strong> qua <code>&lt;form method=&quot;post&quot;&gt;</code></td>
+<td><code>AdminTripManagementController</code> <code>@PostMapping(&quot;/trips/delete/{id}&quot;)</code>, <code>/trips/cancel/{id}</code></td>
+</tr>
+</tbody></table></div>
+<p>Theo quy ước HTTP, <strong>GET chỉ nên đọc</strong>, thay đổi dữ liệu nên dùng POST (hoặc DELETE). Rủi ro của
+xóa bằng GET <span class="tag tag-guess">SUY LUẬN</span>: một đường link bị trình duyệt tải trước, bị bot/công cụ quét truy cập, hay
+bị nhúng vào trang khác đều có thể kích hoạt xóa; <code>confirm()</code> chỉ chặn được người bấm tay. Các
+guard ở service (xe đã có chuyến thì không xóa được — <code>BusService.deleteBus()</code>) giảm thiệt hại,
+nhưng không thay được quy ước. Trả lời hội đồng trung thực: <em>các màn CRUD danh mục dùng GET cho
+nhanh, màn chuyến — nơi thao tác có hậu quả nghiệp vụ — dùng POST; đây là điểm nên chuẩn hóa.</em></p>
+<hr>
+<h2 id="5-rest-va-json">§5. REST và JSON</h2>
+<h3 id="5-1-controller-khac-restcontroller-the-nao">5.1. <code>@Controller</code> khác <code>@RestController</code> thế nào</h3>
+<ul>
+<li><code>@Controller</code>: method trả về <strong>tên view</strong> → Thymeleaf render HTML.</li>
+<li><code>@RestController</code>: method trả về <strong>dữ liệu</strong>, Spring biến thành <strong>JSON</strong> gửi thẳng về <span class="tag tag-spring">SPRING</span>.
+Dùng khi người gọi là <strong>JavaScript</strong> chứ không phải người dùng mở trang.</li>
+</ul>
+<p>Dự án có đúng <strong>một</strong> REST controller: <code>TripRestController</code> (<code>/api/admin/trips</code>), phục vụ form tạo
+chuyến.</p>
+<h3 id="5-2-vi-du-get-api-admin-trips-available-resources">5.2. Ví dụ: <code>GET /api/admin/trips/available-resources</code></h3>
+<p><span class="tag tag-code">CODE</span> <code>…/controller/admin/TripRestController.java:47-86</code> (rút gọn):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@GetMapping("/available-resources")
+public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getAvailableResources(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departure,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival) {
+
+    if (arrival.isBefore(departure) || arrival.isEqual(departure)) {
+        return ResponseEntity.badRequest().body(                       // HTTP 400 + JSON báo lỗi
+                Map.of("error", "Thời gian đến phải sau thời gian khởi hành"));
+    }
+    List&lt;Map&lt;String, Object&gt;&gt; buses = tripService
+            .getAvailableBusesForTimeRange(departure, arrival)
+            .stream().map(this::toBusDto).toList();                    // mỗi Bus → một Map phẳng
+    ... // drivers, assistants tương tự
+    Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();
+    response.put("buses", buses);
+    response.put("drivers", drivers);
+    response.put("assistants", assistants);
+    return ResponseEntity.ok(response);                                // HTTP 200 + JSON
+}</code></pre></div>
+<ul>
+<li><strong><code>ResponseEntity</code></strong> = &quot;phong bì&quot; gồm mã trạng thái HTTP + nội dung. <code>ok(...)</code> = 200,
+<code>badRequest()</code> = 400.</li>
+<li><strong>Jackson</strong> là thư viện Spring dùng để biến object Java thành JSON <span class="tag tag-spring">SPRING</span>. Một <code>Map</code> trở thành
+object JSON, một <code>List</code> trở thành mảng:</li>
+</ul>
+<div class="code-wrap"><pre class="code"><code class="language-json">{ "buses": [ { "id": 3, "licensePlate": "...", "typeId": 1, "typeName": "Limousine", "capacity": 22, "brand": "..." } ],
+  "drivers": [ { "userId": 5, "fullName": "...", "licenseNumber": "...", "experienceYears": 5 } ],
+  "assistants": [ ... ] }</code></pre></div>
+<h3 id="5-3-vi-sao-tu-dung-map-phang-thay-vi-tra-thang-entity">5.3. Vì sao tự dựng <code>Map</code> phẳng thay vì trả thẳng entity</h3>
+<p><code>toBusDto</code> (<code>TripRestController.java:94</code>) và <code>toDriverDto</code> (<code>:109</code>) chép <strong>vài</strong> field ra một <code>Map</code>.
+Lý do [SUY LUẬN, khớp với javadoc <code>AdminTripController.java:105</code> cho trường hợp tương tự bên
+Thymeleaf]:</p>
+<ol>
+<li>Entity có quan hệ hai chiều (<code>Driver.user</code> ↔ <code>User.driver</code>). Serialize thẳng có thể đi vòng
+vô tận → lỗi tràn bộ nhớ ngăn xếp (StackOverflowError).</li>
+<li>Entity <code>User</code> chứa <code>password</code> — trả thẳng sẽ lộ ra JSON.</li>
+<li>JavaScript chỉ cần đúng vài field; gửi ít thì nhanh và rõ.</li>
+</ol>
+<hr>
+<h2 id="6-thymeleaf-phia-giao-dien">§6. Thymeleaf — phía giao diện</h2>
+<p><strong>Thymeleaf</strong> = bộ máy trộn &quot;khuôn HTML&quot; với dữ liệu trong Model để ra HTML hoàn chỉnh, <strong>chạy ở
+server</strong> trước khi gửi về trình duyệt. Các thuộc tính <code>th:...</code> sẽ biến mất trong HTML cuối.</p>
+<h3 id="6-1-khong-co-fragment-layout">6.1. Không có fragment/layout</h3>
+<p><span class="tag tag-code">CODE</span> grep toàn bộ <code>tpl/</code>: <strong>không có</strong> <code>th:fragment</code>, <code>th:replace</code>, <code>th:insert</code>. Mỗi template là
+một trang HTML đầy đủ (tự có <code>&lt;head&gt;</code>, tự nạp CSS/JS). Thư viện giao diện nạp qua <strong>CDN</strong> (tải từ
+internet, không lưu trong dự án — thư mục <code>src/main/resources/static</code> không tồn tại):
+Bootstrap 5.3.0, Bootstrap Icons, Chart.js 4.4.1 (<code>dashboard-analytics.html:463-464</code>).</p>
+<p>Hệ quả <span class="tag tag-guess">SUY LUẬN</span>: thanh điều hướng, khối flash message... được <strong>chép lại</strong> ở từng trang; sửa một
+chỗ phải sửa nhiều file. Máy demo phải có internet thì giao diện mới hiện đúng CSS.</p>
+<h3 id="6-2-cu-phap-du-an-that-su-dung">6.2. Cú pháp dự án thật sự dùng</h3>
+<p>Số lần xuất hiện đếm bằng grep trên toàn bộ <code>tpl/</code> (2026-09-26):</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Cú pháp</th>
+<th>Số lần</th>
+<th>Nghĩa</th>
+<th>Ví dụ thật</th>
+</tr>
+</thead><tbody><tr>
+<td><code>th:text=&quot;${x}&quot;</code></td>
+<td>357</td>
+<td>In giá trị ra (tự chống chèn mã HTML)</td>
+<td><code>bus-list.html:53</code> in <code>bus.id</code></td>
+</tr>
+<tr>
+<td><code>th:if</code> / <code>th:unless</code></td>
+<td>126 / 25</td>
+<td>Hiện khối nếu đúng / nếu sai</td>
+<td><code>bus-list.html:73-75</code> nhãn bảo trì</td>
+</tr>
+<tr>
+<td><code>th:each=&quot;bus : ${buses}&quot;</code></td>
+<td>47</td>
+<td>Lặp</td>
+<td><code>bus-list.html:52</code></td>
+</tr>
+<tr>
+<td><code>th:href=&quot;@{...}&quot;</code></td>
+<td>64</td>
+<td>Tạo link</td>
+<td><code>bus-list.html:79</code></td>
+</tr>
+<tr>
+<td><code>@{/admin/buses/edit/{id}(id=${bus.id})}</code></td>
+<td>—</td>
+<td>Link có biến đường dẫn</td>
+<td><code>bus-list.html:79</code></td>
+</tr>
+<tr>
+<td><code>th:action</code></td>
+<td>23</td>
+<td>URL gửi form</td>
+<td><code>bus-form.html:22</code></td>
+</tr>
+<tr>
+<td><code>th:object</code> + <code>th:field=&quot;*{...}&quot;</code></td>
+<td>4 / 16</td>
+<td>Gắn form với một object; mỗi ô gắn một field</td>
+<td><code>bus-form.html:23</code>, <code>:28</code></td>
+</tr>
+<tr>
+<td><code>th:value</code>, <code>th:selected</code></td>
+<td>50 / 13</td>
+<td>Giá trị ô / option được chọn</td>
+<td><code>bus-form.html:42</code></td>
+</tr>
+<tr>
+<td><code>th:classappend</code></td>
+<td>22</td>
+<td>Thêm class CSS theo điều kiện</td>
+<td>nhiều trang danh sách</td>
+</tr>
+<tr>
+<td><code>th:switch</code> / <code>th:case</code></td>
+<td>1 / 5</td>
+<td>Rẽ nhánh hiển thị</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>th:attr=&quot;data-x=${...}&quot;</code></td>
+<td>1</td>
+<td>Gắn thuộc tính tùy ý</td>
+<td><code>trip-create-form.html:148</code> gắn <code>data-duration</code>, <code>data-type</code> cho JS đọc</td>
+</tr>
+<tr>
+<td><code>th:inline=&quot;javascript&quot;</code></td>
+<td>3</td>
+<td>Đẩy dữ liệu vào <code>&lt;script&gt;</code></td>
+<td>§7.1</td>
+</tr>
+<tr>
+<td><code>#lists.isEmpty(...)</code> / <code>#lists.size</code></td>
+<td>33 / 13</td>
+<td>Tiện ích danh sách</td>
+<td><code>bus-list.html:87</code></td>
+</tr>
+<tr>
+<td><code>#numbers.formatDecimal(x, 1, 0)</code></td>
+<td>58</td>
+<td>Định dạng số</td>
+<td><code>bus-list.html:61</code></td>
+</tr>
+<tr>
+<td><code>#temporals.format(t, &#39;dd/MM/yyyy HH:mm&#39;)</code></td>
+<td>33</td>
+<td>Định dạng ngày giờ Java 8</td>
+<td>nhiều trang chuyến</td>
+</tr>
+</tbody></table></div>
+<p><strong>Một form hoàn chỉnh</strong> — <span class="tag tag-code">CODE</span> <code>tpl/admin/bus/bus-form.html:21-23</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-html">&lt;form th:action="${bus.id == null} ? @{/admin/buses/create} : @{/admin/buses/edit/{id}(id=${bus.id})}"
+      th:object="${bus}" method="post"&gt;</code></pre></div>
+<p>Cùng một template phục vụ cả <strong>thêm</strong> lẫn <strong>sửa</strong>: xe chưa có <code>id</code> → gửi tới <code>/create</code>; có <code>id</code> →
+gửi tới <code>/edit/{id}</code>. <code>th:field=&quot;*{licensePlate}&quot;</code> sinh ra <code>name=&quot;licensePlate&quot;</code> +
+<code>value=&quot;...&quot;</code> <span class="tag tag-spring">SPRING</span> — tên ô khớp tên field của <code>Bus</code>, nên phía controller <code>@ModelAttribute Bus</code>
+nhận đúng (§4.3).</p>
+<h3 id="6-3-template-goi-thang-method-cua-entity">6.3. Template gọi thẳng method của entity</h3>
+<p><span class="tag tag-code">CODE</span> <code>bus-list.html:63</code> gọi <code>bus.getKmSinceLastMaintenance()</code>, <code>:73</code> gọi <code>bus.needsMaintenance()</code>
+— đây là method nghiệp vụ viết trong entity <code>Bus.java</code>. Template chỉ <strong>hỏi</strong>, không tự tính lại
+ngưỡng bảo trì; luật nằm ở một chỗ duy nhất (entity).</p>
+<hr>
+<h2 id="7-javascript-phia-trinh-duyet">§7. JavaScript phía trình duyệt</h2>
+<p>Nhiều logic của dự án chạy <strong>trên trình duyệt</strong>, sau khi HTML đã về. Khi trace một chức năng, phải
+tính cả tầng này.</p>
+<h3 id="7-1-day-du-lieu-server-vao-javascript-th-inline-javascript">7.1. Đẩy dữ liệu server vào JavaScript: <code>th:inline=&quot;javascript&quot;</code></h3>
+<p><span class="tag tag-code">CODE</span> <code>tpl/admin/trip-edit-form.html:252-257</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-html">&lt;script th:inline="javascript"&gt;
+    /*&lt;![CDATA[*/
+    const driversForJs = /*[[${driversForJs}]]*/[];
+    const savedCoDriverIds = /*[[${savedCoDriverIds}]]*/[];
+    /*]]&gt;*/</code></pre></div>
+<ul>
+<li><code>/*[[${driversForJs}]]*/[]</code> — Thymeleaf thay cả cụm bằng dữ liệu thật dạng JSON khi render ở
+server <span class="tag tag-spring">SPRING</span>. Mở file tĩnh (không qua server) thì chỉ thấy <code>[]</code> — nên file vẫn là JS hợp lệ.</li>
+<li>Ba template dùng kỹ thuật này: <code>trip-edit-form.html:252</code>, <code>approve-form.html:355</code>,
+<code>dashboard-analytics.html:465</code>.</li>
+</ul>
+<p><strong>Không được đẩy thẳng entity vào JS.</strong> Controller luôn rút gọn thành <code>Map</code> phẳng trước:
+<code>AdminTripController.toDriverOptionsForJs()</code> (<code>:117</code>) chỉ giữ <code>userId</code>, <code>fullName</code>,
+<code>totalDrivingHours24h</code>. Javadoc ngay phía trên (<code>:105-116</code>) ghi lý do <span class="tag tag-code">CODE</span>: Thymeleaf serialize
+cả đồ thị object, đi vòng <code>Driver.user → User.driver → …</code> → <code>StackOverflowError</code>, response bị cắt
+giữa chừng, toàn bộ JS của trang chết. Đó là <strong>lỗi #9</strong> trong <code>docs/todo/current_bugs_found.md</code>.</p>
+<h3 id="7-2-fetch-goi-rest-form-tao-chuyen-dang-wizard">7.2. <code>fetch()</code> gọi REST — form tạo chuyến dạng &quot;wizard&quot;</h3>
+<p>Chuỗi sự kiện ở <code>tpl/admin/trip-create-form.html</code> <span class="tag tag-code">CODE</span>:</p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant JS as JavaScript (trip-create-form.html)
+    participant API as TripRestController
+    participant TS as TripService
+    A-&gt;&gt;JS: chọn tuyến (routeSelect, :410) hoặc giờ đi (departureInput, :418)
+    JS-&gt;&gt;JS: onScheduleChanged() (:424) — đọc data-duration (:148), tính giờ đến
+    JS-&gt;&gt;JS: triggerFetchResources() (:463) — chờ 400ms (debounce)
+    JS-&gt;&gt;API: fetchAvailableResources() (:470) → await fetch(".../available-resources?departure=..&amp;arrival=..") (:482-486)
+    API-&gt;&gt;TS: getAvailableBusesForTimeRange / DriversForTimeRange / AssistantsForTimeRange
+    TS--&gt;&gt;API: danh sách Bus, danh sách Driver
+    API--&gt;&gt;JS: JSON { buses, drivers, assistants }
+    JS-&gt;&gt;JS: renderResources() (:515) — đổ dữ liệu vào các dropdown
+    JS--&gt;&gt;A: form hiện danh sách xe, tài xế, phụ xe còn rảnh</pre></figure>
+<ul>
+<li><strong><code>async</code> / <code>await</code></strong>: <code>fetch</code> gửi request và <strong>không đứng chờ</strong> — trang vẫn dùng được. <code>await</code>
+nghĩa là &quot;đợi kết quả về rồi mới chạy dòng tiếp theo trong hàm này&quot;.</li>
+<li><strong><code>AbortController</code></strong> (<code>:472-476</code>): nếu Admin đổi giờ khi request cũ chưa về, request cũ bị hủy
+để kết quả cũ không đè lên kết quả mới.</li>
+<li>Nếu server trả 400 (<code>badRequest</code> ở §5.2), JS đọc <code>errData.error</code> và hiện cảnh báo (<code>:489-491</code>).</li>
+</ul>
+<h3 id="7-3-su-kien-va-kiem-tra-phia-trinh-duyet">7.3. Sự kiện và kiểm tra phía trình duyệt</h3>
+<ul>
+<li><code>addEventListener(&#39;change&#39; | &#39;submit&#39; | &#39;DOMContentLoaded&#39;, hàm)</code> — &quot;khi chuyện X xảy ra thì chạy
+hàm này&quot;. <code>DOMContentLoaded</code> = trang vừa dựng xong.</li>
+<li><code>confirm(&#39;Bạn có chắc...&#39;)</code> — hộp hỏi Có/Không; <code>onclick=&quot;return confirm(...)&quot;</code> ở
+<code>bus-list.html:83</code>: bấm &quot;Không&quot; thì link không được mở.</li>
+<li><strong>Kiểm tra trùng nhân sự trước khi gửi form</strong> — <span class="tag tag-code">CODE</span> <code>trip-create-form.html:704-716</code>: lúc
+submit, gọi <code>validateNoDriverConflict()</code> (<code>:721</code>); nếu một người vừa là tài xế chính vừa là phụ
+xe thì <code>e.preventDefault()</code> chặn gửi form và tô đỏ ô sai.</li>
+</ul>
+<aside class="callout"><p><strong>Nguyên tắc quan trọng — sẽ gặp lại ở mọi bài:</strong> kiểm tra bằng JavaScript chỉ là lớp
+<strong>&quot;không-mời&quot;</strong> (giúp người dùng không lỡ tay). Nó <strong>không</strong> bảo vệ được gì trước một request tự
+chế (tắt JS, dùng công cụ gửi POST thẳng). <strong>Lớp chặn thật</strong> luôn nằm ở server:
+<code>TripService.validateStaffForTrip()</code> kiểm lại trùng nhân sự. Xem Bài 00b §5.</p>
+</aside>
+<h3 id="7-4-chart-js-o-trang-analytics">7.4. Chart.js ở trang Analytics</h3>
+<ul>
+<li>Service tính số liệu → gói thành <code>ChartSeriesDto</code> (hai danh sách <code>labels</code> và <code>values</code>) → Model →
+<code>dashboard-analytics.html:505-518</code> đẩy vào biến JS bằng <code>/*[[...]]*/</code> → hàm <code>makeDoughnut</code> /
+<code>makeBar</code> (<code>:472</code>, <code>:485</code>) gọi <code>new Chart(...)</code> vẽ biểu đồ <span class="tag tag-code">CODE</span>.</li>
+<li>Vì sao cần <code>chart.resize()</code> khi đổi tab — <span class="tag tag-code">CODE</span> comment <code>:529-531</code>: canvas nằm trong tab đang ẩn
+(<code>display:none</code>) bị Chart.js đo kích thước 0×0 lúc khởi tạo; phải vẽ lại khi tab được hiện
+(sự kiện <code>shown.bs.tab</code>, <code>:533-539</code>).</li>
+</ul>
+<hr>
+<h2 id="8-chay-nen-cau-hinh-bao-mat">§8. Chạy nền, cấu hình, bảo mật</h2>
+<h3 id="8-1-scheduled-viec-tu-chay-dinh-ky">8.1. <code>@Scheduled</code> — việc tự chạy định kỳ</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:76-78</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Scheduled(fixedRate = 10_000)     // cứ 10.000 ms = 10 giây chạy một lần
+@Transactional
+public void scanAndSuggestExtraTrips() { ... }</code></pre></div>
+<p>Không ai bấm nút nào — Spring tự gọi method này mỗi 10 giây (cần <code>@EnableScheduling</code> ở §1.3)
+<span class="tag tag-spring">SPRING</span>. Đây là &quot;trái tim&quot; của chức năng chuyến tăng cường (bài chức năng 08). <code>10_000</code> là cách
+viết số có dấu gạch dưới cho dễ đọc (Java 7+), bằng <code>10000</code>. Vì sao method này <strong>bắt buộc</strong> có
+<code>@Transactional</code>: xem Bài 00b §4.</p>
+<h3 id="8-2-file-cau-hinh-va-profile">8.2. File cấu hình và profile</h3>
+<ul>
+<li><strong><code>application.properties</code></strong> = file cấu hình chính. Các dòng quan trọng <span class="tag tag-code">CODE</span>
+(<code>src/main/resources/application.properties</code>):<ul>
+<li><code>:18</code> <code>spring.jpa.hibernate.ddl-auto=update</code> — Hibernate chỉ <strong>bổ sung</strong> bảng/cột còn thiếu,
+không xóa dữ liệu;</li>
+<li><code>:19</code> URL MySQL tới database <code>busmanagement</code> (kèm <code>foreign_key_checks=0</code> — Bài 00b §5);</li>
+<li><code>:23</code> <code>spring.jpa.show-sql: false</code> — không in câu SQL ra log.</li>
+</ul>
+</li>
+<li><strong>Profile</strong> = &quot;chế độ chạy&quot;. <code>application-demo.properties</code> chỉ được đọc khi bật profile <code>demo</code>, và
+ghi đè <code>ddl-auto=create-drop</code> (<code>:19</code>) — <strong>xóa và tạo lại toàn bộ bảng</strong> mỗi lần khởi động.</li>
+<li><strong><code>@Profile(&quot;demo&quot;)</code></strong> trên một bean = bean đó chỉ tồn tại khi profile <code>demo</code> được bật.
+<span class="tag tag-code">CODE</span> <code>…/config/DataInitializer.java:26-29</code>: <code>@Component @Profile(&quot;demo&quot;) ... implements CommandLineRunner</code>. <strong><code>CommandLineRunner</code></strong> = &quot;chạy method <code>run()</code> một lần ngay sau khi ứng dụng
+khởi động xong&quot; <span class="tag tag-spring">SPRING</span>. <code>DataInitializer.run()</code> gọi <code>deleteAll()</code> mọi bảng rồi nạp dữ liệu mẫu.
+Tương tự <code>HistoricalDataBackfill</code> (<code>:110-114</code>) với <code>@Profile(&quot;backfill&quot;)</code> sinh 12 tuần dữ liệu
+lịch sử mô phỏng.</li>
+</ul>
+<div class="table-wrap"><table><thead><tr>
+<th>Cách chạy</th>
+<th>Profile</th>
+<th>Hệ quả</th>
+</tr>
+</thead><tbody><tr>
+<td><code>./mvnw spring-boot:run</code></td>
+<td>(mặc định)</td>
+<td>Giữ dữ liệu, không nạp gì</td>
+</tr>
+<tr>
+<td><code>./mvnw spring-boot:run -Dspring-boot.run.profiles=demo</code></td>
+<td><code>demo</code></td>
+<td>⚠️ <strong>XÓA SẠCH</strong> DB <code>busmanagement</code> rồi nạp dữ liệu mẫu</td>
+</tr>
+<tr>
+<td><code>./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill</code></td>
+<td><code>backfill</code></td>
+<td>Bổ sung dữ liệu lịch sử còn thiếu, không xóa gì</td>
+</tr>
+<tr>
+<td><code>./mvnw test</code></td>
+<td>(test)</td>
+<td>Dùng DB riêng <code>busmanagement_test</code> (<code>src/test/resources/application.properties:23</code>, <code>create-drop</code>)</td>
+</tr>
+</tbody></table></div>
+<p>Vì sao mặc định là &quot;giữ dữ liệu&quot;: roadmap Phase 0 — dữ liệu lịch sử là nền của Dự báo; nếu xóa là
+mặc định thì một lần khởi động quên cờ là mất sạch mà không báo lỗi (comment
+<code>application.properties:1-17</code>) <span class="tag tag-code">CODE</span>.</p>
+<h3 id="8-3-bao-mat-bat-nhung-cho-qua-moi-request">8.3. Bảo mật: <strong>bật</strong> nhưng cho qua mọi request</h3>
+<p><span class="tag tag-code">CODE</span> <code>…/config/SecurityConfig.java:8-21</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Configuration
+public class SecurityConfig {
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.authorizeHttpRequests(auth -&gt; auth.anyRequest().permitAll()) // mọi request đều được phép
+            .csrf(csrf -&gt; csrf.disable())                                  // tắt chống giả mạo form (CSRF)
+            .formLogin(form -&gt; form.disable())                             // tắt trang đăng nhập
+            .httpBasic(basic -&gt; basic.disable());                          // tắt hộp user/pass của trình duyệt
+        return http.build();
+    }
+}</code></pre></div>
+<ul>
+<li>Nói <strong>đúng</strong>: <em>Spring Security đang BẬT; cấu hình của nó cho phép mọi request và tắt CSRF, form
+đăng nhập, HTTP Basic.</em> <strong>Đừng</strong> nói &quot;Spring Security bị tắt&quot; — câu đó đã bị đính chính nhiều lần
+trong tài liệu dự án (<code>Proj_functions_summary.md</code> §12 mục 9).</li>
+<li><strong>CSRF</strong> = kiểu tấn công lừa trình duyệt của người đã đăng nhập gửi form tới trang của bạn. Tắt
+nó nghĩa là form POST không cần kèm mã bảo vệ.</li>
+<li>Vì sao như vậy: bật đăng nhập thật là <strong>Non-Goal có chủ đích</strong> của roadmap (§4) — cần chủ dự án
+duyệt thành một task riêng. Hệ quả: không có phân quyền theo <code>Role</code>, mật khẩu lưu thô.</li>
+</ul>
+<hr>
+<h2 id="9-lombok">§9. Lombok</h2>
+<p><strong>Lombok</strong> = thư viện tự sinh code lặp đi lặp lại (getter, setter, constructor...) lúc biên dịch.
+Bạn không thấy code đó trong file <code>.java</code>, nhưng nó có thật trong file <code>.class</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation</th>
+<th>Sinh ra gì</th>
+<th>Ví dụ</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@Data</code></td>
+<td>getter + setter mọi field, <code>equals</code>, <code>hashCode</code>, <code>toString</code>, constructor cho field <code>final</code></td>
+<td>mọi entity, ví dụ <code>User.java:17</code></td>
+</tr>
+<tr>
+<td><code>@Getter</code></td>
+<td>chỉ getter</td>
+<td><code>AutoAssignResult</code>, <code>ValidationResult</code></td>
+</tr>
+<tr>
+<td><code>@RequiredArgsConstructor</code></td>
+<td>constructor nhận mọi field <code>final</code> (dùng cho DI — §3.2)</td>
+<td>mọi controller/service</td>
+</tr>
+<tr>
+<td><code>@NoArgsConstructor</code> / <code>@AllArgsConstructor</code></td>
+<td>constructor rỗng / đủ tham số</td>
+<td><code>Station.java</code>, <code>RouteStationId.java</code></td>
+</tr>
+<tr>
+<td><code>@EqualsAndHashCode(onlyExplicitlyIncluded = true)</code> + <code>@EqualsAndHashCode.Include</code></td>
+<td><code>equals/hashCode</code> chỉ dựa trên field được đánh dấu</td>
+<td><code>User.java:18</code>, <code>:22</code></td>
+</tr>
+<tr>
+<td><code>@ToString.Exclude</code></td>
+<td>bỏ field khỏi <code>toString()</code></td>
+<td><code>User.java:71</code>, <code>Driver.java:24</code></td>
+</tr>
+<tr>
+<td><code>@Slf4j</code></td>
+<td>tạo biến <code>log</code> để ghi log (<code>log.info(...)</code>, <code>log.warn(...)</code>)</td>
+<td><code>TripService.java:21</code></td>
+</tr>
+</tbody></table></div>
+<p>Ví dụ những gì <code>@Data</code> sinh ra cho một field (viết tay để hình dung):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">private String licensePlate;
+public String getLicensePlate() { return licensePlate; }
+public void setLicensePlate(String licensePlate) { this.licensePlate = licensePlate; }
+// + equals(), hashCode(), toString() dựa trên các field</code></pre></div>
+<p><strong>Vì sao <code>@Data</code> trên entity từng gây lỗi, và quy ước hiện tại.</strong> <code>@Data</code> sinh <code>equals/hashCode/ toString</code> dựa trên <strong>mọi</strong> field. <code>User</code> có field <code>driver</code>, <code>Driver</code> có field <code>user</code> → gọi
+<code>user.hashCode()</code> sẽ gọi <code>driver.hashCode()</code>, lại gọi <code>user.hashCode()</code>... vô tận →
+<code>StackOverflowError</code>. Ngoài ra nó còn chạm vào các quan hệ lười nạp (LAZY — Bài 00b), bắn truy vấn
+ngầm. Quy ước đã chốt, ghi trong javadoc <code>User.java:44-70</code> và roadmap Hidden Cost #9 <span class="tag tag-code">CODE</span>:</p>
+<ol>
+<li><code>equals/hashCode</code> <strong>chỉ theo <code>id</code></strong> — <code>@EqualsAndHashCode(onlyExplicitlyIncluded = true)</code> ở
+class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
+<li>mọi quan hệ tới entity khác gắn <code>@ToString.Exclude</code>.</li>
+</ol>
+<p>Test canh quy ước này: <code>src/test/.../domain/EntityEqualsHashCodeCycleTest.java</code> (7 test).</p>
+<hr>
+<h2 id="10-bang-tra-cuu-thuat-ngu">§10. Bảng tra cứu thuật ngữ</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Thuật ngữ</th>
+<th>Nghĩa đời thường</th>
+<th>Ví dụ trong dự án</th>
+</tr>
+</thead><tbody><tr>
+<td>Framework</td>
+<td>Bộ khung làm sẵn phần &quot;đường ống&quot;</td>
+<td>Spring Boot 4.0.8 (<code>pom.xml:8</code>)</td>
+</tr>
+<tr>
+<td>Maven / <code>pom.xml</code></td>
+<td>Công cụ tải thư viện + build; danh sách thư viện</td>
+<td><code>pom.xml</code></td>
+</tr>
+<tr>
+<td>Starter</td>
+<td>Gói combo thư viện + cấu hình sẵn</td>
+<td><code>spring-boot-starter-webmvc</code> (<code>pom.xml:55</code>)</td>
+</tr>
+<tr>
+<td>Lambda</td>
+<td>Hàm nhỏ viết tại chỗ <code>x -&gt; ...</code></td>
+<td><code>TripService.java:484</code></td>
+</tr>
+<tr>
+<td>Method reference</td>
+<td>Lambda viết gọn <code>Class::method</code></td>
+<td><code>TripService.java:345</code></td>
+</tr>
+<tr>
+<td>Stream</td>
+<td>Dây chuyền xử lý danh sách</td>
+<td><code>TripService.java:482-499</code></td>
+</tr>
+<tr>
+<td><code>filter</code> / <code>map</code> / <code>collect</code></td>
+<td>Lọc / biến đổi / gom kết quả</td>
+<td>như trên</td>
+</tr>
+<tr>
+<td><code>groupingBy</code></td>
+<td>Chia nhóm theo khóa</td>
+<td><code>DashboardService.java:166-169</code></td>
+</tr>
+<tr>
+<td><code>Comparator</code></td>
+<td>Luật so sánh để sắp xếp</td>
+<td><code>TripService.java:343-346</code></td>
+</tr>
+<tr>
+<td><code>Optional</code></td>
+<td>Hộp có thể rỗng</td>
+<td><code>AdminBusController.java:47-48</code></td>
+</tr>
+<tr>
+<td><code>orElseThrow</code></td>
+<td>Hộp rỗng thì ném lỗi</td>
+<td>như trên</td>
+</tr>
+<tr>
+<td><code>record</code></td>
+<td>Class chở dữ liệu viết một dòng</td>
+<td><code>ForecastService.java:140</code></td>
+</tr>
+<tr>
+<td>Switch expression</td>
+<td>switch trả về giá trị, dùng <code>-&gt;</code></td>
+<td><code>TripService.java:1855-1876</code></td>
+</tr>
+<tr>
+<td>Text block <code>&quot;&quot;&quot;</code></td>
+<td>Chuỗi nhiều dòng</td>
+<td><code>TripRepository.java:46-56</code></td>
+</tr>
+<tr>
+<td><code>BigDecimal</code></td>
+<td>Số thập phân chính xác, dùng cho tiền</td>
+<td><code>Trip.price</code></td>
+</tr>
+<tr>
+<td><code>LocalDateTime</code> / <code>Duration</code></td>
+<td>Ngày giờ / khoảng thời gian</td>
+<td><code>Trip.getTripDurationHours()</code></td>
+</tr>
+<tr>
+<td><code>EnumSet</code></td>
+<td>Tập giá trị enum</td>
+<td><code>DispatchController.BOARD_ACTIONS</code></td>
+</tr>
+<tr>
+<td>Bean</td>
+<td>Object do Spring tạo và quản lý</td>
+<td>mọi <code>@Service</code></td>
+</tr>
+<tr>
+<td>IoC Container</td>
+<td>Kho giữ các bean</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>Dependency Injection</td>
+<td>Spring tự đưa phụ thuộc vào</td>
+<td><code>AdminBusController.java:14-17</code></td>
+</tr>
+<tr>
+<td><code>@SpringBootApplication</code></td>
+<td>Điểm gốc: quét bean + cấu hình tự động</td>
+<td><code>BusManagementApplication.java:24</code></td>
+</tr>
+<tr>
+<td><code>@EnableScheduling</code></td>
+<td>Bật chạy việc định kỳ</td>
+<td><code>BusManagementApplication.java:25</code></td>
+</tr>
+<tr>
+<td><code>@Controller</code></td>
+<td>Bean web trả HTML</td>
+<td><code>AdminBusController.java:12</code></td>
+</tr>
+<tr>
+<td><code>@RestController</code></td>
+<td>Bean web trả JSON</td>
+<td><code>TripRestController.java:27</code></td>
+</tr>
+<tr>
+<td><code>@Service</code> / <code>@Repository</code> / <code>@Component</code></td>
+<td>Bean nghiệp vụ / truy cập dữ liệu / chung</td>
+<td><code>BusService.java:18</code>, <code>BusRepository.java:12</code>, <code>DataInitializer.java:26</code></td>
+</tr>
+<tr>
+<td><code>@Configuration</code> / <code>@Bean</code></td>
+<td>Class cấu hình / method tạo bean</td>
+<td><code>SecurityConfig.java:8</code>, <code>:11</code></td>
+</tr>
+<tr>
+<td>Spring Data proxy</td>
+<td>Class cài đặt repository do Spring tự sinh</td>
+<td><code>BusRepository</code> (interface)</td>
+</tr>
+<tr>
+<td>DispatcherServlet</td>
+<td>Tổng đài nhận mọi request</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td><code>@RequestMapping</code> / <code>@GetMapping</code> / <code>@PostMapping</code></td>
+<td>Gắn URL (+ phương thức HTTP) với method</td>
+<td><code>AdminBusController.java:13</code>, <code>:19</code>, <code>:33</code></td>
+</tr>
+<tr>
+<td><code>@PathVariable</code></td>
+<td>Lấy giá trị trong đường dẫn</td>
+<td><code>AdminBusController.java:45</code></td>
+</tr>
+<tr>
+<td><code>@RequestParam</code></td>
+<td>Lấy tham số URL / ô form</td>
+<td><code>AdminTripManagementController.java:122</code></td>
+</tr>
+<tr>
+<td><code>@ModelAttribute</code></td>
+<td>Gom ô form thành object</td>
+<td><code>AdminBusController.java:34</code></td>
+</tr>
+<tr>
+<td><code>DomainClassConverter</code></td>
+<td>Tự đổi id gửi lên thành entity</td>
+<td>javadoc <code>AdminIncidentController.java:58-63</code></td>
+</tr>
+<tr>
+<td><code>@DateTimeFormat</code></td>
+<td>Định dạng khi đổi chuỗi → ngày giờ</td>
+<td><code>TripRestController.java:49</code></td>
+</tr>
+<tr>
+<td><code>Model</code></td>
+<td>Khay dữ liệu cho template</td>
+<td><code>AdminBusController.java:21</code></td>
+</tr>
+<tr>
+<td>View name / <code>redirect:</code></td>
+<td>Tên template / bảo trình duyệt chuyển URL</td>
+<td><code>AdminBusController.java:22</code>, <code>:41</code></td>
+</tr>
+<tr>
+<td>Flash attribute</td>
+<td>Thông báo sống qua một lần chuyển trang</td>
+<td><code>AdminBusController.java:37</code></td>
+</tr>
+<tr>
+<td>PRG</td>
+<td>POST xong thì redirect sang GET</td>
+<td><code>AdminBusController.java:33-42</code></td>
+</tr>
+<tr>
+<td><code>ResponseEntity</code></td>
+<td>Phong bì: mã HTTP + nội dung</td>
+<td><code>TripRestController.java:53</code>, <code>:85</code></td>
+</tr>
+<tr>
+<td>Jackson / JSON</td>
+<td>Thư viện đổi object ↔ JSON / định dạng dữ liệu cho JS</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>Thymeleaf</td>
+<td>Bộ trộn khuôn HTML với dữ liệu, chạy ở server</td>
+<td>27 template</td>
+</tr>
+<tr>
+<td><code>th:text</code> / <code>th:if</code> / <code>th:each</code></td>
+<td>In / điều kiện / lặp</td>
+<td><code>bus-list.html:52-75</code></td>
+</tr>
+<tr>
+<td><code>th:object</code> / <code>th:field</code></td>
+<td>Gắn form với object / ô với field</td>
+<td><code>bus-form.html:23</code>, <code>:28</code></td>
+</tr>
+<tr>
+<td><code>@{...}</code></td>
+<td>Cú pháp tạo URL</td>
+<td><code>bus-list.html:79</code></td>
+</tr>
+<tr>
+<td><code>#numbers</code> / <code>#temporals</code> / <code>#lists</code></td>
+<td>Tiện ích định dạng số / ngày / danh sách</td>
+<td><code>bus-list.html:61</code>, <code>:87</code></td>
+</tr>
+<tr>
+<td>CDN</td>
+<td>Nơi tải thư viện CSS/JS qua internet</td>
+<td><code>dashboard-analytics.html:463-464</code></td>
+</tr>
+<tr>
+<td><code>th:inline=&quot;javascript&quot;</code> + <code>/*[[...]]*/</code></td>
+<td>Đẩy dữ liệu server vào JS</td>
+<td><code>trip-edit-form.html:252-256</code></td>
+</tr>
+<tr>
+<td><code>fetch</code> / <code>async</code> / <code>await</code></td>
+<td>JS gọi server không chặn trang / đợi kết quả</td>
+<td><code>trip-create-form.html:470-495</code></td>
+</tr>
+<tr>
+<td>Debounce</td>
+<td>Chờ người dùng ngừng thao tác rồi mới gọi</td>
+<td><code>trip-create-form.html:463</code></td>
+</tr>
+<tr>
+<td><code>addEventListener</code></td>
+<td>&quot;Khi X xảy ra thì chạy hàm&quot;</td>
+<td><code>trip-create-form.html:410</code></td>
+</tr>
+<tr>
+<td><code>preventDefault()</code></td>
+<td>Chặn hành vi mặc định (vd gửi form)</td>
+<td><code>trip-create-form.html:706</code></td>
+</tr>
+<tr>
+<td>Lớp &quot;không-mời&quot; / &quot;chặn thật&quot;</td>
+<td>UI không mời thao tác sai / server từ chối thao tác sai</td>
+<td>§7.3, Bài 00b §5</td>
+</tr>
+<tr>
+<td><code>@Scheduled</code></td>
+<td>Chạy method định kỳ</td>
+<td><code>TripService.java:76</code></td>
+</tr>
+<tr>
+<td><code>application.properties</code></td>
+<td>File cấu hình</td>
+<td><code>src/main/resources/</code></td>
+</tr>
+<tr>
+<td>Profile / <code>@Profile</code></td>
+<td>Chế độ chạy / bean chỉ có ở chế độ đó</td>
+<td><code>DataInitializer.java:27</code></td>
+</tr>
+<tr>
+<td><code>CommandLineRunner</code></td>
+<td>Chạy <code>run()</code> một lần sau khi khởi động</td>
+<td><code>DataInitializer.java:29</code></td>
+</tr>
+<tr>
+<td><code>ddl-auto</code></td>
+<td>Chính sách Hibernate với cấu trúc bảng</td>
+<td><code>application.properties:18</code></td>
+</tr>
+<tr>
+<td>Spring Security / <code>permitAll</code></td>
+<td>Lớp bảo mật / cho mọi request qua</td>
+<td><code>SecurityConfig.java:15</code></td>
+</tr>
+<tr>
+<td>CSRF</td>
+<td>Tấn công giả mạo form</td>
+<td><code>SecurityConfig.java:17</code></td>
+</tr>
+<tr>
+<td>Lombok</td>
+<td>Tự sinh code lặp lại</td>
+<td><code>pom.xml:75</code></td>
+</tr>
+<tr>
+<td><code>@Data</code> / <code>@RequiredArgsConstructor</code> / <code>@Slf4j</code></td>
+<td>getter-setter-equals... / constructor DI / biến <code>log</code></td>
+<td><code>User.java:17</code>, <code>AdminBusController.java:14</code>, <code>TripService.java:21</code></td>
+</tr>
+<tr>
+<td><code>@EqualsAndHashCode.Include</code> / <code>@ToString.Exclude</code></td>
+<td>So sánh chỉ theo id / bỏ khỏi toString</td>
+<td><code>User.java:22</code>, <code>:71</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="11-cau-hoi-hoi-dong-goi-y-tra-loi">§11. Câu hỏi hội đồng + gợi ý trả lời</h2>
+<p><strong>Q1. Vì sao em chia Controller / Service / Repository?</strong>
+Mỗi lớp một trách nhiệm: controller nhận request và chọn trang trả về, service giữ luật nghiệp vụ,
+repository chỉ truy cập dữ liệu. Nhờ vậy một luật chỉ nằm một chỗ và dùng lại được ở nhiều màn —
+ví dụ <code>TripService.validateBusForTrip()</code> được dùng cho tạo, sửa, duyệt và cả màn Đề xuất. Roadmap
+§3 yêu cầu controller mới chỉ inject service, theo khuôn <code>AdminBusController</code>. Em cũng thừa nhận
+còn hai controller cũ inject thẳng repository (<code>AdminTripManagementController</code>, <code>AdminController</code>)
+— đã ghi nhận là anti-pattern, không nhân bản sang code mới.</p>
+<p><strong>Q2. Dependency Injection là gì, em dùng ở đâu?</strong>
+Là để Spring tự tạo object và đưa vào nơi cần, thay vì tự <code>new</code>. Dự án dùng constructor injection
+nhất quán: field <code>private final</code> + Lombok <code>@RequiredArgsConstructor</code>, ví dụ <code>AdminBusController</code>
+nhận <code>BusService</code> (<code>AdminBusController.java:14-17</code>). Lợi ích: cả ứng dụng dùng chung một bean,
+Spring bọc thêm được transaction, và khi test có thể thay phụ thuộc.</p>
+<p><strong>Q3. Một request đi qua hệ thống thế nào?</strong> (dùng ví dụ <code>GET /admin/buses</code>)
+DispatcherServlet nhận request, tra <code>@GetMapping</code> ra <code>AdminBusController.listBuses()</code>; method gọi
+<code>BusService.findAllWithBusType()</code>, service gọi <code>BusRepository.findAllWithBusType()</code> — một JPQL có
+<code>JOIN FETCH</code> loại xe; Hibernate dịch sang SQL, trả <code>List&lt;Bus&gt;</code>; controller đặt vào Model với tên
+<code>buses</code> và trả tên view <code>admin/bus/bus-list</code>; Thymeleaf lặp <code>th:each</code> sinh bảng HTML.</p>
+<p><strong>Q4. Sao sau khi lưu em lại redirect mà không trả trang luôn?</strong>
+Đó là mẫu Post/Redirect/Get. Nếu trả HTML ngay sau POST, người dùng bấm F5 sẽ gửi lại form và tạo
+trùng dữ liệu. Thông báo kết quả được chuyển sang trang sau bằng flash attribute (<code>success</code>,
+<code>error</code>, <code>warning</code>), ví dụ <code>AdminBusController.java:33-42</code>.</p>
+<p><strong>Q5. Sao xóa xe lại dùng GET?</strong>
+Trả lời thật: các màn danh mục (xe, tài xế, bến, tuyến, sự cố) dùng link GET kèm <code>confirm()</code> cho
+đơn giản; đây là điểm chưa chuẩn vì GET theo quy ước chỉ nên đọc. Màn chuyến — nơi thao tác có hậu
+quả nghiệp vụ — đã dùng POST. Rủi ro được giảm nhờ guard ở service (xe đã có chuyến hoặc có sự cố
+thì không xóa được — <code>BusService.deleteBus()</code>), nhưng hướng đúng là chuyển sang POST.</p>
+<p><strong>Q6. Dữ liệu từ server vào JavaScript bằng cách nào?</strong>
+Hai cách. (1) Lúc render: <code>th:inline=&quot;javascript&quot;</code> với cú pháp <code>/*[[${...}]]*/</code>, ví dụ
+<code>trip-edit-form.html:254</code>; controller luôn rút gọn thành <code>Map</code> phẳng trước vì đẩy thẳng entity gây
+vòng lặp <code>Driver.user ↔ User.driver</code> (lỗi #9). (2) Lúc người dùng thao tác: JS gọi <code>fetch()</code> tới
+<code>TripRestController</code> nhận JSON, ví dụ form tạo chuyến lấy danh sách xe/tài xế rảnh theo giờ đã chọn.</p>
+<p><strong>Q7. Kiểm tra ở JavaScript rồi, sao server còn kiểm lại?</strong>
+Kiểm tra ở JS chỉ giúp người dùng không lỡ tay; ai cũng có thể tắt JS hoặc gửi POST trực tiếp. Lớp
+chặn thật luôn ở service — ví dụ trùng nhân sự được <code>validateNoDriverConflict()</code> ở JS báo trước,
+nhưng <code>TripService.validateStaffForTrip()</code> mới là nơi từ chối.</p>
+<p><strong>Q8. Hệ thống có bảo mật không?</strong>
+Spring Security đang bật, nhưng <code>SecurityConfig</code> cho phép mọi request và tắt CSRF, form đăng nhập,
+HTTP Basic. Đăng nhập và phân quyền là Non-Goal có chủ đích của roadmap (§4); enum <code>Role</code> hiện chỉ
+dùng để phân loại tài khoản. Hệ quả em phải nói rõ: chưa có phân quyền, mật khẩu chưa mã hóa — đây
+là việc cần làm nếu triển khai thật.</p>
+<p><strong>Q9. <code>@Scheduled</code> trong dự án dùng làm gì?</strong>
+Job <code>TripService.scanAndSuggestExtraTrips()</code> chạy mỗi 10 giây, quét các chuyến đang bán vé, chuyến
+nào đông trên 90% và qua các điều kiện thời gian thì tự tạo chuyến tăng cường chờ Admin duyệt. Cần
+<code>@EnableScheduling</code> ở class main mới chạy được.</p>
+<p><strong>Q10. Lombok giúp gì, có rủi ro gì?</strong>
+Giảm code lặp (getter, setter, constructor). Rủi ro: <code>@Data</code> sinh <code>equals/hashCode</code> theo mọi field,
+với entity có quan hệ hai chiều thì gây đệ quy vô hạn. Dự án đã chốt quy ước: <code>equals/hashCode</code> chỉ
+theo id và loại mọi quan hệ khỏi <code>toString</code>, có <code>EntityEqualsHashCodeCycleTest</code> canh.</p>
+<hr>
+<h2 id="12-bai-tap-tu-kiem-tra">§12. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Trong <code>AdminBusController</code>, ai tạo ra object <code>BusService</code> và truyền vào controller?</li>
+<li><code>return &quot;admin/bus/bus-list&quot;</code> và <code>return &quot;redirect:/admin/buses&quot;</code> khác nhau thế nào?</li>
+<li><code>@PathVariable</code> và <code>@RequestParam</code> khác nhau ở đâu? Cho một ví dụ URL cho mỗi loại.</li>
+<li>Vì sao <code>BusRepository</code> là interface mà vẫn gọi được method?</li>
+<li>Một flash attribute tồn tại được bao lâu?</li>
+<li><code>record Observation(long routeId, int hour, LocalDate date, double occupancy)</code> — gọi method nào để
+lấy ngày của một <code>Observation o</code>?</li>
+<li>Vì sao <code>deleteRefusalReason()</code> không có <code>default</code>? Chuyện gì xảy ra nếu thêm <code>TripStatus.DELAYED</code>?</li>
+<li>Chạy app với profile <code>demo</code> có hậu quả gì với dữ liệu?</li>
+</ol>
+<p><strong>Bài viết lại Stream bằng vòng for</strong></p>
+<ol start="9">
+<li>Viết lại bằng vòng <code>for</code> (không dùng Stream):</li>
+</ol>
+<div class="code-wrap"><pre class="code"><code class="language-java">long readyCount = allBuses.stream().filter(b -&gt; b.getStatus() == BusStatus.READY).count();</code></pre></div>
+<ol start="10">
+<li>Viết lại bằng vòng <code>for</code> + <code>HashMap</code>:</li>
+</ol>
+<div class="code-wrap"><pre class="code"><code class="language-java">Map&lt;String, Long&gt; busTypeCounts = allBuses.stream()
+        .collect(Collectors.groupingBy(
+                b -&gt; b.getBusType() != null ? b.getBusType().getTypeName() : "Chưa phân loại",
+                Collectors.counting()));</code></pre></div>
+<p><strong>Bài tự trace</strong></p>
+<ol start="11">
+<li>Admin bấm <strong>Lưu</strong> trên form <strong>sửa</strong> xe #7 (đổi hãng xe). Hãy viết chuỗi: form gửi tới URL nào,
+phương thức gì → method controller nào (kèm annotation) → service method nào → kết quả trên màn
+hình nếu thành công, và nếu service ném exception.</li>
+</ol>
+<p><strong>Câu đọc code</strong></p>
+<ol start="12">
+<li>Đoạn sau ở <code>trip-create-form.html:704-716</code> làm gì? Nếu xóa dòng <code>e.preventDefault();</code> trong
+nhánh <code>if (!validateNoDriverConflict())</code> thì chuyện gì xảy ra — dữ liệu sai có lọt vào DB không?</li>
+</ol>
+<div class="code-wrap"><pre class="code"><code class="language-javascript">document.getElementById('createTripForm').addEventListener('submit', function (e) {
+    if (!this.checkValidity()) { e.preventDefault(); this.reportValidity(); return; }
+    if (!validateNoDriverConflict()) {
+        e.preventDefault();
+        ...
+    }
+});</code></pre></div>
+<hr>
+<details><summary>Đáp án</summary>
+
+<ol>
+<li><strong>Spring</strong> (IoC Container). Lombok <code>@RequiredArgsConstructor</code> sinh constructor nhận
+<code>BusService</code>; lúc khởi động Spring lấy bean <code>BusService</code> trong kho truyền vào.</li>
+<li>Chuỗi thường là <strong>tên view</strong> → Thymeleaf render <code>tpl/admin/bus/bus-list.html</code> ngay trong request
+này. <code>redirect:</code> bảo trình duyệt <strong>gửi request GET mới</strong> tới <code>/admin/buses</code> (mẫu PRG).</li>
+<li><code>@PathVariable</code> lấy giá trị <strong>nằm trong đường dẫn</strong>: <code>/admin/buses/edit/7</code> → <code>id = 7</code>.
+<code>@RequestParam</code> lấy <strong>tham số sau dấu <code>?</code></strong> hoặc ô form: <code>/admin/trip-management/trips/filter?status=ACTIVE</code>
+→ <code>status = &quot;ACTIVE&quot;</code>.</li>
+<li>Spring Data JPA tự sinh một class cài đặt (proxy) lúc khởi động, dựa trên tên method và <code>@Query</code>.</li>
+<li>Qua <strong>đúng một</strong> lần chuyển trang: đặt ở request POST, đọc được ở request GET ngay sau redirect,
+rồi mất.</li>
+<li><code>o.date()</code> — <code>record</code> sinh method đọc <strong>không có chữ <code>get</code></strong>.</li>
+<li>Để trình biên dịch buộc phủ đủ mọi giá trị enum. Thêm <code>DELAYED</code> thì switch không còn phủ đủ →
+<strong>lỗi biên dịch</strong> ở <code>deleteRefusalReason()</code> (và <code>editRefusalReason()</code>), người thêm buộc phải
+quyết định chính sách xóa/sửa cho trạng thái mới.</li>
+<li><code>ddl-auto=create-drop</code> + <code>DataInitializer</code> chạy <code>deleteAll()</code>: <strong>xóa sạch</strong> database
+<code>busmanagement</code> rồi nạp dữ liệu mẫu. Mọi dữ liệu lịch sử bị mất.</li>
+<li></li>
+</ol>
+<div class="code-wrap"><pre class="code"><code class="language-java">long readyCount = 0;
+for (Bus b : allBuses) {
+    if (b.getStatus() == BusStatus.READY) {
+        readyCount++;
+    }
+}</code></pre></div>
+<ol start="10">
+<li></li>
+</ol>
+<div class="code-wrap"><pre class="code"><code class="language-java">Map&lt;String, Long&gt; busTypeCounts = new HashMap&lt;&gt;();
+for (Bus b : allBuses) {
+    String key = (b.getBusType() != null) ? b.getBusType().getTypeName() : "Chưa phân loại";
+    busTypeCounts.put(key, busTypeCounts.getOrDefault(key, 0L) + 1);
+}</code></pre></div>
+<ol start="11">
+<li>Form ở <code>bus-form.html:21-23</code> có <code>bus.id = 7</code> nên <code>th:action</code> sinh <code>/admin/buses/edit/7</code>,
+<code>method=&quot;post&quot;</code> → <code>POST /admin/buses/edit/7</code> → <code>AdminBusController.updateBus()</code>
+(<code>@PostMapping(&quot;/edit/{id}&quot;)</code>, <code>@PathVariable Long id = 7</code>, <code>@ModelAttribute Bus bus</code> gom các ô
+form, loại xe đổi từ id sang <code>BusType</code> nhờ <code>DomainClassConverter</code>) → <code>busService.updateBus(7, bus)</code>
+(<code>AdminBusController.java:64</code>). Thành công: flash <code>success</code> &quot;Cập nhật thông tin xe thành công!&quot;
+→ <code>redirect:/admin/buses</code> → trang danh sách hiện khung xanh. Service ném exception (ví dụ
+odometer âm): khối <code>catch</code> đặt flash <code>error</code> &quot;Lỗi: ...&quot; → cũng redirect về danh sách, hiện khung
+đỏ (<code>AdminBusController.java:66-69</code>, <code>bus-list.html:28-31</code>).</li>
+<li>Khi bấm gửi form: nếu có ô bắt buộc chưa điền thì chặn gửi và hiện gợi ý của trình duyệt; nếu
+một người bị chọn ở hai vai trò (vd vừa tài xế chính vừa phụ xe) thì chặn gửi, tô đỏ và cuộn tới
+ô lỗi. Xóa <code>e.preventDefault()</code> thì form <strong>vẫn được gửi</strong> dù trùng người — nhưng dữ liệu sai
+<strong>không</strong> lọt vào DB, vì <code>TripService.validateStaffForTrip()</code> ở server kiểm &quot;Nhân sự trùng lặp&quot;
+và ném <code>IllegalArgumentException</code>; controller bắt lỗi và hiện flash <code>error</code>. Đây đúng là khác
+biệt giữa lớp &quot;không-mời&quot; (JS) và lớp &quot;chặn thật&quot; (service).</li>
+</ol>
+</details>
+
+<hr>
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li>Đọc Stream như dây chuyền: mỗi <code>filter</code> là một câu <code>if ... continue</code> đảo ngược; <code>Optional</code> +
+<code>orElseThrow</code> là mẫu &quot;không tìm thấy thì ném lỗi&quot; có mặt ở mọi service.</li>
+<li>Spring tạo và nối các object (bean) cho bạn; dự án dùng thống nhất <code>@RequiredArgsConstructor</code> +
+field <code>private final</code>. Repository là interface, Spring Data tự viết phần thân.</li>
+<li>Một request: DispatcherServlet → method controller (theo <code>@GetMapping</code>/<code>@PostMapping</code>) → service
+→ repository → Model → template. Sau POST luôn redirect kèm flash <code>success</code>/<code>error</code>/<code>warning</code>.</li>
+<li>Có một tầng JavaScript thật: <code>/*[[...]]*/</code> đưa dữ liệu vào JS, <code>fetch()</code> gọi REST lấy JSON. Mọi
+kiểm tra ở JS chỉ là lớp &quot;không-mời&quot;; lớp chặn thật luôn ở service.</li>
+<li>Nói đúng về cấu hình: Spring Security <strong>bật nhưng permit-all</strong>; profile <code>demo</code> <strong>xóa sạch</strong> DB;
+xóa danh mục đang dùng GET (điểm yếu cần thừa nhận).</li>
+</ol>
+<p><strong>Điểm đáng ngờ / chưa đủ căn cứ ghi lại khi viết bài:</strong></p>
+<ul>
+<li>Cơ chế cụ thể đổi chuỗi <code>datetime-local</code> thành <code>LocalDateTime</code> trên <code>Trip</code> (không có
+<code>@DateTimeFormat</code> ở entity) chưa được kiểm chứng — chỉ biết form chạy được (§4.3).</li>
+<li>Starter <code>validation</code>, <code>mail</code> và <code>thymeleaf-extras-springsecurity6</code> có trong <code>pom.xml</code> nhưng không
+được dùng (§1.2).</li>
+<li>Lý do trả <code>Map</code> phẳng ở <code>TripRestController</code> (§5.3) là suy luận, dựa trên javadoc của trường hợp
+tương tự ở <code>AdminTripController</code>.</li>
+</ul>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>
