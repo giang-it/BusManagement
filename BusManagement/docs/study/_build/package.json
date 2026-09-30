@@ -1,0 +1,9 @@
+{
+  "name": "busmanagement-study-build",
+  "private": true,
+  "description": "Builds docs/study/*.md lessons into self-contained HTML pages (Mermaid + code highlighting).",
+  "type": "module",
+  "dependencies": {
+    "marked": "12.0.2"
+  }
+}
