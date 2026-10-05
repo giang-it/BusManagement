@@ -1,0 +1,1939 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 03 Quản lý tuyến đường</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</a></li>
+<li><a href="#2-ban-do-tong-quan">§2. Bản đồ tổng quan</a></li>
+<li><a href="#3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</a></li>
+<li><a href="#4-luong-loi-xoa-tuyen-da-co-chuyen">§4. Luồng lỗi — xoá tuyến đã có chuyến</a></li>
+<li><a href="#5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</a></li>
+<li><a href="#6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</a></li>
+<li><a href="#7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</a></li>
+<li><a href="#8-vi-du-tinh-tay">§8. Ví dụ tính tay</a></li>
+<li><a href="#9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</a></li>
+<li><a href="#10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</a></li>
+<li><a href="#11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 03 · CHỨC NĂNG</span>
+      <h1></h1>
+    </header>
+<h1 id="bai-03-route-management-quan-ly-tuyen-duong">Bài 03 — Route Management (Quản lý tuyến đường)</h1>
+<aside class="callout"><p>Bài chức năng thứ ba, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN B), ngày 2026-10-01.
+Học sau Bài 00a, 00b, 01 và 02. Số dòng là ảnh chụp ngày viết — lệch thì grep lại.</p>
+<p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết
+ra · <span class="tag tag-guess">SUY LUẬN</span> suy luận của người viết (&quot;chưa kiểm chứng&quot; nếu chưa chạy thử).</p>
+<p>Viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>, <code>test/</code> =
+<code>src/test/java/giang/com/BusManagement/</code>, <code>tpl/</code> = <code>src/main/resources/templates/</code>.</p>
+<p>Khung giống Bài 01 và 02: 6 endpoint, form, flash. Bài này <strong>không giảng lại</strong> phần giống nhau mà
+tập trung vào bốn chỗ mới: form gửi lên một <strong>danh sách có thứ tự</strong> (<code>List&lt;Long&gt; stationIds</code>) do
+JavaScript dựng, lộ trình được <strong>xoá hết rồi dựng lại</strong> mỗi lần sửa (khoá kép + <code>flush()</code>), một
+lần lưu có thể trả về <strong>cảnh báo</strong> chứ không chỉ thành công/thất bại, và ba con số của tuyến được
+<strong>cả hệ thống đọc lại</strong> (odometer, bảo trì, chi phí, số tài xế).</p>
+</aside>
+<hr>
+<h2 id="1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</h2>
+<p><strong>Vấn đề thật của nhà xe.</strong> Tuyến là &quot;khuôn&quot; mà mọi chuyến xe chạy theo: đi từ đâu, qua những bến
+nào, dài bao nhiêu km, mất bao lâu, nên chạy loại xe gì. Chuyến xe không tự ghi các thông tin này
+mà trỏ về tuyến. Thiếu màn Quản lý tuyến thì:</p>
+<ul>
+<li>không mở được tuyến mới. Trước Phase 1, tuyến <strong>chỉ có</strong> nhờ dữ liệu seed (roadmap §5 Phase 1:
+<em>&quot;Route currently has zero CRUD UI — only seeded via <code>DataInitializer</code>&quot;</em>);</li>
+<li>không sửa được quãng đường gõ sai — mà quãng đường này là số km <strong>cộng vào đồng hồ công-tơ-mét
+(odometer)</strong> của xe mỗi khi một chuyến hoàn thành, nên gõ sai là kế hoạch bảo trì sai theo;</li>
+<li>không thêm được điểm dừng giữa đường (tuyến Hà Nội → Hải Phòng có ghé Hải Dương).</li>
+</ul>
+<p><strong>Một kịch bản cụ thể.</strong> Nhà xe mở tuyến Hà Nội → Hải Phòng có ghé Hải Dương. Anh admin vào
+Dashboard, bấm <strong>Quản Lý Tuyến Đường</strong>, rồi bấm <strong>Thêm Tuyến Mới</strong>. Form có sẵn <strong>hai dòng chọn
+bến</strong> (điểm đi, điểm đến). Anh gõ 120 km, 150 phút, chọn loại xe &quot;Limousine&quot;, chọn dòng 1 =
+&quot;Bến xe Mỹ Đình&quot;, dòng 2 = &quot;Bến xe Hải Dương&quot;, bấm <strong>Thêm Trạm Dừng</strong> để có dòng 3 = &quot;Bến xe Niệm
+Nghĩa&quot;, rồi bấm <strong>Lưu Tuyến</strong>. Hệ thống quay về danh sách, khung xanh <em>&quot;Thêm mới tuyến đường thành
+công!&quot;</em>, dòng mới hiện &quot;Bến xe Mỹ Đình → Bến xe Niệm Nghĩa&quot;, lộ trình <code>1. Mỹ Đình 2. Hải Dương 3. Niệm Nghĩa</code>.</p>
+<p>Chiều hôm đó anh phát hiện quãng đường thật là 105 km, bấm <strong>Sửa</strong>, đổi 120 → 105, lưu. Tuyến này
+đang có một chuyến <strong>đang chạy</strong> (<code>DEPARTED</code>), nên ngoài khung xanh còn có khung vàng: <em>&quot;Tuyến này
+đang có 1 chuyến trên đường (DEPARTED). Quãng đường mới (105 km, trước đây 120 km) sẽ được cộng vào
+odometer của xe khi các chuyến đó hoàn thành…&quot;</em>. Lưu vẫn diễn ra — hệ thống chỉ báo cho anh biết.</p>
+<p>Cuối cùng anh thử <strong>Xóa</strong> một tuyến cũ. Trình duyệt hỏi <em>&quot;Bạn có chắc chắn muốn xóa tuyến này?&quot;</em>,
+anh bấm OK, và nhận khung đỏ <em>&quot;Lỗi: Không thể xóa tuyến này vì đã có chuyến xe sử dụng (dữ liệu lịch
+sử vận hành và doanh thu phải được giữ nguyên)!&quot;</em>.</p>
+<hr>
+<h2 id="2-ban-do-tong-quan">§2. Bản đồ tổng quan</h2>
+<h3 id="2-1-cac-manh-ghep">2.1. Các mảnh ghép</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Loại</th>
+<th>File</th>
+<th>Trách nhiệm (1 dòng)</th>
+</tr>
+</thead><tbody><tr>
+<td>Template (lối vào)</td>
+<td><code>tpl/admin/dashboard.html:117</code></td>
+<td>Nút &quot;Quản Lý Tuyến Đường&quot; trên Dashboard</td>
+</tr>
+<tr>
+<td>Template</td>
+<td><code>tpl/admin/route/route-list.html</code></td>
+<td>Bảng tuyến: nhãn điểm đi → điểm đến, lộ trình đầy đủ, km, phút, loại xe; flash <code>success</code>/<code>error</code>/<code>warning</code></td>
+</tr>
+<tr>
+<td>Template + JS</td>
+<td><code>tpl/admin/route/route-form.html</code></td>
+<td>Form Thêm/Sửa; khối <code>&lt;script&gt;</code> <code>:111-169</code> là trình sửa nhiều điểm dừng (thêm/xoá dòng, đánh số, chặn trùng bến)</td>
+</tr>
+<tr>
+<td>Controller</td>
+<td><code>…/controller/admin/AdminRouteController.java</code></td>
+<td>6 endpoint <code>/admin/routes/*</code>; inject <code>RouteService</code> và <code>BusService</code> (chỉ để lấy danh sách loại xe)</td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>…/service/RouteService.java</code></td>
+<td>Tạo (tripwire id), sửa (chép field + cảnh báo km + dựng lại lộ trình), xoá (guard có chuyến), <code>validateRoute()</code> 4 luật</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>…/repository/RouteRepository.java</code></td>
+<td>Hai JPQL <code>JOIN FETCH</code> nạp tuyến kèm bến và loại xe</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>…/repository/RouteStationRepository.java</code></td>
+<td>Đọc lộ trình của một tuyến theo <code>stopOrder</code></td>
+</tr>
+<tr>
+<td>Repository (mượn)</td>
+<td><code>…/repository/TripRepository.java:240</code>, <code>:249</code></td>
+<td><code>existsByRouteId</code> (guard xoá), <code>countByRouteIdAndStatus</code> (cảnh báo km)</td>
+</tr>
+<tr>
+<td>Entity</td>
+<td><code>…/domain/Route.java</code></td>
+<td>Bảng <code>routes</code>: <code>distanceKm</code>, <code>estimatedDuration</code>, <code>suitableBusType</code>, collection <code>routeStations</code> + các hàm suy ra điểm đi/đến</td>
+</tr>
+<tr>
+<td>Entity</td>
+<td><code>…/domain/RouteStation.java</code>, <code>RouteStationId.java</code></td>
+<td>Bảng nối <code>route_stations</code>, khoá kép <code>(route_id, station_id)</code>, cột <code>stop_order</code></td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/service/RouteServiceDistanceWarningTest.java</code></td>
+<td>4 test cho cảnh báo km</td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/service/CreatePathIdTripwireTest.java:260</code>, <code>:300</code></td>
+<td>Tripwire tạo tuyến; sửa tuyến chép field và dựng lại lộ trình</td>
+</tr>
+<tr>
+<td>Seed</td>
+<td><code>…/config/DataInitializer.java:175-190</code>, <code>:237-248</code></td>
+<td>6 tuyến mẫu, mỗi tuyến 2 bến (profile <code>demo</code>)</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-2-bang-endpoint-du-moi-diem-bat-dau">2.2. Bảng endpoint — đủ mọi điểm bắt đầu</h3>
+<p>Không có <code>@Scheduled</code>, <code>fetch()</code>/REST hay <code>CommandLineRunner</code> riêng cho màn này. JavaScript của form
+<strong>không gọi server</strong> — nó chỉ sửa giao diện rồi để form gửi bình thường. Số dòng controller thuộc
+<code>…/controller/admin/AdminRouteController.java</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>HTTP</th>
+<th>URL</th>
+<th>Controller method</th>
+<th>Được gọi từ đâu</th>
+<th>Service chính</th>
+<th>Kết quả</th>
+</tr>
+</thead><tbody><tr>
+<td>GET</td>
+<td><code>/admin/routes</code></td>
+<td><code>listRoutes()</code> <code>:22-26</code></td>
+<td>nút <code>dashboard.html:117</code>; nút &quot;Hủy Bỏ&quot; <code>route-form.html:87</code>; mọi redirect thành công</td>
+<td><code>findAllWithStations()</code></td>
+<td>view <code>admin/route/route-list</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/routes/create</code></td>
+<td><code>showCreateForm()</code> <code>:28-34</code></td>
+<td>nút &quot;Thêm Tuyến Mới&quot; <code>route-list.html:20</code>; redirect khi tạo lỗi</td>
+<td>— (chỉ <code>addFormOptions</code>)</td>
+<td>view <code>route-form</code>, <code>new Route()</code>, <code>selectedStationIds</code> rỗng</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/routes/create</code></td>
+<td><code>createRoute()</code> <code>:41-53</code></td>
+<td>nút &quot;Lưu Tuyến&quot; khi <code>route.id == null</code> (<code>route-form.html:29</code>, <code>:88</code>)</td>
+<td><code>createRoute(route, stationIds)</code></td>
+<td>thành công: redirect <code>/admin/routes</code> + <code>success</code>; lỗi: redirect <code>/admin/routes/create</code> + <code>error</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/routes/edit/{id}</code></td>
+<td><code>showEditForm()</code> <code>:55-75</code></td>
+<td>nút &quot;Sửa&quot; <code>route-list.html:86-87</code>; redirect khi sửa lỗi</td>
+<td><code>findByIdWithStations(id)</code></td>
+<td>view <code>route-form</code> điền sẵn; không thấy: redirect <code>/admin/routes</code> + <code>error</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/routes/edit/{id}</code></td>
+<td><code>updateRoute()</code> <code>:77-95</code></td>
+<td>nút &quot;Lưu Tuyến&quot; khi <code>route.id != null</code></td>
+<td><code>updateRoute(id, form, stationIds)</code> → <code>String</code></td>
+<td>thành công: redirect <code>/admin/routes</code> + <code>success</code> (+ <code>warning</code> nếu có); lỗi: redirect <code>/admin/routes/edit/{id}</code> + <code>error</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/routes/delete/{id}</code></td>
+<td><code>deleteRoute()</code> <code>:97-106</code></td>
+<td>nút &quot;Xóa&quot; + <code>confirm()</code> <code>route-list.html:88-91</code></td>
+<td><code>deleteRoute(id)</code></td>
+<td>redirect <code>/admin/routes</code> + <code>success</code> hoặc <code>error</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="2-3-so-do-toan-canh">2.3. Sơ đồ toàn cảnh</h3>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    subgraph UI["Trình duyệt"]
+        L["route-list.html"]
+        F["route-form.html&lt;br/&gt;JS: thêm/xoá dòng bến, chặn trùng"]
+    end
+    subgraph C["AdminRouteController /admin/routes"]
+        C1["listRoutes / showCreateForm / showEditForm"]
+        C2["createRoute / updateRoute / deleteRoute"]
+    end
+    subgraph S["RouteService"]
+        V["validateRoute - 4 luật"]
+        S1["createRoute - tripwire id"]
+        S2["updateRoute - chép 3 field,&lt;br/&gt;cảnh báo km, dựng lại lộ trình"]
+        S3["deleteRoute - guard có chuyến"]
+        RB["rebuildStops - stopOrder 1..n"]
+    end
+    RR["RouteRepository&lt;br/&gt;JOIN FETCH"]
+    RSR["RouteStationRepository"]
+    TR["TripRepository&lt;br/&gt;existsByRouteId,&lt;br/&gt;countByRouteIdAndStatus"]
+    SR["StationRepository"]
+    BS["BusService.findAllBusTypes"]
+    DB[("MySQL&lt;br/&gt;routes, route_stations")]
+    L --&gt; C1
+    F --&gt; C2
+    C1 --&gt; RR
+    C1 --&gt; BS
+    C2 --&gt; S1 &amp; S2 &amp; S3
+    S1 --&gt; V
+    S2 --&gt; V
+    S1 --&gt; RB
+    S2 --&gt; RB
+    S2 --&gt; TR
+    S3 --&gt; TR
+    RB --&gt; SR
+    RB --&gt; RSR
+    S2 --&gt; RSR
+    RR --&gt; DB
+    RSR --&gt; DB
+    TP["TripService, Recommendation,&lt;br/&gt;What-if, Forecast, Dashboard"] -.-&gt;|đọc distanceKm, estimatedDuration,&lt;br/&gt;suitableBusType, nhãn tuyến| DB</pre></figure>
+<p>Quan hệ dữ liệu:</p>
+<figure class="diagram"><pre class="mermaid">erDiagram
+    ROUTES ||--o{ ROUTE_STATIONS : "gồm các điểm dừng"
+    STATIONS ||--o{ ROUTE_STATIONS : "có mặt trong"
+    BUS_TYPES |o--o{ ROUTES : "gợi ý cho"
+    ROUTES ||--o{ TRIPS : "được chạy bởi"
+    ROUTES {
+        bigint id PK
+        double distance_km
+        int estimated_duration "phút"
+        bigint suitable_bus_type_id "có thể NULL"
+    }
+    ROUTE_STATIONS {
+        bigint route_id PK
+        bigint station_id PK
+        int stop_order "1..n"
+    }</pre></figure>
+<h3 id="2-4-dieu-cot-loi-can-nho">2.4. Điều cốt lõi cần nhớ</h3>
+<ol>
+<li><strong>Tuyến không có tên.</strong> Nhãn &quot;điểm đi → điểm đến&quot; được suy ra lúc hiển thị từ bến có
+<code>stopOrder</code> nhỏ nhất và lớn nhất (<code>Route.java:100-141</code>). Lộ trình chỉ nằm ở bảng nối
+<code>route_stations</code>.</li>
+<li><strong>Thứ tự dòng trên form = thứ tự dừng.</strong> Trình duyệt gửi nhiều tham số <code>stationIds</code> theo thứ tự
+các dòng; Spring gom thành <code>List&lt;Long&gt;</code>; <code>rebuildStops()</code> đánh <code>stopOrder</code> 1..n theo đúng thứ tự
+đó (<code>RouteService.java:160-173</code>).</li>
+<li><strong>Sửa lộ trình = xoá hết rồi dựng lại</strong>, có <code>flush()</code> ở giữa — vì khoá chính của <code>RouteStation</code>
+là cặp <code>(routeId, stationId)</code> nên không &quot;sửa&quot; được bến của một điểm dừng, và <code>cascade = ALL</code> không
+kèm <code>orphanRemoval</code> nên bỏ phần tử khỏi danh sách không xoá được gì (roadmap §9:1233).</li>
+<li><strong>Bốn luật ở server</strong> (<code>validateRoute()</code> <code>:197-218</code>): ít nhất 2 bến, không trùng bến, km &gt; 0,
+phút &gt; 0. <strong>Một guard xoá</strong>: tuyến đã có chuyến thì không xoá được. <strong>Một cảnh báo</strong>: đổi km khi
+tuyến còn chuyến <code>DEPARTED</code>.</li>
+<li><strong>Ba con số của tuyến là đầu vào của nhiều chức năng khác</strong>: <code>distanceKm</code> được đọc <strong>lúc chạy</strong>
+(odometer khi hoàn thành chuyến, kiểm tra bảo trì, chi phí nhiên liệu); <code>estimatedDuration</code> chỉ
+được đọc <strong>lúc tạo chuyến</strong> (giờ đến dự kiến, rồi từ đó ra số tài xế); <code>suitableBusType</code> chỉ là
+<strong>gợi ý</strong> xếp xe.</li>
+</ol>
+<hr>
+<h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
+<p><strong>Chọn luồng nào và vì sao.</strong></p>
+<ul>
+<li><strong>Luồng A — Sửa tuyến</strong>: luồng giàu cơ chế nhất của chức năng — bind danh sách <code>stationIds</code>,
+<code>DomainClassConverter</code> đổi id loại xe thành entity, <code>validateRoute()</code>, cảnh báo km, xoá-<code>flush()</code>-
+dựng lại lộ trình, và flash <code>warning</code>. Hiểu luồng này là hiểu gần hết chức năng.</li>
+<li><strong>Luồng B — Tạo tuyến</strong>: chọn để giảng <strong>phần JavaScript</strong> (dòng bến được dựng ra sao, thứ tự đi
+lên server thế nào) và thứ tự ghi DB khi tuyến chưa có id.</li>
+</ul>
+<p>Luồng xoá dùng làm luồng lỗi ở §4.</p>
+<h3 id="3-1-luong-a-sua-tuyen-ca-co-canh-bao">3.1. Luồng A — Sửa tuyến (ca có cảnh báo)</h3>
+<p>Tình huống: tuyến 1 đang là 120 km, lộ trình bến 1 → bến 2, có 2 chuyến <code>DEPARTED</code>. Admin đổi
+thành 500 km và lộ trình bến 1 → bến 3 → bến 2. (Phần đổi km là ca đã chạy thật khi kiểm chứng Group
+C(c): <em>&quot;Tuyến 1 (2 chuyến <code>DEPARTED</code>) 120 → 500 km: success + warning&quot;</em> — <code>current_bugs_found.md</code>,
+khối &quot;Group C(a) và C(c) ĐÃ SỬA&quot;.)</p>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant JS as JavaScript route-form
+    participant C as AdminRouteController
+    participant P as Proxy Transactional
+    participant S as RouteService
+    participant R as Các Repository
+    participant DB as MySQL
+    A-&gt;&gt;C: GET /admin/routes/edit/1
+    C-&gt;&gt;R: findByIdWithStations(1) - JOIN FETCH
+    R-&gt;&gt;DB: SELECT routes + route_stations + stations + bus_types
+    C-&gt;&gt;C: lấy danh sách id bến theo stopOrder
+    C--&gt;&gt;A: view route-form, 2 dòng bến điền sẵn
+    A-&gt;&gt;JS: đổi km, bấm Thêm Trạm Dừng, chọn bến, bấm Lưu Tuyến
+    JS-&gt;&gt;JS: chặn trùng bến + checkValidity
+    JS-&gt;&gt;C: POST /admin/routes/edit/1 (distanceKm, estimatedDuration, suitableBusType, stationIds x3)
+    Note over C: Spring dựng new Route() từ form&lt;br/&gt;suitableBusType: id thành BusType&lt;br/&gt;stationIds thành danh sách Long
+    C-&gt;&gt;P: updateRoute(1, form, [1, 3, 2])
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;R: routeRepository.findById(1)
+    S-&gt;&gt;S: validateRoute - 4 luật
+    S-&gt;&gt;R: countByRouteIdAndStatus(1, DEPARTED)
+    R--&gt;&gt;S: 2 nên tạo câu cảnh báo
+    S-&gt;&gt;S: chép distanceKm, estimatedDuration, suitableBusType
+    S-&gt;&gt;R: xoá các RouteStation cũ rồi flush
+    R-&gt;&gt;DB: UPDATE routes, DELETE route_stations x2
+    loop mỗi id bến theo thứ tự
+        S-&gt;&gt;R: findById bến, save RouteStation stopOrder 1, 2, 3
+    end
+    S--&gt;&gt;P: trả câu cảnh báo
+    P-&gt;&gt;DB: commit - INSERT route_stations x3
+    P--&gt;&gt;C: String cảnh báo
+    C--&gt;&gt;A: flash success + warning, redirect:/admin/routes</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Trình duyệt</td>
+<td><code>route-list.html:86-87</code></td>
+<td>thẻ <code>&lt;a&gt;</code> &quot;Sửa&quot;</td>
+<td>—</td>
+<td><code>th:href=&quot;@{/admin/routes/edit/{id}(id=${route.id})}&quot;</code> ⇒ <code>/admin/routes/edit/1</code></td>
+<td>GET</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Spring</td>
+<td>—</td>
+<td>DispatcherServlet</td>
+<td>URL</td>
+<td>khớp <code>@GetMapping(&quot;/edit/{id}&quot;)</code>, <code>id = 1</code></td>
+<td><code>showEditForm(1, model, ra)</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Controller → Service</td>
+<td><code>AdminRouteController.java:58-59</code></td>
+<td><code>routeService.findByIdWithStations(1)</code></td>
+<td>1</td>
+<td>service chỉ chuyển tiếp (<code>RouteService.java:46-48</code>); <strong>không</strong> có <code>@Transactional</code> — chạy trong phiên Hibernate do OSIV mở (Bài 00b §4.5)</td>
+<td><code>Optional&lt;Route&gt;</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Repository → DB</td>
+<td><code>RouteRepository.java:28-33</code></td>
+<td>JPQL <code>LEFT JOIN FETCH r.routeStations rs LEFT JOIN FETCH rs.station LEFT JOIN FETCH r.suitableBusType WHERE r.id = :id</code></td>
+<td>1</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT r.*, rs.*, s.*, bt.* FROM routes r LEFT JOIN route_stations rs ON rs.route_id = r.id LEFT JOIN stations s ON s.id = rs.station_id LEFT JOIN bus_types bt ON bt.id = r.suitable_bus_type_id WHERE r.id = 1</code> — 2 dòng kết quả (một dòng mỗi bến), Hibernate gộp thành <strong>một</strong> <code>Route</code> có 2 <code>RouteStation</code></td>
+<td><code>Route</code> đã nạp đủ</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Controller</td>
+<td><code>:59</code></td>
+<td><code>orElseThrow(...)</code></td>
+<td><code>Optional</code></td>
+<td>rỗng ⇒ <code>RuntimeException(&quot;Không tìm thấy tuyến với ID: 1&quot;)</code> ⇒ <code>catch</code> <code>:71-73</code> ⇒ flash <code>error</code> <strong>không</strong> có tiền tố &quot;Lỗi: &quot;, redirect <code>/admin/routes</code></td>
+<td><code>Route</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Controller</td>
+<td><code>:63-65</code></td>
+<td><code>getOrderedRouteStations().stream().map(rs -&gt; rs.getStation().getId()).toList()</code></td>
+<td><code>Route</code></td>
+<td>sắp lộ trình theo <code>stopOrder</code> (<code>Route.java:87-94</code>), lấy id bến</td>
+<td><code>[1, 2]</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Controller</td>
+<td><code>:67-70</code>, <code>:108-111</code></td>
+<td><code>model.addAttribute</code></td>
+<td>—</td>
+<td>key <code>route</code>, <code>selectedStationIds</code>; <code>addFormOptions</code> thêm <code>stations</code> (<code>stationRepository.findAll()</code>) và <code>busTypes</code> (<code>BusService.findAllBusTypes()</code> <code>BusService.java:50-52</code>)</td>
+<td><code>&quot;admin/route/route-form&quot;</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>View</td>
+<td><code>route-form.html:20</code>, <code>:29</code></td>
+<td>tiêu đề + <code>th:action</code></td>
+<td><code>route.id = 1</code></td>
+<td>tiêu đề &quot;Sửa Tuyến Đường&quot;; form trỏ về <code>/admin/routes/edit/1</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>View</td>
+<td><code>:36-37</code>, <code>:42-43</code>, <code>:48-54</code></td>
+<td><code>name=</code> + <code>th:value</code> / <code>th:selected</code></td>
+<td><code>route</code></td>
+<td>điền km, phút; option loại xe được <code>selected</code> khi <code>route.suitableBusType.id == type.id</code>. Form này <strong>không</strong> dùng <code>th:object</code>/<code>th:field</code> như form bến — tự ghi <code>name</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>View</td>
+<td><code>:74-83</code></td>
+<td><code>th:each=&quot;stationId : ${selectedStationIds}&quot;</code></td>
+<td><code>[1, 2]</code></td>
+<td>mỗi id sinh <strong>một dòng</strong> <code>&lt;select name=&quot;stationIds&quot;&gt;</code>, option có <code>th:selected=&quot;${s.id == stationId}&quot;</code></td>
+<td>2 dòng</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>JavaScript</td>
+<td><code>:144-147</code></td>
+<td>vòng <code>while</code> + <code>refresh()</code></td>
+<td>DOM</td>
+<td>đã có 2 dòng ≥ <code>MIN_STOPS = 2</code> nên không thêm; <code>refresh()</code> <code>:119-127</code> ghi số 1, 2 vào ô <code>.stop-index</code> và <strong>khoá nút xoá</strong> vì chỉ còn 2 dòng</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>JavaScript</td>
+<td><code>:134</code>, <code>:129-132</code></td>
+<td><code>addRow()</code> khi bấm &quot;Thêm Trạm Dừng&quot;</td>
+<td>—</td>
+<td><code>template.content.cloneNode(true)</code> nhân bản khối <code>&lt;template id=&quot;stopRowTemplate&quot;&gt;</code> (<code>:99-109</code>) và <strong>gắn vào cuối</strong> <code>#stopList</code>; <code>refresh()</code> đánh số 1, 2, 3 và mở khoá nút xoá</td>
+<td>3 dòng</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Admin</td>
+<td>—</td>
+<td>thao tác</td>
+<td>—</td>
+<td>dòng 2 chọn bến 3, dòng 3 chọn bến 2 (không có nút kéo/đổi chỗ — muốn chèn giữa phải chọn lại giá trị các dòng)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>14</td>
+<td>JavaScript</td>
+<td><code>:151-159</code></td>
+<td>listener <code>submit</code> thứ nhất</td>
+<td>các <code>&lt;select&gt;</code></td>
+<td>gom giá trị khác rỗng, so <code>new Set(values).size</code> với <code>values.length</code>; trùng ⇒ <code>preventDefault()</code> + <code>alert(...)</code>. Ở đây không trùng</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>15</td>
+<td>JavaScript</td>
+<td><code>:161-167</code></td>
+<td>listener <code>submit</code> thứ hai</td>
+<td>form</td>
+<td><code>checkValidity()</code>: các ô <code>required</code> (km, phút, mọi <code>&lt;select&gt;</code> bến) và <code>min</code> (<code>0.1</code>, <code>1</code>) phải đạt; sai ⇒ chặn + tô đỏ</td>
+<td>POST</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Trình duyệt</td>
+<td>—</td>
+<td>gửi form</td>
+<td>—</td>
+<td>body: <code>distanceKm=500&amp;estimatedDuration=120&amp;suitableBusType=1&amp;stationIds=1&amp;stationIds=3&amp;stationIds=2</code> — <strong>cùng một tên lặp lại ba lần, theo thứ tự trong trang</strong></td>
+<td>POST</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Spring</td>
+<td><code>AdminRouteController.java:77-80</code></td>
+<td>bind tham số</td>
+<td>body</td>
+<td><code>@PathVariable id = 1</code>; <code>@ModelAttribute Route</code>: <code>new Route()</code> rồi <code>setDistanceKm(500.0)</code>, <code>setEstimatedDuration(120)</code>; <code>suitableBusType=1</code> được <code>DomainClassConverter</code> đổi thành <code>BusType</code> id 1 (Bài 00a §4); chuỗi rỗng <code>&quot;&quot;</code> ⇒ <code>null</code>. <code>id</code> và <code>routeStations</code> của object form = <code>null</code>. <code>@RequestParam(required = false) List&lt;Long&gt; stationIds</code> = <code>[1, 3, 2]</code> — <strong>thứ tự được giữ</strong></td>
+<td>object rời + danh sách</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>18</td>
+<td>Controller</td>
+<td><code>:85</code></td>
+<td><code>routeService.updateRoute(id, route, stationIds)</code></td>
+<td>—</td>
+<td>truyền id riêng, <strong>không</strong> <code>route.setId(id)</code> (comment <code>:83-84</code>)</td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>19</td>
+<td>Proxy</td>
+<td><code>RouteService.java:115</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td><strong>mở transaction</strong></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>20</td>
+<td>Service → DB</td>
+<td><code>:117-118</code></td>
+<td><code>routeRepository.findById(1)</code></td>
+<td>1</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT id, distance_km, estimated_duration, suitable_bus_type_id FROM routes WHERE id = 1</code>; không thấy ⇒ <code>RuntimeException</code></td>
+<td><code>existing</code> (managed)</td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>21</td>
+<td>Service</td>
+<td><code>:120</code>, <code>:197-218</code></td>
+<td><code>validateRoute(form, stationIds)</code></td>
+<td>form, <code>[1,3,2]</code></td>
+<td>(1) <code>null</code> hoặc <code>&lt; 2</code> phần tử ⇒ lỗi; (2) <code>HashSet</code> nhỏ hơn danh sách ⇒ trùng bến ⇒ lỗi; (3) km <code>null</code> hoặc <code>&lt;= 0</code>; (4) phút <code>null</code> hoặc <code>&lt;= 0</code>. Tất cả là <code>IllegalArgumentException</code>. Ở đây qua hết</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>22</td>
+<td>Service</td>
+<td><code>:124</code></td>
+<td><code>Objects.equals(existing.getDistanceKm(), form.getDistanceKm())</code></td>
+<td>120.0 vs 500.0</td>
+<td><strong>đọc km cũ trước khi chép</strong> (comment <code>:122</code>); khác nhau ⇒ đi tiếp kiểm chuyến đang chạy</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>23</td>
+<td>Service → DB</td>
+<td><code>:125</code>, <code>TripRepository.java:249</code></td>
+<td><code>countByRouteIdAndStatus(1, DEPARTED)</code></td>
+<td>—</td>
+<td>derived query; <code>Trip</code> có <code>@SQLRestriction(&quot;is_deleted = false&quot;)</code> (<code>Trip.java:21</code>) nên Hibernate tự thêm điều kiện. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) FROM trips t WHERE t.route_id = 1 AND t.status = &#39;DEPARTED&#39; AND t.is_deleted = false</code></td>
+<td><code>2</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>24</td>
+<td>Service</td>
+<td><code>:126-132</code>, <code>:152-157</code></td>
+<td><code>String.format(...)</code> + <code>formatKm()</code></td>
+<td>2, 500.0, 120.0</td>
+<td>tạo câu cảnh báo; <code>formatKm</code> bỏ đuôi <code>.0</code> (500.0 ⇒ &quot;500&quot;)</td>
+<td><code>warning</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>25</td>
+<td>Service</td>
+<td><code>:135-137</code></td>
+<td>chép field</td>
+<td>form</td>
+<td><code>setDistanceKm</code>, <code>setEstimatedDuration</code>, <code>setSuitableBusType</code> — chép <strong>nguyên</strong>, kể cả <code>null</code> của loại xe (&quot;Không giới hạn&quot; là ý định hợp lệ, javadoc <code>:94-97</code>)</td>
+<td><code>existing</code> bị &quot;bẩn&quot;</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>26</td>
+<td>Service</td>
+<td><code>:142</code></td>
+<td><code>existing.setRouteStations(null)</code></td>
+<td>—</td>
+<td>buông tham chiếu tới collection cũ (comment <code>:139-141</code>)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>27</td>
+<td>Service → DB</td>
+<td><code>:143</code>, <code>RouteStationRepository.java:14</code></td>
+<td><code>findByRouteIdOrderByStopOrderAsc(1)</code></td>
+<td>1</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT route_id, station_id, stop_order FROM route_stations WHERE route_id = 1 ORDER BY stop_order</code></td>
+<td>2 <code>RouteStation</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>28</td>
+<td>Service</td>
+<td><code>:143</code></td>
+<td><code>deleteAll(...)</code></td>
+<td>2 entity</td>
+<td><strong>đánh dấu</strong> xoá trong persistence context, chưa chạy SQL</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>29</td>
+<td>Service → DB</td>
+<td><code>:144</code></td>
+<td><code>routeStationRepository.flush()</code></td>
+<td>—</td>
+<td>ép Hibernate ghi <strong>mọi</strong> thay đổi đang chờ ngay bây giờ: <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>UPDATE routes SET distance_km = 500, estimated_duration = 120, suitable_bus_type_id = 1 WHERE id = 1</code> (dirty checking từ bước 25) và <code>DELETE FROM route_stations WHERE route_id = 1 AND station_id = ?</code> × 2. Transaction <strong>vẫn mở</strong> — chưa commit</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>30</td>
+<td>Service</td>
+<td><code>:146</code>, <code>:160-173</code></td>
+<td><code>rebuildStops(existing, [1, 3, 2])</code></td>
+<td>—</td>
+<td>vòng <code>for</code>, biến <code>stopOrder</code> bắt đầu 1</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>31</td>
+<td>Service → DB</td>
+<td><code>:163-164</code></td>
+<td><code>stationRepository.findById(stationId)</code></td>
+<td>1, rồi 3, rồi 2</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT … FROM stations WHERE id = ?</code> (bỏ qua nếu bến đã có trong persistence context); không thấy ⇒ <code>RuntimeException(&quot;Không tìm thấy bến xe #…&quot;)</code></td>
+<td><code>Station</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>32</td>
+<td>Service</td>
+<td><code>:166-171</code></td>
+<td>dựng <code>RouteStation</code></td>
+<td>—</td>
+<td><code>id = new RouteStationId(1, stationId)</code>, <code>route</code>, <code>station</code>, <code>stopOrder = 1, 2, 3</code> rồi <code>routeStationRepository.save(rs)</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>33</td>
+<td>Spring Data</td>
+<td>—</td>
+<td><code>save()</code> thấy <code>id</code> <strong>khác null</strong></td>
+<td><code>rs</code></td>
+<td>coi là &quot;đã có&quot; ⇒ gọi <code>merge</code> chứ không <code>persist</code> (Bài 00b §3.1). <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> Hibernate chạy <code>SELECT … FROM route_stations WHERE route_id = 1 AND station_id = ?</code>, không thấy dòng nào ⇒ lên lịch <code>INSERT</code></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>34</td>
+<td>Service</td>
+<td><code>:148</code></td>
+<td><code>return warning</code></td>
+<td>—</td>
+<td>—</td>
+<td><code>String</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>35</td>
+<td>Proxy</td>
+<td>—</td>
+<td>commit</td>
+<td>—</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>INSERT INTO route_stations (route_id, station_id, stop_order) VALUES (1,1,1), (1,3,2), (1,2,3)</code> — <strong>đóng transaction</strong></td>
+<td><code>warning</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>36</td>
+<td>Controller</td>
+<td><code>:86-89</code></td>
+<td>flash</td>
+<td><code>warning</code></td>
+<td><code>success</code> = &quot;Cập nhật tuyến đường thành công!&quot;; <code>warning != null</code> ⇒ thêm flash <code>warning</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>37</td>
+<td>Controller</td>
+<td><code>:94</code></td>
+<td><code>return &quot;redirect:/admin/routes&quot;</code></td>
+<td>—</td>
+<td>PRG (Bài 00a §4)</td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>38</td>
+<td>Controller → Repository → DB</td>
+<td><code>:22-26</code>, <code>RouteRepository.java:22-26</code></td>
+<td><code>listRoutes()</code> → <code>findAllWithStations()</code></td>
+<td>—</td>
+<td><strong>một</strong> câu JPQL <code>SELECT DISTINCT r … LEFT JOIN FETCH</code> nạp mọi tuyến kèm bến và loại xe</td>
+<td><code>List&lt;Route&gt;</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>39</td>
+<td>View</td>
+<td><code>route-list.html:25-36</code>, <code>:59-84</code></td>
+<td>khung flash + bảng</td>
+<td><code>success</code>, <code>warning</code>, <code>routes</code></td>
+<td>khung xanh và <strong>khung vàng</strong> (<code>:33-36</code> — khung này thêm cùng bản sửa Group C(c)); dòng tuyến 1 hiện &quot;… → …&quot; qua <code>getDeparturePointDisplay()</code>/<code>getDestinationPointDisplay()</code>, lộ trình <code>1. … 2. … 3. …</code> qua <code>getOrderedRouteStations()</code>, <code>500 km</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Ranh giới transaction.</strong> GET form sửa: <strong>không</strong> có transaction của service (chỉ có phiên do
+OSIV). POST sửa: đúng <strong>một</strong> transaction, bao trọn <code>updateRoute()</code> (bước 19 → 35). Lần <code>flush()</code> ở
+bước 29 <strong>không</strong> phải commit: nếu bước 31 ném lỗi (bến không tồn tại), toàn bộ — kể cả <code>UPDATE routes</code> và hai <code>DELETE</code> đã chạy ở bước 29 — bị <strong>rollback</strong>, tuyến giữ nguyên như trước <span class="tag tag-spring">SPRING</span>.</p>
+<p><strong>(c) Code then chốt</strong></p>
+<p><code>…/service/RouteService.java:115-149</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Transactional                                                    // cả hàm là một giao dịch
+public String updateRoute(Long id, Route form, List&lt;Long&gt; stationIds) {
+    Route existing = routeRepository.findById(id)                 // bản ghi thật, theo id trên URL
+            .orElseThrow(() -&gt; new RuntimeException("Không tìm thấy tuyến với ID: " + id));
+
+    validateRoute(form, stationIds);                              // 4 luật; sai thì ném, chưa ghi gì
+
+    String warning = null;                                        // null = không có gì cần báo
+    if (!Objects.equals(existing.getDistanceKm(), form.getDistanceKm())) {    // km THẬT SỰ đổi?
+        long departedTrips = tripRepository.countByRouteIdAndStatus(id, TripStatus.DEPARTED);
+        if (departedTrips &gt; 0) {                                  // chỉ DEPARTED mới bị ảnh hưởng
+            warning = String.format("Tuyến này đang có %d chuyến trên đường (DEPARTED). ...",
+                    departedTrips, formatKm(form.getDistanceKm()), formatKm(existing.getDistanceKm()));
+        }
+    }
+
+    existing.setDistanceKm(form.getDistanceKm());                 // chép đúng 3 field form có
+    existing.setEstimatedDuration(form.getEstimatedDuration());
+    existing.setSuitableBusType(form.getSuitableBusType());       // null là hợp lệ: "Không giới hạn"
+
+    existing.setRouteStations(null);                              // buông collection cũ
+    routeStationRepository.deleteAll(                             // xoá TƯỜNG MINH các điểm dừng cũ
+            routeStationRepository.findByRouteIdOrderByStopOrderAsc(id));
+    routeStationRepository.flush();                               // ghi DELETE ngay, trước khi INSERT lại
+
+    rebuildStops(existing, stationIds);                           // dựng lại, stopOrder 1..n
+    return warning;                                               // controller biến thành flash "warning"
+}</code></pre></div>
+<p><code>Objects.equals(a, b)</code> — so sánh &quot;an toàn với null&quot;: hai bên đều <code>null</code> ⇒ <code>true</code>; một bên <code>null</code> ⇒
+<code>false</code>; còn lại gọi <code>a.equals(b)</code>. Dùng nó thay <code>a.equals(b)</code> vì <code>distanceKm</code> là <code>Double</code> (có thể
+<code>null</code>), gọi <code>.equals</code> trên <code>null</code> sẽ ném <code>NullPointerException</code>.</p>
+<p><code>…/service/RouteService.java:160-173</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">private void rebuildStops(Route route, List&lt;Long&gt; stationIds) {
+    int stopOrder = 1;                                            // điểm dừng đầu tiên = 1
+    for (Long stationId : stationIds) {                           // đi đúng thứ tự form gửi lên
+        Station station = stationRepository.findById(stationId)   // bến phải tồn tại thật
+                .orElseThrow(() -&gt; new RuntimeException("Không tìm thấy bến xe #" + stationId));
+
+        RouteStation rs = new RouteStation();
+        rs.setId(new RouteStationId(route.getId(), station.getId()));  // khoá kép tự dựng
+        rs.setRoute(route);                                       // @MapsId("routeId")
+        rs.setStation(station);                                   // @MapsId("stationId")
+        rs.setStopOrder(stopOrder++);                             // gán rồi mới tăng: 1, 2, 3...
+        routeStationRepository.save(rs);
+    }
+}</code></pre></div>
+<p>Phía controller, đoạn Stream ở bước 6 — <code>AdminRouteController.java:63-65</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;Long&gt; selectedStationIds = route.getOrderedRouteStations().stream()  // lộ trình đã sắp
+        .map(rs -&gt; rs.getStation().getId())                               // mỗi điểm dừng → id bến
+        .toList();                                                        // gom thành List</code></pre></div>
+<p>Viết lại bằng vòng <code>for</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;Long&gt; selectedStationIds = new ArrayList&lt;&gt;();
+for (RouteStation rs : route.getOrderedRouteStations()) {
+    selectedStationIds.add(rs.getStation().getId());
+}</code></pre></div>
+<p><strong>Vì sao cần <code>flush()</code> ở giữa.</strong> Lý do đã được duyệt (roadmap §9:1233): <em>&quot;then <code>flush()</code>es, so the
+re-inserted rows cannot collide with the old ones inside the same transaction&quot;</em>. Cụ thể <span class="tag tag-guess">SUY LUẬN —
+chưa kiểm chứng bằng cách bỏ dòng này</span>: nếu lộ trình mới <strong>giữ lại</strong> một bến cũ (ở đây bến 1 và bến
+2), dòng mới có <strong>đúng khoá</strong> <code>(1, 1)</code> như dòng vừa xoá. Không <code>flush()</code> thì dòng cũ mới chỉ được
+&quot;đánh dấu xoá&quot; trong bộ nhớ khi <code>save()</code> dòng mới chạy — Hibernate hoặc từ chối merge một entity đang
+bị xoá, hoặc (khi tới lúc ghi) chạy <code>INSERT</code> trước <code>DELETE</code> theo thứ tự ghi mặc định của nó và đụng
+khoá chính. Cả hai test sửa tuyến hiện có đều đi đúng ca &quot;giữ lại bến cũ&quot; (§9.4), nên đường này đang
+được test giữ.</p>
+<h3 id="3-2-luong-b-tao-tuyen-3-ben">3.2. Luồng B — Tạo tuyến 3 bến</h3>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant JS as JavaScript route-form
+    participant C as AdminRouteController
+    participant P as Proxy Transactional
+    participant S as RouteService
+    participant R as Các Repository
+    participant DB as MySQL
+    A-&gt;&gt;C: GET /admin/routes/create
+    C--&gt;&gt;A: route-form, selectedStationIds rỗng
+    JS-&gt;&gt;JS: while dưới 2 dòng thì addRow - dựng sẵn 2 dòng trống
+    A-&gt;&gt;JS: chọn 2 bến, bấm Thêm Trạm Dừng, chọn bến thứ 3
+    JS-&gt;&gt;JS: refresh - đánh số 1, 2, 3
+    A-&gt;&gt;JS: bấm Lưu Tuyến
+    JS-&gt;&gt;C: POST /admin/routes/create (stationIds = 1, 7, 2)
+    C-&gt;&gt;P: createRoute(route, [1, 7, 2])
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;S: id khác null? - không, đi tiếp
+    S-&gt;&gt;S: validateRoute
+    S-&gt;&gt;R: routeRepository.save(route)
+    R-&gt;&gt;DB: INSERT routes ngay - IDENTITY cần id
+    DB--&gt;&gt;S: route.id = 11
+    loop 3 bến
+        S-&gt;&gt;R: findById bến, save RouteStation (11, bến, stopOrder)
+    end
+    P-&gt;&gt;DB: commit - INSERT route_stations x3
+    C--&gt;&gt;A: flash success, redirect:/admin/routes</pre></figure>
+<p><strong>(b) Bảng từng bước</strong> — chỉ ghi phần <strong>khác</strong> luồng A</p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Controller</td>
+<td><code>AdminRouteController.java:28-34</code></td>
+<td><code>showCreateForm()</code></td>
+<td>—</td>
+<td><code>new Route()</code>, <code>selectedStationIds = List.of()</code> (rỗng), <code>addFormOptions</code></td>
+<td><code>route-form</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>View</td>
+<td><code>route-form.html:74</code></td>
+<td><code>th:each</code> trên danh sách rỗng</td>
+<td>—</td>
+<td><strong>không</strong> sinh dòng bến nào; nhưng khối <code>&lt;template&gt;</code> <code>:99-109</code> đã được Thymeleaf điền sẵn toàn bộ bến (<code>:104</code>)</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>JavaScript</td>
+<td><code>:112-113</code></td>
+<td>hàm tự chạy <code>(() =&gt; { &#39;use strict&#39;; … })()</code></td>
+<td>—</td>
+<td>bọc mọi biến trong một hàm để không rò ra toàn trang; chạy ngay khi trình duyệt đọc tới thẻ <code>&lt;script&gt;</code> ở cuối <code>&lt;body&gt;</code> (DOM phía trên đã có)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>JavaScript</td>
+<td><code>:144-147</code></td>
+<td><code>while (… .length &lt; MIN_STOPS) addRow()</code></td>
+<td>0 dòng</td>
+<td>gọi <code>addRow()</code> hai lần ⇒ hai dòng trống &quot;điểm đi&quot;, &quot;điểm đến&quot;; nút xoá bị khoá</td>
+<td>2 dòng</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>JavaScript</td>
+<td><code>:136-141</code></td>
+<td>listener <code>click</code> trên <code>#stopList</code> (uỷ quyền sự kiện)</td>
+<td>click</td>
+<td><code>event.target.closest(&#39;.remove-stop&#39;)</code> tìm nút xoá gần nhất; nút bị khoá thì bỏ qua; không thì xoá cả dòng rồi <code>refresh()</code>. Một listener đặt trên khung cha xử lý được cả những dòng <strong>thêm sau</strong></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Trình duyệt</td>
+<td>—</td>
+<td>gửi form</td>
+<td>—</td>
+<td><code>stationIds=1&amp;stationIds=7&amp;stationIds=2</code> (theo thứ tự dòng); <strong>không</strong> có <code>id</code> vì form không có ô ẩn nào chứa id</td>
+<td>POST</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Spring</td>
+<td><code>AdminRouteController.java:41-44</code></td>
+<td>bind</td>
+<td>—</td>
+<td><code>new Route()</code>, <code>id = null</code>; <code>stationIds = [1, 7, 2]</code></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Controller</td>
+<td><code>:46</code></td>
+<td><code>routeService.createRoute(route, stationIds)</code></td>
+<td>—</td>
+<td>—</td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Proxy</td>
+<td><code>RouteService.java:71</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td>mở transaction</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service</td>
+<td><code>:73-77</code></td>
+<td>tripwire</td>
+<td><code>route.id</code></td>
+<td>khác <code>null</code> ⇒ <code>IllegalArgumentException(&quot;createRoute() chỉ dùng để tạo tuyến mới (id phải trống). Tuyến #… đã tồn tại — muốn sửa thì dùng chức năng Sửa tuyến.&quot;)</code> (lỗi #21). Ở đây <code>null</code> ⇒ đi tiếp</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Service</td>
+<td><code>:78</code></td>
+<td><code>validateRoute()</code></td>
+<td>—</td>
+<td>như luồng A bước 21</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Service</td>
+<td><code>:82</code></td>
+<td><code>route.setRouteStations(null)</code></td>
+<td>—</td>
+<td>comment <code>:80-81</code>: lộ trình dựng tường minh bên dưới, không dựa vào cascade</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Service → DB</td>
+<td><code>:83</code></td>
+<td><code>routeRepository.save(route)</code></td>
+<td><code>id = null</code></td>
+<td><code>persist</code>; vì <code>GenerationType.IDENTITY</code> (<code>Route.java:27</code>) Hibernate phải chạy <strong>ngay</strong> <code>INSERT INTO routes (distance_km, estimated_duration, suitable_bus_type_id) VALUES (…)</code> để MySQL cấp id (Bài 02 §5)</td>
+<td><code>saved</code> có id, ví dụ 11</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Service</td>
+<td><code>:84</code></td>
+<td><code>rebuildStops(saved, [1, 7, 2])</code></td>
+<td>—</td>
+<td>như luồng A bước 30-33, <code>RouteStationId(11, …)</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Proxy</td>
+<td>—</td>
+<td>commit</td>
+<td>—</td>
+<td><code>INSERT route_stations</code> × 3</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Controller</td>
+<td><code>:47</code>, <code>:52</code></td>
+<td>flash + redirect</td>
+<td>—</td>
+<td><code>success</code> = &quot;Thêm mới tuyến đường thành công!&quot; → <code>redirect:/admin/routes</code></td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Thứ tự ghi quan trọng.</strong> <code>RouteStationId</code> cần <code>route.getId()</code> (<code>:167</code>), mà id chỉ có sau
+<code>INSERT routes</code>. Vì vậy phải <code>save(route)</code> trước rồi mới dựng điểm dừng bằng đối tượng <code>saved</code>
+(<code>:83-84</code>). Seed làm y hệt: <code>DataInitializer.java:242</code> lưu tuyến, <code>:244-245</code> mới nối bến.</p>
+<p><strong>(c) Code then chốt</strong> — <code>tpl/admin/route/route-form.html:119-147</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-javascript">function refresh() {
+    const rows = stopList.querySelectorAll('.stop-row');           // mọi dòng bến hiện có
+    rows.forEach((row, i) =&gt; {
+        row.querySelector('.stop-index').textContent = (i + 1);    // ô số thứ tự: 1, 2, 3...
+    });
+    rows.forEach(row =&gt; {                                          // chỉ còn 2 dòng thì khoá nút xoá
+        row.querySelector('.remove-stop').disabled = rows.length &lt;= MIN_STOPS;
+    });
+}
+
+function addRow() {
+    stopList.appendChild(template.content.cloneNode(true));        // nhân bản &lt;template&gt;, gắn CUỐI danh sách
+    refresh();
+}
+
+// Tạo mới (chưa có dòng nào) → dựng sẵn 2 dòng trống cho điểm đi/điểm đến.
+while (stopList.querySelectorAll('.stop-row').length &lt; MIN_STOPS) {
+    addRow();
+}
+refresh();</code></pre></div>
+<p>Chú ý: số hiện trong ô <code>.stop-index</code> <strong>chỉ là hiển thị</strong> — không có ô nào gửi số thứ tự lên server.
+Thứ tự dừng được truyền <strong>ngầm</strong> bằng thứ tự các tham số <code>stationIds</code> trong body, và server tự đánh
+lại 1..n. Nhờ vậy không thể có hai điểm dừng cùng <code>stopOrder</code> hay một lỗ hổng trong dãy số.</p>
+<p>Hàm suy ra điểm đi, kèm bản vòng <code>for</code> — <code>…/domain/Route.java:100-108</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">public Station getDepartureStation() {
+    if (routeStations == null || routeStations.isEmpty()) {
+        return null;                                              // tuyến chưa có bến
+    }
+    return routeStations.stream()
+            .min(Comparator.comparing(RouteStation::getStopOrder)) // điểm dừng có stopOrder NHỎ nhất
+            .map(RouteStation::getStation)                         // lấy bến của nó
+            .orElse(null);
+}</code></pre></div>
+<div class="code-wrap"><pre class="code"><code class="language-java">// Viết lại bằng vòng for
+RouteStation first = null;
+for (RouteStation rs : routeStations) {
+    if (first == null || rs.getStopOrder() &lt; first.getStopOrder()) {
+        first = rs;
+    }
+}
+return (first != null) ? first.getStation() : null;</code></pre></div>
+<p><code>getDestinationStation()</code> (<code>:114-122</code>) giống hệt nhưng dùng <code>max</code>.</p>
+<hr>
+<h2 id="4-luong-loi-xoa-tuyen-da-co-chuyen">§4. Luồng lỗi — xoá tuyến đã có chuyến</h2>
+<p>Tình huống: Admin xoá tuyến 1, tuyến có hàng trăm chuyến lịch sử.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Bước</th>
+<th>Chuyện gì xảy ra</th>
+<th>Vị trí</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td><code>&lt;a&gt;</code> &quot;Xóa&quot; có <code>onclick=&quot;return confirm(&#39;Bạn có chắc chắn muốn xóa tuyến này?&#39;);&quot;</code> — câu hỏi <strong>chung chung</strong>, không báo trước luật (khác màn bến). OK ⇒ <code>GET /admin/routes/delete/1</code></td>
+<td><code>route-list.html:88-91</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>deleteRoute(1)</code> gọi service trong <code>try</code></td>
+<td><code>AdminRouteController.java:98-100</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Proxy mở transaction</td>
+<td><code>RouteService.java:183</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>findByIdWithStations(1)</code> — nạp tuyến <strong>kèm</strong> điểm dừng (<code>JOIN FETCH</code>); không thấy ⇒ <code>RuntimeException(&quot;Không tìm thấy tuyến cần xóa với ID: 1&quot;)</code></td>
+<td><code>:185-186</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>tripRepository.existsByRouteId(1)</code> — <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT 1 FROM trips WHERE route_id = 1 AND is_deleted = false LIMIT 1</code></td>
+<td><code>:188</code>, <code>TripRepository.java:240</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Có ⇒ <strong>ném <code>RuntimeException</code></strong> &quot;Không thể xóa tuyến này vì đã có chuyến xe sử dụng (dữ liệu lịch sử vận hành và doanh thu phải được giữ nguyên)!&quot;</td>
+<td><code>:189-191</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>routeRepository.delete(route)</code> ở <code>:194</code> <strong>không chạy</strong></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Unchecked exception ⇒ proxy <strong>rollback</strong>; chưa ghi gì nên không có gì để hoàn tác</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>catch (Exception e)</code> ⇒ flash <code>error</code> = <code>&quot;Lỗi: &quot; + e.getMessage()</code></td>
+<td><code>AdminRouteController.java:102-104</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>redirect:/admin/routes</code> ⇒ danh sách với khung đỏ (<code>route-list.html:29-32</code>); tuyến 1 vẫn còn. Dòng chữ nhỏ cuối trang (<code>:99-102</code>) vốn đã nói trước luật này</td>
+<td><code>:105</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p>Ca thành công (tuyến chưa có chuyến nào): <code>delete(route)</code> ⇒ <code>cascade = ALL</code> trên
+<code>Route.routeStations</code> (<code>Route.java:44</code>) xoá kèm các dòng điểm dừng đã nạp ở bước 4, rồi xoá tuyến.
+<span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>DELETE FROM route_stations WHERE route_id = ? AND station_id = ?</code> × n,
+rồi <code>DELETE FROM routes WHERE id = ?</code>. Phase 1 đã kiểm chứng bằng app thật: <em>&quot;deleting an unused
+route succeeded and cascaded its <code>route_stations</code> away&quot;</em> (roadmap §8, 2026-07-16).</p>
+<p><strong>Các lỗi khác và đường về của chúng</strong> — điểm khác Bài 01/02: lỗi khi <strong>tạo/sửa</strong> quay về <strong>form</strong>,
+không quay về danh sách.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Nguyên nhân</th>
+<th>Ném ở</th>
+<th>Loại</th>
+<th>Quay về đâu, thấy gì</th>
+</tr>
+</thead><tbody><tr>
+<td>Ít hơn 2 bến (POST tự chế, hoặc không gửi <code>stationIds</code>)</td>
+<td><code>RouteService.java:198-201</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form, khung đỏ <code>route-form.html:24-26</code>: &quot;Lỗi: Lộ trình phải có ít nhất 2 trạm (điểm đi và điểm đến)!&quot;</td>
+</tr>
+<tr>
+<td>Trùng bến</td>
+<td><code>:206-210</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form: &quot;Lỗi: Một bến xe chỉ được xuất hiện một lần trong lộ trình…&quot;</td>
+</tr>
+<tr>
+<td>km <code>null</code>/<code>&lt;= 0</code> hoặc phút <code>null</code>/<code>&lt;= 0</code></td>
+<td><code>:212-217</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form: &quot;Lỗi: Quãng đường phải lớn hơn 0 km!&quot; / &quot;… 0 phút!&quot;</td>
+</tr>
+<tr>
+<td>POST tạo mang sẵn <code>id</code></td>
+<td><code>:73-77</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form tạo, câu báo có id tuyến</td>
+</tr>
+<tr>
+<td>Bến không tồn tại</td>
+<td><code>:163-164</code></td>
+<td><code>RuntimeException</code></td>
+<td>form; mọi thứ đã ghi trong transaction (kể cả <code>INSERT routes</code> của luồng tạo) bị rollback</td>
+</tr>
+<tr>
+<td>Tuyến không tồn tại (POST sửa)</td>
+<td><code>:117-118</code></td>
+<td><code>RuntimeException</code></td>
+<td>redirect <code>/admin/routes/edit/{id}</code> ⇒ GET form lại không thấy ⇒ redirect danh sách với flash của <strong>lần GET</strong> (không có &quot;Lỗi: &quot;). <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> flash của lần POST bị đè vì cả hai cùng key <code>error</code></td>
+</tr>
+<tr>
+<td>Tuyến không tồn tại (GET form sửa)</td>
+<td><code>AdminRouteController.java:59</code></td>
+<td><code>RuntimeException</code></td>
+<td>danh sách, khung đỏ <strong>không</strong> có tiền tố &quot;Lỗi: &quot; (<code>:72</code>) — cùng bất nhất nhỏ như màn xe và màn bến</td>
+</tr>
+</tbody></table></div>
+<p><strong>Cái giá của &quot;quay về form&quot;:</strong> sau khi tạo lỗi, <code>showCreateForm()</code> dựng lại <code>new Route()</code> — mọi thứ
+Admin đã gõ và các bến đã chọn <strong>mất hết</strong>. Sau khi sửa lỗi, form nạp lại <strong>giá trị trong DB</strong>, tức
+các thay đổi chưa lưu cũng mất. Flash chỉ mang câu báo lỗi, không mang dữ liệu form <span class="tag tag-code">CODE</span>
+(<code>AdminRouteController.java:48-50</code>, <code>:90-92</code>).</p>
+<hr>
+<h2 id="5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</h2>
+<ul>
+<li><strong>Xem danh sách</strong> — <code>[dashboard.html:117]</code> → <code>listRoutes()</code> <code>:22-26</code> →
+<code>RouteService.findAllWithStations()</code> <code>:42-44</code> → <code>RouteRepository.findAllWithStations()</code> <code>:22-26</code>
+(JPQL <code>SELECT DISTINCT r … LEFT JOIN FETCH r.routeStations rs LEFT JOIN FETCH rs.station LEFT JOIN FETCH r.suitableBusType</code>) → view <code>route-list</code>. Template gọi nhiều hàm trên mỗi tuyến
+(<code>getDeparturePointDisplay()</code>, <code>getOrderedRouteStations()</code>, <code>suitableBusType.typeName</code>) nhưng tất
+cả dữ liệu đã nằm sẵn trong bộ nhớ nhờ <code>JOIN FETCH</code> ⇒ <strong>một</strong> câu SQL cho cả trang. Thời lượng
+được in thêm dạng giờ: <code>estimatedDuration / 60.0</code> làm tròn 1 chữ số (<code>route-list.html:78</code>). Không
+phân trang (Bài 00b §6).</li>
+<li><strong>Mở form Thêm</strong> — <code>[nút Thêm Tuyến Mới]</code> → <code>showCreateForm()</code> <code>:28-34</code> → <code>addFormOptions()</code>
+<code>:108-111</code> → <code>routeService.findAllStations()</code> + <code>busService.findAllBusTypes()</code> → view <code>route-form</code>.
+Không ghi gì.</li>
+</ul>
+<p>Luồng tạo (§3.2), sửa (§3.1), mở form sửa (§3.1 bước 1-11) và xoá (§4) đã trace ở trên — đủ 6
+endpoint của bảng §2.2.</p>
+<hr>
+<h2 id="6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</h2>
+<h3 id="6-1-bang-khong-moi-chan-that">6.1. Bảng &quot;không-mời / chặn thật&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Luật</th>
+<th>Lớp không-mời (UI)</th>
+<th>Lớp chặn thật (server)</th>
+<th>POST tự chế vượt lớp đầu thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td>Ít nhất 2 bến</td>
+<td>JS dựng sẵn 2 dòng và khoá nút xoá khi còn 2 (<code>route-form.html:114</code>, <code>:125</code>, <code>:144-146</code>); mọi <code>&lt;select&gt;</code> bến <code>required</code> (<code>:76</code>, <code>:102</code>)</td>
+<td><code>validateRoute()</code> <code>RouteService.java:198-201</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>Không trùng bến</td>
+<td>JS chặn submit + <code>alert()</code> (<code>:151-159</code>)</td>
+<td><code>validateRoute()</code> <code>:206-210</code>; tầng cuối là khoá chính <code>(route_id, station_id)</code></td>
+<td>Bị chặn với câu nghiệp vụ, không vỡ ở DB</td>
+</tr>
+<tr>
+<td>km &gt; 0</td>
+<td><code>type=&quot;number&quot; step=&quot;0.1&quot; min=&quot;0.1&quot; required</code> (<code>:36-37</code>)</td>
+<td><code>:212-214</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>phút &gt; 0</td>
+<td><code>type=&quot;number&quot; min=&quot;1&quot; required</code> (<code>:42-43</code>)</td>
+<td><code>:215-217</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>Bến phải tồn tại</td>
+<td>dropdown chỉ liệt kê bến có thật</td>
+<td><code>rebuildStops()</code> <code>:163-164</code></td>
+<td>Bị chặn, rollback cả tuyến</td>
+</tr>
+<tr>
+<td>Loại xe phải tồn tại</td>
+<td>dropdown chỉ liệt kê loại có thật (<code>:48-54</code>)</td>
+<td><strong>Không có</strong> kiểm tra riêng</td>
+<td><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> <code>suitableBusType=999</code> (không tồn tại): <code>DomainClassConverter</code> gọi <code>findById</code> ra rỗng và trả <code>null</code> ⇒ tuyến lưu thành &quot;Không giới hạn&quot;, <strong>không báo lỗi</strong></td>
+</tr>
+<tr>
+<td>Không xoá tuyến đã có chuyến</td>
+<td>dòng chữ cuối trang báo trước (<code>route-list.html:99-102</code>); nút Xóa luôn hiện, <code>confirm()</code> chung chung</td>
+<td><code>deleteRoute()</code> <code>:188-192</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>&quot;Tạo&quot; không ghi đè tuyến có sẵn</td>
+<td>form tạo không có ô <code>id</code></td>
+<td>tripwire <code>createRoute()</code> <code>:73-77</code></td>
+<td>Bị chặn; tuyến nạn nhân giữ km, loại xe và lộ trình (test <code>CreatePathIdTripwireTest:260</code>)</td>
+</tr>
+<tr>
+<td>&quot;Sửa&quot; chỉ sửa đúng tuyến trên URL</td>
+<td>—</td>
+<td><code>updateRoute(id, …)</code> lấy id từ URL</td>
+<td><code>id</code> gửi kèm bị bỏ qua</td>
+</tr>
+<tr>
+<td>Đổi km khi có chuyến <code>DEPARTED</code></td>
+<td>—</td>
+<td><strong>Cố ý không chặn</strong> — chỉ cảnh báo (<code>:124-133</code>)</td>
+<td>Lưu được, kèm flash <code>warning</code></td>
+</tr>
+<tr>
+<td>Giới hạn trên cho km / phút</td>
+<td><strong>Không có</strong> <code>max</code></td>
+<td><strong>Không có</strong></td>
+<td>Nhập 4500 phút được (tuyến id 9 trên DB thật là 4500′ — <code>current_bugs_found.md</code>, mục #12)</td>
+</tr>
+<tr>
+<td>Không trùng tuyến (cùng lộ trình)</td>
+<td><strong>Không có</strong></td>
+<td><strong>Không có</strong></td>
+<td>Tạo được hai tuyến giống hệt nhau</td>
+</tr>
+</tbody></table></div>
+<p>Tuyến có lớp chặn thật <strong>dày hơn</strong> bến xe (Bài 02 §6.1): bốn luật số và cấu trúc đều có ở cả hai
+lớp. Javadoc <code>BusService.java:204</code> gọi <code>RouteService.validateRoute()</code> là <strong>tiền lệ</strong> mà các
+service khác bắt chước.</p>
+<h3 id="6-2-bang-thay-doi-gi-trong-db">6.2. Bảng &quot;thay đổi gì trong DB&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Thao tác</th>
+<th>Bảng / cột</th>
+<th>Từ → sang</th>
+</tr>
+</thead><tbody><tr>
+<td>Xem danh sách, mở form</td>
+<td>—</td>
+<td>Không ghi DB</td>
+</tr>
+<tr>
+<td>Tạo tuyến</td>
+<td><code>routes</code></td>
+<td>thêm 1 dòng (<code>distance_km</code>, <code>estimated_duration</code>, <code>suitable_bus_type_id</code> hoặc NULL)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>route_stations</code></td>
+<td>thêm n dòng <code>(route_id mới, station_id, stop_order = 1..n)</code></td>
+</tr>
+<tr>
+<td>Sửa tuyến</td>
+<td><code>routes</code> — dòng <code>id</code> trên URL</td>
+<td>3 cột đổi theo form; <code>suitable_bus_type_id</code> có thể thành NULL nếu chọn &quot;Không giới hạn&quot;</td>
+</tr>
+<tr>
+<td></td>
+<td><code>route_stations</code></td>
+<td><strong>xoá mọi dòng</strong> của tuyến rồi thêm lại n dòng mới — kể cả khi lộ trình không đổi</td>
+</tr>
+<tr>
+<td></td>
+<td><em>(gián tiếp, về sau)</em> <code>buses.odometer</code></td>
+<td>mỗi chuyến <code>DEPARTED</code> của tuyến, khi hoàn thành, cộng <strong>km mới</strong> (<code>TripService.java:684-688</code>) — đây là lý do có cảnh báo</td>
+</tr>
+<tr>
+<td>Xoá tuyến</td>
+<td><code>route_stations</code>, <code>routes</code></td>
+<td><code>DELETE</code> các điểm dừng (cascade) rồi <code>DELETE</code> tuyến. Xoá <strong>thật</strong>, không soft delete</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</h2>
+<p>Những gì đã có ở Bài 01 §7 và Bài 02 §7 (<code>@Controller</code>, <code>@RequestMapping</code>, <code>@ModelAttribute</code>,
+<code>RedirectAttributes</code>, <code>@Transactional</code>, dirty checking, <code>@OneToMany(mappedBy)</code>, LAZY, <code>cascade = ALL</code>,
+<code>@EmbeddedId</code> + <code>@MapsId</code>, <code>GenerationType.IDENTITY</code>…) không nhắc lại. Chỉ ghi phần <strong>mới</strong>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation / cơ chế</th>
+<th>Nghĩa đời thường</th>
+<th>Tác dụng ở đây</th>
+<th>Bỏ đi thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@RequestParam(required = false) List&lt;Long&gt; stationIds</code></td>
+<td>&quot;Gom mọi tham số cùng tên thành một danh sách, giữ đúng thứ tự; không có thì cho <code>null</code>&quot;</td>
+<td><code>AdminRouteController.java:43</code>, <code>:80</code></td>
+<td>Bỏ <code>required = false</code>: thiếu tham số thì Spring trả lỗi 400 trước khi vào controller, Admin không thấy câu báo nghiệp vụ &quot;ít nhất 2 trạm&quot;</td>
+</tr>
+<tr>
+<td>Nhiều <code>&lt;select&gt;</code> cùng <code>name=&quot;stationIds&quot;</code></td>
+<td>&quot;Trình duyệt gửi cùng một tên nhiều lần, theo thứ tự trong trang&quot;</td>
+<td><code>route-form.html:76</code>, <code>:102</code></td>
+<td>— ; đây là cách duy nhất form gửi được <strong>thứ tự</strong></td>
+</tr>
+<tr>
+<td><code>&lt;template&gt;</code> + <code>cloneNode(true)</code></td>
+<td>&quot;Khuôn HTML trình duyệt không hiển thị; JS nhân bản ra khi cần&quot;</td>
+<td><code>route-form.html:99-109</code>, <code>:130</code></td>
+<td>Phải tự dựng chuỗi HTML trong JS, và danh sách bến (do Thymeleaf điền) không có sẵn cho JS</td>
+</tr>
+<tr>
+<td>Uỷ quyền sự kiện (<code>closest()</code>)</td>
+<td>&quot;Đặt một người gác ở cửa phòng thay vì mỗi ghế một người&quot;</td>
+<td><code>:136-141</code></td>
+<td>Dòng thêm sau sẽ không có listener xoá</td>
+</tr>
+<tr>
+<td><code>JOIN FETCH</code></td>
+<td>&quot;Nạp luôn quan hệ trong cùng câu truy vấn&quot; (Bài 00b §2.4)</td>
+<td><code>RouteRepository.java:22-33</code></td>
+<td>Danh sách tuyến thành 1 + N câu truy vấn (mỗi tuyến một lần nạp điểm dừng, mỗi điểm dừng một lần nạp bến)</td>
+</tr>
+<tr>
+<td><code>SELECT DISTINCT</code></td>
+<td>&quot;Khử tuyến trùng do join với nhiều điểm dừng&quot;</td>
+<td><code>:22</code></td>
+<td><span class="tag tag-spring">SPRING</span> Hibernate 6 trở lên (dự án dùng Spring Boot <code>4.0.8</code>, <code>pom.xml:8</code>) đã tự khử trùng entity gốc, nên <code>findByIdWithStations</code> không có <code>DISTINCT</code> vẫn trả đúng một <code>Route</code></td>
+</tr>
+<tr>
+<td>Tham số <code>:id</code> không có <code>@Param</code></td>
+<td>—</td>
+<td><code>RouteRepository.java:32-33</code></td>
+<td><span class="tag tag-spring">SPRING</span> chạy được vì <code>spring-boot-starter-parent</code> biên dịch với cờ <code>-parameters</code>, giữ tên tham số <code>id</code> lúc chạy; dự án ở chỗ khác dùng <code>@Param</code> tường minh</td>
+</tr>
+<tr>
+<td><code>@BatchSize(size = 20)</code></td>
+<td>&quot;Khi phải nạp điểm dừng, gom tối đa 20 tuyến một lần&quot;</td>
+<td><code>Route.java:45</code> — phục vụ các <strong>màn khác</strong> (chuyến, bảng điều hành), nơi không <code>JOIN FETCH</code> được <code>routeStations</code> vì đã fetch <code>coDrivers</code> (<code>MultipleBagFetchException</code>, <code>Route.java:74-78</code>; roadmap §9:1236)</td>
+<td>Màn danh sách chuyến thành N+1 trên điểm dừng</td>
+</tr>
+<tr>
+<td><code>cascade = ALL</code> <strong>không</strong> <code>orphanRemoval</code></td>
+<td>&quot;Xoá tuyến thì xoá kèm điểm dừng; nhưng bỏ một điểm dừng khỏi danh sách thì <strong>không</strong> xoá nó&quot;</td>
+<td><code>Route.java:44</code></td>
+<td>Nếu có <code>orphanRemoval = true</code>, có thể <code>clear()</code> danh sách thay vì <code>deleteAll</code> — nhưng dự án chọn xoá tường minh (roadmap §9:1233)</td>
+</tr>
+<tr>
+<td><code>flush()</code></td>
+<td>&quot;Ghi ngay những gì đang chờ xuống DB, nhưng <strong>chưa</strong> commit&quot;</td>
+<td><code>RouteService.java:144</code></td>
+<td>Xem §3.1 — dòng mới có thể đụng dòng cũ cùng khoá</td>
+</tr>
+<tr>
+<td><code>Objects.equals</code></td>
+<td>&quot;So sánh không sợ <code>null</code>&quot;</td>
+<td><code>:124</code></td>
+<td><code>existing.getDistanceKm().equals(…)</code> ném <code>NullPointerException</code> nếu km cũ <code>null</code></td>
+</tr>
+<tr>
+<td><code>Math.rint</code></td>
+<td>&quot;Làm tròn về số nguyên gần nhất&quot;</td>
+<td><code>formatKm()</code> <code>:156</code> — <code>km == Math.rint(km)</code> nghĩa là &quot;km là số tròn&quot;</td>
+<td>Câu cảnh báo hiện &quot;500.0 km&quot;</td>
+</tr>
+<tr>
+<td>Service trả <code>String</code> cảnh báo</td>
+<td>&quot;Kênh thứ ba: thành công <strong>nhưng</strong> có điều cần biết&quot;</td>
+<td><code>updateRoute()</code> → <code>AdminRouteController.java:85-89</code> → <code>route-list.html:33-36</code>. Cùng kênh với <code>TripService.createManualTrip()/updateManualTrip()</code> (javadoc <code>RouteService.java:109-110</code>)</td>
+<td>Hoặc phải chặn (sai ý chủ dự án), hoặc im lặng</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="8-vi-du-tinh-tay">§8. Ví dụ tính tay</h2>
+<p>Chức năng không có 🧮, mục này tùy chọn. Ba phép tính nhỏ có thật trong code — <strong>số liệu minh hoạ</strong>,
+trừ chỗ ghi rõ.</p>
+<p><strong>8.1. Đánh số điểm dừng.</strong> Form gửi <code>stationIds = [5, 2, 9, 4]</code> (đã xoá một dòng ở giữa trên
+trình duyệt, nên ô số hiển thị từng là 1, 2, 4, 5 trước khi <code>refresh()</code> đánh lại).
+<code>rebuildStops()</code> (<code>RouteService.java:161-171</code>): <code>stopOrder</code> bắt đầu 1, mỗi vòng gán rồi tăng ⇒
+<code>(5,1) (2,2) (9,3) (4,4)</code>. Điểm đi = bến 5 (<code>stopOrder</code> nhỏ nhất), điểm đến = bến 4 (lớn nhất).</p>
+<p><strong>8.2. Cảnh báo km và odometer.</strong> <em>(Lấy từ lần kiểm chứng thật của Group C(c), riêng odometer là
+minh hoạ.)</em> Tuyến 1: 120 km, 2 chuyến <code>DEPARTED</code>. Admin sửa thành 500 km.</p>
+<ul>
+<li><code>Objects.equals(120.0, 500.0)</code> = <code>false</code> ⇒ đếm <code>DEPARTED</code> = 2 &gt; 0 ⇒ có cảnh báo
+(<code>RouteService.java:124-126</code>).</li>
+<li><code>formatKm(500.0)</code>: <code>500.0 == Math.rint(500.0)</code> ⇒ <code>String.valueOf(500L)</code> = &quot;500&quot;;
+<code>formatKm(120.0)</code> = &quot;120&quot; ⇒ câu: <em>&quot;Tuyến này đang có 2 chuyến trên đường (DEPARTED). Quãng đường mới
+(500 km, trước đây 120 km)…&quot;</em>. (Test <code>RouteServiceDistanceWarningTest:99-101</code> kiểm đúng các mẩu
+&quot;500 km&quot;, &quot;trước đây 120 km&quot;.)</li>
+<li>Một trong hai xe đang có odometer 10.000 km. Khi chuyến của nó hoàn thành, <code>updateTripStatus()</code>
+đọc <code>route.getDistanceKm()</code> <strong>lúc đó</strong> (<code>TripService.java:684-688</code>): 10.000 + 500 = <strong>10.500</strong>,
+không phải 10.000 + 120 = 10.120. Nếu 500 là số đúng (sửa lỗi gõ) thì đây là điều mong muốn; nếu
+tuyến thật sự đổi lộ trình sau khi xe đã xuất phát, xe bị cộng thừa 380 km.</li>
+</ul>
+<p><strong>8.3. Thời lượng tuyến ⇒ số tài xế.</strong> <code>estimatedDuration</code> không tự quyết định số tài xế, nhưng nó
+sinh ra giờ đến dự kiến của chuyến (JS form tạo chuyến <code>trip-create-form.html:438</code>:
+<code>arrMs = depMs + routeDurationMinutes × 60 × 1000</code>), và <code>validateStaffForTrip()</code> tính từ đó
+(<code>TripService.java:1226-1236</code>):</p>
+<ul>
+<li>Tuyến 120 phút: 2 giờ ⇒ <code>ceil(2 / 8) = 1</code> tài xế.</li>
+<li>Tuyến 1800 phút (tuyến Hà Nội → Sài Gòn của seed, <code>DataInitializer.java:190</code>): 30 giờ ⇒
+<code>ceil(30 / 8) = ceil(3,75) = 4</code> tài xế.
+Vì vậy một con số Admin gõ ở màn tuyến làm thay đổi luật kiểm tài xế ở màn chuyến (Bài 06).</li>
+</ul>
+<hr>
+<h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>
+<h3 id="9-1-cac-quyet-dinh-thiet-ke">9.1. Các quyết định thiết kế</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Quyết định</th>
+<th>Tránh được gì</th>
+<th>Vì sao không làm cách đơn giản hơn</th>
+<th>Nguồn</th>
+</tr>
+</thead><tbody><tr>
+<td>Lộ trình là bảng nối có <code>stopOrder</code>, không phải 2 ô chữ điểm đi/đến</td>
+<td>Tên bến gõ tay bất nhất; không có điểm dừng giữa</td>
+<td>Hai ô chữ đã từng có và bị xoá</td>
+<td><code>Route.java:31-35</code>; <code>project_report.md</code> Incon #1</td>
+</tr>
+<tr>
+<td>Trình sửa nhiều điểm dừng động, <code>stopOrder</code> đánh lại 1..n</td>
+<td>Lỗ hổng hoặc trùng số thứ tự</td>
+<td>Cho Admin gõ số thứ tự thì phải kiểm thêm luật dãy số</td>
+<td>roadmap §5 Phase 1 (owner duyệt <em>&quot;full dynamic multi-stop editor&quot;</em>)</td>
+</tr>
+<tr>
+<td>Sửa lộ trình = xoá + <code>flush()</code> + dựng lại</td>
+<td>Đụng khoá chính khi giữ lại bến cũ</td>
+<td>Không &quot;update&quot; được một phần khoá chính; không có <code>orphanRemoval</code></td>
+<td>roadmap §9:1233</td>
+</tr>
+<tr>
+<td>Chặn trùng bến sớm ở service (và JS)</td>
+<td>Lỗi vỡ khoá chính khó hiểu</td>
+<td>Đây là <strong>giới hạn mô hình</strong>, không phải lựa chọn nghiệp vụ — tuyến vòng A→B→A cần thiết kế khoá khác</td>
+<td>roadmap §9:1234; <code>current_functional_spec.md:55</code></td>
+</tr>
+<tr>
+<td>Tách <code>createRoute()</code> / <code>updateRoute(id, form)</code></td>
+<td>POST tự chế tới <code>/create</code> ghi đè tuyến 1 (đo thật, lỗi #21)</td>
+<td><code>@InitBinder</code> chỉ là lớp không-mời; dự án đã nhiều lần chọn &quot;chặn ở service&quot;</td>
+<td>#21</td>
+</tr>
+<tr>
+<td>Chặn xoá tuyến đã có chuyến</td>
+<td>Mất lịch sử vận hành, doanh thu, chuỗi dự báo</td>
+<td>Cùng nguyên tắc <code>BusService.deleteBus()</code> (javadoc <code>RouteService.java:176-178</code>)</td>
+<td>roadmap §5 Phase 1 <em>&quot;Guard rules reuse existing patterns&quot;</em></td>
+</tr>
+<tr>
+<td>Loại xe của tuyến là <strong>gợi ý</strong>, không phải luật</td>
+<td>Form Tạo và form Sửa từng hiểu khác nhau</td>
+<td>Rủi ro thật của xe sai loại (bán quá chỗ) đã có luật #22 chặn</td>
+<td>javadoc <code>Route.java:53-66</code>; roadmap §9 (ruling #26)</td>
+</tr>
+<tr>
+<td>Đổi km khi có chuyến <code>DEPARTED</code>: <strong>cảnh báo, không chặn</strong></td>
+<td>—</td>
+<td>Hệ thống không phân biệt được &quot;sửa lỗi gõ&quot; với &quot;đổi lộ trình thật&quot;; chụp km vào chuyến lúc khởi hành cần thêm cột, trái §3 roadmap</td>
+<td>javadoc <code>RouteService.java:103-110</code>; <code>current_functional_spec.md:58</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="9-2-bug-that-da-tung-xay-ra-o-chuc-nang-nay">9.2. Bug thật đã từng xảy ra ở chức năng này</h3>
+<p><strong>Lỗi #21 (phần tuyến) — form &quot;Thêm tuyến&quot; ghi đè được tuyến có sẵn.</strong></p>
+<ul>
+<li><em>Hiểu sai điều gì:</em> tin rằng &quot;form tạo không có ô <code>id</code> nên request tạo không mang <code>id</code>&quot;. Controller
+bind thẳng vào entity bằng <code>@ModelAttribute</code>, không có <code>@InitBinder</code>, nên ai gửi <code>id=1</code> là có
+<code>route.id = 1</code>. Tệ hơn màn bến: hàm cũ <code>saveRoute()</code> <strong>dùng chính</strong> <code>route.getId() == null</code> để
+<strong>quyết định</strong> tạo hay sửa (<code>current_bugs_found.md</code>, bảng &quot;bảy đường tạo, sáu hở&quot;).</li>
+<li><em>Đo trên bản sao DB thật (2026-09-19):</em> POST <code>/routes/create</code> mang id tuyến 1 ⇒ tuyến 1 từ
+<strong>120 km / 120′ / loại 1, trạm 1→2</strong> thành <strong>999 km / 999′ / <code>suitable_bus_type_id = NULL</code></strong>, lộ
+trình thành 11→10, số tuyến 8 → 8. Cột form không gửi bị <strong>xoá thành NULL</strong> vì merge chép cả <code>null</code>.
+Bán kính: <strong>416 chuyến</strong> (388 <code>COMPLETED</code>, 2 <code>DEPARTED</code>) trỏ vào tuyến này — nhãn tuyến trên mọi màn,
+km cộng odometer lúc hoàn thành, chuỗi dự báo của tuyến 1 đều đổi theo.</li>
+<li><em>Sửa:</em> tách thành <code>createRoute()</code> có tripwire và <code>updateRoute(id, form, stationIds)</code> nạp bản ghi
+rồi chép từng field (javadoc <code>RouteService.java:58-66</code>, <code>:87-97</code>). Kiểm chứng: phát lại nguyên văn
+request phá hoại ⇒ bị từ chối, tuyến 1 giữ nguyên; sửa tuyến 10 bằng form thật (đổi km, bỏ loại xe,
+đảo lộ trình 3→2→1) ⇒ đúng, không đẻ dòng mới.</li>
+</ul>
+<p><strong>Group C(c) — sửa km khi tuyến còn chuyến đang chạy (không phải lỗi, mà là ruling).</strong></p>
+<ul>
+<li><em>Phát hiện:</em> <code>updateTripStatus()</code> đọc <code>route.distanceKm</code> <strong>lúc hoàn thành</strong>, nên đổi km của tuyến
+khi xe đã chạy làm đổi số km cộng vào odometer. Bản sửa #18 đã đóng cạnh này cho <code>trip.route</code> (không
+cho sửa chuyến đã khởi hành), nhưng vẫn mở qua <strong>entity tuyến</strong>.</li>
+<li><em>Vì sao không chặn:</em> sửa một quãng đường gõ sai thì <strong>nên</strong> áp vào chuyến đang chạy. Chủ dự án chốt
+2026-09-23: cảnh báo, không chặn. Thêm <code>TripRepository.countByRouteIdAndStatus</code>, <code>updateRoute()</code> đổi
+kiểu trả về thành <code>String</code>, và khung <code>alert-warning</code> cho <code>route-list.html</code>.</li>
+</ul>
+<p><strong>Group C(a) và #26 — loại xe của tuyến.</strong> Trước 2026-09-23, AI và dropdown Duyệt/Sửa <strong>lọc cứng</strong>
+theo <code>suitableBusType</code> trong khi form Tạo và validator không xét — chuyến 3492 tạo được bằng xe 9 ghế
+nhưng form Sửa chỉ mời Limousine. Nay là gợi ý ở mọi nơi: <code>preferredTypeThenLeastWorn()</code>
+(<code>TripService.java:343-344</code>) xếp xe đúng loại lên đầu. Phần này học kỹ ở Bài 06/07.</p>
+<p><strong>Javadoc hứa điều không có.</strong> <code>Route.getSuitableBusType()</code> từng hứa <em>&quot;nếu Admin chưa gán loại xe, hệ
+thống tự gợi ý dựa trên quãng đường&quot;</em> trong khi thân hàm luôn trả <code>null</code> ở nhánh đó. Sửa bằng cách
+<strong>xoá lời hứa</strong>, không cài thêm luật mà chưa ai chốt (javadoc <code>Route.java:63-65</code>).</p>
+<h3 id="9-3-cam-bay-va-diem-la-ghi-lai-khong-sua">9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)</h3>
+<ol>
+<li><strong><code>distanceKm</code> được đọc lúc chạy, <code>estimatedDuration</code> được chụp lúc tạo chuyến.</strong> Đổi km ảnh
+hưởng ngay tới: odometer của chuyến <code>DEPARTED</code> khi hoàn thành (<code>TripService.java:684-688</code>), kiểm
+tra &quot;sắp tới hạn bảo trì&quot; khi xếp xe (<code>:1186-1188</code>, <code>:324</code>, <code>:1496-1497</code>), chi phí nhiên liệu ở Đề
+xuất (<code>RecommendationService.java:300-301</code>) và What-if (<code>WhatIfSimulationService.java:270-271</code>).
+Còn đổi phút thì <strong>chuyến cũ không đổi</strong> — chuyến lưu <code>arrivalTimeExpected</code> của riêng nó — chỉ
+chuyến tạo sau mới dùng số mới (form tạo chuyến, <code>TripService.java:157-160</code> cho chuyến tăng cường).
+Cảnh báo chỉ có cho km là đúng với sự bất đối xứng này.</li>
+<li><strong>Sửa lộ trình là sửa lịch sử hiển thị.</strong> Như đổi tên bến (Bài 02 §9.3): đổi bến đầu/cuối của tuyến
+thì mọi chuyến cũ, mọi chuỗi dự báo theo tuyến đều hiện nhãn mới.</li>
+<li><strong>Lỗi thì mất dữ liệu đã gõ</strong> (§4). Với form nhiều dòng bến, đây là chỗ khó chịu nhất cho người
+dùng; validate JS đã chặn phần lớn lỗi trước khi gửi.</li>
+<li><strong>Không có nút đổi chỗ điểm dừng.</strong> &quot;Thêm Trạm Dừng&quot; luôn gắn dòng mới <strong>vào cuối</strong> (<code>:130</code>) —
+tức là sau điểm đến. Muốn chèn một bến vào giữa phải chọn lại giá trị các dòng phía sau.</li>
+<li><strong>Loại xe không tồn tại bị nuốt thành &quot;Không giới hạn&quot;</strong> (§6.1, chưa kiểm chứng).</li>
+<li><strong>Không giới hạn trên cho phút</strong>, mà phút quyết định số tài xế bắt buộc (§8.3). <code>current_bugs_found.md</code>
+(mục #12) ghi <em>&quot;ngòi nổ nằm trong tay Admin&quot;</em>: thêm một tuyến 9 giờ là đủ làm lệch
+dropdown tài xế với validator. Lịch sử mô phỏng chỉ dùng tuyến ≤ 8 giờ
+(<code>HistoricalDataBackfill.java:141</code>, <code>:284-285</code>).</li>
+<li><strong>Chuyến đã xoá mềm không chặn được việc xoá tuyến.</strong> <code>existsByRouteId</code> đi qua <code>@SQLRestriction</code>
+nên không thấy chuyến <code>is_deleted = true</code>. Sổ lỗi đã xét và <strong>RÚT</strong> mục này (bán kính đo được = 0,
+cùng loại ghi chú soft-delete mà roadmap §9 chấp nhận) — nói được khi bị hỏi, không trình bày như
+lỗi.</li>
+<li><strong>Mỗi lần sửa đều xoá và chèn lại toàn bộ điểm dừng</strong>, kể cả khi chỉ đổi km. Với 2-5 bến thì không
+đáng kể; <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> mỗi <code>save()</code> một điểm dừng còn kéo theo một <code>SELECT</code> do đi
+nhánh <code>merge</code> (§3.1 bước 33).</li>
+<li><strong>Mâu thuẫn tài liệu/comment ↔ code (code thắng):</strong><ul>
+<li>Javadoc <code>RouteRepository.java:15-21</code> nói gọi <code>getDeparturePointDisplay()</code> <em>&quot;ngoài transaction (ví
+dụ trong Thymeleaf) sẽ ném LazyInitializationException nếu không JOIN FETCH sẵn&quot;</em>. Dự án <strong>không</strong>
+tắt <code>spring.jpa.open-in-view</code> (grep <code>src/</code> không thấy cấu hình này) nên OSIV đang bật mặc định
+(Bài 00b §4.5) và template vẫn nạp LAZY được. <span class="tag tag-guess">SUY LUẬN</span> Lý do thật để dùng <code>JOIN FETCH</code> ở màn
+danh sách là <strong>tránh N+1</strong>, không phải tránh exception — trừ khi gọi từ job nền / <code>CommandLineRunner</code>.</li>
+<li>Roadmap §9:1233 và javadoc <code>CostParameterService.java:57</code> còn gọi tên hàm cũ
+<code>RouteService.saveRoute()</code>; từ bản sửa #21 hàm đó đã tách thành <code>createRoute()</code>/<code>updateRoute()</code>.</li>
+<li><code>Proj_functions_summary.md:31</code> ghi <code>getSuitableBusType()</code> <em>&quot;không có AI logic dù docstring nói
+có&quot;</em> — docstring đã được sửa ngày 2026-09-23 (<code>Route.java:53-66</code>), nay không còn hứa gì.</li>
+<li><code>docs/testing/test_case.md</code> <strong>không có</strong> nhóm test tay cho màn tuyến (các tiền tố hiện có: BUS,
+STA, TRIP, APR, FSM, AI, INC, DEL, FC, RC, VR, SEC).</li>
+</ul>
+</li>
+</ol>
+<h3 id="9-4-test-dang-giu-chuc-nang-nay">9.4. Test đang giữ chức năng này</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Test</th>
+<th>Chốt luật gì</th>
+</tr>
+</thead><tbody><tr>
+<td><code>RouteServiceDistanceWarningTest.changingTheDistance_whileATripIsOnTheRoad_savesAndWarns</code> (<code>:93</code>)</td>
+<td>Có 1 chuyến <code>DEPARTED</code>, đổi 120 → 500 ⇒ có cảnh báo chứa &quot;1 chuyến trên đường&quot;, &quot;500 km&quot;, &quot;trước đây 120 km&quot;; <strong>và km mới vẫn được lưu</strong> (cảnh báo, không chặn)</td>
+</tr>
+<tr>
+<td><code>…keepingTheSameDistance_doesNotWarn_evenWithATripOnTheRoad</code> (<code>:109</code>)</td>
+<td>Giữ nguyên km ⇒ không cảnh báo dù có chuyến đang chạy</td>
+</tr>
+<tr>
+<td><code>…changingTheDistance_withNoTripOnTheRoad_doesNotWarn</code> (<code>:117</code>)</td>
+<td>Không có chuyến đang chạy ⇒ không cảnh báo</td>
+</tr>
+<tr>
+<td><code>…finishedAndUpcomingTrips_doNotCount_onlyDepartedOnesAreStillToBeCredited</code> (<code>:122</code>)</td>
+<td><code>COMPLETED</code> và <code>ACTIVE</code> không tính — chỉ <code>DEPARTED</code></td>
+</tr>
+<tr>
+<td><code>CreatePathIdTripwireTest.createRoute_refusesAnEntityThatAlreadyHasAnId_andLeavesRouteAndStopsUntouched</code> (<code>:260</code>)</td>
+<td>Tạo mang id ⇒ <code>IllegalArgumentException</code>; tuyến nạn nhân giữ 120 km, 120 phút, loại xe, lộ trình A→B; số tuyến không đổi</td>
+</tr>
+<tr>
+<td><code>CreatePathIdTripwireTest.updateRoute_copiesFieldsOntoTheExistingRow_andRebuildsStops</code> (<code>:300</code>)</td>
+<td>Sửa chép km, phút, loại xe <code>null</code>; lộ trình A→B thành <strong>B→C→A đúng thứ tự gửi</strong>; không đẻ tuyến mới</td>
+</tr>
+</tbody></table></div>
+<p>Cả hai class là <code>@SpringBootTest</code> + <code>@Transactional</code> trên DB <code>busmanagement_test</code>, dùng
+<code>flushAndClear()</code> (<code>RouteServiceDistanceWarningTest.java:189-192</code>) để đọc lại từ DB thật. Sổ lỗi ghi
+các test đã thử <strong>không rỗng</strong>: tắt cảnh báo ⇒ đỏ test cảnh báo; đếm mọi trạng thái thay vì chỉ
+<code>DEPARTED</code> ⇒ đỏ test đối trọng.</p>
+<p>Hai test sửa tuyến đều gửi lại <strong>bến cũ</strong> (cùng <code>[A, B]</code> hoặc <code>B, C, A</code>), nên đường &quot;xoá → <code>flush()</code>
+→ chèn lại cùng khoá&quot; đang chạy qua test mỗi lần.</p>
+<p><strong>Chưa có test tự động</strong> cho: guard xoá <code>deleteRoute()</code>, bốn luật của <code>validateRoute()</code>, bến không tồn
+tại, và JavaScript của form. Các ca này được kiểm bằng cách chạy app thật lúc giao Phase 1 (roadmap §8,
+2026-07-16: <em>&quot;duplicate-station and single-station submissions were blocked; deleting a route in use
+was blocked&quot;</em>).</p>
+<h3 id="9-5-lien-ket">9.5. Liên kết</h3>
+<ul>
+<li><strong>Màn này ảnh hưởng tới:</strong><ul>
+<li>FSM chuyến (Bài 05): odometer cộng <code>distanceKm</code> khi <code>COMPLETED</code>.</li>
+<li>Xếp xe và kiểm tài xế (Bài 06): <code>distanceKm</code> trong kiểm tra bảo trì; giờ đến (từ
+<code>estimatedDuration</code>) quyết định số tài xế; <code>suitableBusType</code> xếp thứ tự xe.</li>
+<li>Tạo chuyến thủ công (Bài 07): dropdown tuyến đọc <code>routeRepository.findAllWithStations()</code> <strong>thẳng
+từ controller</strong> (<code>AdminTripManagementController.java:111</code>, <code>:274</code>) — anti-pattern đã biết
+(roadmap §9, <code>project_report.md</code> Warn #4), không đi qua <code>RouteService</code>.</li>
+<li>Chuyến tăng cường (Bài 08): giờ đến = khởi hành + <code>estimatedDuration</code> (<code>TripService.java:157-160</code>).</li>
+<li>Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc <code>findAllWithStations()</code>
+(<code>DashboardService.java:201</code>, <code>ForecastService.java:239</code>, <code>RecommendationService.java:102</code>,
+<code>WhatIfSimulationService.java:178</code>); chi phí nhiên liệu = đơn giá × <code>distanceKm</code>.</li>
+</ul>
+</li>
+<li><strong>Màn này bị ảnh hưởng bởi:</strong> bến xe (Bài 02 — nguồn của dropdown, và guard xoá bến đọc
+<code>route_stations</code>); loại xe (Bài 01 — <code>BusService.findAllBusTypes()</code>); chuyến (quyết định tuyến có
+xoá được không, và có cảnh báo khi sửa km không).</li>
+</ul>
+<hr>
+<h2 id="10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</h2>
+<h3 id="10-1-tom-tat-1-phut">10.1. Tóm tắt 1 phút</h3>
+<aside class="callout"><p>Màn Quản lý tuyến định nghĩa khuôn cho mọi chuyến xe: quãng đường, thời gian dự kiến, loại xe gợi ý
+và một lộ trình nhiều điểm dừng có thứ tự. Tuyến không lưu tên; điểm đi và điểm đến được suy ra từ
+bến đầu và bến cuối trong bảng nối <code>RouteStation</code>. Trên form, JavaScript cho thêm hoặc bớt dòng bến;
+thứ tự các dòng được gửi lên thành một danh sách id và service đánh số thứ tự 1 đến n. Khi sửa, em
+xoá toàn bộ điểm dừng cũ, flush, rồi dựng lại, vì khoá chính của điểm dừng là cặp tuyến-bến. Service
+kiểm bốn luật: ít nhất hai bến, không trùng bến, quãng đường và thời gian phải dương. Tuyến đã có
+chuyến thì không xoá được. Nếu đổi quãng đường khi còn chuyến đang chạy, hệ thống vẫn lưu nhưng cảnh
+báo, vì số km mới sẽ cộng vào odometer khi chuyến hoàn thành.</p>
+</aside>
+<h3 id="10-2-cau-hoi-hoi-dong-goi-y-tra-loi">10.2. Câu hỏi hội đồng + gợi ý trả lời</h3>
+<p><strong>1. (Cái gì) Một tuyến gồm những thông tin gì, và sao không có tên tuyến?</strong>
+<code>distanceKm</code>, <code>estimatedDuration</code> (phút), <code>suitableBusType</code> (có thể trống) và danh sách điểm dừng
+<code>routeStations</code> (<code>Route.java:37-51</code>). Không có cột tên: nhãn &quot;điểm đi → điểm đến&quot; được tính từ điểm
+dừng có <code>stopOrder</code> nhỏ nhất và lớn nhất (<code>Route.java:100-141</code>). Trước đây có hai ô chữ điểm đi/đến
+song song với bảng bến và bị bất nhất nên đã xoá (<code>Route.java:31-35</code>) — chỉ còn một nguồn sự thật.</p>
+<p><strong>2. (Thế nào) Làm sao form gửi được thứ tự các điểm dừng?</strong>
+Mỗi dòng là một <code>&lt;select name=&quot;stationIds&quot;&gt;</code> (<code>route-form.html:76</code>). Trình duyệt gửi tham số cùng tên
+nhiều lần theo thứ tự trong trang; Spring gom thành <code>List&lt;Long&gt;</code> giữ nguyên thứ tự
+(<code>AdminRouteController.java:43</code>). <code>rebuildStops()</code> duyệt danh sách và gán <code>stopOrder</code> 1, 2, 3…
+(<code>RouteService.java:160-173</code>). Số thứ tự hiện trên form chỉ là hiển thị, không được gửi lên.</p>
+<p><strong>3. (Thế nào) Khi sửa lộ trình, dữ liệu trong DB thay đổi thế nào?</strong>
+Trong một transaction: nạp tuyến, kiểm luật, chép 3 field, rồi <code>deleteAll</code> các <code>RouteStation</code> cũ,
+<code>flush()</code> để <code>DELETE</code> chạy ngay, rồi chèn lại từng điểm dừng với <code>stopOrder</code> mới
+(<code>RouteService.java:135-146</code>). Nếu giữa chừng có lỗi (bến không tồn tại) thì rollback toàn bộ, kể cả
+những câu đã <code>flush</code>.</p>
+<p><strong>4. (Vì sao) Sao không cập nhật điểm dừng mà phải xoá đi tạo lại?</strong>
+Khoá chính của <code>RouteStation</code> là cặp <code>(routeId, stationId)</code> (<code>RouteStation.java:16-18</code>,
+<code>RouteStationId.java:14-15</code>). Đổi bến của một điểm dừng là đổi khoá chính — JPA không cho sửa khoá
+chính. Quan hệ cũng chỉ có <code>cascade = ALL</code> không có <code>orphanRemoval</code>, nên bỏ phần tử khỏi danh sách
+không xoá được gì. Lý do này được ghi và duyệt ở roadmap §9.</p>
+<p><strong>5. (Vì sao) <code>flush()</code> ở giữa để làm gì, nó có commit không?</strong>
+Không commit — chỉ ghi các thay đổi đang chờ xuống DB trong cùng transaction. Cần nó vì lộ trình mới
+thường giữ lại bến cũ, tức dòng mới trùng khoá với dòng vừa xoá; phải chắc chắn <code>DELETE</code> đã chạy
+trước khi <code>INSERT</code> (roadmap §9: <em>&quot;so the re-inserted rows cannot collide with the old ones&quot;</em>). Lỗi
+xảy ra sau đó vẫn rollback được.</p>
+<p><strong>6. (Vì sao) Sửa quãng đường khi xe đang chạy, sao hệ thống không chặn?</strong>
+Vì <code>updateTripStatus()</code> cộng <code>route.distanceKm</code> vào odometer <strong>lúc hoàn thành</strong>
+(<code>TripService.java:684-688</code>), nên số mới sẽ áp cho chuyến đang chạy. Nếu Admin đang sửa lỗi gõ thì
+đó là điều đúng; nếu tuyến thật sự đổi thì sai — hệ thống không phân biệt được. Chủ dự án chọn
+<strong>cảnh báo</strong>: lưu như thường và hiện số chuyến bị ảnh hưởng, km cũ và mới
+(<code>RouteService.java:124-133</code>). Chụp km vào chuyến lúc xuất phát sẽ cần thêm cột, trái nguyên tắc
+không phình bảng <code>trips</code> (roadmap §3).</p>
+<p><strong>7. (Thế nào) Em tránh N+1 ở màn danh sách tuyến thế nào?</strong>
+<code>findAllWithStations()</code> dùng <code>LEFT JOIN FETCH</code> nạp tuyến, điểm dừng, bến và loại xe trong một câu
+(<code>RouteRepository.java:22-26</code>). Ở các màn chuyến thì không làm vậy được vì Hibernate cấm fetch hai
+collection kiểu <code>List</code> cùng lúc (<code>MultipleBagFetchException</code>, đụng <code>Trip.coDrivers</code>), nên
+<code>Route.routeStations</code> có <code>@BatchSize(20)</code> để gom nạp (<code>Route.java:45</code>, <code>:74-78</code>).</p>
+<p><strong>8. (Nếu… thì sao) Một tuyến đi A → B → A được không?</strong>
+Không. Khoá chính <code>(route_id, station_id)</code> cấm một bến xuất hiện hai lần. Service chặn sớm bằng
+<code>HashSet</code> (<code>RouteService.java:206-210</code>), JS chặn trước khi gửi (<code>route-form.html:151-159</code>). Đây là
+giới hạn mô hình được ghi rõ (roadmap §9:1234, <code>current_functional_spec.md:55</code>); muốn hỗ trợ phải đổi
+khoá thành <code>(route_id, stop_order)</code>.</p>
+<p><strong>9. (Nếu… thì sao) Ai đó gửi POST <code>/admin/routes/create</code> kèm <code>id=1</code>?</strong>
+Trước đây hàm <code>saveRoute()</code> thấy id khác null sẽ <strong>sửa</strong> tuyến 1 — đo thật: tuyến 1 thành 999 km, mất
+loại xe, đổi lộ trình, kéo theo 416 chuyến (lỗi #21). Nay <code>createRoute()</code> ném
+<code>IllegalArgumentException</code> ngay đầu hàm (<code>RouteService.java:73-77</code>); test
+<code>createRoute_refusesAnEntityThatAlreadyHasAnId…</code> khẳng định tuyến nạn nhân không đổi.</p>
+<p><strong>10. (Cái gì) Loại xe phù hợp của tuyến có bắt buộc không?</strong>
+Không — là <strong>gợi ý</strong>. Không validator nào kiểm. Các dropdown chọn xe và AI xếp xe đúng loại lên đầu
+rồi mới tới loại khác (<code>TripService.preferredTypeThenLeastWorn()</code> <code>:343</code>). Rủi ro thật của xe khác
+loại — bán quá số ghế — do luật #22 chặn. Chủ dự án chốt 2026-09-23 và 2026-09-24 (javadoc
+<code>Route.java:53-61</code>).</p>
+<p><strong>11. (Hạn chế) Màn này còn thiếu gì?</strong>
+Trung thực: lỗi khi lưu làm mất dữ liệu đã gõ; không có nút đổi chỗ điểm dừng; không giới hạn trên cho
+thời lượng, mà thời lượng quyết định số tài xế; không chống trùng tuyến; chưa có test tự động cho
+guard xoá và bốn luật validate (đã kiểm bằng chạy app thật lúc giao Phase 1).</p>
+<h3 id="10-3-diem-phai-noi-that">10.3. Điểm phải nói thật</h3>
+<ul>
+<li><strong>Không có đăng nhập / phân quyền, CSRF tắt</strong> (roadmap §4): ai vào được URL là sửa/xoá tuyến được.
+Xoá bằng GET — xem Bài 01 §9.2 vì sao mục này đã bị rút khỏi sổ lỗi.</li>
+<li><strong>Loại xe chỉ là gợi ý</strong>, không phải luật.</li>
+<li><strong>Comment còn dùng chữ &quot;AI&quot;</strong> cho phần tự xếp xe (javadoc <code>Route.java:59</code>) — đó là thuật toán theo
+luật, không phải học máy.</li>
+<li><strong>Lịch sử chuyến là mô phỏng</strong> (profile <code>backfill</code>) và chỉ dùng tuyến ≤ 8 giờ; các tuyến dài không có
+dữ liệu dự báo.</li>
+<li><strong>Sửa km khi xe đang chạy chỉ được cảnh báo</strong>, và <strong>sửa lộ trình làm đổi nhãn của chuyến lịch sử</strong>.</li>
+<li>Tuyến <strong>không</strong> có giá vé, lịch chạy cố định hay tọa độ — giá nằm ở từng chuyến.</li>
+</ul>
+<hr>
+<h2 id="11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Trên form, Admin xoá dòng 2 trong 4 dòng bến. Trước khi gửi, các ô số thứ tự hiện gì, và server
+nhận <code>stopOrder</code> bao nhiêu cho mỗi bến?</li>
+<li>Vì sao <code>createRoute()</code> phải gọi <code>routeRepository.save(route)</code> <strong>trước</strong> <code>rebuildStops()</code>?</li>
+<li>Admin chỉ đổi thời lượng 120 → 150 phút của một tuyến đang có 3 chuyến <code>DEPARTED</code>. Có cảnh báo
+không? Giờ đến dự kiến của 3 chuyến đó có đổi không?</li>
+<li>Trong <code>updateRoute()</code>, câu <code>UPDATE routes</code> thực sự được gửi xuống DB ở dòng nào?</li>
+<li>Tuyến 4 có 1 chuyến <code>ACTIVE</code> và 5 chuyến <code>COMPLETED</code>, không có <code>DEPARTED</code>. Admin đổi km. Có cảnh
+báo không, vì sao?</li>
+<li>Xoá tuyến chưa có chuyến nào thì bảng <code>route_stations</code> thay đổi thế nào, và nhờ cơ chế nào?</li>
+<li>Nếu bỏ <code>required = false</code> ở <code>@RequestParam List&lt;Long&gt; stationIds</code>, một POST không có tham số
+<code>stationIds</code> sẽ cho kết quả gì khác?</li>
+</ol>
+<p><strong>Bài tự trace.</strong> Admin mở form tạo tuyến, gõ 80 km, 90 phút, chọn dòng 1 = bến 3, dòng 2 = bến 3
+(trùng), bấm Lưu Tuyến. Viết chuỗi <code>[JS] → Controller → Service → Repository → view</code> và kết quả trên
+màn hình. Sau đó làm lại với một <strong>POST tự chế</strong> (bỏ qua trình duyệt) có
+<code>distanceKm=80&amp;estimatedDuration=90&amp;stationIds=3&amp;stationIds=3</code>.</p>
+<p><strong>Câu đọc code.</strong> <code>RouteService.java:142-146</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">existing.setRouteStations(null);
+routeStationRepository.deleteAll(routeStationRepository.findByRouteIdOrderByStopOrderAsc(id));
+routeStationRepository.flush();
+
+rebuildStops(existing, stationIds);</code></pre></div>
+<p>Đoạn này làm gì? Nếu bỏ dòng <code>deleteAll(...)</code> (giữ nguyên các dòng còn lại), sửa tuyến từ lộ trình
+A→B thành C→D sẽ để lại dữ liệu gì trong <code>route_stations</code>, và danh sách tuyến hiện lộ trình ra sao?</p>
+<details><summary>Đáp án</summary>
+
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li><code>refresh()</code> đánh lại ô số thành 1, 2, 3 (<code>route-form.html:119-123</code>). Server nhận 3 tham số
+<code>stationIds</code> theo thứ tự còn lại và gán <code>stopOrder</code> 1, 2, 3 (<code>RouteService.java:161-170</code>). Ô số
+không được gửi lên.</li>
+<li><code>RouteStationId</code> cần <code>route.getId()</code> (<code>:167</code>); với <code>GenerationType.IDENTITY</code>, id chỉ có sau khi
+<code>INSERT routes</code> chạy ở <code>save()</code> (<code>:83</code>).</li>
+<li>Không — cảnh báo chỉ xét <code>distanceKm</code> (<code>:124</code>). Giờ đến của chuyến cũ <strong>không</strong> đổi: mỗi chuyến lưu
+<code>arrivalTimeExpected</code> riêng; <code>estimatedDuration</code> chỉ dùng khi tạo chuyến mới.</li>
+<li>Ở <code>routeStationRepository.flush()</code> (<code>:144</code>) — flush ghi <strong>mọi</strong> thay đổi đang chờ, gồm cả thay đổi
+của <code>existing</code> từ <code>:135-137</code> (dirty checking), không chỉ các <code>DELETE</code>.</li>
+<li>Không. <code>countByRouteIdAndStatus(id, DEPARTED)</code> = 0. <code>ACTIVE</code> chưa lăn bánh nên chạy theo km mới là
+đúng; <code>COMPLETED</code> đã được cộng xong (test <code>:122</code>).</li>
+<li>Mọi dòng của tuyến bị <code>DELETE</code>, nhờ <code>cascade = ALL</code> trên <code>Route.routeStations</code> (<code>Route.java:44</code>);
+<code>deleteRoute()</code> nạp tuyến kèm điểm dừng bằng <code>findByIdWithStations</code> (<code>RouteService.java:185</code>).</li>
+<li>Hiện tại: <code>stationIds = null</code> ⇒ <code>validateRoute()</code> ném &quot;Lộ trình phải có ít nhất 2 trạm…&quot; ⇒ quay về
+form với khung đỏ. Bỏ <code>required = false</code>: Spring từ chối request trước khi vào controller (lỗi
+400 thiếu tham số) — Admin thấy trang lỗi thay vì câu báo nghiệp vụ.</li>
+</ol>
+<p><strong>Bài tự trace</strong></p>
+<ul>
+<li><em>Qua trình duyệt:</em> <code>[JS]</code> listener submit <code>route-form.html:151-159</code> — <code>values = [&#39;3&#39;,&#39;3&#39;]</code>,
+<code>new Set(values).size = 1 ≠ 2</code> ⇒ <code>preventDefault()</code> + <code>alert(&#39;Một bến xe chỉ được xuất hiện một lần trong lộ trình…&#39;)</code>. <strong>Không có request nào.</strong> Màn hình vẫn là form, dữ liệu còn nguyên.</li>
+<li><em>POST tự chế:</em> <code>AdminRouteController.createRoute()</code> <code>:41-46</code> → bind <code>new Route()</code> (80 km, 90 phút,
+<code>id = null</code>, loại xe <code>null</code>), <code>stationIds = [3, 3]</code> → proxy mở transaction →
+<code>RouteService.createRoute()</code> qua tripwire <code>:73</code> → <code>validateRoute()</code>: đủ 2 phần tử nhưng
+<code>HashSet{3}</code> có kích thước 1 ⇒ <code>IllegalArgumentException</code> <code>:207-209</code> → rollback (chưa ghi gì) →
+<code>catch</code> <code>:48-50</code> → flash <code>error</code> &quot;Lỗi: Một bến xe chỉ được xuất hiện một lần trong lộ trình. Vui lòng
+kiểm tra lại các trạm đã chọn!&quot; → <code>redirect:/admin/routes/create</code> → <code>showCreateForm()</code> dựng form
+<strong>trống</strong>, khung đỏ <code>route-form.html:24-26</code>, JS dựng lại 2 dòng trống. Không chạm repository nào.</li>
+</ul>
+<p><strong>Câu đọc code</strong></p>
+<p>Đoạn này xoá toàn bộ điểm dừng cũ của tuyến, ép ghi xuống DB ngay, rồi chèn lộ trình mới. Bỏ
+<code>deleteAll(...)</code>: không có gì bị xoá (<code>setRouteStations(null)</code> không xoá vì không có <code>orphanRemoval</code>);
+<code>rebuildStops</code> chèn thêm <code>(id, C, 1)</code> và <code>(id, D, 2)</code> ⇒ bảng còn <strong>cả bốn</strong> dòng <code>(A,1) (B,2) (C,1) (D,2)</code>. Danh sách tuyến sẽ hiện lộ trình 4 bến với hai số 1 và hai số 2; điểm đi/đến lấy theo
+<code>min</code>/<code>max</code> của <code>stopOrder</code> nên tuỳ thứ tự phần tử mà ra A hoặc C, B hoặc D. <span class="tag tag-guess">SUY LUẬN — chưa
+kiểm chứng</span> Nếu lộ trình mới giữ lại A thì <code>save()</code> dòng <code>(id, A)</code> đi nhánh <code>merge</code>, tìm thấy dòng cũ
+và chỉ ghi đè <code>stop_order</code> của nó thay vì báo lỗi; hai test sửa tuyến ở §9.4 sẽ đỏ vì danh sách bến
+đọc lại không khớp.</p>
+</details>
+
+<hr>
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li>Tuyến = <strong>ba con số + một lộ trình có thứ tự</strong>; không có tên, nhãn được suy ra từ bến đầu và bến
+cuối qua <code>RouteStation.stopOrder</code>.</li>
+<li>Thứ tự dòng trên form chính là thứ tự dừng: JS dựng các <code>&lt;select name=&quot;stationIds&quot;&gt;</code>, Spring gom
+thành <code>List&lt;Long&gt;</code>, <code>rebuildStops()</code> đánh 1..n.</li>
+<li>Sửa lộ trình = <strong>xoá hết → <code>flush()</code> → dựng lại</strong>, vì khoá kép <code>(routeId, stationId)</code> và không có
+<code>orphanRemoval</code> (roadmap §9).</li>
+<li><code>validateRoute()</code> có 4 luật, xoá tuyến bị chặn khi đã có chuyến, tạo có tripwire (lỗi #21), và
+đổi km khi có chuyến <code>DEPARTED</code> thì <strong>cảnh báo, không chặn</strong> (Group C(c)).</li>
+<li><code>distanceKm</code> được đọc lúc chạy (odometer, bảo trì, chi phí); <code>estimatedDuration</code> được chụp lúc tạo
+chuyến (giờ đến ⇒ số tài xế); <code>suitableBusType</code> chỉ là gợi ý xếp xe.</li>
+</ol>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>
