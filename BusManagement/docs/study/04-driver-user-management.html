@@ -1,0 +1,1793 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 04 Quản lý tài xế và tài khoản</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</a></li>
+<li><a href="#2-ban-do-tong-quan">§2. Bản đồ tổng quan</a></li>
+<li><a href="#3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</a></li>
+<li><a href="#4-luong-loi-xoa-tai-xe-da-co-lich-su">§4. Luồng lỗi — xoá tài xế đã có lịch sử</a></li>
+<li><a href="#5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</a></li>
+<li><a href="#6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</a></li>
+<li><a href="#7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</a></li>
+<li><a href="#8-vi-du-tinh-tay">§8. Ví dụ tính tay</a></li>
+<li><a href="#9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</a></li>
+<li><a href="#10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</a></li>
+<li><a href="#11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 04 · CHỨC NĂNG</span>
+      <h1>Bài 04 — Driver &amp; User Management (Quản lý tài xế và tài khoản)</h1>
+    </header>
+<aside class="callout"><p>Bài chức năng thứ tư, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN B), ngày 2026-10-01.
+Học sau Bài 00a, 00b, 01, 02 và 03. Số dòng là ảnh chụp ngày viết — lệch thì grep lại.</p>
+<p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết
+ra · <span class="tag tag-guess">SUY LUẬN</span> suy luận của người viết (&quot;chưa kiểm chứng&quot; nếu chưa chạy thử).</p>
+<p>Viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>, <code>test/</code> =
+<code>src/test/java/giang/com/BusManagement/</code>, <code>tpl/</code> = <code>src/main/resources/templates/</code>.</p>
+<p>Bài gồm <strong>hai màn</strong>: Quản lý tài xế (<code>/admin/drivers</code>, đủ 6 endpoint như Bài 01–03) và màn tạo
+tài khoản (<code>/admin/users/new</code>, <code>/admin/users/save</code> trong <code>AdminController</code>). Endpoint
+<code>/admin/dashboard</code> cũng nằm trong <code>AdminController</code> nhưng thuộc <strong>Bài 12</strong>. Phần mới so với các bài
+trước: <strong>một form, hai entity</strong> (<code>User</code> + <code>Driver</code>) nối bằng khoá chung <code>@MapsId</code>; ô checkbox cần
+<strong>&quot;field marker&quot;</strong> <code>_isActive</code>; mật khẩu dùng <strong>ô riêng</strong> khi sửa; và một luật dùng chung giữa hai
+service (<code>requireUsernameAvailable</code>).</p>
+</aside>
+<hr>
+<h2 id="1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</h2>
+<p><strong>Vấn đề thật của nhà xe.</strong> Mỗi chuyến cần ít nhất một tài xế, và hệ thống chỉ được giao chuyến cho
+người <strong>đang làm việc</strong> và <strong>còn bằng lái vào ngày khởi hành</strong>. Màn Quản lý tài xế là nơi giữ hai
+thông tin đó cho đúng: số bằng, hạn bằng, kinh nghiệm, và công tắc &quot;Đang hoạt động&quot;. Mọi chức năng
+xếp người — form tạo chuyến, duyệt chuyến AI, gợi ý tài xế, bảng điều hành — đều đọc từ đây.</p>
+<p>Không có màn này thì tài xế chỉ có nhờ dữ liệu seed (roadmap §5 Phase 1: <em>&quot;Driver CRUD does not
+currently exist — only seeded via <code>DataInitializer</code>&quot;</em>), không ai sửa được hạn bằng lái khi tài xế
+gia hạn, và không có cách cho một người nghỉ việc mà vẫn giữ lịch sử các chuyến họ đã lái.</p>
+<p>Màn <strong>tạo tài khoản</strong> (<code>/admin/users/new</code>) nhỏ hơn: tạo tài khoản <code>ROLE_ADMIN</code> hoặc <code>ROLE_USER</code>. Vì
+hệ thống <strong>không có đăng nhập</strong>, các tài khoản này hiện không dùng vào việc gì (§10.3).</p>
+<p><strong>Một kịch bản cụ thể.</strong> Nhà xe tuyển anh Nguyễn Văn A. Chị admin vào Dashboard, bấm <strong>Quản lý tài
+xế</strong>, rồi <strong>Thêm Tài Xế Mới</strong>. Form có hai phần: <em>Thông tin tài khoản</em> (tên đăng nhập <code>tx_nguyenvana</code>,
+mật khẩu, họ tên, điện thoại, email để trống) và <em>Hồ sơ nghề nghiệp</em> (số bằng <code>B2-123</code>, hạn bằng
+2027-06-30, 4 năm kinh nghiệm, công tắc &quot;Đang hoạt động&quot; bật sẵn). Bấm <strong>Lưu Tài Xế</strong> → danh sách,
+khung xanh <em>&quot;Thêm mới tài xế thành công!&quot;</em>.</p>
+<p>Ba tháng sau anh A xin nghỉ, nhưng vẫn còn một chuyến đang bán vé ngày mai. Chị admin bấm <strong>Sửa</strong>, bỏ
+tick &quot;Đang hoạt động&quot;, lưu → khung đỏ <em>&quot;Lỗi: Không thể khóa tài xế này vì đang được phân công cho
+chuyến xe chưa kết thúc (chờ duyệt / đang bán vé / đang trên đường). Hãy gỡ tài xế khỏi các chuyến
+đó trước!&quot;</em>. Chị đổi tài xế của chuyến đó, quay lại khoá được. Chị thử <strong>Xóa</strong> hẳn anh A → bị chặn,
+vì anh A đã từng lái chuyến: <em>&quot;…Hãy khóa hồ sơ (bỏ tick &#39;Đang hoạt động&#39;) thay vì xóa cứng!&quot;</em>.</p>
+<hr>
+<h2 id="2-ban-do-tong-quan">§2. Bản đồ tổng quan</h2>
+<h3 id="2-1-cac-manh-ghep">2.1. Các mảnh ghép</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Loại</th>
+<th>File</th>
+<th>Trách nhiệm (1 dòng)</th>
+</tr>
+</thead><tbody><tr>
+<td>Template (lối vào)</td>
+<td><code>tpl/admin/dashboard.html:110</code>, <code>:93</code></td>
+<td>Nút &quot;Quản lý tài xế&quot; và nút tạo tài khoản trên Dashboard</td>
+</tr>
+<tr>
+<td>Template</td>
+<td><code>tpl/admin/driver/driver-list.html</code></td>
+<td>Bảng tài xế: họ tên, username, liên hệ, bằng lái + nhãn &quot;Hết hạn&quot;, trạng thái; nút Sửa/Xóa</td>
+</tr>
+<tr>
+<td>Template + JS</td>
+<td><code>tpl/admin/driver/driver-form.html</code></td>
+<td>Form gộp hai phần User + Driver; ô mật khẩu đổi tên giữa Thêm/Sửa; marker <code>_isActive</code>; JS <code>:119-130</code> chặn submit khi ô bắt buộc trống</td>
+</tr>
+<tr>
+<td>Template</td>
+<td><code>tpl/admin/user-form.html</code></td>
+<td>Form tạo tài khoản (username, mật khẩu, họ tên, điện thoại, vai trò)</td>
+</tr>
+<tr>
+<td>Controller</td>
+<td><code>…/controller/admin/AdminDriverController.java</code></td>
+<td>6 endpoint <code>/admin/drivers/*</code>; chỉ inject <code>DriverService</code></td>
+</tr>
+<tr>
+<td>Controller</td>
+<td><code>…/controller/admin/AdminController.java:41-69</code></td>
+<td><code>GET /admin/users/new</code>, <code>POST /admin/users/save</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>…/service/DriverService.java</code></td>
+<td>Tạo cặp User+Driver, sửa (chép field, guard khoá), xoá (2 guard)</td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>…/service/AdminService.java</code></td>
+<td>Tạo tài khoản không phải tài xế; luật &quot;username duy nhất&quot; dùng chung</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>…/repository/DriverRepository.java:17-18</code></td>
+<td><code>findAllWithUser()</code> (<code>JOIN FETCH d.user</code>)</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>…/repository/UserRepository.java:12</code></td>
+<td><code>findByUsername()</code></td>
+</tr>
+<tr>
+<td>Repository (mượn)</td>
+<td><code>TripRepository.java:257-276</code>, <code>IncidentRepository.java:62</code></td>
+<td>Guard: tài xế từng/đang có chuyến; tài xế có bản ghi sự cố</td>
+</tr>
+<tr>
+<td>Entity</td>
+<td><code>…/domain/User.java</code></td>
+<td>Bảng <code>users</code>: username (unique), password, fullName, email (unique), phone, role, status + quan hệ ngược <code>driver</code></td>
+</tr>
+<tr>
+<td>Entity</td>
+<td><code>…/domain/Driver.java</code></td>
+<td>Bảng <code>drivers</code>: khoá chính <strong>là</strong> <code>user_id</code>; số bằng, hạn bằng, kinh nghiệm, <code>isActive</code>, hai cột ẩn</td>
+</tr>
+<tr>
+<td>Enum</td>
+<td><code>…/domain/Role.java</code></td>
+<td><code>ROLE_ADMIN</code>, <code>ROLE_DRIVER</code>, <code>ROLE_USER</code></td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/service/AdminServiceTest.java</code>; <code>test/service/CreatePathIdTripwireTest.java:195</code>, <code>:227</code>, <code>:240</code>; <code>test/domain/EntityEqualsHashCodeCycleTest.java:88</code></td>
+<td>6 test luật tài khoản; 3 tripwire; vòng User↔Driver không đệ quy</td>
+</tr>
+<tr>
+<td>Seed</td>
+<td><code>…/config/DataInitializer.java:290-300</code></td>
+<td><code>createDriver()</code> mẫu — form gộp bắt chước đúng hàm này</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-2-bang-endpoint-du-moi-diem-bat-dau">2.2. Bảng endpoint — đủ mọi điểm bắt đầu</h3>
+<p>Không có <code>@Scheduled</code>, <code>fetch()</code>/REST hay <code>CommandLineRunner</code> riêng. JS của hai form chỉ kiểm tra
+phía trình duyệt, không gọi server. <code>ADC</code> = <code>AdminDriverController.java</code>, <code>AC</code> = <code>AdminController.java</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>HTTP</th>
+<th>URL</th>
+<th>Controller method</th>
+<th>Được gọi từ đâu</th>
+<th>Service chính</th>
+<th>Kết quả</th>
+</tr>
+</thead><tbody><tr>
+<td>GET</td>
+<td><code>/admin/drivers</code></td>
+<td><code>ADC.listDrivers()</code> <code>:19-23</code></td>
+<td>nút <code>dashboard.html:110</code>; &quot;Hủy Bỏ&quot; <code>driver-form.html:109</code>; mọi redirect thành công</td>
+<td><code>findAllWithUser()</code></td>
+<td>view <code>admin/driver/driver-list</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/drivers/create</code></td>
+<td><code>ADC.showCreateForm()</code> <code>:25-30</code></td>
+<td>&quot;Thêm Tài Xế Mới&quot; <code>driver-list.html:20</code>; redirect khi tạo lỗi</td>
+<td>—</td>
+<td>view <code>driver-form</code> với <code>new Driver()</code> + <code>new User()</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/drivers/create</code></td>
+<td><code>ADC.createDriver()</code> <code>:39-51</code></td>
+<td>&quot;Lưu Tài Xế&quot; khi <code>driver.userId == null</code> (<code>driver-form.html:29</code>)</td>
+<td><code>createDriver(user, driver)</code></td>
+<td>redirect <code>/admin/drivers</code> + <code>success</code>; lỗi: redirect <code>/admin/drivers/create</code> + <code>error</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/drivers/edit/{id}</code></td>
+<td><code>ADC.showEditForm()</code> <code>:53-65</code></td>
+<td>&quot;Sửa&quot; <code>driver-list.html:82-83</code>; redirect khi sửa lỗi</td>
+<td><code>findById(id)</code></td>
+<td>view <code>driver-form</code> điền sẵn; không thấy: redirect <code>/admin/drivers</code> + <code>error</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/drivers/edit/{id}</code></td>
+<td><code>ADC.updateDriver()</code> <code>:67-81</code></td>
+<td>&quot;Lưu Tài Xế&quot; khi <code>driver.userId != null</code></td>
+<td><code>updateDriver(id, user, driver, rawPassword)</code></td>
+<td>redirect <code>/admin/drivers</code> + <code>success</code>; lỗi: redirect <code>/admin/drivers/edit/{id}</code> + <code>error</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/drivers/delete/{id}</code></td>
+<td><code>ADC.deleteDriver()</code> <code>:83-92</code></td>
+<td>&quot;Xóa&quot; + <code>confirm()</code> <code>driver-list.html:84-87</code></td>
+<td><code>deleteDriver(id)</code></td>
+<td>redirect <code>/admin/drivers</code> + <code>success</code>/<code>error</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/users/new</code></td>
+<td><code>AC.showUserForm()</code> <code>:42-52</code></td>
+<td>nút <code>dashboard.html:93</code>; redirect khi lưu lỗi</td>
+<td>—</td>
+<td>view <code>admin/user-form</code>, <code>roles</code> = mọi vai trò <strong>trừ</strong> <code>ROLE_DRIVER</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/users/save</code></td>
+<td><code>AC.saveUser()</code> <code>:60-69</code></td>
+<td>&quot;Tạo tài khoản&quot; <code>user-form.html:22</code>, <code>:54</code></td>
+<td><code>AdminService.createNewUser(user)</code></td>
+<td>redirect <code>/admin/dashboard?success=user</code>; lỗi: redirect <code>/admin/users/new</code> + <code>error</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="2-3-so-do-toan-canh">2.3. Sơ đồ toàn cảnh</h3>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    subgraph UI["Trình duyệt"]
+        DL["driver-list.html"]
+        DF["driver-form.html&lt;br/&gt;User + Driver chung một form"]
+        UF["user-form.html"]
+    end
+    subgraph C["Controller"]
+        ADC["AdminDriverController&lt;br/&gt;/admin/drivers"]
+        AC["AdminController&lt;br/&gt;/admin/users/new, /save"]
+    end
+    subgraph S["Service"]
+        DS["DriverService&lt;br/&gt;createDriver / updateDriver / deleteDriver"]
+        AS["AdminService&lt;br/&gt;createNewUser"]
+        U["requireUsernameAvailable&lt;br/&gt;luật dùng chung"]
+    end
+    DR["DriverRepository"]
+    UR["UserRepository"]
+    TR["TripRepository&lt;br/&gt;existsAnyTripForDriver,&lt;br/&gt;existsTripForDriverWithStatusIn"]
+    IR["IncidentRepository&lt;br/&gt;existsByDriverUserId"]
+    DB[("MySQL&lt;br/&gt;users, drivers")]
+    DL --&gt; ADC
+    DF --&gt; ADC
+    UF --&gt; AC
+    ADC --&gt; DS
+    AC --&gt; AS
+    DS --&gt; U
+    AS --&gt; U
+    U --&gt; UR
+    DS --&gt; DR &amp; UR &amp; TR &amp; IR
+    AS --&gt; UR
+    DR --&gt; DB
+    UR --&gt; DB
+    TS["TripService, DriverRecommendation,&lt;br/&gt;Dashboard, Backfill"] -.-&gt;|đọc isActive, licenseExpiryDate,&lt;br/&gt;totalDrivingHours24h| DB</pre></figure>
+<p>Quan hệ dữ liệu — hai bảng chung một khoá:</p>
+<figure class="diagram"><pre class="mermaid">erDiagram
+    USERS ||--o| DRIVERS : "có hồ sơ tài xế (nếu ROLE_DRIVER)"
+    DRIVERS ||--o{ TRIPS : "lái chính / phụ xe"
+    DRIVERS }o--o{ TRIPS : "tài xế phụ qua trip_co_drivers"
+    DRIVERS |o--o{ INCIDENTS : "liên quan"
+    USERS {
+        bigint id PK
+        varchar username "UNIQUE, NOT NULL"
+        varchar password "lưu thô"
+        varchar full_name
+        varchar email "UNIQUE, có thể NULL"
+        varchar phone
+        varchar role "ROLE_ADMIN, ROLE_DRIVER, ROLE_USER"
+        bit status
+    }
+    DRIVERS {
+        bigint user_id PK "cũng là FK tới users.id"
+        varchar license_number
+        date license_expiry_date
+        int experience_years
+        bit is_active
+        double total_driving_hours24h "ẩn khỏi form"
+        int monthly_rest_days "ẩn khỏi form"
+    }</pre></figure>
+<h3 id="2-4-dieu-cot-loi-can-nho">2.4. Điều cốt lõi cần nhớ</h3>
+<ol>
+<li><strong>Tài xế = một <code>User</code> + một <code>Driver</code> dùng chung một id.</strong> <code>Driver.userId</code> vừa là khoá chính vừa là
+khoá ngoại tới <code>users.id</code> (<code>@MapsId</code>, <code>Driver.java:18-28</code>). Không thể có <code>Driver</code> thiếu <code>User</code>, nên
+màn này tạo và xoá <strong>cả cặp</strong> (javadoc <code>DriverService.java:18-25</code>; roadmap §9:1230).</li>
+<li><strong>Một form, hai <code>@ModelAttribute</code>.</strong> Spring dựng <strong>cả</strong> <code>User</code> lẫn <code>Driver</code> từ cùng một request,
+khớp theo tên ô; hai class không có field trùng tên nên mỗi ô chỉ rơi vào một object (javadoc
+<code>AdminDriverController.java:32-38</code>).</li>
+<li><strong>&quot;Khoá&quot; thay cho &quot;xoá&quot;.</strong> Tài xế đã từng chạy chuyến hoặc có bản ghi sự cố thì không xoá cứng
+được; muốn cho nghỉ thì bỏ tick &quot;Đang hoạt động&quot;. Và không được khoá người còn chuyến
+<code>PENDING_APPROVAL</code>/<code>ACTIVE</code>/<code>DEPARTED</code>.</li>
+<li><strong>Hai trường quyết định việc xếp chuyến:</strong> <code>isActive</code> và <code>licenseExpiryDate</code>. Bằng lái được xét
+<strong>vào ngày khởi hành</strong> (<code>Driver.isLicenseValid(LocalDate)</code>), còn nhãn &quot;Hết hạn&quot; ở danh sách xét
+<strong>hôm nay</strong>.</li>
+<li><strong>Username duy nhất</strong> được kiểm ở <strong>một chỗ</strong> (<code>AdminService.requireUsernameAvailable()</code>), cả màn
+tài xế lẫn màn tài khoản cùng gọi; màn tài khoản <strong>không</strong> cho tạo <code>ROLE_DRIVER</code> (lỗi #25).</li>
+</ol>
+<hr>
+<h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
+<p><strong>Chọn luồng nào và vì sao.</strong></p>
+<ul>
+<li><strong>Luồng A — Tạo tài xế</strong>: chỗ duy nhất trong dự án mà một form sinh ra <strong>hai entity</strong> trong một
+transaction, theo đúng thứ tự <code>@MapsId</code> bắt buộc. Cũng là chỗ có tripwire kiểm <strong>hai</strong> khoá.</li>
+<li><strong>Luồng B — Sửa tài xế và khoá hồ sơ</strong>: chứa luật nghiệp vụ quan trọng nhất của màn (không khoá
+người còn chuyến dở), cơ chế marker <code>_isActive</code>, và cách giữ mật khẩu cũ.</li>
+</ul>
+<h3 id="3-1-luong-a-tao-tai-xe">3.1. Luồng A — Tạo tài xế</h3>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant JS as JavaScript driver-form
+    participant C as AdminDriverController
+    participant P as Proxy Transactional
+    participant S as DriverService
+    participant AS as AdminService
+    participant R as Repository
+    participant DB as MySQL
+    A-&gt;&gt;C: GET /admin/drivers/create
+    C--&gt;&gt;A: driver-form, new Driver + new User
+    A-&gt;&gt;JS: điền form, bấm Lưu Tài Xế
+    JS-&gt;&gt;JS: checkValidity - username, password, họ tên, số bằng, hạn bằng
+    JS-&gt;&gt;C: POST /admin/drivers/create
+    Note over C: Spring dựng HAI object từ cùng request&lt;br/&gt;User: username, password, fullName, phone, email&lt;br/&gt;Driver: licenseNumber, licenseExpiryDate, experienceYears, isActive
+    C-&gt;&gt;P: createDriver(user, driver)
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;S: tripwire - user.id hoặc driver.userId khác null thì ném
+    S-&gt;&gt;S: normalizeUser - email, phone rỗng thành null
+    S-&gt;&gt;AS: requireUsernameAvailable(username, null)
+    AS-&gt;&gt;R: findByUsername
+    R--&gt;&gt;AS: không có
+    S-&gt;&gt;S: role = ROLE_DRIVER, status = true
+    S-&gt;&gt;R: userRepository.save(user)
+    R-&gt;&gt;DB: INSERT users ngay - IDENTITY cần id
+    S-&gt;&gt;S: driver.setUser(savedUser)
+    S-&gt;&gt;R: driverRepository.save(driver)
+    Note over S,R: MapsId chép users.id vào drivers.user_id
+    P-&gt;&gt;DB: commit - INSERT drivers
+    C--&gt;&gt;A: flash success, redirect:/admin/drivers</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Controller</td>
+<td><code>AdminDriverController.java:25-30</code></td>
+<td><code>showCreateForm()</code></td>
+<td>—</td>
+<td>đặt <code>driver = new Driver()</code> và <code>user = new User()</code> vào Model</td>
+<td><code>driver-form</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>View</td>
+<td><code>driver-form.html:20</code>, <code>:29</code></td>
+<td>tiêu đề + <code>th:action</code></td>
+<td><code>driver.userId == null</code></td>
+<td>&quot;Thêm Tài Xế Mới&quot;; form trỏ <code>/admin/drivers/create</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>View</td>
+<td><code>:49-52</code></td>
+<td>ô mật khẩu</td>
+<td><code>driver.userId == null</code></td>
+<td>khi <strong>tạo</strong>: hiện ô <code>name=&quot;password&quot;</code> <code>required</code> (bind thẳng vào <code>User.password</code>); ô <code>rawPassword</code> không hiện</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>View</td>
+<td><code>:100-102</code></td>
+<td>công tắc</td>
+<td>—</td>
+<td><code>&lt;input type=&quot;hidden&quot; name=&quot;_isActive&quot; value=&quot;on&quot;&gt;</code> + checkbox <code>name=&quot;isActive&quot; value=&quot;true&quot;</code>; khi tạo <code>th:checked</code> = <code>true</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>JavaScript</td>
+<td><code>:122-128</code></td>
+<td>listener <code>submit</code></td>
+<td>form</td>
+<td><code>checkValidity()</code>: các ô <code>required</code> (username <code>:37</code>, password <code>:49</code>, họ tên <code>:57</code>, số bằng <code>:77</code>, hạn bằng <code>:83</code>) và <code>min=&quot;0&quot;</code> ở kinh nghiệm (<code>:91</code>); sai ⇒ chặn + tô đỏ</td>
+<td>POST</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Trình duyệt</td>
+<td>—</td>
+<td>gửi form</td>
+<td>—</td>
+<td>ví dụ <code>username=tx_nguyenvana&amp;password=123&amp;fullName=Nguyễn Văn A&amp;phone=&amp;email=&amp;licenseNumber=B2-123&amp;licenseExpiryDate=2027-06-30&amp;experienceYears=4&amp;_isActive=on&amp;isActive=true</code></td>
+<td>POST</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Spring</td>
+<td><code>AdminDriverController.java:40-41</code></td>
+<td><code>@ModelAttribute(&quot;user&quot;) User</code> + <code>@ModelAttribute(&quot;driver&quot;) Driver</code></td>
+<td>cùng một body</td>
+<td>Spring tạo <strong>hai</strong> object và đổ <strong>mọi</strong> tham số vào cả hai, mỗi object nhận ô trùng tên field của nó, lờ đi phần còn lại. <code>phone=&quot;&quot;</code>, <code>email=&quot;&quot;</code> thành chuỗi rỗng; <code>licenseExpiryDate</code> đổi chuỗi <code>yyyy-MM-dd</code> thành <code>LocalDate</code>; <code>isActive=true</code> thành <code>Boolean.TRUE</code></td>
+<td><code>user</code>, <code>driver</code> (đều chưa có id)</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Controller</td>
+<td><code>:44</code></td>
+<td><code>driverService.createDriver(user, driver)</code></td>
+<td>—</td>
+<td>gọi trong <code>try</code></td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Proxy</td>
+<td><code>DriverService.java:66</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td><strong>mở transaction</strong></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service</td>
+<td><code>:68-73</code></td>
+<td>tripwire <strong>hai khoá</strong></td>
+<td><code>user.id</code>, <code>driver.userId</code></td>
+<td>một trong hai khác <code>null</code> ⇒ <code>IllegalArgumentException(&quot;createDriver() chỉ dùng để tạo tài xế mới (id phải trống). Hồ sơ #… đã tồn tại — muốn sửa thì dùng chức năng Sửa tài xế.&quot;)</code> (lỗi #21)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Service</td>
+<td><code>:74</code>, <code>:172-179</code></td>
+<td><code>normalizeUser(user)</code></td>
+<td><code>email=&quot;&quot;</code>, <code>phone=&quot;&quot;</code></td>
+<td>chuỗi trắng ⇒ <code>null</code>. Lý do (javadoc <code>:168-171</code>): <code>email</code> là cột <code>unique</code> — tài xế thứ hai cũng để trống email sẽ trùng chuỗi <code>&quot;&quot;</code> với người đầu</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Service → Service</td>
+<td><code>:75</code> → <code>AdminService.java:65-75</code></td>
+<td><code>requireUsernameAvailable(username, null)</code></td>
+<td>—</td>
+<td>username trống ⇒ <code>IllegalArgumentException(&quot;Tên đăng nhập không được để trống!&quot;)</code>; <code>findByUsername</code> có kết quả mà id khác <code>currentUserId</code> (ở đây <code>null</code>) ⇒ <code>&quot;Tên đăng nhập &#39;…&#39; đã tồn tại, vui lòng chọn tên khác!&quot;</code>. Hàm này <strong>không</strong> có <code>@Transactional</code> riêng nên chạy <strong>trong</strong> transaction của <code>createDriver</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Repository → DB</td>
+<td><code>UserRepository.java:12</code></td>
+<td><code>findByUsername</code></td>
+<td>—</td>
+<td>derived query. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT … FROM users WHERE username = &#39;tx_nguyenvana&#39;</code></td>
+<td><code>Optional.empty()</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Service</td>
+<td><code>:77-78</code></td>
+<td><code>setRole(ROLE_DRIVER)</code>, <code>setStatus(TRUE)</code></td>
+<td>—</td>
+<td><strong>ép</strong> vai trò, bất kể form gửi gì</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Service → DB</td>
+<td><code>:79</code></td>
+<td><code>userRepository.save(user)</code></td>
+<td><code>id = null</code></td>
+<td><code>persist</code>; <code>User.id</code> là <code>IDENTITY</code> (<code>User.java:21</code>) nên Hibernate chạy <strong>ngay</strong> <code>INSERT INTO users (username, password, full_name, email, phone, role, status) VALUES (…)</code> để lấy id</td>
+<td><code>savedUser</code>, ví dụ id 42</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Service</td>
+<td><code>:81</code></td>
+<td><code>driver.setUser(savedUser)</code></td>
+<td>—</td>
+<td>nối hồ sơ vào tài khoản vừa có id</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Service</td>
+<td><code>:82-84</code></td>
+<td>mặc định <code>isActive</code></td>
+<td>—</td>
+<td><code>null</code> ⇒ <code>TRUE</code>. Thực tế hiếm khi <code>null</code> vì field đã khởi tạo <code>= true</code> (<code>Driver.java:34</code>)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>18</td>
+<td>Service</td>
+<td><code>:85</code></td>
+<td><code>driverRepository.save(driver)</code></td>
+<td><code>userId = null</code></td>
+<td>Spring Data thấy id <code>null</code> ⇒ <code>persist</code>. <code>@MapsId</code> (<code>Driver.java:26</code>) khiến Hibernate <strong>chép id của <code>user</code></strong> (42) vào <code>driver.userId</code></td>
+<td>managed</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>19</td>
+<td>Proxy</td>
+<td>—</td>
+<td>commit</td>
+<td>—</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>INSERT INTO drivers (user_id, license_number, license_expiry_date, experience_years, is_active, total_driving_hours24h, monthly_rest_days) VALUES (42, &#39;B2-123&#39;, &#39;2027-06-30&#39;, 4, 1, NULL, NULL)</code> — <strong>đóng transaction</strong></td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>20</td>
+<td>Controller</td>
+<td><code>AdminDriverController.java:45</code>, <code>:50</code></td>
+<td>flash + redirect</td>
+<td>—</td>
+<td><code>success</code> = &quot;Thêm mới tài xế thành công!&quot; → <code>redirect:/admin/drivers</code></td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>21</td>
+<td>Controller → DB</td>
+<td><code>:19-23</code>, <code>DriverRepository.java:17-18</code></td>
+<td><code>findAllWithUser()</code></td>
+<td>—</td>
+<td>JPQL <code>SELECT DISTINCT d FROM Driver d LEFT JOIN FETCH d.user</code> — <strong>một</strong> câu cho cả trang</td>
+<td><code>List&lt;Driver&gt;</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>22</td>
+<td>View</td>
+<td><code>driver-list.html:25-28</code>, <code>:57-89</code></td>
+<td>bảng</td>
+<td><code>drivers</code>, <code>success</code></td>
+<td>khung xanh; dòng mới: họ tên, username, <code>—</code> ở cột liên hệ (phone <code>null</code>), số bằng in hoa <strong>bằng CSS</strong> (<code>:69</code>), hạn bằng không có nhãn &quot;Hết hạn&quot;, &quot;Đang hoạt động&quot;</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Ranh giới transaction:</strong> một transaction bao trọn <code>createDriver()</code> (bước 9 → 19), gồm cả lời gọi
+sang <code>AdminService</code> (bước 12). Nếu <code>driverRepository.save()</code> hỏng sau khi <code>INSERT users</code> đã chạy ở
+bước 15, cả hai bị <strong>rollback</strong> — không bao giờ để lại tài khoản tài xế không có hồ sơ <span class="tag tag-spring">SPRING</span>.</p>
+<p><strong>(c) Code then chốt</strong></p>
+<p><code>…/service/DriverService.java:66-86</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Transactional                                                  // User và Driver: cùng thành hoặc cùng hỏng
+public void createDriver(User user, Driver driver) {
+    if (user.getId() != null || driver.getUserId() != null) {   // tripwire: CẢ HAI phải chưa có khoá
+        throw new IllegalArgumentException("createDriver() chỉ dùng để tạo tài xế mới ...");
+    }
+    normalizeUser(user);                                        // "" → null cho email, phone
+    adminService.requireUsernameAvailable(user.getUsername(), null);  // luật dùng chung (lỗi #25)
+
+    user.setRole(Role.ROLE_DRIVER);                             // ép vai trò, không tin form
+    user.setStatus(Boolean.TRUE);
+    User savedUser = userRepository.save(user);                 // INSERT users NGAY để có id
+
+    driver.setUser(savedUser);                                  // @MapsId sẽ lấy id từ đây
+    if (driver.getIsActive() == null) {
+        driver.setIsActive(Boolean.TRUE);
+    }
+    driverRepository.save(driver);                              // INSERT drivers (user_id = id của User)
+}</code></pre></div>
+<p><code>…/domain/Driver.java:18-28</code> — khoá chung:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">@Id
+@EqualsAndHashCode.Include
+private Long userId;            // khoá chính của drivers — KHÔNG có @GeneratedValue
+
+@ToString.Exclude
+@OneToOne                       // một tài xế ↔ một tài khoản; mặc định EAGER
+@MapsId                         // "lấy khoá chính của tôi từ chính quan hệ này"
+@JoinColumn(name = "user_id")   // cột drivers.user_id vừa là PK vừa là FK
+private User user;</code></pre></div>
+<p><code>@MapsId</code> — nôm na là &quot;hồ sơ này không tự đánh số; số của nó <strong>chính là</strong> số của tài khoản nó gắn
+vào&quot;. Vì vậy <code>Driver</code> không có <code>@GeneratedValue</code>, và phải <code>save(user)</code> <strong>trước</strong> thì mới có số để
+chép sang (Bài 00b §1.3).</p>
+<h3 id="3-2-luong-b-sua-tai-xe-bo-tick-dang-hoat-dong-khi-con-chuyen-do">3.2. Luồng B — Sửa tài xế: bỏ tick &quot;Đang hoạt động&quot; khi còn chuyến dở</h3>
+<p>Tình huống: tài xế id 42 đang <code>isActive = true</code>, có một chuyến <code>ACTIVE</code> ngày mai. Admin bỏ tick
+&quot;Đang hoạt động&quot;, để trống ô mật khẩu, bấm lưu.</p>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant C as AdminDriverController
+    participant P as Proxy Transactional
+    participant S as DriverService
+    participant R as Repository
+    participant DB as MySQL
+    A-&gt;&gt;C: GET /admin/drivers/edit/42
+    C-&gt;&gt;R: driverService.findById(42)
+    C--&gt;&gt;A: driver-form, ô rawPassword trống, checkbox đang tick
+    A-&gt;&gt;C: bỏ tick, POST /admin/drivers/edit/42 (có _isActive, không có isActive)
+    Note over C: WebDataBinder thấy marker _isActive&lt;br/&gt;mà không thấy isActive nên đặt isActive = false
+    C-&gt;&gt;P: updateDriver(42, user, driver, rawPassword rỗng)
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;R: driverRepository.findById(42)
+    S-&gt;&gt;R: requireUsernameAvailable(username, 42)
+    S-&gt;&gt;S: isBeingDeactivated = true
+    S-&gt;&gt;R: existsTripForDriverWithStatusIn(42, PENDING_APPROVAL, ACTIVE, DEPARTED)
+    R-&gt;&gt;DB: SELECT COUNT trips theo 3 vai trò và 3 trạng thái
+    DB--&gt;&gt;S: true
+    alt còn chuyến dở
+        S--&gt;&gt;P: ném RuntimeException
+        P--&gt;&gt;C: rollback
+        C--&gt;&gt;A: flash error, redirect:/admin/drivers/edit/42
+    else không còn
+        S-&gt;&gt;S: chép 4 field User, 4 field Driver, giữ mật khẩu cũ
+        P-&gt;&gt;DB: commit - UPDATE users, UPDATE drivers
+        C--&gt;&gt;A: flash success, redirect:/admin/drivers
+    end</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Controller</td>
+<td><code>AdminDriverController.java:56-57</code></td>
+<td><code>driverService.findById(42)</code></td>
+<td>42</td>
+<td><code>DriverService.java:49-51</code> chỉ chuyển tiếp; không thấy ⇒ <code>RuntimeException</code> ⇒ flash <code>error</code> <strong>không</strong> có &quot;Lỗi: &quot; (<code>:62</code>), redirect danh sách</td>
+<td><code>Driver</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Repository → DB</td>
+<td>—</td>
+<td><code>findById</code> của <code>JpaRepository</code></td>
+<td>42</td>
+<td><code>Driver.user</code> là <code>@OneToOne</code> không ghi <code>fetch</code> ⇒ <strong>EAGER</strong> (Bài 00b §2.4). <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT d.*, u.* FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.user_id = 42</code></td>
+<td><code>Driver</code> + <code>User</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Controller</td>
+<td><code>:58-60</code></td>
+<td>Model</td>
+<td>—</td>
+<td>key <code>driver</code> và <code>user</code> = <code>driver.getUser()</code> — form dùng <strong>hai</strong> key</td>
+<td><code>driver-form</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>View</td>
+<td><code>driver-form.html:20</code>, <code>:29</code></td>
+<td>—</td>
+<td><code>userId = 42</code></td>
+<td>&quot;Sửa Hồ Sơ Tài Xế&quot;; action <code>/admin/drivers/edit/42</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>View</td>
+<td><code>:51-52</code></td>
+<td>ô mật khẩu</td>
+<td>—</td>
+<td>khi <strong>sửa</strong>: ô tên <code>rawPassword</code>, không <code>required</code>, gợi ý &quot;Để trống nếu không đổi&quot;. Comment <code>:45-48</code> giải thích: nếu vẫn tên <code>password</code>, để trống sẽ bind chuỗi rỗng vào <code>User.password</code></td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>View</td>
+<td><code>:102</code></td>
+<td>checkbox</td>
+<td><code>driver.isActive = true</code></td>
+<td><code>th:checked</code> theo giá trị trong DB ⇒ đang tick</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Trình duyệt</td>
+<td>—</td>
+<td>Admin bỏ tick</td>
+<td>—</td>
+<td>checkbox <strong>không tick thì trình duyệt không gửi gì</strong> cho ô đó; ô ẩn <code>_isActive=on</code> vẫn được gửi</td>
+<td>POST</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Spring</td>
+<td><code>AdminDriverController.java:68-71</code></td>
+<td>bind</td>
+<td>body</td>
+<td><code>id = 42</code>; <code>User</code> và <code>Driver</code> mới toanh từ form; <code>rawPassword = &quot;&quot;</code> (<code>@RequestParam(required = false) String</code>). <strong>Field marker</strong>: <code>WebDataBinder</code> thấy <code>_isActive</code> mà không thấy <code>isActive</code> ⇒ đặt <code>driver.isActive = false</code>. Không có marker, field giữ giá trị khởi tạo <code>true</code> (<code>Driver.java:34</code>) và việc bỏ tick vô tác dụng (comment <code>driver-form.html:96-99</code>)</td>
+<td><code>formUser</code>, <code>formDriver</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Controller</td>
+<td><code>:74</code></td>
+<td><code>updateDriver(id, user, driver, rawPassword)</code></td>
+<td>—</td>
+<td>—</td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Proxy</td>
+<td><code>DriverService.java:93</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td>mở transaction</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Service → DB</td>
+<td><code>:95-96</code></td>
+<td><code>driverRepository.findById(42)</code></td>
+<td>—</td>
+<td>bản ghi thật (kèm <code>User</code> — EAGER)</td>
+<td><code>existing</code> managed</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Service</td>
+<td><code>:98-99</code></td>
+<td><code>normalizeUser</code> + <code>requireUsernameAvailable(username, 42)</code></td>
+<td>—</td>
+<td>truyền <code>42</code> để <strong>không tự báo trùng với chính mình</strong> (javadoc <code>AdminService.java:61-62</code>)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Service</td>
+<td><code>:104-105</code></td>
+<td><code>isBeingDeactivated</code></td>
+<td><code>existing.isActive = true</code>, <code>formDriver.isActive = false</code></td>
+<td><code>TRUE.equals(cũ) &amp;&amp; !TRUE.equals(mới)</code> ⇒ <code>true</code>. Chỉ xét khi <strong>chuyển</strong> từ hoạt động sang khoá</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Service → DB</td>
+<td><code>:106</code>, <code>TripRepository.java:269-276</code></td>
+<td><code>existsTripForDriverWithStatusIn(42, BUSY_STATUSES)</code></td>
+<td><code>BUSY_STATUSES</code> = <code>PENDING_APPROVAL</code>, <code>ACTIVE</code>, <code>DEPARTED</code> (<code>DriverService.java:42-43</code>)</td>
+<td>JPQL xét <strong>cả ba vai trò</strong>: tài xế chính, phụ xe, tài xế phụ (<code>LEFT JOIN t.coDrivers</code>). <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) &gt; 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = 42 OR t.assistant_id = 42 OR cd.driver_id = 42) AND t.status IN (&#39;PENDING_APPROVAL&#39;,&#39;ACTIVE&#39;,&#39;DEPARTED&#39;) AND t.is_deleted = false</code></td>
+<td><code>true</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Service</td>
+<td><code>:107-109</code></td>
+<td>ném lỗi</td>
+<td>—</td>
+<td><code>RuntimeException(&quot;Không thể khóa tài xế này vì đang được phân công cho chuyến xe chưa kết thúc …&quot;)</code></td>
+<td>↑</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Proxy</td>
+<td>—</td>
+<td>rollback</td>
+<td>—</td>
+<td>chưa chép field nào ⇒ không có gì để hoàn tác</td>
+<td>↑</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Controller</td>
+<td><code>AdminDriverController.java:76-78</code></td>
+<td><code>catch (Exception e)</code></td>
+<td>—</td>
+<td>flash <code>error</code> = &quot;Lỗi: &quot; + câu trên; <code>redirect:/admin/drivers/edit/42</code></td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>18</td>
+<td>View</td>
+<td><code>driver-form.html:24-26</code></td>
+<td>khung đỏ trên form</td>
+<td><code>error</code></td>
+<td>form nạp lại từ DB ⇒ checkbox <strong>vẫn tick</strong> (DB vẫn <code>is_active = 1</code>)</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Nhánh không còn chuyến dở</strong> (bước 14 trả <code>false</code>, hoặc Admin không đổi trạng thái):</p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Vị trí</th>
+<th>Làm gì</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>15′</td>
+<td><code>DriverService.java:112-116</code></td>
+<td>chép <code>username</code>, <code>fullName</code>, <code>email</code>, <code>phone</code> sang <code>existing.getUser()</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>16′</td>
+<td><code>:117-119</code></td>
+<td><code>rawPassword</code> khác <code>null</code> và không trắng ⇒ đặt mật khẩu mới; trống ⇒ <strong>giữ nguyên</strong> mật khẩu cũ</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>17′</td>
+<td><code>:121-124</code></td>
+<td>chép <code>licenseNumber</code>, <code>licenseExpiryDate</code>, <code>experienceYears</code>, và <code>isActive = TRUE.equals(form)</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>18′</td>
+<td><code>:126-127</code></td>
+<td><code>save(user)</code>, <code>save(existing)</code> trên entity đang managed — dirty checking đã đủ, <code>save()</code> chỉ để rõ ý</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>19′</td>
+<td>commit</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>UPDATE users SET username=?, full_name=?, email=?, phone=? WHERE id=42</code> và <code>UPDATE drivers SET license_number=?, license_expiry_date=?, experience_years=?, is_active=0 WHERE user_id=42</code>. <strong>Không</strong> đụng <code>role</code>, <code>status</code>, <code>total_driving_hours24h</code>, <code>monthly_rest_days</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>20′</td>
+<td><code>AdminDriverController.java:75</code>, <code>:80</code></td>
+<td>flash &quot;Cập nhật hồ sơ tài xế thành công!&quot; → danh sách, nhãn &quot;Đã khóa&quot; (<code>driver-list.html:79</code>)</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p>Phase 1 đã kiểm chứng cả hai nhánh bằng app thật (roadmap §8, 2026-07-16): <em>&quot;unticking &#39;Đang hoạt
+động&#39; flipped <code>is_active</code> 1→0 (proving the <code>_isActive</code> field marker works)&quot;</em> và <em>&quot;deactivating a driver
+holding an <code>ACTIVE</code>+<code>PENDING_APPROVAL</code> trip was blocked … and <code>is_active</code> stayed 1&quot;</em>.</p>
+<p><strong>(c) Code then chốt</strong> — <code>…/service/DriverService.java:101-124</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">// RÀNG BUỘC: Không cho khóa tài xế đang còn chuyến dở dang.
+boolean isBeingDeactivated = Boolean.TRUE.equals(existing.getIsActive())   // TRƯỚC: đang hoạt động
+        &amp;&amp; !Boolean.TRUE.equals(formDriver.getIsActive());                 // SAU: bị bỏ tick
+if (isBeingDeactivated &amp;&amp; tripRepository.existsTripForDriverWithStatusIn(userId, BUSY_STATUSES)) {
+    throw new RuntimeException("Không thể khóa tài xế này vì đang được phân công ...");
+}
+
+User user = existing.getUser();                     // tài khoản thật đi kèm hồ sơ
+user.setUsername(formUser.getUsername());           // chép đúng 4 field tài khoản
+user.setFullName(formUser.getFullName());
+user.setEmail(formUser.getEmail());
+user.setPhone(formUser.getPhone());
+if (rawPassword != null &amp;&amp; !rawPassword.isBlank()) {  // có gõ mật khẩu mới thì mới đổi
+    user.setPassword(rawPassword);                     // lưu THÔ, không mã hoá
+}
+
+existing.setLicenseNumber(formDriver.getLicenseNumber());       // chép 4 field hồ sơ
+existing.setLicenseExpiryDate(formDriver.getLicenseExpiryDate());
+existing.setExperienceYears(formDriver.getExperienceYears());
+existing.setIsActive(Boolean.TRUE.equals(formDriver.getIsActive())); // null cũng thành false</code></pre></div>
+<p><code>Boolean.TRUE.equals(x)</code> — so sánh &quot;an toàn với null&quot;: <code>x</code> là <code>null</code> thì ra <code>false</code> chứ không ném
+<code>NullPointerException</code> như khi viết <code>x == true</code> với <code>Boolean</code>. Dự án dùng mẫu này ở mọi chỗ đọc
+<code>isActive</code> (<code>TripService.java:484</code>, <code>:1302</code>…).</p>
+<hr>
+<h2 id="4-luong-loi-xoa-tai-xe-da-co-lich-su">§4. Luồng lỗi — xoá tài xế đã có lịch sử</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Bước</th>
+<th>Chuyện gì xảy ra</th>
+<th>Vị trí</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Nút &quot;Xóa&quot; có <code>confirm(&#39;Bạn có chắc chắn muốn xóa tài xế này?&#39;)</code> — câu chung chung; luật được báo trước bằng dòng chữ nhỏ cuối trang</td>
+<td><code>driver-list.html:84-87</code>, <code>:95-99</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>GET /admin/drivers/delete/42</code> → <code>deleteDriver(42)</code> trong <code>try</code></td>
+<td><code>AdminDriverController.java:84-86</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Proxy mở transaction; <code>driverRepository.findById(42)</code>; không thấy ⇒ <code>RuntimeException(&quot;Không tìm thấy tài xế cần xóa với ID: 42&quot;)</code></td>
+<td><code>DriverService.java:142-145</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Guard 1</strong> <code>existsAnyTripForDriver(42)</code> — mọi vai trò, <strong>mọi trạng thái</strong>. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> như bước 14 luồng B nhưng không có điều kiện <code>status</code></td>
+<td><code>:147</code>, <code>TripRepository.java:257-262</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Có ⇒ ném <code>RuntimeException(&quot;Không thể xóa tài xế này vì đã có dữ liệu lịch sử vận hành … Hãy khóa hồ sơ (bỏ tick &#39;Đang hoạt động&#39;) thay vì xóa cứng!&quot;)</code></td>
+<td><code>:148-150</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Proxy rollback (chưa ghi gì) → <code>catch</code> → flash <code>error</code> &quot;Lỗi: …&quot; → <code>redirect:/admin/drivers</code> → khung đỏ <code>driver-list.html:29-32</code></td>
+<td><code>AdminDriverController.java:88-91</code></td>
+<td><span class="tag tag-spring">SPRING</span>+<span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p>Nếu qua guard 1, còn <strong>guard 2</strong> <code>incidentRepository.existsByDriverUserId(42)</code> (<code>DriverService.java:158</code>,
+<code>IncidentRepository.java:62</code>) — tài xế có bản ghi sự cố (dù sự cố đã <code>RESOLVED</code>) cũng không xoá được.
+Câu báo gợi ý ba lối thoát: gỡ tài xế khỏi sự cố (&quot;Không xác định&quot;), xoá sự cố, hoặc khoá hồ sơ
+(<code>:159-162</code>). Khác với xe, <code>Incident.driver</code> là tùy chọn nên lối &quot;gỡ khỏi sự cố&quot; tồn tại.</p>
+<p>Qua cả hai guard: <code>userRepository.delete(driver.getUser())</code> (<code>:165</code>) — xoá <strong>tài khoản</strong>, và
+<code>cascade = ALL</code> trên <code>User.driver</code> (<code>User.java:72</code>) xoá kèm hồ sơ. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span>
+<code>DELETE FROM drivers WHERE user_id = 42</code> rồi <code>DELETE FROM users WHERE id = 42</code>. Javadoc <code>:138-140</code> và
+roadmap §9:1230 giải thích vì sao xoá từ phía <code>User</code>: chỉ xoá <code>Driver</code> sẽ để lại một tài khoản
+<code>ROLE_DRIVER</code> &quot;mồ côi&quot; mà không màn nào quản lý được.</p>
+<p><strong>Trên dữ liệu thật, gần như mọi tài xế đều rơi vào bước 5.</strong> Lịch sử mô phỏng (profile <code>backfill</code>)
+gán chuyến cho cả 33 tài xế đang hoạt động, nên chỉ <strong>3/36</strong> tài xế còn xoá cứng được (roadmap §6
+Hidden Cost #8). Đây không phải lỗi — kịch bản &quot;xoá tài xế chưa có chuyến thành công&quot; của Phase 1 chỉ
+không tái hiện được trên DB này; cần thì tạo một tài xế mới để demo.</p>
+<p><strong>Các lỗi khác và đường về:</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>Nguyên nhân</th>
+<th>Ném ở</th>
+<th>Loại</th>
+<th>Quay về đâu, thấy gì</th>
+</tr>
+</thead><tbody><tr>
+<td>Username trống</td>
+<td><code>AdminService.java:66-67</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form, &quot;Lỗi: Tên đăng nhập không được để trống!&quot;</td>
+</tr>
+<tr>
+<td>Username đã thuộc người khác</td>
+<td><code>:69-74</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form, &quot;Lỗi: Tên đăng nhập &#39;…&#39; đã tồn tại, vui lòng chọn tên khác!&quot;</td>
+</tr>
+<tr>
+<td>POST tạo mang <code>id</code> hoặc <code>userId</code></td>
+<td><code>DriverService.java:68-73</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td>form tạo</td>
+</tr>
+<tr>
+<td>Email trùng người khác</td>
+<td><strong>không</strong> kiểm ở service — DB từ chối (<code>User.java:31</code>)</td>
+<td>lỗi Hibernate/JDBC</td>
+<td><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> form với một câu kỹ thuật sau &quot;Lỗi: &quot;. Khi <strong>tạo</strong>, <code>INSERT users</code> chạy ngay ở <code>save()</code> nên lỗi nổ trong service; khi <strong>sửa</strong>, <code>UPDATE</code> chỉ chạy lúc commit, lỗi nổ ở proxy nhưng vẫn rơi vào <code>catch (Exception)</code> của controller</td>
+</tr>
+<tr>
+<td>Tài xế không tồn tại (GET form sửa)</td>
+<td><code>AdminDriverController.java:57</code></td>
+<td><code>RuntimeException</code></td>
+<td>danh sách, khung đỏ <strong>không</strong> có &quot;Lỗi: &quot; (<code>:62</code>) — cùng bất nhất nhỏ như Bài 01–03</td>
+</tr>
+</tbody></table></div>
+<p>Như Bài 03 §4: lỗi khi tạo quay về form <strong>trống</strong>, lỗi khi sửa quay về form <strong>nạp lại từ DB</strong> — dữ
+liệu Admin vừa gõ mất (<code>AdminDriverController.java:46-48</code>, <code>:76-78</code>).</p>
+<hr>
+<h2 id="5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</h2>
+<ul>
+<li><strong>Xem danh sách tài xế</strong> — <code>[dashboard.html:110]</code> → <code>listDrivers()</code> <code>:19-23</code> →
+<code>DriverService.findAllWithUser()</code> <code>:45-47</code> → <code>DriverRepository.findAllWithUser()</code> <code>:17-18</code> (JPQL
+<code>JOIN FETCH d.user</code>) → <code>driver-list</code>. Nhãn &quot;Hết hạn&quot; dùng <code>driver.isLicenseValid()</code> <strong>không tham số</strong>
+= so với hôm nay (<code>driver-list.html:72</code>, <code>Driver.java:59-61</code>); <code>licenseExpiryDate</code> <code>null</code> cũng hiện
+&quot;Hết hạn&quot; vì <code>isLicenseValid</code> trả <code>false</code> khi ngày <code>null</code> (<code>Driver.java:48</code>).</li>
+<li><strong>Mở form Thêm tài xế</strong> — <code>[Thêm Tài Xế Mới]</code> → <code>showCreateForm()</code> <code>:25-30</code> → view. Không gọi service.</li>
+<li><strong>Mở form tạo tài khoản</strong> — <code>[dashboard.html:93]</code> → <code>AdminController.showUserForm()</code> <code>:42-52</code> →
+<code>new User()</code> + <code>roles</code> = <code>Role.values()</code> lọc bỏ <code>ROLE_DRIVER</code> bằng Stream (<code>:48-50</code>) → <code>user-form</code>.
+Comment <code>:45-47</code> gọi đây là <strong>lớp không-mời</strong>; lớp chặn thật ở <code>AdminService.createNewUser()</code>.</li>
+<li><strong>Lưu tài khoản</strong> — <code>[user-form.html:54]</code> → <code>AdminController.saveUser()</code> <code>:60-69</code> →
+<code>AdminService.createNewUser()</code> <code>:37-53</code>: tripwire id (<code>:39-43</code>) → từ chối <code>ROLE_DRIVER</code> (<code>:44-48</code>) →
+<code>requireUsernameAvailable(username, null)</code> (<code>:49</code>) → <code>userRepository.save(user)</code> (<code>:52</code>, mật khẩu
+lưu thô — comment <code>:50-51</code> <em>&quot;Thực tế nên mã hóa password tại đây&quot;</em>) → <code>redirect:/admin/dashboard?success=user</code>.
+Dashboard báo thành công bằng <strong>tham số URL</strong>, không phải flash: <code>th:if=&quot;${param.success}&quot;</code> →
+&quot;Thao tác thành công!&quot; (<code>dashboard.html:21-22</code>). Lỗi: flash <code>error</code> → <code>redirect:/admin/users/new</code> →
+khung đỏ <code>user-form.html:19-21</code>.</li>
+</ul>
+<p>Đoạn Stream ở <code>AdminController.java:48-50</code> viết lại bằng vòng <code>for</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;Role&gt; roles = new ArrayList&lt;&gt;();
+for (Role r : Role.values()) {        // ROLE_ADMIN, ROLE_DRIVER, ROLE_USER
+    if (r != Role.ROLE_DRIVER) {      // bỏ vai trò tài xế
+        roles.add(r);
+    }
+}
+model.addAttribute("roles", roles);   // còn ROLE_ADMIN, ROLE_USER</code></pre></div>
+<hr>
+<h2 id="6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</h2>
+<h3 id="6-1-bang-khong-moi-chan-that">6.1. Bảng &quot;không-mời / chặn thật&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Luật</th>
+<th>Lớp không-mời (UI)</th>
+<th>Lớp chặn thật (server)</th>
+<th>POST tự chế vượt lớp đầu thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td>Username bắt buộc và duy nhất</td>
+<td><code>required</code> (<code>driver-form.html:37</code>, <code>user-form.html:25</code>)</td>
+<td><code>AdminService.requireUsernameAvailable()</code> <code>:65-75</code>; cuối cùng là <code>unique</code> ở DB</td>
+<td>Bị chặn với câu nghiệp vụ</td>
+</tr>
+<tr>
+<td>Email duy nhất</td>
+<td><strong>Không có</strong></td>
+<td><strong>Chỉ DB</strong> (<code>User.java:31</code>)</td>
+<td>Lỗi kỹ thuật (§4)</td>
+</tr>
+<tr>
+<td>Không tạo <code>ROLE_DRIVER</code> ở màn tài khoản</td>
+<td>dropdown không có <code>ROLE_DRIVER</code> (<code>AdminController.java:48-50</code>)</td>
+<td><code>createNewUser()</code> <code>:44-48</code></td>
+<td>Bị chặn, không để lại user mồ côi (test <code>AdminServiceTest:58</code>)</td>
+</tr>
+<tr>
+<td>Tài xế luôn có vai trò <code>ROLE_DRIVER</code></td>
+<td>form không có ô vai trò</td>
+<td><code>createDriver()</code> ép <code>ROLE_DRIVER</code> (<code>:77</code>); <code>updateDriver()</code> không chép <code>role</code></td>
+<td><code>role=ROLE_ADMIN</code> gửi kèm bị ghi đè / lờ đi</td>
+</tr>
+<tr>
+<td>&quot;Tạo&quot; không ghi đè tài khoản có sẵn</td>
+<td>form không có ô id</td>
+<td>tripwire <code>createDriver()</code> <code>:68-73</code>, <code>createNewUser()</code> <code>:39-43</code></td>
+<td>Bị chặn (3 test tripwire, §9.4)</td>
+</tr>
+<tr>
+<td>&quot;Sửa&quot; chỉ sửa đúng tài xế trên URL</td>
+<td>—</td>
+<td><code>updateDriver(userId, …)</code> lấy id từ URL</td>
+<td>id gửi kèm bị lờ đi</td>
+</tr>
+<tr>
+<td>Không khoá tài xế còn chuyến dở</td>
+<td><strong>Không có</strong> — checkbox luôn bỏ được</td>
+<td><code>updateDriver()</code> <code>:104-110</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>Không xoá tài xế có lịch sử / có sự cố</td>
+<td>dòng chữ báo trước <code>driver-list.html:95-99</code>; nút Xóa luôn hiện</td>
+<td><code>deleteDriver()</code> <code>:147-163</code></td>
+<td>Bị chặn</td>
+</tr>
+<tr>
+<td>Họ tên, số bằng, hạn bằng, mật khẩu (khi tạo) bắt buộc</td>
+<td><code>required</code> + JS <code>checkValidity()</code></td>
+<td><strong>Không có</strong></td>
+<td><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> lưu được tài xế thiếu hạn bằng; hệ quả an toàn: <code>isLicenseValid</code> trả <code>false</code> nên người đó bị loại khỏi <strong>mọi</strong> phân công (<code>Driver.java:48</code>) và hiện &quot;Hết hạn&quot;</td>
+</tr>
+<tr>
+<td>Kinh nghiệm ≥ 0</td>
+<td><code>min=&quot;0&quot;</code> (<code>:91</code>)</td>
+<td><strong>Không có</strong></td>
+<td>Lưu được số âm</td>
+</tr>
+<tr>
+<td>Số bằng in hoa</td>
+<td>chỉ <strong>CSS</strong> <code>text-uppercase</code> (<code>:77</code>, <code>driver-list.html:69</code>) — đổi cách <strong>hiển thị</strong>, không đổi giá trị gửi đi</td>
+<td><strong>Không có</strong></td>
+<td>DB lưu đúng như gõ (<code>b2-123</code>), màn hình vẫn hiện <code>B2-123</code></td>
+</tr>
+<tr>
+<td>Số bằng duy nhất</td>
+<td><strong>Không có</strong></td>
+<td><strong>Không có</strong></td>
+<td>Hai tài xế cùng số bằng</td>
+</tr>
+<tr>
+<td>Hai cột ẩn <code>totalDrivingHours24h</code>, <code>monthlyRestDays</code> không sửa qua UI</td>
+<td>không có ô trên form (roadmap §9:1232)</td>
+<td><code>updateDriver()</code> không chép; <strong><code>createDriver()</code> lưu nguyên object form</strong></td>
+<td><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> POST tạo kèm <code>totalDrivingHours24h=7</code> sẽ được bind và lưu, làm tài xế mới có sẵn 7 giờ nền hôm nay</td>
+</tr>
+</tbody></table></div>
+<h3 id="6-2-bang-thay-doi-gi-trong-db">6.2. Bảng &quot;thay đổi gì trong DB&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Thao tác</th>
+<th>Bảng / cột</th>
+<th>Từ → sang</th>
+</tr>
+</thead><tbody><tr>
+<td>Xem danh sách, mở form</td>
+<td>—</td>
+<td>Không ghi DB</td>
+</tr>
+<tr>
+<td>Tạo tài xế</td>
+<td><code>users</code></td>
+<td>thêm 1 dòng, <code>role = &#39;ROLE_DRIVER&#39;</code>, <code>status = 1</code>, email/phone trống ⇒ <code>NULL</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>drivers</code></td>
+<td>thêm 1 dòng, <code>user_id</code> = id vừa sinh; <code>total_driving_hours24h</code>, <code>monthly_rest_days</code> = <code>NULL</code></td>
+</tr>
+<tr>
+<td>Sửa tài xế</td>
+<td><code>users</code></td>
+<td><code>username</code>, <code>full_name</code>, <code>email</code>, <code>phone</code>; <code>password</code> <strong>chỉ</strong> khi gõ mật khẩu mới</td>
+</tr>
+<tr>
+<td></td>
+<td><code>drivers</code></td>
+<td><code>license_number</code>, <code>license_expiry_date</code>, <code>experience_years</code>, <code>is_active</code></td>
+</tr>
+<tr>
+<td>Khoá tài xế</td>
+<td><code>drivers.is_active</code></td>
+<td><code>1 → 0</code>. Từ lúc đó người này biến khỏi mọi dropdown xếp chuyến và bị validator từ chối (<code>TripService.java:1302-1305</code>)</td>
+</tr>
+<tr>
+<td>Xoá tài xế</td>
+<td><code>drivers</code>, <code>users</code></td>
+<td><code>DELETE</code> cả hai dòng (cascade từ <code>User.driver</code>). Xoá thật, không soft delete</td>
+</tr>
+<tr>
+<td>Tạo tài khoản</td>
+<td><code>users</code></td>
+<td>thêm 1 dòng <code>ROLE_ADMIN</code> hoặc <code>ROLE_USER</code>; email <code>NULL</code> (form không có ô email); phone <strong>không</strong> được chuẩn hoá — để trống thì lưu chuỗi <code>&quot;&quot;</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</h2>
+<p>Phần đã học ở Bài 01–03 (<code>@Controller</code>, <code>@ModelAttribute</code>, flash, <code>@Transactional</code>, tripwire, dirty
+checking, <code>JOIN FETCH</code>…) không nhắc lại. Chỉ ghi phần <strong>mới</strong>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation / cơ chế</th>
+<th>Nghĩa đời thường</th>
+<th>Tác dụng ở đây</th>
+<th>Bỏ đi thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@OneToOne</code> + <code>@MapsId</code></td>
+<td>&quot;Hồ sơ dùng chung số với tài khoản&quot; (Bài 00b §1.3)</td>
+<td><code>Driver.java:25-27</code></td>
+<td>Phải có cột khoá riêng cho <code>drivers</code> và một cột <code>user_id</code> thêm; một tài khoản có thể bị gắn hai hồ sơ</td>
+</tr>
+<tr>
+<td><code>@OneToOne(mappedBy = &quot;user&quot;, fetch = LAZY, cascade = ALL)</code></td>
+<td>&quot;Phía đọc ngược; xoá tài khoản thì xoá luôn hồ sơ&quot;</td>
+<td><code>User.java:71-73</code></td>
+<td>Bỏ <code>cascade</code>: <code>deleteDriver()</code> xoá <code>User</code> sẽ để lại dòng <code>drivers</code> trỏ vào id không còn (DB không chặn vì <code>foreign_key_checks=0</code>)</td>
+</tr>
+<tr>
+<td>Hai <code>@ModelAttribute</code> trong một method</td>
+<td>&quot;Một form đổ vào hai object; mỗi ô vào object có field cùng tên&quot;</td>
+<td><code>AdminDriverController.java:40-41</code>, <code>:69-70</code></td>
+<td>Phải viết một DTO gộp — dự án không dùng DTO cho form (Bài 00b §6)</td>
+</tr>
+<tr>
+<td>Field marker <code>_isActive</code></td>
+<td>&quot;Ô ẩn báo cho Spring: form có checkbox này; không thấy giá trị thì hiểu là bỏ tick&quot;</td>
+<td><code>driver-form.html:100</code></td>
+<td>Bỏ tick không có tác dụng — <code>isActive</code> giữ mặc định <code>true</code> (<code>Driver.java:34</code>)</td>
+</tr>
+<tr>
+<td><code>@RequestParam(required = false) String rawPassword</code></td>
+<td>&quot;Nhận một ô lẻ không thuộc object nào&quot;</td>
+<td><code>AdminDriverController.java:71</code></td>
+<td>Dùng chung <code>password</code> ⇒ để trống là xoá mật khẩu</td>
+</tr>
+<tr>
+<td><code>@Column(unique = true)</code></td>
+<td>&quot;DB không cho hai dòng trùng giá trị&quot;</td>
+<td><code>User.java:25</code> (username), <code>:31</code> (email)</td>
+<td>Username trùng chỉ còn do service chặn</td>
+</tr>
+<tr>
+<td><code>@Enumerated(EnumType.STRING)</code></td>
+<td>&quot;Lưu tên enum dạng chữ&quot; (Bài 00b §1.2)</td>
+<td><code>User.java:36-37</code> — cột <code>role</code> chứa <code>&#39;ROLE_DRIVER&#39;</code></td>
+<td>Lưu số thứ tự 0, 1, 2 — đổi thứ tự enum là hỏng dữ liệu</td>
+</tr>
+<tr>
+<td><code>jakarta.transaction.Transactional</code></td>
+<td>Annotation transaction của chuẩn Jakarta EE, <strong>khác gói</strong> với <code>org.springframework…Transactional</code> dùng ở mọi service khác</td>
+<td><code>AdminService.java:8</code>, <code>:37</code></td>
+<td><span class="tag tag-spring">SPRING</span> Spring nhận cả hai loại; với lỗi unchecked cả hai đều rollback, nên hành vi ở đây không khác. Chỉ là bất nhất phong cách</td>
+</tr>
+<tr>
+<td><code>${param.success}</code></td>
+<td>&quot;Đọc tham số trên URL&quot; — khác với flash attribute</td>
+<td><code>dashboard.html:21</code></td>
+<td>— ; vì là tham số URL, bấm F5 vẫn còn thông báo</td>
+</tr>
+<tr>
+<td>Gọi service từ service</td>
+<td>&quot;Một luật, một chỗ&quot;</td>
+<td><code>DriverService.java:35</code>, <code>:75</code>, <code>:99</code> gọi <code>AdminService.requireUsernameAvailable()</code></td>
+<td>Hai bản luật trôi lệch nhau — đúng chuyện đã xảy ra trước lỗi #25</td>
+</tr>
+<tr>
+<td>Hai bản <code>isLicenseValid</code></td>
+<td>&quot;Một luật, nhận ngày làm tham số&quot;</td>
+<td><code>Driver.java:47-61</code> — bản có ngày cho xếp chuyến, bản không tham số cho nhãn hiển thị</td>
+<td>Xem §8</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="8-vi-du-tinh-tay">§8. Ví dụ tính tay</h2>
+<p>Chức năng không có 🧮, mục này tùy chọn. <strong>Số liệu minh hoạ.</strong></p>
+<p><strong>8.1. Bằng lái &quot;còn hiệu lực&quot; vào ngày nào?</strong> <code>isLicenseValid(onDate)</code> =
+<code>licenseExpiryDate != null &amp;&amp; licenseExpiryDate.isAfter(onDate)</code> (<code>Driver.java:48</code>). <code>isAfter</code> là
+&quot;<strong>sau hẳn</strong>&quot;, không tính bằng. Tài xế có hạn bằng <strong>2026-10-15</strong>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Ngày khởi hành (<code>onDate</code>)</th>
+<th><code>2026-10-15.isAfter(onDate)</code></th>
+<th>Được xếp chuyến?</th>
+</tr>
+</thead><tbody><tr>
+<td>2026-10-14</td>
+<td><code>true</code></td>
+<td>Có</td>
+</tr>
+<tr>
+<td>2026-10-15</td>
+<td><code>false</code></td>
+<td><strong>Không</strong> — ngày hết hạn coi như đã hết</td>
+</tr>
+<tr>
+<td>2026-11-01</td>
+<td><code>false</code></td>
+<td>Không</td>
+</tr>
+</tbody></table></div>
+<p>Hôm nay là 2026-10-01 ⇒ danh sách tài xế <strong>không</strong> hiện nhãn &quot;Hết hạn&quot; (<code>isLicenseValid()</code> so với
+hôm nay ⇒ <code>true</code>), nhưng một chuyến khởi hành 2026-10-20 sẽ không mời người này. Đây đúng là lỗi đã
+sửa ngày 2026-07-20: trước đó cả việc xếp chuyến cũng so với hôm nay (roadmap §8, &quot;Bug fix: licence
+validity now evaluated on the departure date&quot;).</p>
+<p><strong>8.2. Khi nào guard &quot;khoá&quot; chạy?</strong> <code>DriverService.java:104-106</code>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>DB <code>isActive</code></th>
+<th>Form <code>isActive</code></th>
+<th><code>isBeingDeactivated</code></th>
+<th>Có truy vấn chuyến?</th>
+</tr>
+</thead><tbody><tr>
+<td><code>true</code></td>
+<td><code>false</code> (bỏ tick)</td>
+<td><code>true</code></td>
+<td><strong>Có</strong> — còn chuyến dở thì chặn</td>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td><code>true</code></td>
+<td><code>false</code></td>
+<td>Không</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td><code>true</code> (mở khoá)</td>
+<td><code>false</code></td>
+<td>Không — mở khoá không cần kiểm</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td><code>false</code></td>
+<td><code>false</code></td>
+<td>Không — người đã khoá từ trước được sửa thông tin khác bình thường</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>
+<h3 id="9-1-cac-quyet-dinh-thiet-ke">9.1. Các quyết định thiết kế</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Quyết định</th>
+<th>Tránh được gì</th>
+<th>Vì sao không làm cách đơn giản hơn</th>
+<th>Nguồn</th>
+</tr>
+</thead><tbody><tr>
+<td>Một form gộp tạo cả <code>User</code> + <code>Driver</code></td>
+<td>Tài khoản tài xế không có hồ sơ</td>
+<td>Hai bước (tạo user rồi gắn hồ sơ) tách bạch hơn nhưng tốn hai màn; form gộp bắt chước <code>DataInitializer.createDriver()</code></td>
+<td>roadmap §9:1230 (owner duyệt)</td>
+</tr>
+<tr>
+<td>Xoá tài xế bằng cách xoá <code>User</code></td>
+<td>User <code>ROLE_DRIVER</code> mồ côi</td>
+<td>Form gộp không có cách gắn hồ sơ vào tài khoản có sẵn</td>
+<td>roadmap §9:1230; javadoc <code>DriverService.java:138-140</code></td>
+</tr>
+<tr>
+<td>Guard khoá dùng đúng tập &quot;bận&quot; của <code>TripService</code></td>
+<td>Hai định nghĩa &quot;bận&quot; lệch nhau</td>
+<td>Định nghĩa mới thì phải giữ đồng bộ bằng tay</td>
+<td>roadmap §9:1231; <code>TripService.java:716-717</code></td>
+</tr>
+<tr>
+<td>Guard xoá theo &quot;từng có chuyến&quot;, không lọc trạng thái</td>
+<td>Mất lịch sử vận hành</td>
+<td>Cùng nguyên tắc <code>BusService.deleteBus()</code></td>
+<td>javadoc <code>DriverService.java:131-136</code></td>
+</tr>
+<tr>
+<td>Guard sự cố không lọc trạng thái sự cố</td>
+<td>Bản ghi sự cố mồ côi (<code>foreign_key_checks=0</code>)</td>
+<td>Sự cố <code>RESOLVED</code> vẫn là dữ liệu</td>
+<td>roadmap §9:1200 (owner duyệt)</td>
+</tr>
+<tr>
+<td>Ẩn <code>monthlyRestDays</code>, <code>totalDrivingHours24h</code> khỏi form</td>
+<td>Ô nhập &quot;có vẻ có tác dụng&quot;</td>
+<td><code>monthlyRestDays</code> không ai đọc; <code>totalDrivingHours24h</code> là giờ nền mock, đúng ra do thiết bị GPS nạp</td>
+<td>roadmap §9:1232 (owner duyệt); comment <code>TripService.java:817-825</code></td>
+</tr>
+<tr>
+<td>Ô <code>rawPassword</code> riêng khi sửa</td>
+<td>Để trống mật khẩu là xoá mật khẩu</td>
+<td>—</td>
+<td>comment <code>driver-form.html:45-48</code></td>
+</tr>
+<tr>
+<td>Luật username ở <strong>một</strong> chỗ</td>
+<td>Tạo user và tạo tài xế xử lý trùng khác nhau</td>
+<td>—</td>
+<td>lỗi #25; javadoc <code>AdminService.java:55-64</code></td>
+</tr>
+<tr>
+<td>Màn tài khoản không mời <code>ROLE_DRIVER</code> + service từ chối</td>
+<td>User tài xế mồ côi</td>
+<td>Bỏ hẳn màn là lựa chọn khác; chủ dự án chọn giữ</td>
+<td>lỗi #25</td>
+</tr>
+</tbody></table></div>
+<h3 id="9-2-bug-that-da-tung-xay-ra-o-chuc-nang-nay">9.2. Bug thật đã từng xảy ra ở chức năng này</h3>
+<p><strong>Lỗi #21 (phần tài xế và tài khoản) — tài khoản admin duy nhất bị biến thành tài xế.</strong></p>
+<ul>
+<li><em>Hiểu sai điều gì:</em> tin rằng form tạo không có ô id thì request tạo không có id. <code>@ModelAttribute</code>
+không có <code>@InitBinder</code> nên ai gửi <code>id=1</code> là có <code>user.id = 1</code>, và <code>userRepository.save()</code> thành
+<strong>merge</strong> (Bài 00b §3).</li>
+<li><em>Đo trên bản sao DB thật (2026-09-19):</em> <code>POST /drivers/create</code> với id của <strong>user 1 = admin</strong> (chưa có
+hồ sơ tài xế) ⇒ flash <em>&quot;Thêm mới tài xế thành công!&quot;</em>; admin thành <code>hijacked-admin</code>, <code>ROLE_DRIVER</code>,
+mật khẩu mới, thêm một dòng <code>drivers</code> (36 → 37). <strong>Tài khoản admin duy nhất biến mất.</strong> Với user đã
+là tài xế thì thất bại nhờ Hibernate ném <code>NonUniqueObjectException</code> — javadoc
+<code>DriverService.java:62-64</code> gọi đó là <em>&quot;lưới tình cờ, không phải luật&quot;</em>. Ở cửa <code>/users/save</code>: một user
+tài xế bị đổi thành <code>ROLE_ADMIN</code> kèm mật khẩu mới (javadoc <code>AdminService.java:21-24</code>).</li>
+<li><em>Sửa:</em> tripwire ở đầu <code>createDriver()</code> (kiểm <strong>cả</strong> <code>user.id</code> lẫn <code>driver.userId</code>) và
+<code>createNewUser()</code>. Test khẳng định admin giữ username, vai trò, mật khẩu và không bị gắn hồ sơ.</li>
+</ul>
+<p><strong>Lỗi #25 — màn tạo tài khoản: trùng username ⇒ HTTP 500; mời <code>ROLE_DRIVER</code> ⇒ user mồ côi.</strong></p>
+<ul>
+<li><em>Trước khi sửa:</em> <code>AdminController.saveUser()</code> là endpoint ghi <strong>duy nhất</strong> không có <code>try/catch</code>, và
+<code>createNewUser()</code> không kiểm username. Đo trên app thật: POST <code>username=admin</code> ⇒ <strong>HTTP 500</strong>
+Whitelabel, log <code>Duplicate entry &#39;admin&#39;</code>. Nửa thứ hai: chọn <code>ROLE_DRIVER</code> ⇒ user 42 có vai trò tài xế
+và <strong>0</strong> dòng <code>drivers</code> — không hiện ở <code>/admin/drivers</code>, <code>/admin/drivers/edit/42</code> báo không tìm thấy,
+và không có màn nào xoá được.</li>
+<li><em>Hiểu sai điều gì:</em> hai cửa tạo tài khoản giữ hai cách xử lý khác nhau — <code>DriverService</code> có hàm kiểm
+username riêng, <code>AdminService</code> thì không, và dropdown vai trò lấy nguyên <code>Role.values()</code>.</li>
+<li><em>Sửa:</em> luật dồn về <code>AdminService.requireUsernameAvailable()</code> (bản riêng của <code>DriverService</code> bị xoá),
+<code>createNewUser()</code> từ chối <code>ROLE_DRIVER</code>, controller bọc <code>try/catch</code>, dropdown lọc <code>ROLE_DRIVER</code>.</li>
+</ul>
+<p><strong>Lỗi bằng lái xét theo hôm nay (2026-07-20).</strong> Thuộc phần xếp chuyến (Bài 06) nhưng sinh ra
+<code>Driver.isLicenseValid(LocalDate)</code> — xem §8.1.</p>
+<p><strong>Mục đã rút: #17 &quot;Sửa hạn bằng lái không kiểm lại các chuyến đã phân công&quot;.</strong> Rút ngắn hạn bằng có
+thể để lại chuyến <code>ACTIVE</code> với tài xế hết hạn, nhưng sổ lỗi xếp vào &quot;ĐÃ LOẠI — đừng nêu lại&quot;: bất biến
+dự án tuyên bố là bằng hợp lệ <strong>lúc phân công</strong>; bán kính đo được 0; và chặn sửa sẽ <strong>sai</strong> vì bằng
+hết hạn là sự kiện thật phải ghi được. Nếu làm, hình dạng đúng là <strong>cảnh báo</strong> kèm danh sách chuyến.</p>
+<h3 id="9-3-cam-bay-va-diem-la-ghi-lai-khong-sua">9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)</h3>
+<ol>
+<li><strong>Không có màn danh sách / sửa / xoá tài khoản.</strong> Tài khoản tạo ở <code>/admin/users/new</code> chỉ hiện lại
+dưới dạng con số <code>totalUsers</code> trên Dashboard (<code>AdminController.java:34</code>). Lỗi #25 cũng ghi:
+<code>AdminController</code> <em>&quot;chỉ có <code>/users/new</code> + <code>/users/save</code>&quot;</em>.</li>
+<li><strong>Vai trò và cột <code>status</code> không có tác dụng.</strong> Không có đăng nhập; grep <code>src/main</code> không thấy chỗ nào
+đọc <code>getRole()</code> ngoài lời từ chối <code>ROLE_DRIVER</code>, cũng không thấy chỗ nào đọc <code>User.status</code>.</li>
+<li><strong>Mật khẩu lưu thô</strong> (<code>User.java:28</code> <em>&quot;Nên được mã hóa BCrypt&quot;</em>, <code>AdminService.java:50-51</code>).</li>
+<li><strong>Email trùng ra lỗi kỹ thuật</strong>; số bằng không chống trùng; số bằng &quot;in hoa&quot; chỉ là CSS (§6.1).</li>
+<li><strong>Lỗi thì mất dữ liệu đã gõ</strong> (§4).</li>
+<li><strong>Chuyến đã xoá mềm không chặn xoá tài xế</strong> — <code>existsAnyTripForDriver</code> đi qua <code>@SQLRestriction</code>.
+Sổ lỗi đã <strong>RÚT</strong> mục này (bán kính 0), nêu được khi bị hỏi, không trình bày như lỗi.</li>
+<li><strong>Hai cột ẩn có thể lọt qua POST tạo</strong> (§6.1, chưa kiểm chứng).</li>
+<li><strong><code>AdminController</code> inject thẳng <code>UserRepository</code>, <code>BusRepository</code>, <code>TripRepository</code></strong> (<code>:26-28</code>,
+comment <code>// Giả định bạn đã có</code>) — chỉ để đếm cho Dashboard (Bài 12). Phần <code>/users/*</code> đi đúng qua
+<code>AdminService</code>. Đây là cùng loại anti-pattern roadmap §9 nêu với <code>AdminTripManagementController</code>.</li>
+<li><strong><code>AdminService</code> dùng <code>jakarta.transaction.Transactional</code></strong> trong khi mọi service khác dùng của
+Spring (§7) — không đổi hành vi, chỉ bất nhất.</li>
+<li><strong>Mâu thuẫn tài liệu ↔ code (code thắng):</strong><ul>
+<li>Roadmap §8 (2026-07-16) viết <em>&quot;blank password left the old <strong>hash</strong> untouched&quot;</em> — mật khẩu không
+hề được băm; đúng ra là &quot;giữ nguyên mật khẩu cũ&quot;.</li>
+<li>Bảng tham số trong <code>DriverService.java:42-43</code> và roadmap trỏ về <code>TripService.isDriverBusyInWindow()</code>
+— tập trạng thái hai bên hiện <strong>khớp</strong> (<code>TripService.java:716-717</code>), chỉ cần nhớ đây là hai
+<strong>bản khai báo</strong>, đổi một bên phải đổi bên kia.</li>
+<li><code>docs/testing/test_case.md</code> <strong>không có</strong> nhóm test tay cho màn tài xế hay màn tài khoản.</li>
+</ul>
+</li>
+</ol>
+<h3 id="9-4-test-dang-giu-chuc-nang-nay">9.4. Test đang giữ chức năng này</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Test</th>
+<th>Chốt luật gì</th>
+</tr>
+</thead><tbody><tr>
+<td><code>AdminServiceTest.createNewUser_savesAnAdminOrUserAccount</code> (<code>:36</code>)</td>
+<td>Tạo được tài khoản <code>ROLE_ADMIN</code></td>
+</tr>
+<tr>
+<td><code>…createNewUser_refusesADuplicateUsername_beforeTheDatabaseDoes</code> (<code>:43</code>)</td>
+<td>Trùng username ⇒ <code>IllegalArgumentException</code> &quot;đã tồn tại&quot;, DB vẫn chỉ 1 dòng. Sổ lỗi: tắt luật thì lỗi đổi thành <code>DataIntegrityViolationException</code> — đúng triệu chứng HTTP 500 cũ</td>
+</tr>
+<tr>
+<td><code>…createNewUser_refusesABlankUsername</code> (<code>:53</code>)</td>
+<td>Username toàn khoảng trắng bị từ chối</td>
+</tr>
+<tr>
+<td><code>…createNewUser_refusesRoleDriver_becauseADriverNeedsAProfile</code> (<code>:58</code>)</td>
+<td><code>ROLE_DRIVER</code> bị từ chối, câu báo chỉ sang <code>/admin/drivers/create</code>, không để lại user</td>
+</tr>
+<tr>
+<td><code>…requireUsernameAvailable_allowsAnAccountToKeepItsOwnName</code> (<code>:66</code>)</td>
+<td>Sửa giữ tên của chính mình thì qua; id khác thì bị chặn</td>
+</tr>
+<tr>
+<td><code>…driverService_delegatesTheUsernameRule_soBothDoorsAgree</code> (<code>:75</code>)</td>
+<td>Tạo tài xế trùng username với một user thường ⇒ cùng câu từ chối — chốt việc uỷ quyền</td>
+</tr>
+<tr>
+<td><code>CreatePathIdTripwireTest.createDriver_refusesAUserThatAlreadyHasAnId_andLeavesTheAccountUntouched</code> (<code>:195</code>)</td>
+<td>Đúng kịch bản #21: admin giữ username, <code>ROLE_ADMIN</code>, mật khẩu, không bị gắn hồ sơ</td>
+</tr>
+<tr>
+<td><code>…createDriver_refusesADriverProfileThatAlreadyHasAUserId</code> (<code>:227</code>)</td>
+<td><code>driver.userId</code> có sẵn ⇒ từ chối, không tạo user nào</td>
+</tr>
+<tr>
+<td><code>…createNewUser_refusesAnEntityThatAlreadyHasAnId_andLeavesTheAccountUntouched</code> (<code>:240</code>)</td>
+<td>User tài xế không bị tự phong <code>ROLE_ADMIN</code></td>
+</tr>
+<tr>
+<td><code>EntityEqualsHashCodeCycleTest.userDriverCycle_doesNotRecurse</code> (<code>test/domain/…:88</code>)</td>
+<td><code>hashCode</code>/<code>equals</code>/<code>toString</code> của cặp <code>User</code>↔<code>Driver</code> không đệ quy vô hạn (Hidden Cost #9)</td>
+</tr>
+</tbody></table></div>
+<p><strong>Chưa có test tự động</strong> cho: <code>updateDriver()</code> (guard khoá, giữ mật khẩu, chép field),
+<code>deleteDriver()</code> (hai guard, cascade), và <code>Driver.isLicenseValid()</code> — grep <code>src/test</code> không thấy
+<code>existsAnyTripForDriver</code>, <code>existsTripForDriverWithStatusIn</code>, <code>existsByDriverUserId</code> hay
+<code>isLicenseValid</code>. Các ca này đã được kiểm bằng app thật lúc giao Phase 1 (roadmap §8, 2026-07-16).</p>
+<h3 id="9-5-lien-ket">9.5. Liên kết</h3>
+<ul>
+<li><strong>Màn này ảnh hưởng tới:</strong><ul>
+<li>Validator và mọi đường xếp người (Bài 06–09): <code>isActive</code> và <code>isLicenseValid(ngày khởi hành)</code> ở
+<code>TripService.java:484-492</code> (AI chọn tài xế), <code>:1302-1310</code>, <code>:1326-1330</code>, <code>:1350-1357</code> (validator
+tài xế chính / phụ / phụ xe), <code>:1531-1532</code>, <code>:1560-1561</code>, <code>:1632-1633</code>, <code>:1680-1681</code> (các dropdown).</li>
+<li>Giờ lái trong ngày: <code>totalDrivingHours24h</code> cộng vào khi xét <strong>hôm nay</strong> (<code>TripService.java:827-831</code>).</li>
+<li>Gợi ý tài xế (Bài 15): <code>DriverRecommendationService.java:85-93</code>.</li>
+<li>Dashboard (Bài 12): <code>DashboardService.java:239</code>, <code>DriverRepository.java:20-34</code>.</li>
+<li>Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (<code>HistoricalDataBackfill.java:167</code>).</li>
+</ul>
+</li>
+<li><strong>Màn này bị ảnh hưởng bởi:</strong> chuyến (quyết định có khoá / xoá được không); sự cố (Bài 11 — chặn xoá).</li>
+</ul>
+<hr>
+<h2 id="10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</h2>
+<h3 id="10-1-tom-tat-1-phut">10.1. Tóm tắt 1 phút</h3>
+<aside class="callout"><p>Màn Quản lý tài xế giữ hồ sơ của người lái: tài khoản, số bằng, hạn bằng, kinh nghiệm và trạng thái
+hoạt động. Một tài xế gồm hai bản ghi — <code>User</code> và <code>Driver</code> — dùng chung một khoá nhờ <code>@MapsId</code>, nên
+em làm một form gộp: Spring dựng cả hai object từ cùng request, service lưu <code>User</code> trước để có id
+rồi mới lưu <code>Driver</code>, tất cả trong một transaction. Hai luật nghiệp vụ chính: không được khoá tài
+xế còn chuyến chờ duyệt, đang bán vé hoặc đang chạy; và không xoá cứng tài xế đã từng có chuyến hay
+có sự cố — khi đó phải khoá thay vì xoá. Hai trường <code>isActive</code> và hạn bằng quyết định ai được xếp
+chuyến; hạn bằng được xét theo ngày khởi hành. Luật tên đăng nhập duy nhất nằm ở một chỗ, dùng chung
+với màn tạo tài khoản.</p>
+</aside>
+<h3 id="10-2-cau-hoi-hoi-dong-goi-y-tra-loi">10.2. Câu hỏi hội đồng + gợi ý trả lời</h3>
+<p><strong>1. (Cái gì) Vì sao tài xế lại tách thành hai bảng <code>users</code> và <code>drivers</code>?</strong>
+<code>users</code> giữ thông tin tài khoản dùng chung cho mọi vai trò (username, mật khẩu, họ tên, vai trò);
+<code>drivers</code> giữ phần nghề nghiệp chỉ tài xế có (bằng lái, kinh nghiệm, trạng thái). Khoá chính của
+<code>drivers</code> chính là <code>user_id</code> (<code>@MapsId</code>, <code>Driver.java:18-28</code>), nên quan hệ là đúng một-một và không có
+hồ sơ nào thiếu tài khoản.</p>
+<p><strong>2. (Thế nào) Một form mà lưu được hai bảng là thế nào?</strong>
+Controller nhận hai tham số <code>@ModelAttribute(&quot;user&quot;) User</code> và <code>@ModelAttribute(&quot;driver&quot;) Driver</code>
+(<code>AdminDriverController.java:40-41</code>). Spring đổ mọi ô của request vào cả hai object theo tên field; hai
+class không có field trùng tên nên mỗi ô chỉ vào một bên. <code>createDriver()</code> lưu <code>User</code> trước — lúc đó
+MySQL cấp id — rồi gắn <code>Driver</code> vào <code>User</code> và lưu, <code>@MapsId</code> tự chép id sang (<code>DriverService.java:79-85</code>).</p>
+<p><strong>3. (Vì sao) Sao phải lưu <code>User</code> trước?</strong>
+Vì <code>Driver</code> không tự sinh khoá; khoá của nó lấy từ <code>User</code>. <code>User.id</code> là <code>IDENTITY</code>, chỉ có sau khi
+<code>INSERT users</code> chạy. Cả hai nằm trong một <code>@Transactional</code>, nên nếu lưu <code>Driver</code> hỏng thì <code>INSERT users</code>
+cũng bị hoàn tác — không bao giờ có tài khoản tài xế mồ côi.</p>
+<p><strong>4. (Thế nào) Bỏ tick &quot;Đang hoạt động&quot; thì Spring biết bằng cách nào?</strong>
+Checkbox không tick thì trình duyệt không gửi gì. Form có thêm ô ẩn <code>_isActive</code> (<code>driver-form.html:100</code>);
+Spring thấy ô đánh dấu này mà không thấy <code>isActive</code> thì hiểu là bỏ tick và đặt <code>false</code>. Không có nó,
+field giữ giá trị mặc định <code>true</code> của entity và việc bỏ tick vô tác dụng. Phase 1 đã kiểm chứng
+<code>is_active</code> 1→0.</p>
+<p><strong>5. (Vì sao) Sao không cho khoá tài xế đang có chuyến?</strong>
+Nếu khoá, chuyến <code>ACTIVE</code>/<code>PENDING_APPROVAL</code>/<code>DEPARTED</code> của họ sẽ còn tài xế mà validator coi là không
+hợp lệ. Service kiểm bằng <code>existsTripForDriverWithStatusIn</code> trên cả ba vai trò (<code>DriverService.java:104-110</code>),
+dùng đúng tập &quot;bận&quot; mà <code>TripService.isDriverBusyInWindow()</code> đã định nghĩa, để không có hai định nghĩa
+&quot;bận&quot; khác nhau (roadmap §9).</p>
+<p><strong>6. (Vì sao) Sao không xoá được tài xế cũ, mà chỉ khoá?</strong>
+Chuyến đã chạy, dữ liệu dự báo, giờ lái đều trỏ tới tài xế; DB tắt kiểm khoá ngoại nên xoá sẽ để lại
+tham chiếu treo. Service chặn nếu tài xế từng có chuyến hoặc có bản ghi sự cố (<code>:147-163</code>). Hệ quả biết
+trước: trên dữ liệu thật chỉ 3/36 tài xế còn xoá được (Hidden Cost #8) — người nghỉ việc thì khoá.</p>
+<p><strong>7. (Thế nào) Bằng lái được kiểm thế nào?</strong>
+<code>isLicenseValid(LocalDate)</code> trả đúng khi hạn bằng <strong>sau hẳn</strong> ngày được hỏi (<code>Driver.java:47-49</code>). Mọi
+đường xếp người truyền <strong>ngày khởi hành</strong>; nhãn &quot;Hết hạn&quot; ở danh sách dùng bản không tham số, so với
+hôm nay. Trước 2026-07-20 xếp chuyến cũng so với hôm nay, nên chuyến tháng sau vẫn duyệt được cho tài
+xế hết bằng tuần sau — đã sửa ở gốc, vẫn một luật duy nhất.</p>
+<p><strong>8. (Nếu… thì sao) Ai đó gửi POST tạo tài xế kèm <code>id=1</code> (id của admin)?</strong>
+Trước đây <code>save()</code> thành merge và tài khoản admin bị đổi tên, hạ thành tài xế (đo thật, lỗi #21). Nay
+<code>createDriver()</code> ném ngay nếu <code>user.id</code> hoặc <code>driver.userId</code> khác null (<code>DriverService.java:68-73</code>); test
+khẳng định admin giữ nguyên tên, vai trò, mật khẩu.</p>
+<p><strong>9. (Cái gì) Màn tạo tài khoản dùng để làm gì, sao không tạo được tài xế ở đó?</strong>
+Tạo tài khoản <code>ROLE_ADMIN</code>/<code>ROLE_USER</code>. Tài xế phải có hồ sơ <code>Driver</code> đi kèm, mà màn này chỉ tạo
+<code>User</code> — trước đây chọn <code>ROLE_DRIVER</code> sinh ra tài khoản không màn nào thấy được (lỗi #25). Giờ dropdown
+không mời và service từ chối (<code>AdminService.java:44-48</code>).</p>
+<p><strong>10. (Hạn chế) Phần tài khoản còn thiếu gì?</strong>
+Trung thực: không có đăng nhập nên vai trò chưa có tác dụng; mật khẩu lưu thô; không có màn
+danh sách/sửa/xoá tài khoản; email trùng chỉ do DB chặn nên báo lỗi kỹ thuật. Đăng nhập và phân quyền
+là Non-Goal của đề tài (roadmap §4).</p>
+<p><strong>11. (Nếu… thì sao) Sửa tài xế mà để trống mật khẩu thì sao?</strong>
+Mật khẩu cũ giữ nguyên. Khi sửa, ô mật khẩu có tên <code>rawPassword</code> — không trùng field nào của <code>User</code> —
+và service chỉ đổi khi chuỗi không trống (<code>DriverService.java:117-119</code>). Nếu dùng chung tên <code>password</code>,
+ô trống sẽ bind chuỗi rỗng và xoá mật khẩu.</p>
+<h3 id="10-3-diem-phai-noi-that">10.3. Điểm phải nói thật</h3>
+<ul>
+<li><strong>Không có đăng nhập / phân quyền, mật khẩu lưu thô, CSRF tắt</strong> (roadmap §4). <code>Role</code> và tài khoản
+<code>ROLE_ADMIN</code>/<code>ROLE_USER</code> hiện chỉ là dữ liệu.</li>
+<li><strong><code>totalDrivingHours24h</code> là giờ nền mock</strong>, chỉ cộng khi xét ngày hôm nay, không sửa được qua UI; comment
+trong code nói về &quot;IoT/GPS&quot; là hướng tương lai, <strong>hệ thống không có GPS</strong> (<code>TripService.java:817-825</code>).</li>
+<li><strong><code>monthlyRestDays</code> có trong DB nhưng không ai đọc</strong> — luật &quot;nghỉ 2 ngày/tháng&quot; của đề xuất ban đầu
+chưa làm (roadmap §9:1232).</li>
+<li><strong>Không có cổng tài xế</strong>: tài xế không tự đăng nhập xem lịch; mọi thứ do Admin nhập
+(<code>current_functional_spec.md:16</code>).</li>
+<li><strong>Lịch sử chuyến là mô phỏng</strong>, và chính nó làm gần hết tài xế không xoá được (Hidden Cost #8).</li>
+</ul>
+<hr>
+<h2 id="11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Trong <code>createDriver()</code>, nếu đảo thứ tự — <code>driverRepository.save(driver)</code> chạy trước
+<code>userRepository.save(user)</code> — vấn đề là gì?</li>
+<li>Ô mật khẩu trên form <strong>tạo</strong> và form <strong>sửa</strong> có <code>name</code> khác nhau thế nào, và vì sao?</li>
+<li>Tài xế đang bị khoá (<code>isActive = false</code>) và vẫn còn một chuyến <code>ACTIVE</code> (dữ liệu cũ). Admin chỉ sửa
+số điện thoại, không đụng checkbox. Có bị chặn không?</li>
+<li>Admin tạo tài xế thứ hai với ô email để trống. Nếu không có <code>normalizeUser()</code>, chuyện gì xảy ra?</li>
+<li>Hạn bằng 2026-12-31. Chuyến khởi hành 2026-12-31 lúc 06:00 có mời người này không?</li>
+<li>Vì sao <code>deleteDriver()</code> gọi <code>userRepository.delete(...)</code> chứ không <code>driverRepository.delete(...)</code>?</li>
+<li>Sau khi tạo tài khoản thành công ở <code>/admin/users/new</code>, thông báo &quot;Thao tác thành công!&quot; đến từ flash
+hay từ đâu? Bấm F5 thì sao?</li>
+</ol>
+<p><strong>Bài tự trace.</strong> Admin mở <code>/admin/users/new</code>, gõ username <code>admin</code> (đã có), mật khẩu <code>x</code>, chọn
+<code>ROLE_USER</code>, bấm &quot;Tạo tài khoản&quot;. Viết chuỗi <code>Controller → Service → Repository → view</code> và kết quả trên
+màn hình. Sau đó làm lại với một POST tự chế <code>username=ketoan&amp;password=x&amp;role=ROLE_DRIVER</code>.</p>
+<p><strong>Câu đọc code.</strong> <code>DriverService.java:104-106</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">boolean isBeingDeactivated = Boolean.TRUE.equals(existing.getIsActive())
+        &amp;&amp; !Boolean.TRUE.equals(formDriver.getIsActive());
+if (isBeingDeactivated &amp;&amp; tripRepository.existsTripForDriverWithStatusIn(userId, BUSY_STATUSES)) {</code></pre></div>
+<p>Đoạn này làm gì? Nếu bỏ vế <code>isBeingDeactivated &amp;&amp;</code> (chỉ còn kiểm chuyến), điều gì thay đổi với một tài
+xế đang hoạt động bình thường có một chuyến <code>ACTIVE</code>, khi Admin muốn sửa số điện thoại của họ?</p>
+<details><summary>Đáp án</summary>
+
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li><code>driver</code> chưa được gắn <code>user</code> có id, nên <code>@MapsId</code> không có id để chép sang — <code>Driver</code> không có
+<code>@GeneratedValue</code> nên không có khoá. <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> Hibernate sẽ ném lỗi khi persist
+(id rỗng / quan hệ chưa lưu), transaction rollback. Đúng thứ tự là <code>User</code> trước để MySQL cấp id.</li>
+<li>Tạo: <code>name=&quot;password&quot;</code> (bind thẳng vào <code>User.password</code>, <code>required</code>). Sửa: <code>name=&quot;rawPassword&quot;</code>
+(<code>driver-form.html:49-52</code>) — một tham số lẻ (<code>AdminDriverController.java:71</code>) để phân biệt &quot;không đổi&quot;
+với &quot;đổi&quot;; dùng chung <code>password</code> thì ô trống sẽ ghi đè mật khẩu thành rỗng.</li>
+<li>Không. <code>isBeingDeactivated</code> chỉ đúng khi DB đang <code>true</code> và form <code>false</code>; ở đây DB đã <code>false</code> nên guard
+không chạy (bảng §8.2).</li>
+<li>Email <code>&quot;&quot;</code> được lưu; người thứ hai cũng <code>&quot;&quot;</code> ⇒ trùng cột <code>unique</code> (<code>User.java:31</code>) ⇒ DB từ chối, Admin
+thấy lỗi kỹ thuật. <code>normalizeUser</code> biến <code>&quot;&quot;</code> thành <code>NULL</code>, mà nhiều <code>NULL</code> không vi phạm <code>unique</code>.</li>
+<li>Không. Xếp chuyến dùng <code>departure.toLocalDate()</code> = 2026-12-31; <code>2026-12-31.isAfter(2026-12-31)</code> =
+<code>false</code> (<code>Driver.java:48</code>). Giờ trong ngày không tham gia.</li>
+<li>Vì <code>User.driver</code> có <code>cascade = ALL</code> (<code>User.java:72</code>): xoá <code>User</code> kéo theo <code>Driver</code>. Xoá riêng <code>Driver</code>
+sẽ để lại một <code>User</code> <code>ROLE_DRIVER</code> mồ côi mà không màn nào quản lý được (javadoc <code>DriverService.java:138-140</code>).</li>
+<li>Từ <strong>tham số URL</strong> <code>?success=user</code> (<code>AdminController.java:68</code>), template đọc <code>${param.success}</code>
+(<code>dashboard.html:21</code>). F5 tải lại cùng URL nên thông báo vẫn hiện — khác flash chỉ sống một lần.</li>
+</ol>
+<p><strong>Bài tự trace</strong></p>
+<ul>
+<li><em>Username trùng:</em> trình duyệt gửi <code>POST /admin/users/save</code> → bind <code>User</code> (<code>id = null</code>, role
+<code>ROLE_USER</code>) → <code>AdminController.saveUser()</code> <code>:61-63</code> → proxy mở transaction (<code>jakarta</code> <code>@Transactional</code>)
+→ <code>AdminService.createNewUser()</code>: tripwire qua (<code>:39</code>), không phải <code>ROLE_DRIVER</code> (<code>:44</code>) →
+<code>requireUsernameAvailable(&quot;admin&quot;, null)</code> → <code>UserRepository.findByUsername(&quot;admin&quot;)</code> tìm thấy, id khác
+<code>null</code> ⇒ <code>IllegalArgumentException(&quot;Tên đăng nhập &#39;admin&#39; đã tồn tại, vui lòng chọn tên khác!&quot;)</code>
+(<code>:69-73</code>) → rollback → <code>catch</code> <code>:64-66</code> → flash <code>error</code> &quot;Lỗi: …&quot; → <code>redirect:/admin/users/new</code> → form
+trống, khung đỏ <code>user-form.html:19-21</code>. (Trước lỗi #25: HTTP 500.)</li>
+<li><em>POST tự chế <code>ROLE_DRIVER</code>:</em> bind <code>role = ROLE_DRIVER</code> (dropdown không có nhưng request vẫn gửi được) →
+<code>createNewUser()</code> qua tripwire → <code>:44-47</code> ném <code>IllegalArgumentException(&quot;Tài khoản tài xế phải được tạo ở màn Quản Lý Tài Xế (/admin/drivers/create)…&quot;)</code> → không chạm repository nào → flash lỗi → form. Không
+có dòng <code>users</code> nào được tạo (test <code>AdminServiceTest:58</code>).</li>
+</ul>
+<p><strong>Câu đọc code</strong></p>
+<p>Đoạn này chỉ chạy truy vấn &quot;còn chuyến dở không&quot; khi Admin đang <strong>chuyển</strong> tài xế từ hoạt động sang
+khoá. Bỏ vế <code>isBeingDeactivated &amp;&amp;</code>: mọi lần sửa của một tài xế có chuyến <code>ACTIVE</code> đều bị chặn với câu
+&quot;Không thể khóa tài xế này…&quot; — kể cả khi chỉ đổi số điện thoại hay gia hạn bằng lái — tức không sửa được
+hồ sơ của bất kỳ tài xế đang làm việc nào. Ngoài ra mỗi lần sửa còn tốn thêm một truy vấn không cần.</p>
+</details>
+
+<hr>
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li>Tài xế = <strong><code>User</code> + <code>Driver</code> chung một khoá</strong> (<code>@MapsId</code>); tạo bằng một form gộp, lưu <code>User</code> trước
+rồi <code>Driver</code>, trong một transaction; xoá từ phía <code>User</code> để cascade kéo theo <code>Driver</code>.</li>
+<li>Hai <code>@ModelAttribute</code> từ một form; marker <code>_isActive</code> làm cho bỏ tick có tác dụng; ô <code>rawPassword</code>
+riêng giữ mật khẩu cũ khi để trống.</li>
+<li><strong>Khoá thay cho xoá</strong>: không xoá tài xế từng có chuyến hoặc có sự cố; không khoá tài xế còn chuyến
+<code>PENDING_APPROVAL</code>/<code>ACTIVE</code>/<code>DEPARTED</code> (cùng tập &quot;bận&quot; với <code>TripService</code>).</li>
+<li><code>isActive</code> và <code>isLicenseValid(ngày khởi hành)</code> quyết định ai được xếp chuyến; nhãn &quot;Hết hạn&quot; ở danh
+sách xét hôm nay.</li>
+<li>Luật username duy nhất ở <strong>một</strong> chỗ (<code>AdminService.requireUsernameAvailable()</code>); màn tạo tài khoản
+không cho tạo <code>ROLE_DRIVER</code>, có tripwire, và bắt lỗi thay vì HTTP 500 (lỗi #21, #25).</li>
+</ol>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>
