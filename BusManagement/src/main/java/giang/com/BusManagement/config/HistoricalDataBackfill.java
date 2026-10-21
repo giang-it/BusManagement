@@ -1,7 +1,9 @@
 package giang.com.BusManagement.config;
 
+import giang.com.BusManagement.config.HistorySimulation.RouteProfile;
 import giang.com.BusManagement.domain.Bus;
 import giang.com.BusManagement.domain.Driver;
+import giang.com.BusManagement.domain.HolidayCalendar;
 import giang.com.BusManagement.domain.Route;
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.domain.TripStatus;
@@ -10,102 +12,98 @@ import giang.com.BusManagement.repository.DriverRepository;
 import giang.com.BusManagement.repository.RouteRepository;
 import giang.com.BusManagement.repository.TripRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Set;
 
 /**
- * PHASE 5 — Sinh dữ liệu chuyến xe LỊCH SỬ để Demand Forecast (Phase 6) có cái
- * mà học.
+ * Bộ sinh dữ liệu chuyến xe LỊCH SỬ cho Demand Forecast — viết lại ở GĐ2 của đợt thiết
+ * kế lại dự báo (QĐ-10, QĐ-11 trong docs/development/forecast_decisions.md). Bản Phase 5
+ * sinh TỈ LỆ LẤP ĐẦY cho 84 ngày tính từ ngày chạy; bản này sinh NHU CẦU từ 01/01/2023,
+ * rồi cắt theo số ghế mà một "nhà xe trong quá khứ" đã thật sự chạy.
  *
- * Vì sao cần: dữ liệu vận hành thật không thể tích lũy kịp trong thời gian làm
- * đồ án, nên bộ dữ liệu lịch sử được sinh tổng hợp. Đây là dữ liệu MÔ PHỎNG và
- * phải được nói rõ như vậy khi bảo vệ — không được trình bày như số liệu thật.
+ * Dữ liệu này là MÔ PHỎNG và phải được nói rõ như vậy khi bảo vệ — không được trình bày
+ * như số liệu thật. Phần mô phỏng (nhu cầu, bão, hủy, ý định tăng cường) nằm ở
+ * HistorySimulation; lớp này xếp xe, tài xế và ghi DB.
  *
  * ====================================================================
  * CÁCH CHẠY
  * ====================================================================
  * ./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill
  *
- * Profile `backfill` KHÔNG kích hoạt `demo`, nên DataInitializer (@Profile
- * ("demo")) không chạy và KHÔNG có gì bị xóa. application.properties mặc định
- * (ddl-auto=update) vẫn được áp dụng như thường.
+ * Profile `backfill` KHÔNG kích hoạt `demo`, nên DataInitializer không chạy và không
+ * có gì bị xóa. TUYỆT ĐỐI KHÔNG chạy kèm `demo` — profile đó xóa sạch schema.
  *
- * TUYỆT ĐỐI KHÔNG chạy kèm profile `demo` — profile đó dùng
- * ddl-auto=create-drop và sẽ xóa sạch schema trước khi bean này kịp chạy.
- *
- * ====================================================================
- * CHẠY LẠI NHIỀU LẦN ĐƯỢC (idempotent) — không nhân bản dữ liệu
- * ====================================================================
- * Mỗi ô dữ liệu là một cặp (tuyến × mốc khởi hành) sinh ra một cách TẤT ĐỊNH.
- * Trước khi tạo, bean hỏi tripRepository.existsByRouteIdAndDepartureTime(...);
- * ô nào đã có thì bỏ qua. Chạy lần thứ hai sẽ chèn 0 dòng. Nhờ vậy không cần
- * thêm cột "đây là dữ liệu backfill" vào Trip — đúng nguyên tắc không để Trip
- * phình thêm trách nhiệm.
+ * Tuỳ chọn: -Dbackfill.truth-csv=<đường dẫn> ghi thêm NHU CẦU THẬT của từng khung ra một
+ * file CSV (QĐ-10, G2-6). DB chỉ lưu số vé đã bán — đã bị chặn bởi số ghế — nên đây là
+ * cách duy nhất để chấm xem bước EM của mô hình khôi phục nhu cầu tốt tới đâu. File chỉ
+ * phục vụ nghiên cứu; không ghi gì thêm vào DB.
  *
  * ====================================================================
- * VÌ SAO GHI THẲNG QUA REPOSITORY, KHÔNG QUA TripService
+ * CHẠY LẠI / CHẠY BỔ SUNG — THEO TỪNG NGÀY, KHÔNG NHÂN BẢN
  * ====================================================================
- * createManualTrip() kiểm tra ràng buộc theo TRẠNG THÁI HIỆN TẠI: xe có đang
- * TRAVELING không, odometer đã tới ngưỡng bảo trì chưa... Những câu hỏi đó vô
- * nghĩa với một chuyến của ba tháng trước, và sẽ khiến gần như toàn bộ dữ liệu
- * lịch sử bị từ chối. DataInitializer đã có tiền lệ: dữ liệu seed ghi thẳng qua
- * repository.
+ * Mọi con số của một ngày tất định theo ngày đó (HistorySimulation tính từ mốc cố định
+ * EPOCH, không từ ngày chạy), nên chạy bổ sung về sau nối tiếp liền mạch. Một ngày đã có
+ * chuyến dạng bộ sinh thì được BỎ QUA CẢ NGÀY: xe và tài xế được xếp cho cả ngày một lúc,
+ * nên sinh nửa ngày sẽ phá bất biến "mỗi xe, mỗi tài xế một chuyến/ngày".
  *
- * Bù lại, dữ liệu sinh ra vẫn TÔN TRỌNG các quy tắc nghiệp vụ theo cách dựng
- * sẵn (xem generateForDay): mỗi tài xế tối đa 1 chuyến/ngày và mỗi xe tối đa 1
- * chuyến/ngày, cộng với việc chỉ chọn tuyến dài không quá 8h. Nhờ đó không có
- * chuyến nào trùng lịch xe/tài xế, và không tài xế nào vượt hạn mức 8h/ngày —
- * tức bộ dữ liệu không bịa ra những tình huống mà chính hệ thống coi là sai.
+ * Dữ liệu của bộ sinh này luôn bắt đầu đúng EPOCH. Nếu DB có chuyến dạng bộ sinh mà ngày
+ * EPOCH lại trống, đó là dữ liệu của bộ sinh cũ — bộ sinh DỪNG và yêu cầu chạy script xoá
+ * của GĐ3 trước, thay vì trộn hai bộ dữ liệu.
+ *
+ * ====================================================================
+ * NHÀ XE TRONG QUÁ KHỨ (planDay) — QUY TẮC NGHIỆP VỤ ĐÚNG THEO CÁCH DỰNG
+ * ====================================================================
+ * Ghi thẳng qua repository như DataInitializer, không qua TripService: createManualTrip()
+ * kiểm theo TRẠNG THÁI HIỆN TẠI của xe (TRAVELING, ngưỡng bảo trì...), vô nghĩa với một
+ * chuyến của ba năm trước. Bù lại, dữ liệu sinh ra tôn trọng các quy tắc theo cách dựng:
+ * <ul>
+ * <li>mỗi xe và mỗi tài xế tối đa MỘT chuyến mỗi ngày, chỉ sinh tuyến ≤ 8h — nên không
+ * trùng lịch và không ai vượt 8h lái/ngày;</li>
+ * <li>bằng lái phải CÒN HẠN vào ngày khởi hành — hỏi chính Driver.isLicenseValid(date).
+ * Bộ sinh cũ thiếu điều kiện này và đã xếp 69 chuyến cho tài xế hết hạn bằng (lỗi #32);</li>
+ * <li>số vé không vượt số ghế; số ghế là sức chứa của chính xe được xếp.</li>
+ * </ul>
+ * Mỗi khung có một chuyến thường; xe ưu tiên đúng loại xe phù hợp của tuyến, thiếu thì
+ * lấy loại khác — cùng thứ tự với AI phân công (findBestAvailableBus, mục #26). Quanh
+ * các kỳ nghỉ nhà xe muốn thêm chuyến (HistorySimulation.wishedExtraTrips); chuyến thêm
+ * chỉ chạy được bằng xe và tài xế còn rảnh trong ngày (QĐ-10, G2-4 / M-13), ưu tiên khung
+ * có nhu cầu kỳ vọng cao nhất, khởi hành sau chuyến gốc 30/40/50 phút — cùng giờ nên vẫn
+ * thuộc cùng khung khi gom theo HOUR(departureTime), như chuyến của createExtraTrip().
+ * Vé lấp chuyến thường trước, phần tràn sang chuyến thêm. Ngày bão: mọi chuyến của tuyến
+ * bị hủy; ngoài ra 6% khung bị hủy ngẫu nhiên. Khung bị hủy không có chuyến thêm, và giữ
+ * số vé đã bán trước khi hủy (cố ý, xem THESIS_ROADMAP.md).
  *
  * ====================================================================
  * ODOMETER: CỘNG CẢ HAI MỐC, GIỮ NGUYÊN kmSinceLastMaintenance
  * ====================================================================
- * Ở luồng thật, FSM cộng quãng đường tuyến vào Bus.odometer khi chuyến
- * DEPARTED → COMPLETED. Nếu bỏ qua, 1.260 chuyến hoàn thành (~195.000 km) sẽ
- * không để lại dấu vết nào trên odometer, và Phase 7 (Vehicle Replacement —
- * xếp hạng theo odometer trọn đời) sẽ chấm điểm trên số liệu seed không liên
- * quan gì tới bộ dữ liệu lịch sử.
+ * Như bản Phase 5: chuyến COMPLETED cộng quãng đường tuyến vào CẢ odometer LẪN
+ * lastMaintenanceOdometer, nên kmSinceLastMaintenance — và mọi quy tắc bảo dưỡng —
+ * không đổi; chỉ quãng đường trọn đời tăng thật. Chỉ cộng km của chuyến do lần chạy này
+ * tạo ra, nên chạy lại (tạo 0 chuyến) cũng cộng 0 km.
  *
- * Nhưng cộng thẳng vào odometer thôi thì HỎNG HỆ THỐNG: ~10.300 km/xe trong
- * khi maintenanceThreshold trung bình chỉ 5.000 km ⇒ needsMaintenance() đúng
- * với TOÀN BỘ đội xe ⇒ findBestAvailableBus() từ chối mọi xe ⇒ điều phối và AI
- * auto-assign đứng hình.
- *
- * Cách làm đúng, và là cách bean này dùng: cộng CÙNG một lượng km vào CẢ
- * odometer LẪN lastMaintenanceOdometer. Vì
- * kmSinceLastMaintenance = odometer - lastMaintenanceOdometer, hiệu số này
- * KHÔNG ĐỔI — needsMaintenance(), isNearMaintenance(), cảnh báo bảo dưỡng trên
- * Dashboard và thứ tự ưu tiên trong findBestAvailableBus() đều giữ nguyên hành
- * vi cũ. Về mặt nghiệp vụ, điều này mô phỏng đúng chuyện xe có chạy nhiều thì
- * cũng đã được bảo dưỡng định kỳ tương ứng trong 12 tuần đó.
- *
- * Chỉ chuyến COMPLETED mới cộng km — đúng như FSM; chuyến CANCELLED không chạy.
- * Chỉ cộng km của những chuyến do LẦN CHẠY NÀY tạo ra, nên chạy lại (tạo 0
- * chuyến) cũng cộng 0 km: tính idempotent của odometer đi kèm luôn với tính
- * idempotent của dữ liệu, không cần cột đánh dấu riêng.
- *
- * ====================================================================
- * TRỤC THỜI GIAN LÀ departureTime — KHÔNG PHẢI createdAt
- * ====================================================================
- * createdAt do @CreationTimestamp đóng dấu lúc INSERT và cột này
- * updatable = false, nên mọi dòng backfill đều mang ngày CHẠY SCRIPT ở
- * createdAt. Điều đó là bình thường và vô hại: mọi truy vấn theo thời gian đều
- * dùng departureTime. TUYỆT ĐỐI KHÔNG "sửa" bằng native SQL để lùi createdAt —
- * đó là làm sai lệch một mốc kỹ thuật để phục vụ việc mà departureTime đã làm
- * đúng (xem THESIS_ROADMAP.md, Developer Notes).
+ * Trục thời gian là departureTime; createdAt mang ngày chạy bộ sinh, đó là bình thường
+ * (xem THESIS_ROADMAP.md, Developer Notes).
  */
 @Component
 @Profile("backfill")
@@ -118,47 +116,73 @@ public class HistoricalDataBackfill implements CommandLineRunner {
     private final BusRepository busRepository;
     private final DriverRepository driverRepository;
 
-    /** Độ dài bộ dữ liệu lịch sử: 12 tuần, đủ để thấy cả xu hướng lẫn chu kỳ tuần. */
-    private static final int BACKFILL_DAYS = 84;
+    /** Đường dẫn file CSV nhu cầu thật; trống = không ghi. */
+    @Value("${backfill.truth-csv:}")
+    private String truthCsvPath;
+
+    /** Seed cố định của toàn bộ mô phỏng: chạy trên máy khác vẫn ra đúng bộ số đó. */
+    static final long RANDOM_SEED = 20261021L;
 
     /**
-     * Các khung giờ khởi hành trong ngày. Đây chính là "time slot" mà Phase 6 sẽ
-     * gom nhóm để dự báo, nên chúng cố định và rời rạc chứ không rải ngẫu nhiên.
-     */
-    private static final List<Integer> DEPARTURE_HOURS = List.of(6, 12, 18);
-
-    /**
-     * Chỉ backfill các tuyến mà MỘT tài xế chạy trọn được trong hạn mức ngày.
-     *
-     * Giá trị 8h khai báo lại tại đây theo đúng lý do đã ghi ở
-     * DriverRecommendationService: trong TripService số 8.0 mang ba ý nghĩa khác
-     * nhau, không gom được thành một hằng số chung. Ở đây nó phản chiếu hạn mức
-     * giờ lái/ngày — nếu tuyến dài hơn thế thì chuyến bắt buộc phải có tài xế phụ
-     * và phụ xe, và bộ dữ liệu sẽ phải bịa thêm nhân sự cho từng chuyến.
-     * Dữ liệu thật hiện có vài tuyến 30h/50h/75h (rõ ràng là dữ liệu thử), các
-     * tuyến đó bị loại khỏi backfill.
+     * Chỉ sinh tuyến mà MỘT tài xế chạy trọn được trong hạn mức ngày (giá trị 8h khai báo
+     * lại theo đúng lý do đã ghi ở DriverRecommendationService). Tuyến dài hơn bắt buộc có
+     * tài xế phụ và phụ xe, bộ dữ liệu sẽ phải bịa thêm nhân sự.
      */
     private static final int MAX_ROUTE_DURATION_MINUTES = 8 * 60;
 
-    /** Tỉ lệ chuyến bị hủy — có để Phase 6 buộc phải lọc theo trạng thái. */
-    private static final double CANCELLED_RATE = 0.06;
+    /** Số ghế xe chuẩn khi tuyến chưa có loại xe phù hợp. */
+    private static final int DEFAULT_SEATS = 40;
 
     /** Chuyến được mở bán trước ngày chạy bao lâu (mốc nghiệp vụ, không phải audit). */
     private static final int SALE_OPENS_DAYS_BEFORE = 30;
 
-    /** Seed cố định: chạy lại trên máy khác vẫn ra đúng bộ số liệu đó. */
-    private static final long RANDOM_SEED = 20260720L;
+    /** Phút khởi hành của chuyến thêm thứ 1, 2, 3 trong cùng khung. */
+    private static final int[] EXTRA_MINUTES = { 30, 40, 50 };
 
-    private static final int DEFAULT_SEATS = 40;
+    /** Một chuyến đã lên kế hoạch, chưa là entity. */
+    record PlannedTrip(Bus bus, Driver driver, int seats, int tickets, int minute, boolean extra) {
+    }
+
+    /** Một khung (tuyến × giờ) của một ngày cùng các chuyến của nó. */
+    record PlannedSlot(Route route, int hourIndex, double mean, int demand, boolean closed, boolean cancelled,
+            List<PlannedTrip> trips) {
+
+        int seats() {
+            return trips.stream().mapToInt(PlannedTrip::seats).sum();
+        }
+
+        int sold() {
+            return trips.stream().mapToInt(PlannedTrip::tickets).sum();
+        }
+    }
 
     @Override
     public void run(String... args) {
+        generate(LocalDate.now().minusDays(1));
+    }
+
+    /**
+     * Sinh mọi ngày còn thiếu trong [EPOCH, lastDay].
+     *
+     * @return số chuyến đã tạo
+     */
+    int generate(LocalDate lastDay) {
         System.out.println("========================================");
-        System.out.println("[Backfill] Phase 5 — sinh dữ liệu chuyến LỊCH SỬ (dữ liệu MÔ PHỎNG)");
+        System.out.println("[Backfill] Sinh dữ liệu chuyến LỊCH SỬ (dữ liệu MÔ PHỎNG) — bộ sinh GĐ2");
+
+        LocalDate coveredEnd = LocalDate.of(HolidayCalendar.LAST_COVERED_YEAR, 12, 31);
+        if (lastDay.isAfter(coveredEnd)) {
+            System.out.printf("[Backfill] Lịch ngày lễ chỉ phủ tới %s — chỉ sinh tới đó. Bổ sung bảng âm lịch "
+                    + "trong HolidayCalendar để sinh tiếp.%n", coveredEnd);
+            lastDay = coveredEnd;
+        }
+        if (lastDay.isBefore(HistorySimulation.EPOCH)) {
+            System.out.println("[Backfill] DỪNG — chưa tới ngày bắt đầu " + HistorySimulation.EPOCH);
+            return 0;
+        }
 
         List<Route> routes = eligibleRoutes();
-        // findAllWithBusType() chứ không phải findAll(): CommandLineRunner chạy
-        // NGOÀI session Hibernate (open-in-view chỉ áp dụng cho request web), nên
+        // findAllWithBusType(): CommandLineRunner chạy NGOÀI session Hibernate, nên
         // bus.getBusType() lazy sẽ ném LazyInitializationException khi lấy số ghế.
         List<Bus> buses = busRepository.findAllWithBusType().stream()
                 .sorted(Comparator.comparing(Bus::getId))
@@ -167,68 +191,295 @@ public class HistoricalDataBackfill implements CommandLineRunner {
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .sorted(Comparator.comparing(Driver::getUserId))
                 .toList();
-
-        int tripsPerDay = routes.size() * DEPARTURE_HOURS.size();
-
-        if (routes.isEmpty() || buses.isEmpty() || drivers.isEmpty()) {
-            System.out.printf("[Backfill] DỪNG — thiếu dữ liệu nền (tuyến hợp lệ=%d, xe=%d, tài xế=%d).%n",
-                    routes.size(), buses.size(), drivers.size());
-            return;
-        }
-        // Bất biến giữ cho dữ liệu không tự mâu thuẫn: trong một ngày, không tài xế
-        // nào và không xe nào bị dùng hai lần.
-        if (tripsPerDay > drivers.size() || tripsPerDay > buses.size()) {
-            System.out.printf("[Backfill] DỪNG — %d chuyến/ngày vượt quá số tài xế (%d) hoặc số xe (%d); "
-                    + "sinh tiếp sẽ tạo ra trùng lịch. Giảm số tuyến hoặc số khung giờ.%n",
-                    tripsPerDay, drivers.size(), buses.size());
-            return;
+        int slotsPerDay = routes.size() * HistorySimulation.DEPARTURE_HOURS.size();
+        if (routes.isEmpty() || buses.size() < slotsPerDay || drivers.isEmpty()) {
+            System.out.printf("[Backfill] DỪNG — thiếu dữ liệu nền (tuyến hợp lệ=%d, xe=%d cần ≥ %d, tài xế=%d).%n",
+                    routes.size(), buses.size(), slotsPerDay, drivers.size());
+            return 0;
         }
 
-        LocalDate today = LocalDate.now();
-        LocalDate firstDay = today.minusDays(BACKFILL_DAYS);
-        System.out.printf("[Backfill] Cửa sổ: %s → %s | %d tuyến × %d khung giờ = %d chuyến/ngày%n",
-                firstDay, today.minusDays(1), routes.size(), DEPARTURE_HOURS.size(), tripsPerDay);
+        Set<LocalDate> existingDays = existingGeneratorDays(routes, lastDay);
+        if (!existingDays.isEmpty() && !existingDays.contains(HistorySimulation.EPOCH)) {
+            System.out.printf("[Backfill] DỪNG — DB đã có chuyến dạng bộ sinh (%d ngày, sớm nhất %s) nhưng ngày %s "
+                    + "trống: đó là dữ liệu của bộ sinh CŨ. Chạy hai script của GĐ3 trong "
+                    + "docs/development/forecast_research/ (gd3_check_old_history.sql rồi gd3_delete_old_history.sql, "
+                    + "sau khi backup) trước, đừng trộn hai bộ dữ liệu.%n",
+                    existingDays.size(), Collections.min(existingDays), HistorySimulation.EPOCH);
+            return 0;
+        }
 
-        Random random = new Random(RANDOM_SEED);
-        int created = 0;
-        int skipped = 0;
-        // km cần cộng vào odometer, gom theo xe — CHỈ từ các chuyến do lần chạy này
-        // tạo ra, nên chạy lại sẽ cộng 0.
+        Map<Long, RouteProfile> profiles = new HashMap<>();
+        for (Route route : routes) {
+            profiles.put(route.getId(), profileOf(route));
+        }
+        HistorySimulation simulation = new HistorySimulation(RANDOM_SEED, List.copyOf(profiles.values()), lastDay);
+        System.out.printf("[Backfill] Cửa sổ: %s → %s | %d tuyến × %d khung | %d xe, %d tài xế đang hoạt động%n",
+                HistorySimulation.EPOCH, lastDay, routes.size(), HistorySimulation.DEPARTURE_HOURS.size(),
+                buses.size(), drivers.size());
+
         Map<Long, Double> kmByBusId = new HashMap<>();
-
-        for (int dayIndex = 0; dayIndex < BACKFILL_DAYS; dayIndex++) {
-            LocalDate day = firstDay.plusDays(dayIndex);
-            List<Trip> batch = generateForDay(day, dayIndex, routes, buses, drivers, tripsPerDay, random);
-            skipped += tripsPerDay - batch.size();
-            if (!batch.isEmpty()) {
-                tripRepository.saveAll(batch);
-                created += batch.size();
-                accumulateOdometerKm(batch, kmByBusId);
+        List<String> truthRows = new ArrayList<>();
+        int created = 0;
+        int extras = 0;
+        int cancelled = 0;
+        int skippedDays = 0;
+        int unservedSlots = 0;
+        int soldOutSlots = 0;
+        int openSlots = 0;
+        for (LocalDate day = HistorySimulation.EPOCH; !day.isAfter(lastDay); day = day.plusDays(1)) {
+            if (existingDays.contains(day)) {
+                skippedDays++;
+                continue;
             }
+            List<PlannedSlot> plan = planDay(day, routes, profiles, buses, drivers, simulation);
+            List<Trip> regular = new ArrayList<>();
+            for (PlannedSlot slot : plan) {
+                if (!slot.trips().isEmpty()) {
+                    regular.add(toTrip(slot, slot.trips().get(0), day, null));
+                }
+            }
+            // Chuyến thường lưu trước để chuyến thêm trỏ được về chuyến gốc của nó.
+            List<Trip> savedRegular = tripRepository.saveAll(regular);
+
+            List<Trip> extraTrips = new ArrayList<>();
+            int index = 0;
+            for (PlannedSlot slot : plan) {
+                truthRows.add(truthRow(day, slot, profiles.get(slot.route().getId())));
+                if (slot.trips().isEmpty()) {
+                    unservedSlots++;
+                    continue;
+                }
+                Trip parent = savedRegular.get(index++);
+                for (PlannedTrip extra : slot.trips().subList(1, slot.trips().size())) {
+                    extraTrips.add(toTrip(slot, extra, day, parent));
+                }
+                if (slot.cancelled()) {
+                    cancelled += slot.trips().size();
+                } else {
+                    openSlots++;
+                    if (slot.demand() >= slot.seats()) {
+                        soldOutSlots++;
+                    }
+                }
+            }
+            tripRepository.saveAll(extraTrips);
+            created += savedRegular.size() + extraTrips.size();
+            extras += extraTrips.size();
+            accumulateOdometerKm(savedRegular, kmByBusId);
+            accumulateOdometerKm(extraTrips, kmByBusId);
         }
 
         int busesUpdated = applyOdometer(kmByBusId);
+        writeTruthCsv(truthRows);
 
-        System.out.printf("[Backfill] XONG — đã tạo %d chuyến, bỏ qua %d ô đã có sẵn.%n", created, skipped);
+        System.out.printf("[Backfill] XONG — tạo %d chuyến (%d chuyến tăng cường, %d chuyến bị hủy); bỏ qua %d ngày "
+                + "đã có sẵn; %d khung thiếu xe hoặc tài xế.%n", created, extras, cancelled, skippedDays, unservedSlots);
+        if (openSlots > 0) {
+            System.out.printf("[Backfill] Khung bán hết vé (nhu cầu ≥ số ghế): %d/%d = %.1f%%.%n",
+                    soldOutSlots, openSlots, 100.0 * soldOutSlots / openSlots);
+        }
         System.out.printf("[Backfill] Odometer: cộng %.0f km cho %d xe (kèm lastMaintenanceOdometer, "
                 + "nên kmSinceLastMaintenance không đổi).%n",
                 kmByBusId.values().stream().mapToDouble(Double::doubleValue).sum(), busesUpdated);
-        if (created == 0) {
-            System.out.println("[Backfill] Không có gì mới: bộ dữ liệu đã được sinh trước đó (idempotent).");
-        }
-        System.out.println("[Backfill] LƯU Ý: createdAt của các dòng này là ngày chạy script, không phải ngày "
+        System.out.println("[Backfill] LƯU Ý: createdAt của các dòng này là ngày chạy bộ sinh, không phải ngày "
                 + "khởi hành — trục thời gian của dataset là departureTime.");
         System.out.println("========================================");
+        return created;
+    }
+
+    // =========================================================================
+    // NHÀ XE TRONG QUÁ KHỨ — hàm thuần, không đụng DB
+    // =========================================================================
+
+    /**
+     * Kế hoạch chạy xe của một ngày: mỗi khung một chuyến thường, rồi chuyến tăng cường
+     * trong giới hạn xe và tài xế còn rảnh. Thứ tự xếp các khung được xáo theo ngày (tất
+     * định) để không khung nào luôn là khung nhận xe "lệch loại".
+     */
+    static List<PlannedSlot> planDay(LocalDate day, List<Route> routes, Map<Long, RouteProfile> profiles,
+            List<Bus> buses, List<Driver> drivers, HistorySimulation simulation) {
+
+        int dayIndex = (int) ChronoUnit.DAYS.between(HistorySimulation.EPOCH, day);
+        List<Driver> licensed = drivers.stream().filter(d -> d.isLicenseValid(day)).toList();
+        List<Bus> busOrder = rotate(buses, dayIndex * 7);
+        List<Driver> driverOrder = rotate(licensed, dayIndex * 11);
+        Set<Long> busesUsed = new HashSet<>();
+        Set<Long> driversUsed = new HashSet<>();
+
+        record Draft(Route route, int hourIndex, double mean, int demand, boolean closed, boolean cancelled,
+                List<Bus> buses, List<Driver> drivers) {
+        }
+        List<Draft> drafts = new ArrayList<>();
+        for (Route route : routes) {
+            RouteProfile profile = profiles.get(route.getId());
+            boolean closed = simulation.isClosed(route.getId(), day);
+            for (int h = 0; h < HistorySimulation.DEPARTURE_HOURS.size(); h++) {
+                boolean cancelled = closed || simulation.isRandomlyCancelled(route.getId(), day, h);
+                drafts.add(new Draft(route, h, simulation.mean(profile, day, h), simulation.demand(profile, day, h),
+                        closed, cancelled, new ArrayList<>(), new ArrayList<>()));
+            }
+        }
+
+        // Chuyến thường: xe đúng loại của tuyến trước, thiếu thì loại khác.
+        List<Draft> assignmentOrder = new ArrayList<>(drafts);
+        Collections.shuffle(assignmentOrder, simulation.slotOrder(day));
+        for (Draft draft : assignmentOrder) {
+            Integer preferredType = draft.route().getSuitableBusType() != null
+                    ? draft.route().getSuitableBusType().getId() : null;
+            Bus bus = busOrder.stream()
+                    .filter(b -> !busesUsed.contains(b.getId()) && preferredType != null
+                            && b.getBusType() != null && preferredType.equals(b.getBusType().getId()))
+                    .findFirst()
+                    .orElse(busOrder.stream().filter(b -> !busesUsed.contains(b.getId())).findFirst().orElse(null));
+            Driver driver = driverOrder.stream().filter(d -> !driversUsed.contains(d.getUserId())).findFirst()
+                    .orElse(null);
+            if (bus == null || driver == null) {
+                continue; // khung không có chuyến — được đếm và báo ở generate()
+            }
+            busesUsed.add(bus.getId());
+            driversUsed.add(driver.getUserId());
+            draft.buses().add(bus);
+            draft.drivers().add(driver);
+        }
+
+        // Chuyến tăng cường: khung muốn thêm, chưa bị hủy, nhu cầu kỳ vọng cao nhất trước;
+        // mỗi vòng thêm tối đa một chuyến cho mỗi khung; xe lớn nhất còn rảnh.
+        List<Draft> wanting = drafts.stream()
+                .filter(d -> !d.cancelled() && !d.buses().isEmpty()
+                        && simulation.wishedExtraTrips(d.route().getId(), day) > 0)
+                .sorted(Comparator.comparingDouble(Draft::mean).reversed()
+                        .thenComparing(d -> d.route().getId())
+                        .thenComparingInt(Draft::hourIndex))
+                .toList();
+        boolean resourcesLeft = true;
+        for (int round = 1; round <= EXTRA_MINUTES.length && resourcesLeft; round++) {
+            for (Draft draft : wanting) {
+                if (simulation.wishedExtraTrips(draft.route().getId(), day) < round) {
+                    continue;
+                }
+                // Stream.max giữ phần tử ĐẦU TIÊN khi bằng nhau, nên giữa các xe cùng cỡ
+                // thứ tự xoay vòng của ngày vẫn được tôn trọng.
+                Bus bus = busOrder.stream()
+                        .filter(b -> !busesUsed.contains(b.getId()))
+                        .max(Comparator.comparingInt(HistoricalDataBackfill::capacityOf))
+                        .orElse(null);
+                Driver driver = driverOrder.stream().filter(d -> !driversUsed.contains(d.getUserId())).findFirst()
+                        .orElse(null);
+                if (bus == null || driver == null) {
+                    resourcesLeft = false;
+                    break;
+                }
+                busesUsed.add(bus.getId());
+                driversUsed.add(driver.getUserId());
+                draft.buses().add(bus);
+                draft.drivers().add(driver);
+            }
+        }
+
+        // Vé: lấp chuyến thường trước, phần tràn sang chuyến thêm theo thứ tự.
+        List<PlannedSlot> plan = new ArrayList<>();
+        for (Draft draft : drafts) {
+            int remaining = draft.demand();
+            List<PlannedTrip> trips = new ArrayList<>();
+            for (int i = 0; i < draft.buses().size(); i++) {
+                int seats = capacityOf(draft.buses().get(i));
+                int tickets = Math.min(remaining, seats);
+                remaining -= tickets;
+                trips.add(new PlannedTrip(draft.buses().get(i), draft.drivers().get(i), seats, tickets,
+                        i == 0 ? 0 : EXTRA_MINUTES[i - 1], i > 0));
+            }
+            plan.add(new PlannedSlot(draft.route(), draft.hourIndex(), draft.mean(), draft.demand(), draft.closed(),
+                    draft.cancelled(), trips));
+        }
+        return plan;
+    }
+
+    /** Danh sách xoay vòng bắt đầu từ vị trí offset — để tải trải đều qua các ngày. */
+    private static <T> List<T> rotate(List<T> items, int offset) {
+        if (items.isEmpty()) {
+            return items;
+        }
+        int start = Math.floorMod(offset, items.size());
+        List<T> rotated = new ArrayList<>(items.subList(start, items.size()));
+        rotated.addAll(items.subList(0, start));
+        return rotated;
+    }
+
+    static int capacityOf(Bus bus) {
+        return bus.getBusType() != null && bus.getBusType().getCapacity() > 0
+                ? bus.getBusType().getCapacity()
+                : DEFAULT_SEATS;
+    }
+
+    static RouteProfile profileOf(Route route) {
+        int seats = route.getSuitableBusType() != null && route.getSuitableBusType().getCapacity() > 0
+                ? route.getSuitableBusType().getCapacity()
+                : DEFAULT_SEATS;
+        return new RouteProfile(route.getId(), route.getHolidayFlow(), seats);
+    }
+
+    // =========================================================================
+    // DB
+    // =========================================================================
+
+    /** Tuyến đủ điều kiện: có thời lượng, và một tài xế chạy trọn được trong hạn mức ngày. */
+    private List<Route> eligibleRoutes() {
+        // findAllWithStations(): suitableBusType và lộ trình được dùng ngoài session.
+        return routeRepository.findAllWithStations().stream()
+                .filter(r -> r.getEstimatedDuration() != null && r.getEstimatedDuration() > 0)
+                .filter(r -> r.getEstimatedDuration() <= MAX_ROUTE_DURATION_MINUTES)
+                .sorted(Comparator.comparing(Route::getId))
+                .toList();
     }
 
     /**
-     * Gom quãng đường của các chuyến ĐÃ HOÀN THÀNH theo xe.
-     *
-     * Chỉ COMPLETED, đúng như FSM (updateTripStatus chỉ cộng odometer ở bước
-     * DEPARTED → COMPLETED) — chuyến CANCELLED không hề chạy nên không cộng km.
+     * Những ngày đã có chuyến DẠNG BỘ SINH (tuyến đủ điều kiện, giờ 06/12/18, phút 0 hoặc
+     * phút của chuyến thêm). Nạp một lần thay vì hỏi từng khung.
      */
-    private void accumulateOdometerKm(List<Trip> batch, Map<Long, Double> kmByBusId) {
-        for (Trip trip : batch) {
+    private Set<LocalDate> existingGeneratorDays(List<Route> routes, LocalDate lastDay) {
+        Set<Integer> minutes = new HashSet<>();
+        minutes.add(0);
+        for (int minute : EXTRA_MINUTES) {
+            minutes.add(minute);
+        }
+        Set<LocalDate> days = new HashSet<>();
+        List<Long> routeIds = routes.stream().map(Route::getId).toList();
+        for (LocalDateTime departure : tripRepository.findDepartureTimesByRouteIdsBetween(routeIds,
+                HistorySimulation.EPOCH.atStartOfDay(), lastDay.plusDays(1).atStartOfDay())) {
+            if (HistorySimulation.DEPARTURE_HOURS.contains(departure.getHour())
+                    && minutes.contains(departure.getMinute())) {
+                days.add(departure.toLocalDate());
+            }
+        }
+        return days;
+    }
+
+    private Trip toTrip(PlannedSlot slot, PlannedTrip planned, LocalDate day, Trip parent) {
+        Route route = slot.route();
+        LocalDateTime departure = day.atTime(HistorySimulation.DEPARTURE_HOURS.get(slot.hourIndex()),
+                planned.minute());
+        Trip trip = new Trip();
+        trip.setRoute(route);
+        trip.setBus(planned.bus());
+        trip.setDriver(planned.driver());
+        trip.setDepartureTime(departure);
+        trip.setArrivalTimeExpected(departure.plusMinutes(route.getEstimatedDuration()));
+        trip.setTotalSeats(planned.seats());
+        trip.setTicketsSold(planned.tickets());
+        trip.setPrice(priceFor(route));
+        trip.setStatus(slot.cancelled() ? TripStatus.CANCELLED : TripStatus.COMPLETED);
+        trip.setSaleOpenedAt(departure.minusDays(SALE_OPENS_DAYS_BEFORE));
+        trip.setExtraTrip(planned.extra());
+        trip.setOriginalTrip(parent);
+        return trip;
+    }
+
+    /**
+     * Gom quãng đường của các chuyến ĐÃ HOÀN THÀNH theo xe — đúng như FSM, chuyến CANCELLED
+     * không chạy nên không cộng km.
+     */
+    private void accumulateOdometerKm(List<Trip> trips, Map<Long, Double> kmByBusId) {
+        for (Trip trip : trips) {
             if (trip.getStatus() != TripStatus.COMPLETED || trip.getBus() == null) {
                 continue;
             }
@@ -240,25 +491,13 @@ public class HistoricalDataBackfill implements CommandLineRunner {
     }
 
     /**
-     * Cộng km đã gom vào odometer VÀ lastMaintenanceOdometer của từng xe.
-     *
-     * Cộng cùng một lượng vào cả hai là điểm mấu chốt: hiệu số
-     * kmSinceLastMaintenance giữ nguyên, nên mọi quy tắc bảo dưỡng hiện có
-     * (needsMaintenance, isNearMaintenance, cảnh báo Dashboard, thứ tự ưu tiên
-     * của findBestAvailableBus) hành xử y hệt trước — chỉ có quãng đường trọn
-     * đời là tăng lên thật.
-     *
-     * Xe nào thiếu một trong hai mốc (null) thì BỎ QUA: khi đó
-     * getKmSinceLastMaintenance() đang trả 0.0 theo quy ước của entity, và cộng
-     * vào chỉ một vế sẽ vô tình bịa ra một khoảng km kể từ lần bảo dưỡng cuối,
-     * tức là làm thay đổi hành vi bảo dưỡng — đúng thứ cần tránh.
+     * Cộng km đã gom vào odometer VÀ lastMaintenanceOdometer của từng xe — hiệu số
+     * kmSinceLastMaintenance giữ nguyên. Xe thiếu một trong hai mốc thì bỏ qua: cộng một
+     * vế sẽ bịa ra một khoảng km kể từ lần bảo dưỡng cuối.
      *
      * @return số xe thực sự được cập nhật
      */
     private int applyOdometer(Map<Long, Double> kmByBusId) {
-        if (kmByBusId.isEmpty()) {
-            return 0;
-        }
         List<Bus> updated = new ArrayList<>();
         for (Map.Entry<Long, Double> entry : kmByBusId.entrySet()) {
             Bus bus = busRepository.findById(entry.getKey()).orElse(null);
@@ -266,119 +505,50 @@ public class HistoricalDataBackfill implements CommandLineRunner {
                 System.out.printf("[Backfill] Bỏ qua odometer của xe #%s (thiếu mốc odometer).%n", entry.getKey());
                 continue;
             }
-            double km = entry.getValue();
-            bus.setOdometer(bus.getOdometer() + km);
-            bus.setLastMaintenanceOdometer(bus.getLastMaintenanceOdometer() + km);
+            bus.setOdometer(bus.getOdometer() + entry.getValue());
+            bus.setLastMaintenanceOdometer(bus.getLastMaintenanceOdometer() + entry.getValue());
             updated.add(bus);
         }
         busRepository.saveAll(updated);
         return updated.size();
     }
 
-    /**
-     * Tuyến đủ điều kiện: có quãng đường/thời lượng, và một tài xế chạy trọn được
-     * trong hạn mức ngày.
-     */
-    private List<Route> eligibleRoutes() {
-        return routeRepository.findAll().stream()
-                .filter(r -> r.getEstimatedDuration() != null && r.getEstimatedDuration() > 0)
-                .filter(r -> r.getEstimatedDuration() <= MAX_ROUTE_DURATION_MINUTES)
-                .sorted(Comparator.comparing(Route::getId))
-                .toList();
+    private String truthRow(LocalDate day, PlannedSlot slot, RouteProfile profile) {
+        return String.join(",",
+                day.toString(),
+                String.valueOf(slot.route().getId()),
+                String.valueOf(HistorySimulation.DEPARTURE_HOURS.get(slot.hourIndex())),
+                String.valueOf(HistorySimulation.Flow.of(profile.holidayFlow())),
+                String.valueOf(profile.standardSeats()),
+                String.format(java.util.Locale.ROOT, "%.4f", slot.mean()),
+                String.valueOf(slot.demand()),
+                String.valueOf(slot.trips().size()),
+                String.valueOf(slot.seats()),
+                String.valueOf(slot.sold()),
+                slot.closed() ? "1" : "0",
+                slot.cancelled() ? "1" : "0");
     }
 
-    /**
-     * Sinh các chuyến của một ngày.
-     *
-     * Xe và tài xế được quay vòng theo chỉ số chạy liên tục qua các ngày. Vì số
-     * chuyến/ngày luôn nhỏ hơn số xe và số tài xế (đã kiểm tra ở run()), các chỉ
-     * số trong cùng một ngày luôn khác nhau — nên không tài xế/xe nào bị xếp hai
-     * chuyến cùng ngày. Việc quay vòng qua các ngày cũng khiến tải trải đều thay
-     * vì dồn vào vài người đầu danh sách.
-     */
-    private List<Trip> generateForDay(LocalDate day, int dayIndex, List<Route> routes, List<Bus> buses,
-            List<Driver> drivers, int tripsPerDay, Random random) {
-
-        List<Trip> batch = new ArrayList<>();
-        int slotIndex = 0;
-
-        for (Route route : routes) {
-            for (int hour : DEPARTURE_HOURS) {
-                LocalDateTime departure = day.atTime(hour, 0);
-                int rotation = dayIndex * tripsPerDay + slotIndex;
-                slotIndex++;
-
-                // Rút số ngẫu nhiên TRƯỚC khi quyết định bỏ qua, để chuỗi ngẫu nhiên
-                // không lệch giữa lần chạy đầu và các lần chạy lại — nhờ đó dataset
-                // vẫn tất định dù chạy nhiều lần.
-                double noise = 1.0 + (random.nextDouble() - 0.5) * 0.16;
-                boolean cancelled = random.nextDouble() < CANCELLED_RATE;
-
-                if (tripRepository.existsByRouteIdAndDepartureTime(route.getId(), departure)) {
-                    continue;
-                }
-
-                Bus bus = buses.get(rotation % buses.size());
-                Driver driver = drivers.get(rotation % drivers.size());
-
-                batch.add(buildTrip(route, bus, driver, departure, dayIndex, noise, cancelled));
-            }
+    private void writeTruthCsv(List<String> rows) {
+        if (truthCsvPath == null || truthCsvPath.isBlank()) {
+            return;
         }
-        return batch;
+        Path path = Path.of(truthCsvPath);
+        try (BufferedWriter writer = Files.newBufferedWriter(path)) {
+            writer.write("date,route_id,hour,flow,standard_seats,mean,demand,trips,seats,sold,closed,cancelled");
+            writer.newLine();
+            for (String row : rows) {
+                writer.write(row);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Không ghi được file nhu cầu thật " + path, e);
+        }
+        System.out.printf("[Backfill] Đã ghi nhu cầu thật của %d khung vào %s%n", rows.size(), path);
     }
 
-    private Trip buildTrip(Route route, Bus bus, Driver driver, LocalDateTime departure,
-            int dayIndex, double noise, boolean cancelled) {
-
-        Trip trip = new Trip();
-        trip.setRoute(route);
-        trip.setBus(bus);
-        trip.setDriver(driver);
-        trip.setDepartureTime(departure);
-        trip.setArrivalTimeExpected(departure.plusMinutes(route.getEstimatedDuration()));
-
-        int seats = (bus.getBusType() != null && bus.getBusType().getCapacity() > 0)
-                ? bus.getBusType().getCapacity()
-                : DEFAULT_SEATS;
-        trip.setTotalSeats(seats);
-        trip.setTicketsSold((int) Math.round(seats * occupancy(route, departure, dayIndex, noise)));
-
-        trip.setPrice(priceFor(route));
-        trip.setStatus(cancelled ? TripStatus.CANCELLED : TripStatus.COMPLETED);
-        trip.setSaleOpenedAt(departure.minusDays(SALE_OPENS_DAYS_BEFORE));
-        trip.setExtraTrip(false);
-        return trip;
-    }
-
-    /**
-     * Tỉ lệ lấp đầy mô phỏng — đây chính là "nhu cầu" mà Phase 6 sẽ dự báo.
-     *
-     * Bốn thành phần cố ý tách bạch để thuật toán dự báo có cái để phát hiện:
-     * nền theo tuyến, hệ số theo khung giờ, chu kỳ cuối tuần, và một xu hướng
-     * tăng nhẹ dần đều theo thời gian (moving average bắt được chu kỳ; linear
-     * regression bắt được xu hướng).
-     */
-    private double occupancy(Route route, LocalDateTime departure, int dayIndex, double noise) {
-        double base = 0.52 + (route.getId() % 4) * 0.07;
-
-        double slotFactor = switch (departure.getHour()) {
-            case 6 -> 1.05;
-            case 12 -> 0.85;
-            default -> 1.12;
-        };
-
-        DayOfWeek dow = departure.getDayOfWeek();
-        double weekendFactor = (dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY) ? 1.20 : 1.0;
-
-        // Tăng trưởng tuyến tính ~15% trên toàn cửa sổ.
-        double trendFactor = 1.0 + 0.15 * ((double) dayIndex / BACKFILL_DAYS);
-
-        double value = base * slotFactor * weekendFactor * trendFactor * noise;
-        return Math.max(0.15, Math.min(1.0, value));
-    }
-
-    /** Giá vé suy ra từ quãng đường, làm tròn tới 10.000đ cho giống dữ liệu thật. */
-    private BigDecimal priceFor(Route route) {
+    /** Giá vé suy ra từ quãng đường, làm tròn tới 10.000đ cho giống dữ liệu thật (như Phase 5). */
+    private static BigDecimal priceFor(Route route) {
         double km = route.getDistanceKm() != null ? route.getDistanceKm() : 100.0;
         long price = Math.round(km * 1000 / 10_000.0) * 10_000L;
         return BigDecimal.valueOf(Math.max(price, 50_000L));

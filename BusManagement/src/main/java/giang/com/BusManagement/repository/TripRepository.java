@@ -331,15 +331,20 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("since") LocalDateTime since);
 
        /**
-        * Kiểm tra đã tồn tại chuyến của tuyến này khởi hành ĐÚNG mốc thời gian này
-        * hay chưa.
+        * Giờ khởi hành của mọi chuyến thuộc các tuyến cho trước, trong [from, to).
         *
         * Dùng bởi HistoricalDataBackfill để chạy lại được nhiều lần mà không nhân
-        * bản dữ liệu: mỗi ô (tuyến × mốc khởi hành) của bộ dữ liệu lịch sử là duy
-        * nhất và sinh ra một cách tất định, nên chỉ cần hỏi đúng câu này là biết ô
-        * đó đã được backfill hay chưa — không cần thêm cột đánh dấu vào Trip.
+        * bản dữ liệu: bộ sinh xếp xe và tài xế cho cả NGÀY một lúc, nên nó cần biết
+        * NGÀY nào đã có chuyến dạng bộ sinh để bỏ qua cả ngày — không cần thêm cột
+        * đánh dấu vào Trip. Một truy vấn cho cả khoảng thay cho hàng chục nghìn câu
+        * hỏi từng khung (bản Phase 5 hỏi existsByRouteIdAndDepartureTime cho mỗi ô).
+        * Chỉ một cột scalar, không nạp entity. Chuyến xóa mềm tự bị loại nhờ
+        * @SQLRestriction.
         */
-       boolean existsByRouteIdAndDepartureTime(Long routeId, LocalDateTime departureTime);
+       @Query("SELECT t.departureTime FROM Trip t " +
+                     "WHERE t.route.id IN :routeIds AND t.departureTime >= :from AND t.departureTime < :to")
+       List<LocalDateTime> findDepartureTimesByRouteIdsBetween(@Param("routeIds") Collection<Long> routeIds,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
        /**
         * Kiểm tra xe có đang bận ở các chuyến đi có trạng thái nằm trong
