@@ -1,7 +1,8 @@
 # Thảo luận thiết kế lại Demand Forecast (2026-10-14 → 2026-10-20)
 
 > **Trạng thái: CHỈ THẢO LUẬN VÀ THÍ NGHIỆM, CHƯA SỬA CODE APP.**
-> **Mới nhất (2026-10-21): chủ dự án đã duyệt 7 quyết định.** Xem [`forecast_decisions.md`](forecast_decisions.md); tiến độ ở [`forecast_progress.md`](forecast_progress.md). File này giờ chỉ là hồ sơ lý do và số đo; chỗ nào nói "chưa chốt" là đúng tại thời điểm viết.
+> **Mới nhất (2026-10-21, GĐ2):** đo lại trên dữ liệu của bộ sinh mới, xem mục 13. Có hai đề xuất đổi so với QĐ-3 và QĐ-1, chờ chủ dự án.
+> **2026-10-21: chủ dự án đã duyệt 7 quyết định.** Xem [`forecast_decisions.md`](forecast_decisions.md); tiến độ ở [`forecast_progress.md`](forecast_progress.md). File này giờ chỉ là hồ sơ lý do và số đo; chỗ nào nói "chưa chốt" là đúng tại thời điểm viết.
 > 2026-10-20: chủ dự án nghiêng về B1 + C2 (mục 11), và bước 0, tức thí nghiệm chọn thuật toán, đã xong (mục 12).
 >
 > Mục 0–10 ghi ba lượt thảo luận trong phiên 2026-10-14 → 16. Mục 11–12 ghi phiên 2026-10-20.
@@ -733,7 +734,145 @@ So từng cặp trên 90 thời điểm, có khoảng tin cậy bootstrap 95% (`
 
 - Chốt các đề xuất ở 12.6, nhất là thuật toán, thuộc tính chiều tuyến, tầm dự báo và cách sửa Non-Goal.
 - Nếu duyệt, làm tiếp theo thứ tự ở mục 11: bước 1 (bộ sinh mới, xóa và sinh lại dữ liệu, có backup), bước 2 (Java + unit test), bước 3 (Recommendation và What-if tính số chuyến cần và doanh thu phần tràn), bước 4 (tài liệu).
-- Lỗi "xu hướng bị reset" của bộ sinh hiện tại (mục 2) vẫn **chưa được ghi** vào `current_bugs_found.md` hay `project_report.md`.
+- Lỗi "xu hướng bị reset" của bộ sinh hiện tại (mục 2) vẫn **chưa được ghi** vào `current_bugs_found.md` hay `project_report.md`. *(Cập nhật 2026-10-21: đã ghi thành #31.)*
+
+---
+
+## 13. GĐ2: đo lại các lựa chọn trên dữ liệu của bộ sinh mới (2026-10-21)
+
+> **Chỉ nghiên cứu.** Dữ liệu lấy từ bản sao `busmanagement_gd2` sau buổi tổng duyệt GĐ3; DB thật và app không bị đụng.
+> Script ở `forecast_research/gd2/`, bảng số đầy đủ ở `forecast_research/gd2/results/`.
+> Đây là phần QĐ-13. **Mọi thay đổi mà kết quả gợi ý đều chờ chủ dự án duyệt.**
+
+### 13.1 Dữ liệu và cách đo
+
+**(B') Dữ liệu mô phỏng mới:**
+- 15 chuỗi khung giờ, từ 01/01/2023 tới 20/10/2026.
+- Mô hình học trên **số vé thật sự ghi trong DB**: đã cộng chuyến thêm, khung bị hủy coi là không quan sát được.
+- Chấm theo **nhu cầu thật** mà bộ sinh xuất ra (`-Dbackfill.truth-csv`). DB và kế hoạch của bộ sinh khớp ở 19.475/19.475 khung.
+- 21,0% khung bán hết vé.
+- 72 thời điểm dự báo, cách nhau 14 ngày, từ 24/12/2023 tới 13/09/2026; tầm 35 ngày.
+- Ở Tết 2024 lịch sử mới có 1 lần Tết, Tết 2025 có 2 lần, Tết 2026 có 3 lần. Mỗi Tết có 5 thời điểm dự báo chạm tới, nên khoảng tin cậy ở các cột Tết rộng.
+
+**(A) Dữ liệu thật Hồng Kông:** đúng dữ liệu, cửa sổ lễ và 90 thời điểm như bước 0. Mô hình chính tái hiện **đúng từng số** của §12.3 (10,40 / 12,01 / Tết 2025 21,66 / Tết 2026 14,56), nên lần chạy này nhất quán với bước 0.
+
+Mỗi lần chỉ đổi **một** yếu tố quanh mô hình đã chọn (G1' + EM, K=0, λ=2, không quy tắc, cửa sổ hiện tại, có chiều tuyến). So sánh từng cặp theo từng thời điểm, kèm khoảng tin cậy bootstrap 95% (`step0/compare.py`).
+
+### 13.2 Kết quả trên dữ liệu mô phỏng mới (WAPE % so với nhu cầu thật; âm = tốt hơn mô hình chính)
+
+| Biến thể | Tầm 1–7 | Tầm 15–35 | Tết 2024 (đã thấy 1 lần) | Tết 2025 | Tết 2026 |
+|---|---|---|---|---|---|
+| **Mô hình chính** (WAPE) | **22,56** | **22,75** | **35,75** | **25,00** | **24,97** |
+| SN4 sạch (WAPE) | 25,29 | 25,32 | 41,53 | 39,29 | 40,63 |
+| App hiện tại (WAPE) | 25,46 | 25,41 | — | — | — |
+| K = 3 | **+0,27** | **+1,28** | | | |
+| Quy tắc (a): ≥ 2 lần | +0,28 (KTC chứa 0) | +0,20 (KTC chứa 0) | **+7,37** | −0,05 | 0 |
+| Quy tắc (b): co hệ số gộp (ridge 2) | −0,20 (KTC chạm 0) | **−0,17** | **−2,56** | −0,15 (KTC chứa 0) | **+0,30** |
+| Không EM | +0,04 (KTC chứa 0) | +0,01 (KTC chứa 0) | **−3,70** | **−1,06** | 0 |
+| EM 5 vòng | **−0,06** | **−0,04** | | | |
+| λ = 0,5 | **+0,28** | **+0,28** | | | |
+| λ = 8 | **−0,12** | **−0,13** | −0,07 | **−1,06** | **−0,97** |
+| Cửa sổ lễ hẹp | **−0,31** | **−0,27** | **−1,20** | 0 | −0,32 (KTC chứa 0) |
+| Cửa sổ lễ rộng | +0,21 (KTC chứa 0) | +0,15 (KTC chứa 0) | | | |
+| Không biết chiều tuyến | −0,07 (KTC chứa 0) | −0,03 (KTC chứa 0) | −0,40 (KTC chứa 0) | +0,56 (KTC chạm 0) | **+0,95** |
+
+Số **đậm** là những chênh lệch có khoảng tin cậy 95% không chứa 0. Ô trống là cặp không được so riêng ở Tết.
+
+**Quyết định mà dự báo nuôi** (`results/gd2_report.md`; "bỏ lại" là phần khách không có chỗ khi chạy đúng số chuyến dự báo):
+
+| | Tầm 1–7, mọi ngày: recall cờ / khách bị bỏ lại | Tầm 15–35, Tết: khách bị bỏ lại / chuyến thừa trên 100 khung |
+|---|---|---|
+| App hiện tại | 0,13 / 5,42% | 12,25% / 2,2 |
+| SN4 sạch | 0,37 / 3,74% | 10,87% / 10,2 |
+| **Mô hình chính** | **0,53 / 1,67%** | **1,26% / 15,0** |
+| Không EM | 0,39 / 2,54% | 2,04% / 10,1 |
+| Quy tắc (b) | 0,52 / 1,71% | 1,71% / 12,1 |
+| Không biết chiều tuyến | 0,52 / 1,75% | 2,03% / 14,8 |
+| *(sàn)* | *0,57 / 1,19%* | *0,80% / 7,4* |
+
+### 13.3 Kết quả trên dữ liệu thật Hồng Kông (`results/hk_direction_pairs.md`, `results/hk_rules_pairs.md`)
+
+| Biến thể (so với mô hình chính) | Tầm 1–7 | Tầm 15–35 | Tết 2025 (đã thấy 1 lần) | Tết 2026 |
+|---|---|---|---|---|
+| Mô hình chính so với SN4 sạch | **−0,90** | **−0,65** | **+2,68** | **−5,21** |
+| Không biết chiều tuyến | +0,02 (KTC chứa 0) | +0,01 (KTC chứa 0) | **+0,33** | **+0,21** |
+| Quy tắc (a): ≥ 2 lần | −0,01 (KTC chứa 0) | +0,03 (KTC chứa 0) | **−2,60** | 0 |
+| **Quy tắc (b): co hệ số gộp** | **−0,22** | **−0,21** | **−2,76** | **−0,68** |
+| λ = 8 | **+0,38** | **+0,39** | **+2,49** | **+3,27** |
+
+### 13.4 Rút ra
+
+1. **Mô hình chính vẫn đứng vững.** Trên dữ liệu mới, nó thắng SN4 sạch và app hiện tại khoảng 2,6–2,9 điểm ở mọi tầm (khoảng tin cậy không chứa 0), và thắng 14–16 điểm ở Tết 2025, 2026.
+   - App hiện tại vẫn gần như không gắn cờ: recall 0,13.
+   - Dịp Tết, khi lên kế hoạch trước, app bỏ lại 12,3% khách; mô hình chính bỏ lại 1,3%.
+2. **K = 0 được xác nhận** trên cả hai bộ dữ liệu. Thêm sóng mùa năm (K = 3) tệ hơn 1,3 điểm ở tầm xa.
+3. **Quy tắc "ít nhất 2 lần" kiểu (a) cho kết quả trái ngược giữa hai bộ dữ liệu.**
+   - Dữ liệu thật: tốt hơn 2,6 điểm ở lần Tết thứ hai.
+   - Dữ liệu mô phỏng: tệ hơn 7,4 điểm.
+   - Lý do: Tết trong bộ sinh đều đặn hơn ngoài đời, nên học từ một lần đã có ích.
+   - **Biến thể (b) — không cắt cứng mà co hệ số gộp về ×1 bằng ridge — tốt hơn hoặc gần bằng ở cả hai:**
+     - dữ liệu thật: −0,2 ở mọi tầm, −2,8 ở Tết 2025, −0,7 ở Tết 2026;
+     - dữ liệu mô phỏng: −0,2 ở mọi tầm, −2,6 ở Tết 2024, chỉ +0,3 ở Tết 2026.
+4. **EM gần như không đổi WAPE** (+0,04, khoảng tin cậy chứa 0), và ở Tết bỏ EM còn cho WAPE thấp hơn. Nhưng EM **đổi quyết định**:
+   - recall cờ tăng từ 0,39 lên 0,53;
+   - khách bị bỏ lại giảm từ 2,54% xuống 1,67%; dịp Tết giảm từ 2,04% xuống 1,26%;
+   - đổi lại chạy thừa thêm khoảng 4–5 chuyến trên 100 khung (10,1 so với 6,2 ở mọi ngày; 15,0 so với 10,1 khi lên kế hoạch Tết).
+
+   Đây đúng là lập luận của bước 0: khung bán hết vé chính là khung cần tăng cường. **5 vòng EM cho kết quả như 15 vòng**, mà số lần khớp giảm từ 16 xuống 6 (một lần khớp đầu cộng mỗi vòng một lần), tức nhanh khoảng 2,7 lần.
+5. **λ: giữ 2.** λ = 8 tốt hơn chút trên dữ liệu mô phỏng nhưng **tệ hơn rõ trên dữ liệu thật**: +2,5 ở Tết 2025, +3,3 ở Tết 2026. Dữ liệu thật được ưu tiên.
+6. **Cửa sổ lễ:** cửa sổ hẹp tốt hơn khoảng 0,3 điểm trên dữ liệu mô phỏng. Nhưng chỉ đo trên bộ sinh do chính ta viết, nơi hình dạng Tết là giả định; chưa đo trên dữ liệu thật.
+7. **Thuộc tính chiều tuyến có ích nhưng nhỏ:**
+   - dữ liệu thật: 0,2–0,3 điểm ở Tết, không đổi gì ở ngày thường;
+   - dữ liệu mô phỏng mới: 0,6–1,0 điểm ở Tết; khách bị bỏ lại dịp Tết là 2,0% khi không có chiều, so với 1,3%.
+
+   Con số 3,8–5,8 điểm của bước 0 bị phóng to bởi bộ sinh cũ. Phần lệch riêng của từng tuyến đã học được phần lớn hình dạng của chính nó. **Khi bảo vệ phải nói con số nhỏ này.** Không đổi gì: thuộc tính đã có từ GĐ1 và tốn rất ít.
+
+### 13.5 Đề xuất (chủ dự án chốt đề xuất 1 và 2 ngày 2026-10-22; chưa áp vào code, `ForecastService` mới chỉ viết ở GĐ5)
+
+| # | Đề xuất | Thay đổi so với |
+|---|---|---|
+| 1 | **Thay quy tắc (a) bằng quy tắc (b):** không bỏ hệ số của dịp mới thấy 1 lần, mà co mọi hệ số lễ gộp về ×1 bằng ridge (λ gộp = 2), giống cách đã co phần lệch riêng của tuyến. **Chủ dự án duyệt ngày 2026-10-22** | QĐ-3 |
+| 2 | **EM 5 vòng** thay vì 15. **Chủ dự án duyệt ngày 2026-10-22** | QĐ-1 (chi tiết) |
+| 3 | Giữ K = 0, λ = 2, cửa sổ lễ hiện tại, thuộc tính chiều tuyến | Không đổi |
+
+### 13.6 Điều phải nói thật
+
+- B' vẫn là bộ sinh do Claude viết, với độ lớn giả định. Điều chứng minh được là **mô hình chạy đúng trên dữ liệu có đúng cấu trúc của app**: chặn trần, chuyến thêm, khung bị hủy. Không phải độ chính xác ngoài đời.
+- Các cột Tết chỉ có 5 (B') hoặc 7–9 (A) thời điểm dự báo. Khoảng tin cậy là theo thời điểm, không tính được độ bất định giữa các năm.
+- Quy tắc (b) và các λ được chọn **sau khi** xem kết quả trên chính các tập này. Hai bộ dữ liệu độc lập cùng chỉ một hướng, nhưng vẫn là chọn sau khi xem, giống K = 0 ở bước 0.
+
+### 13.7 Bổ sung 2026-10-22: tách theo "quy tắc (a) còn tác dụng hay không" (M-15 ý 1)
+
+**Vì sao tách.** App học từ lịch sử bắt đầu 01/01/2023, nên khi chạy thật mọi dịp lễ đã có ít nhất 3 lần (QĐ-3, "Tác động trong đồ án"). Khi đó quy tắc (a) không làm gì cả. Câu hỏi thực tế là: **trong tình huống đó, quy tắc (b) có làm hại không?**
+
+**Cách làm.** Không chạy lại mô hình nào. `gd2/split_by_rule_a.py` chia các thời điểm dự báo đã có thành hai nhóm, tùy dự báo của (a) có trùng với mô hình chính trên mọi dòng hay không, rồi chấm từng nhóm bằng `step0/compare.py`. Bảng đầy đủ ở `gd2/results/rule_ab_by_regime.md`.
+- Mô phỏng: (a) hết tác dụng ở 45/72 thời điểm (05/01/2025 → 13/09/2026); còn tác dụng ở 27 (24/12/2023 → 22/12/2024).
+- Hồng Kông: hết tác dụng ở 83/90 (16/02/2025 → 13/09/2026); còn tác dụng ở 7 (29/12/2024 → 09/02/2025).
+
+Chênh WAPE so với mô hình chính (điểm %, tầm 1–35 nếu không ghi khác; âm = tốt hơn; **đậm** = khoảng tin cậy 95% không chứa 0). "Lễ nhỏ" là 1/1, Giỗ Tổ, 30/4, 2/9 ở dữ liệu mô phỏng, và các ngày lễ khác Tết ở Hồng Kông.
+
+| Tình huống | Dữ liệu | Quy tắc | Mọi ngày, tầm 1–7 | Mọi ngày, tầm 15–35 | Lễ nhỏ | Tết | Ngày thường |
+|---|---|---|---|---|---|---|---|
+| **Lịch sử đủ dài** (như app thật) | Mô phỏng | (a) | 0 | 0 | 0 | 0 | 0 |
+| | | (b) | −0,11 | −0,07 (KTC chạm 0) | **−0,83** | +0,15 | 0 |
+| | Hồng Kông | (a) | 0 | 0 | 0 | 0 | 0 |
+| | | (b) | **−0,12** | **−0,12** | **−0,65** | **−0,68** | **+0,01** |
+| **Lịch sử ngắn** | Mô phỏng | (a) | +0,81 | +0,56 | **−2,24** | **+6,22** | +0,05 |
+| | | (b) | −0,38 | **−0,36** | **−1,53** | **−2,29** | 0 |
+| | Hồng Kông | (a) | −0,14 | +0,35 | +2,93 (1 thời điểm) | **−2,60** | **+3,29** |
+| | | (b) | **−1,43** | **−1,24** | −0,82 (1 thời điểm) | **−2,76** | **+0,12** |
+
+**Rút ra.**
+1. **Khi lịch sử đủ dài, (a) không đổi gì, còn (b) làm tốt hơn các ngày lễ nhỏ 0,65–0,83 điểm trên cả hai bộ dữ liệu**, và Tết Hồng Kông 0,68 điểm. Ngày thường gần như không đổi.
+   - Chỗ duy nhất (b) không thắng: Tết trên dữ liệu mô phỏng (+0,15, khoảng tin cậy chứa 0).
+   - Cách hiểu hợp lý: mỗi hệ số (dịp lễ, ngày lệch) chỉ có vài lần quan sát, nên co về ×1 bớt được nhiễu. Tết trong bộ sinh rất đều đặn, nên co lại không được lợi gì.
+2. **Khi lịch sử ngắn, (b) tốt hơn (a) ở gần như mọi cột.** (a) hỏng nặng hai lần:
+   - Tết mô phỏng: +6,22 điểm;
+   - ngày thường Hồng Kông: +3,29 điểm. Nhiều khả năng vì (a) coi dịp lễ chưa đủ 2 lần là ngày thường **cả lúc học**, nên lượng khách dồn dịp Tết bị tính vào mức chung và vào hệ số chỉnh mức 28 ngày. Điều này chưa kiểm riêng.
+
+   Chỗ duy nhất (a) hơn (b) là lễ nhỏ trên dữ liệu mô phỏng (−2,24 so với −1,53).
+3. Vậy **(b) không chỉ an toàn khi thiếu dữ liệu, mà còn tốt hơn hoặc ngang ở chính tình huống app sẽ chạy.**
+4. Lần tách này chỉ là cách nhìn khác trên **cùng các lần chạy** của §13.2–13.3, không chỉnh thêm tham số nào. Điều đã nói ở §13.6 vẫn đúng: (b) được nghĩ ra sau khi xem kết quả.
 
 ---
 

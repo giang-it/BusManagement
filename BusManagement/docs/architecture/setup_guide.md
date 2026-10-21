@@ -100,17 +100,21 @@ No manual SQL import is needed.
 
 **First-time setup:** a fresh clone starts with an empty database. Run once with `-Dspring-boot.run.profiles=demo` to populate sample data, then use the default profile from then on to accumulate data.
 
-### 4.3 Backfill profile — historical dataset (Phase 5)
+### 4.3 Backfill profile — historical dataset (Phase 5, generator rewritten in the forecast redesign GĐ2)
 
 ```bash
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill
+# optional, research only: also write the TRUE demand of every slot to a CSV (never stored in the DB)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill -Dspring-boot.run.jvmArguments="-Dbackfill.truth-csv=C:/tmp/truth.csv"
 ```
 
-Runs `HistoricalDataBackfill`, which generates **12 weeks of simulated historical trips** (5 routes × 3 departure slots × 84 days = 1,260 rows, `COMPLETED`/`CANCELLED`) ending yesterday. This is the dataset Demand Forecast (Phase 6) consumes.
+Runs `HistoricalDataBackfill` (decisions QĐ-10/QĐ-11 in `docs/development/forecast_decisions.md`). It simulates the **passenger demand** of every slot (route ≤ 8 h × 06:00/12:00/18:00 × day) from **01/01/2023 to yesterday**, then cuts it by the seats a simulated past operator actually ran: one regular trip per slot, extra trips around holidays only within the buses and drivers left free that day. Tickets sold = min(demand, seats). Weekday, season, Vietnamese holidays (`HolidayCalendar`, shaped by each route's `holidayFlow`), level drift, storm closures and 6 % random cancellations are all simulated; every magnitude is an assumption. On the 2026-10-21 data: 20,835 slots, about 21,200 trips, 21 % of slots sold out. This is the dataset Demand Forecast consumes.
 
 - **Additive, never destructive.** This profile does **not** activate `demo`, so `DataInitializer` does not run and nothing is wiped. The default `ddl-auto=update` still applies.
-- **Safe to re-run.** Each row is a deterministic `(route, departureTime)` slot and is skipped if it already exists, so a second run inserts 0 rows.
-- **Deterministic — but only relative to the run date and the existing database.** The occupancy figures come from a fixed seed, so the *demand pattern* is reproducible. The departure dates are not: the window is computed as "the 84 days ending yesterday", so running the backfill on a different day shifts every date. Bus and driver assignment likewise depends on the rows already in that database. Re-running on the same database on the same day is a no-op; regenerating an identical dataset elsewhere is **not** guaranteed.
+- **Deterministic and independent of the run date.** Every number of a day comes from a seed mixed with that day, and the slow processes (level drift) are computed from the fixed start 01/01/2023. Running today or topping up next month gives exactly the same figures for the same day — the old generator recomputed its trend from "today − 84" and reset on every top-up.
+- **Safe to re-run; tops up whole days.** Buses and drivers are assigned per day, so a day that already holds generator-shaped trips is skipped entirely; a second run inserts 0 rows and a later run adds only the missing days.
+- **Refuses to mix with the old generator's data.** The new data always starts on 01/01/2023. If generator-shaped trips exist but that day is empty, the run stops: delete the old history first (GĐ3: back up, then `docs/development/forecast_research/gd3_check_old_history.sql` and `gd3_delete_old_history.sql`).
+- **Business rules hold by construction:** each bus and each driver runs at most one trip a day, routes are ≤ 8 h, a driver's licence is valid on the departure date (`Driver.isLicenseValid`), seats = the assigned bus's capacity, tickets ≤ seats.
 - **Updates bus odometers, without disturbing maintenance state.** Completed trips add their route distance to `odometer` **and the same amount to `lastMaintenanceOdometer`**. Because `kmSinceLastMaintenance` is the difference of the two, it is mathematically unchanged — maintenance alerts, `needsMaintenance()`, and bus selection all behave exactly as before, while lifetime mileage becomes a real wear signal for Phase 7. Cancelled trips add nothing, matching the FSM. Re-running adds 0 km.
 - **Never combine with `demo`** — that profile uses `create-drop` and would wipe the schema before the backfill runs.
 

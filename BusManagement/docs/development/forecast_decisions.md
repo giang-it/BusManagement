@@ -9,6 +9,7 @@
 > **Phạm vi của chữ "duyệt".** Chỉ những điểm ở mục 1 được duyệt:
 > - QĐ-1…QĐ-7: vòng đầu;
 > - QĐ-8, QĐ-9: chốt cùng ngày, khi thảo luận GĐ1. Chủ dự án nói *"oke. tôi chọn các ý kiến bạn đề xuất"*, và yêu cầu giá trị cột bằng tiếng Anh.
+> - QĐ-10…QĐ-13: chốt cùng ngày, khi thảo luận GĐ2. Chủ dự án nói *"oke. tôi duyệt tất cả"*.
 >
 > Những dòng ở mục 4 còn ghi "chưa chốt" sẽ được quyết khi thảo luận giai đoạn tương ứng.
 >
@@ -22,13 +23,17 @@
 |---|---|---|
 | QĐ-1 | Thuật toán | **G1' + EM, K=0**: hồi quy Poisson theo lịch, có phạt ridge, học gộp nhiều chuỗi, có EM khôi phục nhu cầu bị chặn trần. Viết tay bằng Java, không thêm thư viện |
 | QĐ-2 | Đơn vị dự báo | **B1**: nhu cầu của khung giờ (số khách theo tuyến × giờ khởi hành × ngày), thay cho tỉ lệ lấp đầy từng chuyến |
-| QĐ-3 | Lễ và mùa | **C2**: hệ thống tự học từ dữ liệu, không có hệ số nhập tay. Chỉ dùng hệ số của một dịp lễ khi dịp đó đã xuất hiện **ít nhất 2 lần** trong dữ liệu huấn luyện |
+| QĐ-3 | Lễ và mùa | **C2**: hệ thống tự học từ dữ liệu, không có hệ số nhập tay. Hệ số lễ **luôn được dùng nhưng co về ×1 bằng ridge (λ = 2)**: ít dữ liệu thì kéo mạnh, nhiều dữ liệu thì kéo nhẹ. Đây là quy tắc (b), chốt 2026-10-22, thay quy tắc "ít nhất 2 lần" |
 | QĐ-4 | Chiều tuyến | **Thêm thuộc tính "chiều" cho `Route`**. Đây là đổi schema |
 | QĐ-5 | Tầm dự báo | **7 ngày** cho thẻ Recommendation và What-if; **đến 35 ngày** chỉ để xem trước |
 | QĐ-6 | Non-Goal §4 | **Chỉ sửa chữ**: "moving average / linear regression" → "mô hình thống kê (hồi quy Poisson theo lịch) viết bằng Java". Vẫn không có mô hình ML, không thêm thư viện |
 | QĐ-7 | Dữ liệu | **Viết lại bộ sinh, rồi xóa và sinh lại dữ liệu lịch sử** trong DB thật. Phải backup trước |
 | QĐ-8 | Hướng dòng khách dịp lễ (chi tiết của QĐ-4) | Trường `Route.holidayFlow`, kiểu enum `HolidayFlow { LEAVING_HUB, TOWARD_HUB }`. Để trống nghĩa là không theo chiều. Admin chọn, không bắt buộc. **Chỉ gán khi biết chắc chiều đông; không chắc thì để trống** |
 | QĐ-9 | Lịch ngày lễ | 5 dịp theo Điều 112 Bộ luật Lao động 2019, neo vào ngày lễ theo luật hoặc âm lịch. Lưu trong một lớp Java dùng chung, kèm bảng ngày âm lịch tra sẵn có ghi nguồn (2023–2032) |
+| QĐ-10 | Bộ sinh dữ liệu mới | Từ 01/01/2023, tất định theo ngày; nhu cầu theo xe chuẩn; kỳ nghỉ sinh theo quy tắc; mỗi xe/tài xế 1 chuyến/ngày, bằng lái còn hạn; chuyến thêm chỉ trong số xe rảnh; bão là đóng tuyến; xuất nhu cầu thật ra CSV khi bật tham số |
+| QĐ-11 | Chạy thử và tổng duyệt GĐ3 | Bản sao riêng `busmanagement_gd2`; hai script xoá dữ liệu cũ và trừ km ở cả hai cột odometer |
+| QĐ-12 | Màn danh sách chuyến | Chuyến chưa kết thúc luôn hiện; chuyến đã kết thúc chỉ trong 7/30/90 ngày (mặc định 30) |
+| QĐ-13 | Đo lại bằng Python | Đo lại K, quy tắc "ít nhất 2 lần", λ, EM, cửa sổ lễ, chiều tuyến (kể cả trên dữ liệu Hồng Kông) trên dữ liệu mới |
 
 Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
@@ -44,7 +49,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
   log(nhu cầu kỳ vọng) = mức của chuỗi
                        + hệ số thứ trong tuần (riêng từng chuỗi)
                        + xu hướng gấp khúc (mỗi 182 ngày một khúc)
-                       + hiệu ứng (dịp lễ, ngày lệch so với lễ), gộp theo chiều tuyến
+                       + hiệu ứng (dịp lễ, ngày lệch so với lễ), gộp theo chiều tuyến, kéo về ×1 bằng ridge (λ = 2; QĐ-3)
                        + phần lệch lễ riêng của chuỗi, kéo về mức chung bằng ridge (λ = 2)
   ```
 - Mọi chuỗi khớp chung một lần bằng IRLS, trên số đếm đã chia cho trung bình của chuỗi.
@@ -52,7 +57,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 - **Lúc dự báo:**
   - xu hướng giữ nguyên ở giá trị tại ngày dự báo, không kéo ra tương lai;
   - nhân thêm hệ số chỉnh mức = Σ thực tế / Σ mô hình trên 28 ngày gần nhất không có lễ.
-- **EM**, 15 vòng:
+- **EM**, 5 vòng (chủ dự án chốt ngày 2026-10-22, ý 2 của M-15; ban đầu là 15 vòng):
   - Một khung bán hết vé chỉ cho biết "nhu cầu ≥ số ghế".
   - Bước E thay số đó bằng E[nhu cầu | nhu cầu ≥ số ghế], tính theo phân phối nhị thức âm.
   - Bước M khớp lại mô hình Poisson.
@@ -70,6 +75,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 **Phải kiểm lại ở bước 1, trên dữ liệu sinh mới với seed mới:**
 - K = 0 được chọn *sau khi* xem kết quả (§12.5).
 - λ = 2 và 15 vòng EM chưa tinh chỉnh (§12.7).
+- **Đã kiểm ở GĐ2** (`forecast_discussion.md` §13): K = 0 và λ = 2 giữ nguyên. 5 vòng EM cho kết quả như 15 vòng nên chốt 5 vòng; số lần khớp giảm từ 16 xuống 6.
 
 **Hệ quả đã biết.**
 - Tính toán nặng: bản Python mất 10–25 giây cho mỗi lần khớp.
@@ -94,24 +100,35 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 - Số vé ghi trong DB = min(nhu cầu, số ghế), nên bắt buộc phải có EM (QĐ-1).
 - Phải viết lại bộ sinh cùng lúc (QĐ-7). Nếu không, dự báo trên dữ liệu hiện tại sẽ tệ hơn (§0.2).
 
-### QĐ-3. Lễ và mùa: tự học từ dữ liệu (C2), quy tắc "ít nhất 2 lần"
+### QĐ-3. Lễ và mùa: tự học từ dữ liệu (C2), hệ số lễ co về ×1 (quy tắc (b), chốt 2026-10-22)
 
 **Là gì.**
 - Mô hình tự học **độ lớn** hiệu ứng lễ. Không ai nhập hệ số, tức không làm C1 hay C3.
 - **Lịch ngày lễ** (ngày nào là Tết, 30/4, 2/9…) vẫn là đầu vào biết trước. Chi tiết lịch đã chốt ở QĐ-9.
 - Hệ số tính cho từng cặp (dịp lễ, ngày lệch so với lễ), ví dụ "Tết D−3". Mỗi hệ số gồm phần gộp theo chiều tuyến cộng phần lệch riêng của tuyến (QĐ-1).
 
-**Quy tắc "ít nhất 2 lần"** (phương án (a) trong phiên 2026-10-21):
-- Khi dự báo một ngày trong cửa sổ lễ, đếm số lần dịp lễ đó có trong dữ liệu huấn luyện.
-- **Từ 2 lần trở lên:** dùng hệ số đã học.
-- **0 hoặc 1 lần:** coi là ngày thường (×1).
-- **Cơ sở** (dữ liệu thật Hồng Kông, §12.3):
-  - Mới thấy 1 Tết thì học còn hại: ở Tết 2025, G1', K=0 kém SN4 sạch 2,7 điểm.
-  - Đã thấy 2 Tết thì có lợi rõ: ở Tết 2026, các mô hình có hệ số lễ riêng từng chuỗi thắng SN4 sạch 4,7–8,8 điểm.
-- **Chưa thử trực tiếp.** Con số 2 được chọn sau khi xem kết quả, nên kiểm lại ở bước 1 cùng với K=0.
-- **Tác động trong đồ án:** dữ liệu có ít nhất 3 năm, nên khi app dự báo bình thường quy tắc không bao giờ kích hoạt. Nó chỉ ảnh hưởng backtest (ví dụ Tết 2025) và lập luận "nếu triển khai thật mà dữ liệu còn ít thì sao".
+**Quy tắc (b): co hệ số lễ về ×1.** Chủ dự án chốt ngày 2026-10-22 (M-15 ý 1, *"oke tôi chọn (b), ghi lại đi"*). Quy tắc này thay quy tắc (a) "ít nhất 2 lần".
+- Mọi hệ số (dịp lễ, ngày lệch) **luôn được học và dùng**, kể cả dịp mới thấy 1 lần. Không đếm số lần, không bỏ dữ liệu nào.
+- Phần gộp theo chiều tuyến bị ridge kéo về ×1 (tức 0 trên thang log), với **λ = 2**. Đây đúng là con số đã dùng để kéo phần lệch riêng của chuỗi về mức chung (QĐ-1), nên cả hai phần dùng chung một cơ chế. λ không được chỉnh riêng cho phần này.
+- **Mức kéo tự thay đổi, không có công tắc:**
+  - phạt ridge có độ mạnh cố định, còn sức của dữ liệu tăng theo số quan sát;
+  - dịp mới thấy 1 lần thì bị kéo mạnh; dịp đã thấy nhiều lần thì gần như giữ nguyên số đo.
+  - Ví dụ minh họa (không phải số đo): dữ liệu cho ×2,5 thì 1 lần → khoảng ×2,2; 3 lần → khoảng ×2,4; 10 lần → gần ×2,5.
+- **Cơ sở** (`forecast_discussion.md` §13.2, §13.3, §13.7):
+  - **Lịch sử ngắn:** (b) tốt hơn (a) gần như ở mọi chỗ. (a) hỏng nặng hai lần: Tết trên dữ liệu mô phỏng (+6,2 điểm) và ngày thường trên dữ liệu Hồng Kông (+3,3).
+  - **Lịch sử đủ dài, như app thật:** (a) không đổi gì. (b) tốt hơn ở lễ nhỏ 0,65–0,83 điểm trên cả hai bộ dữ liệu, ở Tết Hồng Kông 0,68 điểm; ngày thường không đổi.
+  - Chỗ (b) kém hơn: Tết trên dữ liệu mô phỏng, +0,15 đến +0,30 điểm.
+- **Điều phải nói thật:** (b) được nghĩ ra **sau khi** thấy (a) thất bại trên dữ liệu mô phỏng, giống K = 0 ở bước 0. Bù lại, λ không chỉnh riêng, và (b) thắng trên hai bộ dữ liệu độc lập.
+- **Câu nói khi bảo vệ:** "Dịp lễ nào càng ít dữ liệu thì hệ số càng được kéo về ×1; càng nhiều dữ liệu thì càng tin số đo."
+- **Tác động trong đồ án:** dữ liệu có ít nhất 3 năm, nên khi app chạy, cái kéo luôn bật nhưng nhẹ. Nó tạo khác biệt lớn nhất ở các mốc backtest đầu tiên (ví dụ Tết 2024 trên dữ liệu mô phỏng) và ở tình huống "triển khai thật mà dữ liệu còn ít".
+- Đóng M-6, vì không còn phải đếm số lần.
 
-**Ràng buộc kéo theo:** cửa sổ dữ liệu học của `ForecastService` phải phủ ít nhất 2 lần mỗi dịp lễ, tức khoảng 2 năm trở lên. **Không được cắt ngắn dữ liệu học để chạy nhanh hơn.**
+**Quy tắc cũ (a) "ít nhất 2 lần", đã thay ngày 2026-10-22.**
+- Nội dung: dịp mới thấy 0 hoặc 1 lần thì coi là ngày thường (×1), cả lúc học lẫn lúc dự báo; từ 2 lần trở lên thì dùng hệ số.
+- Được chọn ngày 2026-10-21 dựa trên dữ liệu thật Hồng Kông: ở Tết 2025, G1', K=0 kém SN4 sạch 2,7 điểm (§12.3).
+- Bị thay vì ở GĐ2 nó cho kết quả trái ngược giữa hai bộ dữ liệu (§13).
+
+**Ràng buộc kéo theo:** dùng toàn bộ lịch sử làm dữ liệu học. **Không được cắt ngắn dữ liệu học để chạy nhanh hơn**: càng ít lần lễ thì hệ số càng bị kéo về ×1.
 
 ### QĐ-4. Thuộc tính chiều tuyến
 
@@ -254,7 +271,95 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
   - bảng trong DB + màn hình Admin: thêm entity và màn hình, mà Admin vẫn phải tự tra ngày Tết;
   - thư viện ICU4J: thêm dependency, và lịch âm Trung Quốc có năm lệch lịch Việt Nam một ngày do múi giờ. Ví dụ nằm ngay trong phạm vi lịch: Tết 2030 theo Trung Quốc (GMT+8) là 03/02, theo Việt Nam (GMT+7) là 02/02.
 - **Cửa sổ quanh mỗi dịp.** Tạm dùng số của bước 0 (`step0/run_synth.py:35-41`). Chốt ở GĐ2 bằng số đo.
-- **Sự kiện chỉ xảy ra một lần** (ví dụ đại lễ 30/4/2025) không đưa vào lịch. Dù có đưa vào, quy tắc "ít nhất 2 lần" cũng sẽ bỏ qua. Đây là giới hạn cần nói rõ khi bảo vệ.
+- **Sự kiện chỉ xảy ra một lần** (ví dụ đại lễ 30/4/2025) không đưa vào lịch. Dù có đưa vào cũng không giúp gì: sự kiện không lặp lại nên không ngày nào trong tương lai dùng tới hệ số đó, và chỉ có 1 lần dữ liệu nên hệ số bị kéo mạnh về ×1 (QĐ-3). Đây là giới hạn cần nói rõ khi bảo vệ.
+
+### QĐ-10. Bộ sinh dữ liệu mới (chốt 2026-10-21 khi thảo luận GĐ2, G2-1…G2-6; đóng M-7, M-8, M-13)
+
+Chủ dự án duyệt toàn bộ đề xuất GĐ2: *"oke. tôi duyệt tất cả"*.
+
+- **Khoảng thời gian (G2-1).** Từ **01/01/2023** tới hôm qua, tức có 4 lần Tết (2023–2026).
+  - Mọi con số tất định theo từng ngày: seed trộn theo (tuyến, ngày, khung), mức trôi tính từ mốc cố định. Vì vậy chạy bổ sung nối tiếp liền mạch, và lỗi răng cưa #31 mất từ gốc.
+  - Chạy lại thì bỏ qua cả ngày đã có. Bộ sinh **từ chối** chạy khi DB còn dữ liệu của bộ sinh cũ, nhận ra vì ngày 01/01/2023 trống.
+  - Không lùi về 2020: COVID, bẫy "dữ liệu tự chứng minh", dữ liệu cũ kém liên quan (thảo luận ngày 2026-10-21).
+- **Mức nhu cầu (G2-2).** Tính theo **xe chuẩn** của tuyến (`Route.suitableBusType`).
+  - Mức tải ngày thường: 0,72 / 0,58 / 0,77 số ghế ở các khung 06 / 12 / 18 giờ (trung bình 5 tuyến của bước 0), nhân hệ số riêng của tuyến 0,9–1,1.
+  - Trên bản sao sinh lại, mức tải trung bình cả năm (tính cả dịp lễ) là 0,73–0,82 số ghế xe chuẩn.
+- **Hình dạng (G2-3).** Giữ cấu trúc bộ sinh của bước 0, tổng quát hoá từ "theo id tuyến" sang "theo `Route.holidayFlow`".
+  - Gồm: thứ trong tuần theo hướng, khung giờ, mùa dạng bướu, tăng 4%/năm kèm bước ngẫu nhiên, nhảy bậc, nhiễu nhị thức âm (size 40), Tết khoảng ×3.
+  - **Kỳ nghỉ chính thức sinh theo quy tắc có dao động**, không phải lịch nghỉ thật:
+    - Tết nghỉ từ 2–4 ngày trước mùng 1, dài 7–9 ngày;
+    - các dịp khác là ngày nghỉ theo luật, lùi hoặc nới thêm 0–1 ngày, và kéo sang cuối tuần nếu bắt đầu đúng thứ Hai hoặc kết thúc đúng thứ Sáu.
+  - **Mọi độ lớn là giả định.**
+- **Nhà xe quá khứ (G2-4, đóng M-13).** Mỗi khung một chuyến thường.
+  - Xe ưu tiên đúng loại của tuyến, thiếu thì loại khác (giống thứ tự của AI phân công, #26).
+  - **Mỗi xe và mỗi tài xế tối đa 1 chuyến/ngày; tuyến ≤ 8h; bằng lái còn hạn vào ngày chạy** (`Driver.isLicenseValid`, đóng gốc lỗi #32).
+  - Chuyến tăng cường theo kinh nghiệm quanh các kỳ nghỉ (chép từ bước 0), **chỉ trong số xe và tài xế còn rảnh**: 20 − 15 = 5 xe/ngày.
+    - Ưu tiên khung có nhu cầu kỳ vọng cao nhất; dùng xe lớn nhất còn rảnh.
+    - Khởi hành sau chuyến gốc 30/40/50 phút, nên vẫn cùng khung giờ; `isExtraTrip = true`, trỏ về chuyến gốc.
+  - Vé lấp chuyến thường trước, phần tràn sang chuyến thêm.
+- **Bão và hủy chuyến (G2-5, đóng M-7).** Bão là **đóng tuyến cả ngày**: mọi chuyến của tuyến hôm đó `CANCELLED`.
+  - Mỗi tuyến mỗi năm có tối đa một đợt, dài 1–3 ngày, xác suất 0,8, phần lớn rơi vào tháng 7–11.
+  - Thêm **6%** khung bị hủy ngẫu nhiên, như Phase 5.
+  - Khung bị hủy giữ số vé đã bán trước khi hủy, và không có chuyến thêm.
+  - Bộ dự báo vốn chỉ học từ chuyến `COMPLETED`, nên ngày bão tự rơi khỏi dữ liệu học, không cần cơ chế mới.
+- **Nhu cầu thật (G2-6).** Tham số `-Dbackfill.truth-csv=<đường dẫn>` ghi nhu cầu thật của từng khung ra CSV. File chỉ phục vụ nghiên cứu; không ghi vào DB.
+- **Đã cài ở GĐ2 (2026-10-21):**
+  - `config/HistorySimulation` (mô phỏng) và `config/HistoricalDataBackfill` (xếp xe, ghi DB) viết lại.
+  - `TripRepository.findDepartureTimesByRouteIdsBetween` thay `existsByRouteIdAndDepartureTime`.
+  - Test: `HistorySimulationTest` (7), `HistoricalDataBackfillPlanTest` (6, kiểm đủ 1.389 ngày), `HistoricalDataBackfillGenerateTest` (5, chạy trên DB test).
+  - **Kết quả trên bản sao:**
+    - 20.835 khung, 21.177 chuyến (342 chuyến tăng cường, 1.360 chuyến bị hủy);
+    - **21,0% khung bán hết vé**, 5,1% nhu cầu không được phục vụ;
+    - **0** vi phạm bất biến;
+    - DB và nhu cầu thật mà bộ sinh lên kế hoạch khớp ở **19.475/19.475** khung có chuyến chạy.
+
+### QĐ-11. Chạy trên bản sao riêng, tổng duyệt GĐ3 (chốt 2026-10-21, G2-7)
+
+- GĐ2 chạy trên bản sao riêng **`busmanagement_gd2`**, không dùng `busmanagement_test`, vì `mvnw test` xoá sạch schema đó.
+- **Lần chạy trên bản sao chính là buổi tổng duyệt GĐ3**, bằng hai script trong `forecast_research/`:
+  1. `gd3_check_old_history.sql`: chỉ đọc. Kiểm số chuyến cũ, ngày tạo, tham chiếu, odometer, và số km sẽ trừ.
+  2. `gd3_delete_old_history.sql`: chạy trong một transaction. Trừ km của các chuyến `COMPLETED` cũ khỏi **cả hai** cột odometer, rồi xoá cứng chúng.
+- **Tập bị xoá** được nhận theo hình dạng của bộ sinh cũ **và** ngày tạo thuộc 6 lần chạy bộ sinh cũ: đúng **2.206** chuyến. 19 chuyến của chủ dự án không đụng tới.
+- **Kết quả tổng duyệt trên bản sao:**
+  - 2.225 → 19 chuyến;
+  - tổng odometer giảm đúng **337.860 km**;
+  - tổng km kể từ lần bảo dưỡng cuối giữ nguyên **18.355**;
+  - sau đó bộ sinh mới chạy khoảng 1 phút.
+- **Ở GĐ3 trên DB thật:** backup, rồi chủ dự án xác nhận lần cuối, rồi chạy hai script, rồi chạy bộ sinh.
+
+### QĐ-12. Màn danh sách chuyến có cửa sổ ngày (chốt 2026-10-21, G2-8)
+
+- Màn `/admin/trip-management/trips` hiện **mọi chuyến chưa kết thúc**, bất kể ngày, cộng **chuyến đã kết thúc khởi hành trong N ngày gần nhất**.
+  - "Đã kết thúc" suy từ FSM (`canTransition`): hiện là `COMPLETED` và `CANCELLED`.
+  - N chọn được 7 / 30 / 90 ngày, mặc định 30. Không có lựa chọn "tất cả".
+- Bộ lọc trạng thái giữ cùng cửa sổ. Mới nhất lên đầu.
+- **Lý do:** trang cũ nạp toàn bộ chuyến. Hôm nay đã là 8,4 MB; với khoảng 21 nghìn chuyến sẽ lên khoảng 80 MB.
+- **Đã cài ở GĐ2 (2026-10-21):**
+  - `TripService.getTripsForList` và `TripRepository.findForTripList`; xoá `findAllWithDetails` vì không còn ai dùng.
+  - Controller, template, và test `TripServiceTripListTest` (5).
+  - Trên bản sao sinh lại: trang mặc định **1,76 MB** (462 chuyến), lọc COMPLETED trong 90 ngày ra 4,7 MB.
+- Đây là một thay đổi riêng của Phase 1 (quản lý chuyến), làm trước GĐ3 theo đề xuất G2-8.
+
+### QĐ-13. Đo lại bằng Python trên dữ liệu mới (chốt 2026-10-21, G2-9)
+
+- **Đo lại các lựa chọn của bước 0** trên dữ liệu do bộ sinh mới ghi vào bản sao, chấm theo nhu cầu thật, mỗi lần đổi một yếu tố quanh mô hình đã chọn:
+  - K = 0 so với K = 3;
+  - quy tắc "ít nhất 2 lần", cả ba biến thể a/b/c;
+  - λ (0,5 / 2 / 8);
+  - số vòng EM (0 / 5 / 15);
+  - cửa sổ lễ (hẹp / hiện tại / rộng);
+  - có hay không thuộc tính chiều tuyến.
+- **Thêm biến thể "không có chiều" trên dữ liệu thật Hồng Kông** (việc QĐ-8 để lại).
+- **Script:** `forecast_research/gd2/` (`build_dataset.py`, `run_gd2.py`, `report_gd2.py`, `hk_direction.py`).
+- **Kết quả:** `forecast_discussion.md` §13. Thay đổi nào so với QĐ-1, QĐ-3 hay QĐ-9 mà kết quả gợi ý đều **phải được chủ dự án duyệt**, không tự áp.
+- **Đã chạy ngày 2026-10-21.** Tóm tắt:
+  - mô hình chính thắng SN4 sạch và app hiện tại khoảng 2,6–2,9 điểm, thắng 14–16 điểm ở Tết 2025, 2026;
+  - **K = 0, λ = 2 và EM được xác nhận**;
+  - quy tắc (a) cho kết quả trái ngược giữa dữ liệu thật và dữ liệu mô phỏng, **quy tắc (b) tốt hơn trên cả hai**;
+  - 5 vòng EM cho kết quả như 15 vòng;
+  - chiều tuyến có ích nhưng nhỏ: 0,2–1 điểm ở Tết;
+  - cửa sổ hẹp nhỉnh hơn 0,3 điểm, chỉ trên dữ liệu mô phỏng.
+- Hai đề xuất đổi quyết định (**M-15**), chủ dự án đã chốt cả hai ngày 2026-10-22: EM 5 vòng (vào QĐ-1) và quy tắc (b) (vào QĐ-3). Số đo bổ sung cho quy tắc (b) ở §13.7.
 
 ---
 
@@ -283,20 +388,21 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 
 | Mã | Câu hỏi | Ghi chú |
 |---|---|---|
-| M-1 | ~~Lịch lễ trong app~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-9.** Chỉ còn mở phần cửa sổ trước/sau mỗi dịp, sẽ chốt ở GĐ2 |
+| M-1 | ~~Lịch lễ trong app~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-9.** Cửa sổ trước/sau mỗi dịp đã đo ở QĐ-13: cửa sổ hẹp nhỉnh hơn 0,3 điểm, nhưng chỉ trên bộ sinh của chính ta. Đề xuất **giữ cửa sổ hiện tại** (`forecast_discussion.md` §13.5) |
 | M-2 | ~~Chiều tuyến: chi tiết của QĐ-4~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-8** |
-| M-3 | **"Nhu cầu khung giờ" và "bán hết vé" đo thế nào trên DB:** gộp các chuyến cùng (tuyến, giờ, ngày), kể cả chuyến tăng cường; tính những trạng thái nào; xử lý chuyến `CANCELLED` ra sao | Hiện Phase 6 chỉ tính `COMPLETED` (roadmap §9) |
+| M-3 | **"Nhu cầu khung giờ" và "bán hết vé" đo thế nào trên DB:** gộp các chuyến cùng (tuyến, giờ, ngày), kể cả chuyến tăng cường; tính những trạng thái nào; xử lý chuyến `CANCELLED` ra sao | Hiện Phase 6 chỉ tính `COMPLETED` (roadmap §9). **Dữ liệu GĐ2 đã sinh theo cách hiểu này**, và lần đo lại QĐ-13 dùng đúng nó: cộng các chuyến `COMPLETED` cùng (tuyến, ngày, HOUR); chuyến thêm ở phút 30/40/50 nên tự rơi vào đúng khung; bán hết khi vé ≥ tổng số ghế; khung bị hủy là không quan sát được. Định nghĩa chính thức cho `ForecastService` chốt ở GĐ5 |
 | M-4 | **Ngưỡng 0,90 và số chuyến cần:** giữ một định nghĩa "chuyến nóng" duy nhất như thế nào | Bước 0 đo bằng: số chuyến cần = max(1, ⌈nhu cầu / (0,9 × số ghế xe chuẩn)⌉) (§12.2) |
 | M-5 | **Tính toán và cache:** tính một lần mỗi ngày? Lưu ở đâu? Ai kích hoạt? | QĐ-1, hệ quả |
-| M-6 | **Đếm "ít nhất 2 lần"** theo toàn hệ thống hay theo từng tuyến | Claude nghiêng về toàn hệ thống: tuyến mới vẫn dùng được hệ số gộp theo chiều |
-| M-7 | **Ngày bão, lũ** | Đề xuất ngày 20/10 (§11): đánh dấu và loại khỏi dữ liệu huấn luyện, dựa vào Incident `ROAD_ISSUE`; thời tiết từng ngày không làm ở bản đầu. Chưa duyệt riêng |
-| M-8 | **Bộ sinh:** độ lớn hiệu ứng, số năm, phạm vi xóa, giữ dữ liệu không do bộ sinh tạo ra | Đỉnh Tết ×3–3,5 là giả định theo báo chí (§12.2). 99,8% lịch sử hiện tại là dữ liệu sinh (§0.1) |
+| M-6 | ~~Đếm "ít nhất 2 lần" theo toàn hệ thống hay theo từng tuyến~~ | **ĐÃ ĐÓNG 2026-10-22:** không còn đếm số lần, vì QĐ-3 đổi sang quy tắc (b) |
+| M-7 | ~~Ngày bão, lũ~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** bão là đóng tuyến, mọi chuyến hôm đó `CANCELLED`; không dùng Incident |
+| M-8 | ~~Bộ sinh: độ lớn, số năm, phạm vi xóa~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10 và QĐ-11** |
 | M-9 | **Màn hình dự báo:** hiển thị gì (bảng hệ số lễ, xem trước 35 ngày), backtest so với mốc nào, đo bằng WAPE hay MAPE | |
-| M-10 | **Ghi lỗi "xu hướng reset"** vào `current_bugs_found.md` / `project_report.md` hay không | Claude hỏi ngày 2026-10-21, chủ dự án chưa trả lời |
+| M-10 | ~~Ghi lỗi "xu hướng reset"~~ | **ĐÃ CHỐT 2026-10-21:** ghi thành #31 trong `current_bugs_found.md`, cùng lỗi #32 (69 chuyến tài xế hết hạn bằng). Gốc ở code đã bỏ ở GĐ2; đóng khi GĐ3 xoá dữ liệu cũ |
 | M-11 | **Vé đặt trước (câu F)** | Đề xuất ngày 20/10: không làm trong đợt này; khi thiết kế Booking ở Phase 9 thì lưu thời điểm đặt vé. Chưa duyệt riêng |
 | M-12 | **Thứ tự so với Phase 9** (Customer Portal) | Chưa quyết |
-| M-13 | **Thiếu xe dịp Tết trong bộ sinh.** Bộ sinh hiện giữ bất biến "mỗi xe tối đa 1 chuyến/ngày" (15 chuyến/ngày trên 20 xe). Tết gấp 3 lần thì cần khoảng 45 chuyến/ngày. Cho mỗi xe chạy 2 chuyến/ngày (phải kiểm không chồng giờ, thời gian chuẩn bị xe, giờ lái), hay giới hạn số chuyến thêm theo số xe? | Thuộc GĐ2. Phát hiện ngày 2026-10-21 |
+| M-13 | ~~Thiếu xe dịp Tết trong bộ sinh~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** giữ "mỗi xe 1 chuyến/ngày"; chuyến thêm chỉ trong số xe rảnh (5/ngày) |
 | M-14 | **Nhiều chuyến tăng cường cho cùng một khung.** Recommendation đánh giá từng thẻ độc lập, nên các thẻ cùng khung sẽ đề xuất cùng một xe. Giữ chỗ xe và tài xế đã chọn giữa các thẻ, hay mỗi khung chỉ một thẻ ghi "cần N chuyến"? | Thuộc GĐ6. Phát hiện ngày 2026-10-21 |
+| M-15 | ~~Hai đề xuất sau lần đo lại GĐ2~~ (`forecast_discussion.md` §13.5): (1) quy tắc (b) thay quy tắc (a) "ít nhất 2 lần"; (2) EM 5 vòng thay vì 15 | **ĐÃ CHỐT CẢ HAI NGÀY 2026-10-22.** Ý 2 vào QĐ-1, ý 1 vào QĐ-3 (viết lại); đóng M-6. Số đo bổ sung cho ý 1: §13.7 |
 
 ---
 
@@ -321,3 +427,7 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-21 (sau) | Thảo luận GĐ1: thêm QĐ-8 (hướng dòng khách, giá trị cột bằng tiếng Anh theo yêu cầu của chủ dự án) và QĐ-9 (lịch lễ); đóng M-1, M-2; thêm M-13, M-14 |
 | 2026-10-21 (cài GĐ1) | QĐ-9: bảng âm lịch thêm hai năm biên 2022 và 2033 để phạm vi 2023–2032 đúng tuyệt đối; ví dụ lệch lịch Trung Quốc đổi sang Tết 2030 (nằm trong phạm vi). Ghi nguồn đối chiếu. QĐ-8, QĐ-9: thêm dòng "Đã cài". Các quyết định khác giữ nguyên |
 | 2026-10-21 (sau GĐ1) | QĐ-8: thêm mục "Cách chọn nhãn". Nhãn hỏi tuyến đông vào đầu hay cuối dịp lễ; tuyến giữa hai TP lớn chọn theo dòng khách chính; **chỉ gán khi biết chắc, không chắc thì để trống**. Tuyến 6 giữ để trống theo quy tắc này. Chủ dự án chốt, không thêm giá trị mới cho enum |
+| 2026-10-21 (GĐ2) | Thảo luận GĐ2, chủ dự án duyệt tất cả: thêm QĐ-10 (bộ sinh mới), QĐ-11 (bản sao, tổng duyệt GĐ3), QĐ-12 (màn danh sách chuyến), QĐ-13 (đo lại bằng Python). Đóng M-7, M-8, M-10, M-13; M-3 có cách hiểu dùng cho dữ liệu và lần đo lại, chính thức chốt ở GĐ5; M-1 (cửa sổ) chờ kết quả QĐ-13 |
+| 2026-10-21 (GĐ2 xong) | QĐ-10, QĐ-11, QĐ-12: thêm phần "Đã cài" kèm số đo trên bản sao. QĐ-13: tóm tắt kết quả. M-1: đề xuất giữ cửa sổ hiện tại. Thêm M-15 (quy tắc (b) thay (a); EM 5 vòng), chờ chủ dự án |
+| 2026-10-22 | M-15 ý 2: chủ dự án duyệt EM 5 vòng; sửa QĐ-1. M-15 ý 1 (quy tắc (b)) còn chờ; thêm số đo tách theo tình huống (`forecast_discussion.md` §13.7) |
+| 2026-10-22 (sau) | M-15 ý 1: chủ dự án chọn quy tắc (b). Viết lại QĐ-3 (giữ mô tả quy tắc cũ (a) và lý do thay); sửa bảng mục 1, công thức QĐ-1, ghi chú "sự kiện một lần" ở QĐ-9, tóm tắt QĐ-13. Đóng M-6 và M-15 |

@@ -298,7 +298,7 @@ thật như Bài 00a.
   (`findDemandHistoryByStatus`, `sumTicketsSoldAndRevenueByStatuses` — và cái bẫy
   `ClassCastException` đã ghi ở `Proj_functions_summary.md` mục 10).
 - JPQL khác SQL thế nào (viết trên entity/field, không phải bảng/cột).
-- LAZY vs EAGER, vấn đề N+1; cách dự án tránh: `JOIN FETCH` (`findAllWithDetails`),
+- LAZY vs EAGER, vấn đề N+1; cách dự án tránh: `JOIN FETCH` (`findForTripList`, `findByStatusWithDetails`),
   `@BatchSize` trên `Route.routeStations` và vì sao không JOIN FETCH được hai `List` cùng lúc
   (`MultipleBagFetchException` — comment trong `Route.java`).
 - Vì sao Decision Support đọc bằng projection thay vì nạp entity (roadmap Hidden Cost #4).

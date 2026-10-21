@@ -3216,3 +3216,52 @@ trước). **DB thật byte-identical trước/sau** (`trips` 2225 / md5 `6e39d4
   thành không hợp lệ (tài xế bị khoá, xe quá hạn…), `confirmAutoAssigned()` báo lỗi rồi quay lại đúng
   trang đó — chỉ có Xác nhận (sẽ lại thất bại) hoặc Từ chối; form Sửa chuyến sửa được chuyến
   `PENDING_APPROVAL` nhưng trang Duyệt không link sang. **Mới đọc code, chưa chạy thử.**
+
+# Hai lỗi của bộ sinh dữ liệu CŨ, ghi khi làm GĐ2 của đợt thiết kế lại dự báo (2026-10-21) — gốc ở code đã bỏ, dữ liệu xoá ở GĐ3
+
+Chủ dự án duyệt ghi cả hai (thảo luận GĐ2, *"oke. tôi duyệt tất cả"*). Cả hai nằm trong
+`HistoricalDataBackfill` bản Phase 5, bộ sinh mà GĐ2 viết lại (QĐ-10 trong
+`docs/development/forecast_decisions.md`), và cả hai chỉ còn sống trong 2.206 chuyến mà bộ sinh cũ đã
+ghi vào DB thật. Hai script GĐ3 (`forecast_research/gd3_check_old_history.sql`,
+`gd3_delete_old_history.sql`) xoá đúng tập đó; đã tổng duyệt trên bản sao `busmanagement_gd2`.
+**Đóng khi GĐ3 chạy xong trên DB thật.**
+
+## 31. Xu hướng của bộ sinh cũ bị đặt lại sau MỖI lần chạy bổ sung — lịch sử có hình răng cưa
+
+- **Gốc:** bộ sinh Phase 5 tính `trendFactor = 1 + 0,15·dayIndex/84` với `dayIndex` đếm từ
+  `today − 84` của **chính lần chạy đó** (`HistoricalDataBackfill.java:187` và `:374` ở bản trước
+  GĐ2). Lần chạy bổ sung nào cũng bắt đầu lại xu hướng ở mức thấp hơn mức mà lần trước đã đạt.
+- **Phân loại (ba hướng):** **lỗi thật**, không phải quyết định hết hạn. Javadoc của chính bộ sinh hứa
+  *"xu hướng tăng nhẹ dần đều theo thời gian"*, nhưng code chỉ đúng khi chạy một lần duy nhất.
+- **Bằng chứng (đo 2026-10-14, `forecast_discussion.md` §2 và phụ lục A.2):** lấp đầy trung bình tuần
+  tăng đều 0,663 → 0,747 (27/04 → 13/07), rồi **tụt còn 0,714** ở tuần 03/08 (lần chạy 11/09 bắt đầu
+  lại ở hệ số khoảng 1,08), rồi lên lại 0,747. Độ dốc mô hình tìm ra còn +0,26…+0,54 điểm %/tuần,
+  trong khi mục Phase 6 của roadmap ghi 0,58–1,07.
+- **Hậu quả:** dữ liệu mà dự báo học có những bậc tụt nhân tạo đúng tại mỗi lần chạy bổ sung; câu
+  *"mô hình tìm lại được xu hướng cài sẵn"* không còn đúng.
+- **Đã bỏ gốc (GĐ2):** `HistorySimulation` tính mọi quá trình từ mốc cố định 01/01/2023, không từ ngày
+  chạy. `HistorySimulationTest.aLaterRun_reproducesEveryEarlierDay_soTopUpsDoNotReset` chốt điều này:
+  một lần chạy tới 30/06/2024 và một lần chạy tới 20/10/2026 cho **đúng từng con số** của mọi ngày
+  chung. Đã thử cho xu hướng tính lùi từ ngày cuối như bộ sinh cũ: test này đỏ.
+
+## 32. Bộ sinh cũ xếp 69 chuyến cho hai tài xế đã hết hạn bằng lái
+
+- **Gốc:** bộ sinh Phase 5 đảm bảo "mỗi tài xế một chuyến/ngày, tuyến ≤ 8h" theo cách dựng, nhưng
+  **không xét bằng lái theo ngày khởi hành**. Luật bằng lái được sửa thành theo ngày khởi hành cũng
+  ngày 2026-07-20, sau khi Phase 5 đã thiết kế xong. Các lần chạy bổ sung về sau (22/07, 27/07,
+  04/08, 11/09, 21/09) kéo dữ liệu vượt qua ngày hết hạn bằng của hai tài xế.
+- **Phân loại (ba hướng):** **quyết định hết hạn.** Lời hứa *"bộ dữ liệu không bịa ra những tình huống
+  mà chính hệ thống coi là sai"* đúng với cửa sổ 84 ngày lúc thiết kế (khi đó mọi bằng lái đều còn
+  hạn), rồi hết đúng khi dữ liệu được chạy bổ sung qua ngày hết hạn.
+- **Bằng chứng (SQL trên DB thật, 2026-10-21):**
+  - tài xế #36 (hết hạn 09/07/2026) có **36** chuyến từ 10/07 tới 20/09;
+  - tài xế #35 (hết hạn 17/07/2026) có **33** chuyến từ 17/07 tới 20/09;
+  - cả 69 chuyến đều là dạng bộ sinh (06/12/18 giờ chẵn, tuyến 1–5).
+- **Hậu quả:** dữ liệu lịch sử mâu thuẫn với luật mà `validateStaffForTrip()` áp cho mọi lối phân công.
+  Không ảnh hưởng vận hành, vì đều là chuyến `COMPLETED`/`CANCELLED` trong quá khứ. Nhưng mọi thống kê
+  theo tài xế đọc từ lịch sử đều chứa chúng.
+- **Đã bỏ gốc (GĐ2):** `HistoricalDataBackfill.planDay()` chỉ xếp tài xế mà
+  `Driver.isLicenseValid(ngày)` đúng, tức hỏi chính luật của entity, không khai lại.
+  - `HistoricalDataBackfillPlanTest.driversWithAnExpiredLicence_neverDriveFromTheirExpiryDate` kiểm trên
+    đủ 1.389 ngày. Đã thử bỏ bộ lọc này: test đỏ.
+  - Trên bản sao sinh lại: **0** chuyến vi phạm.

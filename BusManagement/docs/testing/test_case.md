@@ -942,6 +942,30 @@
 
 ---
 
+### TC_TRIP_043 — Danh sách chuyến: chuyến chưa kết thúc luôn hiện, chuyến đã kết thúc chỉ trong cửa sổ ngày (QĐ-12, 2026-10-21)
+
+- **Mã TC:** TC_TRIP_043
+- **Tên Kịch Bản:** Trang danh sách không còn nạp cả lịch sử (~21 nghìn chuyến mô phỏng từ 2023)
+- **Điều kiện tiên quyết:** Có chuyến `DEPARTED` khởi hành từ hơn 30 ngày trước, và chuyến `COMPLETED`
+  khởi hành 10 ngày, 40 ngày và 100 ngày trước
+- **Các bước thực hiện:**
+  1. `GET /admin/trip-management/trips`
+  2. `GET /admin/trip-management/trips/filter?status=&days=90`
+  3. `GET /admin/trip-management/trips/filter?status=COMPLETED&days=7`
+  4. `GET /admin/trip-management/trips/filter?status=DEPARTED&days=999`
+- **Kết quả mong đợi:**
+  - Bước 1: chuyến `DEPARTED` cũ **có**; `COMPLETED` 10 ngày trước **có**; 40 và 100 ngày trước
+    **không**. Dòng ghi chú hiện *"…chỉ hiện nếu khởi hành trong 30 ngày gần nhất…"*; ô chọn ở
+    "Đã kết thúc: 30 ngày gần nhất". Mới nhất lên đầu.
+  - Bước 2: thêm chuyến 40 ngày trước; chuyến 100 ngày trước vẫn **không**.
+  - Bước 3: chỉ chuyến `COMPLETED` trong 7 ngày gần nhất — lọc trạng thái **không** nạp lại lịch sử.
+  - Bước 4: `days` lạ → dùng mặc định 30; mọi chuyến `DEPARTED` hiện bất kể ngày.
+- **Tự động:** `TripServiceTripListTest` (5 test, đã thử làm hỏng biên `>=` và vế "chưa kết thúc" → đỏ).
+- **Đo trên bản sao sinh lại (2026-10-21):** mặc định 462 chuyến / 1,76 MB; COMPLETED 90 ngày 1.274
+  chuyến / 4,7 MB (trang nạp toàn bộ sẽ khoảng 80 MB).
+
+---
+
 ### NHÓM 3.4: XÓA MỀM CHUYẾN XE (Soft-Delete)
 
 ### TC_DEL_001 — Soft Delete: Chặn xóa chuyến đang ở trạng thái DEPARTED
