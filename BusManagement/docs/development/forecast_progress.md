@@ -16,71 +16,164 @@
 
 ## 1. Trạng thái hiện tại (cập nhật 2026-10-21)
 
-- **Đã chốt** 7 quyết định (`forecast_decisions.md` mục 1).
-- **Việc tiếp theo:** lập kế hoạch chi tiết cho bước 1–4, bắt đầu từ bước 1. Kế hoạch phải giải quyết các mục M-… liên quan trong `forecast_decisions.md` mục 4, và được chủ dự án duyệt trước khi viết code.
-- **Code app:** chưa đổi gì. **DB:** chưa đổi gì.
-- **Commit:** toàn bộ tài liệu dự báo từ 14/10 đến 21/10 đã gom thành một commit docs ngày 2026-10-21, **chưa push**. Commit gồm `forecast_*.md`, `forecast_research/` và các thay đổi trong `THESIS_ROADMAP.md`.
+- **Đã chốt** QĐ-1…QĐ-9 (`forecast_decisions.md` mục 1). QĐ-8 và QĐ-9 là thiết kế của GĐ1.
+- **Đã chia** bước 1–4 thành 7 giai đoạn (mục 2–3 dưới đây). Mỗi giai đoạn xong thì app vẫn chạy được.
+- **GĐ1 xong và đã commit ngày 2026-10-21, chưa push.**
+  - Code: `79ba96c`. Tài liệu: commit `docs:` ngay sau đó.
+  - Chủ dự án đã chạy app trên DB thật, gán nhãn 8 tuyến và tự test (*"test xong rồi, commit đi"*).
+  - Chi tiết và bằng chứng ở mục 3.
+- **Việc tiếp theo:** vòng thảo luận GĐ2 (bộ sinh mới), với các câu M-3, M-7, M-8, M-13 và cửa sổ lễ. GĐ4 (lõi toán Java) làm song song được.
+- **Code app:** đã đổi ở GĐ1. **DB thật:** chưa đổi gì; kiểm chứng chạy trên bản sao.
+- **Commit:** toàn bộ tài liệu dự báo từ 14/10 đến 21/10 đã gom thành commit docs `2eebc25` ngày 2026-10-21, **đã push lên `origin/temp`**. Dòng cập nhật này được viết sau commit, nên nó sẽ đi vào commit sau. Commit gồm `forecast_*.md`, `forecast_research/` và các thay đổi trong `THESIS_ROADMAP.md`.
   - Không đưa vào commit: transcript `forecast_research/2026-10-20-chưa xong.txt`. Transcript này để ngoài git như mọi transcript khác.
-  - Không thuộc đợt này và chưa commit: bài học `docs/study/05` (đã sửa) và `06` (mới), còn từ 2026-10-06.
+  - Không thuộc đợt này: bài học `docs/study/05` và `06`. Hai bài này đã commit riêng thành `5a5f30f` và `1dc429f`, và đã push, cùng ngày 2026-10-21.
 - **Đang chờ chủ dự án trả lời:**
   - M-10: có ghi lỗi "xu hướng reset" vào sổ lỗi không;
   - M-12: làm đợt này trước hay sau Phase 9.
 
 ---
 
-## 2. Các bước
+## 2. Các giai đoạn
 
-Trạng thái dùng các nhãn: `CHƯA BẮT ĐẦU` / `ĐANG LÀM` / `XONG, CHƯA COMMIT` / `ĐÃ COMMIT`.
+Trạng thái dùng các nhãn: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG LÀM` / `XONG, CHƯA COMMIT` / `ĐÃ COMMIT`.
 
-| Bước | Nội dung | Trạng thái | Ngày |
-|---|---|---|---|
-| 0 | Thí nghiệm chọn thuật toán (Python, ngoài app) | ĐÃ COMMIT | 2026-10-20 |
-| — | Chốt quyết định | ĐÃ COMMIT | 2026-10-21 |
-| KH | Kế hoạch chi tiết bước 1–4 | CHƯA BẮT ĐẦU | |
-| 1 | Bộ sinh mới; backup; xóa và sinh lại dữ liệu; kiểm lại K=0 và quy tắc "ít nhất 2 lần" | CHƯA BẮT ĐẦU | |
-| 2 | `ForecastService` bằng Java (Poisson + ridge + EM) và unit test | CHƯA BẮT ĐẦU | |
-| 3 | Recommendation và What-if chuyển sang đơn vị nhu cầu | CHƯA BẮT ĐẦU | |
-| 4 | Cập nhật tài liệu | CHƯA BẮT ĐẦU | |
+Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song song với GĐ2–3 và phải xong trước GĐ5.
+
+| GĐ | Nội dung | Thuộc bước | Trạng thái | Ngày |
+|---|---|---|---|---|
+| 0 | Thí nghiệm chọn thuật toán (Python, ngoài app) | 0 | ĐÃ COMMIT | 2026-10-20 |
+| — | Chốt QĐ-1…QĐ-7 | — | ĐÃ COMMIT | 2026-10-21 |
+| KH | Đọc lại project; chia bước 1–4 thành 7 giai đoạn | — | XONG, CHƯA COMMIT | 2026-10-21 |
+| GĐ1 | Nền móng: `Route.holidayFlow` và lịch ngày lễ | 1 | ĐÃ COMMIT `79ba96c` (chưa push) | 2026-10-21 |
+| GĐ2 | Bộ sinh mới, chạy trên bản sao DB; chạy lại thí nghiệm Python | 1 | CHƯA BẮT ĐẦU | |
+| GĐ3 | Thay dữ liệu trên DB thật | 1 | CHƯA BẮT ĐẦU | |
+| GĐ4 | Lõi toán Java, unit test và đo tốc độ | 2 | CHƯA BẮT ĐẦU | |
+| GĐ5 | `ForecastService` mới, cache và màn Dự báo | 2 | CHƯA BẮT ĐẦU | |
+| GĐ6 | Recommendation và What-if theo nhu cầu | 3 | CHƯA BẮT ĐẦU | |
+| GĐ7 | Tài liệu và chuẩn bị bảo vệ | 4 | CHƯA BẮT ĐẦU | |
 
 ---
 
-## 3. Việc của từng bước
+## 3. Việc của từng giai đoạn
 
-> **Danh sách sơ bộ**, chỉ gồm những gì đã chốt trong `forecast_decisions.md`. Khi kế hoạch chi tiết được duyệt, thay mục tương ứng bằng kế hoạch đó.
-> Mỗi việc xong thì đánh `[x]`, ghi ngày, và ghi chỗ kiểm chứng (lệnh, số đo, file:dòng).
+> Giai đoạn nào **chưa thảo luận** thì danh sách bên dưới chỉ là sơ bộ. Trước khi làm, phải có một vòng thảo luận như GĐ1: đối chiếu với project, phản biện, đưa lựa chọn, chủ dự án chốt. Mục nào cần chốt thì ghi mã M-… của `forecast_decisions.md` mục 4.
+> Mỗi việc xong thì đánh `[x]`, ghi ngày và chỗ kiểm chứng (lệnh, số đo, file:dòng).
 
-### Bước 1: dữ liệu
-- [ ] Kế hoạch chi tiết được duyệt. Phải chốt M-1, M-2, M-3, M-7, M-8, và bước nào thêm thuộc tính chiều tuyến (QĐ-4).
-- [ ] Backup DB.
-- [ ] Viết lại bộ sinh theo yêu cầu QĐ-7.
-- [ ] Chủ dự án xác nhận lần cuối, rồi mới xóa và sinh lại.
-- [ ] Kiểm tra dữ liệu mới thỏa mọi bất biến nghiệp vụ, như Phase 5 đã làm.
-- [ ] Kiểm lại K=0 và quy tắc "ít nhất 2 lần" trên dữ liệu mới, với seed mới.
+### Sự thật đã đo khi đọc lại project (2026-10-21; dùng cho các giai đoạn sau)
+1. **Ngưỡng 0,90 vẫn chỉ có một định nghĩa.** Gọi d là nhu cầu dự báo, s là số ghế xe chuẩn của tuyến. Có max(1, ⌈d / (0,9·s)⌉) ≥ 2 khi và chỉ khi d/s > 0,90, đúng điều kiện của `Trip.needsReinforcement()`. Xe chuẩn lấy theo `Route.suitableBusType`: tuyến 1, 2, 5 là 22 ghế; tuyến 3, 4 là 40 ghế. Đây là câu trả lời cho M-4, chờ chốt ở GĐ6.
+2. **Không dùng `@Scheduled` để tính dự báo mỗi ngày.** Roadmap §4 ghi *"No daily cron job … adding a scheduler is a separate owner decision"*. Cách thay thế: tính lần đầu khi có người mở trang trong ngày, rồi giữ trong bộ nhớ (GĐ5, M-5).
+3. **Bộ sinh thiếu xe dịp Tết.** Bộ sinh hiện giữ "mỗi xe tối đa 1 chuyến/ngày": 15 chuyến/ngày trên 20 xe, và có 33 tài xế đang hoạt động (M-13).
+4. **Xóa dữ liệu cũ làm odometer bị cộng hai lần.** Bộ sinh cũ đã cộng km vào cả `odometer` lẫn `lastMaintenanceOdometer`. Khi xóa phải trừ km của các chuyến COMPLETED bị xóa khỏi cả hai cột. Tổng odometer hiện là 356.245 km; tổng km kể từ lần bảo dưỡng cuối là 18.355 km, và số này phải giữ nguyên (GĐ3).
+5. **Kết nối JDBC đặt `foreign_key_checks=0`** (`application.properties`). DB không chặn bản ghi mồ côi, nên trước khi xóa phải tự kiểm các tham chiếu: `trips.original_trip_id`, `incidents.trip_id`, `trip_co_drivers` (GĐ3).
+6. **Nhiều chuyến tăng cường cho cùng một khung** thì các thẻ Recommendation sẽ chọn trùng xe (M-14, GĐ6).
+7. **Hiệu năng.** Giải trực tiếp khoảng 1.400 ẩn bằng Java thuần có thể mất hàng chục giây. Ma trận có cấu trúc "mũi tên": mỗi tuyến chỉ dính tới cột của chính nó và cột lễ gộp chung. Giải theo khối (Schur complement) thì dự kiến dưới 1 giây. **Đây là giả thuyết, phải đo ở GĐ4.**
+8. **`Incident.bus` là bắt buộc**, và DB hiện có 0 sự cố `ROAD_ISSUE`. Vì vậy dùng Incident để đánh dấu ngày bão là không tự nhiên (M-7, GĐ2).
+9. **Phạm vi xóa đo được:** đúng **2.206** chuyến "dạng bộ sinh" (tuyến 1–5, giờ chẵn 06/12/18, `is_extra_trip = 0`, COMPLETED hoặc CANCELLED). 17 chuyến còn lại do chủ dự án tạo, kể cả 2 chuyến gắn sự cố #9 và #14; chúng nằm ngoài tập xóa. DB hiện có 0 chuyến trong tương lai và 2 chuyến đã xóa mềm.
+10. **Bộ quét tăng cường thời gian thực không bị ảnh hưởng.** `TripService.scanAndSuggestExtraTrips()` vẫn xét ngưỡng 0,90 trên vé thật. Chuyến tăng cường của nó khởi hành +30 phút, cùng giờ với chuyến gốc, nên khi gom nhu cầu theo khung (tuyến, giờ, ngày) chúng tự rơi vào đúng khung.
 
-### Bước 2: `ForecastService`
-- [ ] Kế hoạch chi tiết được duyệt. Phải chốt M-5, M-6, M-9.
-- [ ] Mô hình theo QĐ-1. Quy tắc "ít nhất 2 lần" và cửa sổ học phủ ít nhất 2 lần mỗi dịp lễ (QĐ-3). Tầm dự báo theo QĐ-5.
-- [ ] Unit test.
-- [ ] Verify bằng cách chạy app thật (skill `verify`).
+### GĐ1: nền móng (thiết kế ở QĐ-8, QĐ-9). Chủ dự án duyệt danh sách việc ngày 2026-10-21 (*"hãy làm như đã chốt đi"*). Code xong cùng ngày, **chưa commit**
+- [x] Enum `domain/HolidayFlow` gồm `LEAVING_HUB`, `TOWARD_HUB`. Trường `Route.holidayFlow` dùng `@Enumerated(EnumType.STRING)` và `@Column(name = "holiday_flow")`, cho phép null.
+  - Hibernate tạo cột kiểu MySQL `ENUM('LEAVING_HUB','TOWARD_HUB')`, nullable. Đã thấy trên bản sao DB khi app khởi động.
+- [x] `RouteService.updateRoute()` chép trường mới, javadoc ghi rõ null là ý định hợp lệ. `createRoute()` lưu nguyên object từ form nên không cần sửa, chỉ cập nhật javadoc.
+- [x] `AdminRouteController` đưa `HolidayFlow.values()` vào form, theo khuôn `incidentTypes`.
+  - `route-form.html`: ô chọn không bắt buộc ("-- Không theo chiều --" / "Rời TP lớn" / "Về TP lớn"), có dòng giải thích.
+  - `route-list.html`: thêm cột "Dòng Khách Dịp Lễ".
+- [x] `DataInitializer` (profile `demo`) gán nhãn cho 6 tuyến mẫu, đúng như các tuyến 1–6 trong bảng QĐ-8.
+- [x] Lớp lịch lễ dùng chung: `domain/Holiday` (5 dịp, cửa sổ tạm theo bước 0) và `domain/HolidayCalendar`.
+  - `covers()`: phạm vi 01/01/2023 → 31/12/2032.
+  - `anchorOf()` và `holidaysOn()`: ngoài phạm vi thì ném `IllegalArgumentException`.
+  - Bảng âm lịch 2022–2033, có hai năm biên (xem QĐ-9).
+  - Nguồn đã đối chiếu: `forecast_research/holiday_calendar_check.py` và công cụ lịch âm Báo Hà Tĩnh; đủ 24 ngày, khớp hoàn toàn.
+- [x] Test:
+  - `HolidayCalendarTest`, 13 test JUnit thuần: phạm vi; từ chối ngoài phạm vi; các ngày của bước 0; Tết 2030 theo GMT+7; Tết luôn trong khoảng 21/1–20/2; Giỗ Tổ cách Tết đúng số ngày của 2 hoặc 3 tháng âm; hai đầu cửa sổ; hai dịp chồng nhau 26/4/2026; cửa sổ vắt qua năm (gồm cả 31/12/2032).
+  - `RouteServiceHolidayFlowTest`, 4 test: tạo mới lưu nhãn; sửa chép nhãn; sửa về "Không theo chiều" thì xoá nhãn cũ; cột lưu đúng `LEAVING_HUB`.
+  - **Đã thử bỏ dòng chép field:** đúng 2 test cập nhật báo đỏ, nên test không rỗng.
+  - **Toàn bộ `mvnw test`: 143/143, 20 lớp, BUILD SUCCESS** (126 test cũ cộng 17 test mới).
+- [x] Verify bằng app thật trên **bản sao** DB (cổng 8098; JVM PID 4924 khớp log; pool kết nối chỉ nằm trên `busmanagement_test`):
+  - Màn Dự báo, Đề xuất, What-if, Dashboard và Analytics **giống hệt từng byte** so với mốc chụp từ code cũ, trên cùng dữ liệu, cùng ngày.
+  - Danh sách tuyến chỉ thêm đúng một cột; 8 tuyến hiện "Không theo chiều".
+  - Tạo tuyến với `LEAVING_HUB` → sửa thành `TOWARD_HUB` → sửa về trống thì DB là `NULL`. Form sửa chọn sẵn đúng giá trị đang lưu.
+  - Gán nhãn cho tuyến 1 (451 chuyến) qua form: km, thời lượng, loại xe và lộ trình giữ nguyên.
+  - Gửi giá trị lạ `holidayFlow=FOO` → HTTP 400, DB không đổi.
+  - Xoá tuyến thử: thành công, `route_stations` của nó xoá theo.
+  - 11 màn admin khác trả 200; không có lỗi template hay SpEL trong log.
+  - **DB thật không đổi:** số dòng và checksum của 5 bảng giống hệt trước và sau; DB thật chưa có cột `holiday_flow`.
+- [x] **Chủ dự án** chạy app trên DB thật. Kiểm bằng `SELECT`: cột `holiday_flow enum('LEAVING_HUB','TOWARD_HUB')` đã có và cho phép null; số chuyến vẫn 2.225.
+- [x] **Chủ dự án** gán nhãn cho 8 tuyến. Kiểm bằng `SELECT`, khớp đúng bảng QĐ-8: tuyến 1, 2, 8 là `LEAVING_HUB`; tuyến 4, 5 là `TOWARD_HUB`; tuyến 3, 6, 9 để trống.
+- [x] **Chủ dự án** tự test rồi bảo commit.
+  - Trước khi commit đã chạy skill `verify`: chỉ GET trên app của chủ dự án (cổng 8080, DB thật).
+  - Danh sách tuyến hiện 3 "Rời TP lớn", 2 "Về TP lớn", 3 "Không theo chiều"; form sửa tuyến 4 chọn sẵn "Về TP lớn"; Dự báo, Đề xuất, What-if và Dashboard trả 200.
+  - Số dòng và checksum của DB thật giống hệt trước và sau lần kiểm.
+  - Commit `79ba96c`.
 
-### Bước 3: Recommendation và What-if
-- [ ] Kế hoạch chi tiết được duyệt. Phải chốt M-4: giữ một định nghĩa "chuyến nóng" duy nhất.
-- [ ] Recommendation: số chuyến cần; doanh thu tính từ phần khách tràn (thay `RecommendationService.java:213-215`).
-- [ ] What-if dùng đơn vị nhu cầu.
-- [ ] Verify bằng cách chạy app thật.
+### GĐ2: bộ sinh mới, chỉ chạy trên bản sao DB (thuộc bước 1)
+- Cần chốt trước: M-3 (phần liên quan tới hủy chuyến), M-7, M-8, M-13, và cửa sổ lễ (phần còn lại của M-1).
+- Bộ sinh dùng **mốc thời gian cố định** thay cho `today − 84`, để hết lỗi răng cưa. Seed theo từng ngày, để chạy bổ sung ra đúng kết quả như chạy một lần. Vẫn giữ cách chống trùng theo (tuyến, giờ khởi hành).
+- Sinh nhu cầu trước, rồi vé = min(nhu cầu, ghế). Có các thành phần: lễ theo `Route.holidayFlow` và theo lịch QĐ-9, mùa trong năm, mức trôi và nhảy bậc, nhiễu nhị thức âm, ngày bão.
+- Mô phỏng nhà xe quá khứ có chạy chuyến tăng cường dịp Tết (`isExtraTrip`, khởi hành +30 phút giống `createExtraTrip`).
+- Vẫn giữ các bất biến nghiệp vụ và cách cộng odometer vào cả hai cột.
+- Chạy trên **bản sao** DB, rồi kiểm các bất biến bằng SQL.
+- Xuất dữ liệu để chạy lại thí nghiệm Python, kiểm lại:
+  - K=0;
+  - quy tắc "ít nhất 2 lần", cả 3 biến thể a/b/c;
+  - λ và số vòng EM;
+  - cửa sổ quanh mỗi dịp lễ;
+  - biến thể "không có chiều" trên dữ liệu Hồng Kông (QĐ-8).
 
-### Bước 4: tài liệu
-- [ ] `THESIS_ROADMAP.md`:
+### GĐ3: thay dữ liệu trên DB thật (thuộc bước 1)
+- Backup bằng `mysqldump`, rồi **chủ dự án xác nhận lần cuối**.
+- Xóa cứng đúng tập ở sự thật 9; trừ km cũ ở cả hai cột odometer (sự thật 4); tự kiểm tham chiếu (sự thật 5). Sau đó chạy bộ sinh mới.
+- Kiểm:
+  - `kmSinceLastMaintenance` không đổi;
+  - các màn admin trả 200 (skill `verify`);
+  - màn dự báo cũ vẫn chạy được. Kết quả của nó sẽ khác; đây là trạng thái tạm, chấp nhận được.
+
+### GĐ4: lõi toán Java (thuộc bước 2; không cần DB)
+- Một lớp tính toán thuần, theo tiền lệ `WhatIfCoverageTest`. Gồm:
+  - IRLS Poisson có ridge;
+  - E[nhu cầu | nhu cầu ≥ ghế] theo nhị thức âm, tính bằng cách cộng thẳng các xác suất vì số ghế ≤ 50;
+  - vòng EM;
+  - giải theo khối (sự thật 7).
+- Unit test đối chiếu số với bản Python trên cùng một bộ dữ liệu cố định. Đo thời gian chạy trên dữ liệu cỡ thật.
+- **Điểm dừng để quyết:** nếu chậm, bàn phương án (bớt hệ số, bớt vòng EM).
+
+### GĐ5: `ForecastService` mới và màn Dự báo (thuộc bước 2)
+- Cần chốt trước: M-3, M-5, M-6, M-9.
+- Truy vấn mới lấy nhu cầu theo khung (tuyến, giờ, ngày): cộng mọi chuyến trong khung, có cờ "bán hết vé".
+- Đầu ra cho mỗi ngày-khung: nhu cầu, số chuyến cần, cờ tăng cường (sự thật 1).
+- **Tạm giữ trường `predictedOccupancy`** để Recommendation và What-if vẫn chạy cho tới GĐ6.
+- Cache (sự thật 2).
+- Màn hình hiển thị:
+  - bảng 7 ngày và xem trước 35 ngày;
+  - bảng hệ số lễ;
+  - backtest đo bằng WAPE, so với seasonal naive;
+  - cảnh báo khi lịch lễ không phủ tới ngày cần dự báo.
+
+### GĐ6: Recommendation và What-if (thuộc bước 3)
+- Cần chốt trước: M-4, M-14.
+- Recommendation:
+  - số chuyến thêm = số chuyến cần − 1;
+  - doanh thu = phần khách tràn mà xe được chọn chở được (thay `RecommendationService.java:213-215`).
+- What-if:
+  - hệ số nhu cầu nhân thẳng vào nhu cầu, không còn bị kẹp ở 100%;
+  - độ phủ đếm theo số chuyến, vẫn đối chiếu từng ngày;
+  - cập nhật `WhatIfCoverageTest`.
+- Bỏ trường tạm `predictedOccupancy`.
+
+### GĐ7: tài liệu và chuẩn bị bảo vệ (thuộc bước 4)
+- Cần chốt trước: M-10.
+- `THESIS_ROADMAP.md`:
   - §5: phần "As delivered" của Phase 5, 6, 7, 8;
-  - §9: đánh dấu note "occupancy RATE" là đã bị thay thế, và thêm các note mới.
-- [ ] Các file đang nhắc tới phần dự báo:
+  - §9: đánh dấu note "occupancy RATE" là đã bị thay thế, và thêm note mới;
+  - Hidden Costs.
+- Các file đang nhắc tới phần dự báo. Danh sách lấy bằng grep ngày 2026-10-21; lúc làm phải grep lại:
   - `docs/development/current_functional_spec.md`
   - `docs/development/Proj_functions_summary.md`
-  - `docs/architecture/setup_guide.md`
+  - `docs/architecture/setup_guide.md` (cách chạy bộ sinh mới)
   - `docs/todo/current_bugs_found.md`
   - `docs/ai/02_feature_doc_prompt.md`
   - `docs/ai/03_defense_study_prompt.md`
-  - Danh sách lấy bằng grep ngày 2026-10-21. Lúc làm bước 4 phải grep lại, vì có thể còn file khác.
+- Bài học về phần dự báo, và phụ lục so sánh với LightGBM và Prophet bằng Python.
 
 ---
 
@@ -92,7 +185,11 @@ Thêm một dòng mới vào cuối bảng sau mỗi phiên; không sửa các d
 |---|---|---|---|
 | 2026-10-14 → 16 | Đọc kỹ `ForecastService`; thảo luận không viết code; backtest cho thấy LR thua Holt-Winters và seasonal naive (`forecast_discussion.md` §0–10) | Không đổi; DB chỉ `SELECT` | Chưa |
 | 2026-10-20 | Thảo luận vòng 3 (chủ dự án nghiêng về B1 + C2). Làm bước 0 trên dữ liệu thật Hồng Kông và bộ sinh mô phỏng có chặn trần (§11–12) | Không đổi; không truy vấn DB | Chưa |
-| 2026-10-21 | Giải thích G1' + EM, K=0 (hồi quy Poisson) và quy tắc "ít nhất 2 lần". Chủ dự án duyệt 7 quyết định. Tạo `forecast_decisions.md` và file này. Cập nhật roadmap §4, §5 (Phase 5, 6), §7, §8, §9 và phần đầu `forecast_discussion.md`. Chủ dự án bảo commit (*"commit đi bro"*) | Không đổi | Đã commit cả tài liệu 14/10 → 21/10 thành một commit; chưa push |
+| 2026-10-21 | Giải thích G1' + EM, K=0 (hồi quy Poisson) và quy tắc "ít nhất 2 lần". Chủ dự án duyệt 7 quyết định. Tạo `forecast_decisions.md` và file này. Cập nhật roadmap §4, §5 (Phase 5, 6), §7, §8, §9 và phần đầu `forecast_discussion.md`. Chủ dự án bảo commit (*"commit đi bro"*) | Không đổi | Đã commit cả tài liệu 14/10 → 21/10 thành `2eebc25`; đã push lên `origin/temp` |
+| 2026-10-21 (sau) | Đọc lại project và chia bước 1–4 thành 7 giai đoạn, ghi 10 sự thật đo được. Thảo luận GĐ1: chủ dự án chọn mọi đề xuất (QĐ-8, QĐ-9) và yêu cầu giá trị cột bằng tiếng Anh. Thêm M-13, M-14 | Không đổi; DB chỉ `SELECT` | Chưa |
+| 2026-10-21 (cài GĐ1) | Đối chiếu 24 ngày Tết và Giỗ Tổ 2022–2033 với hai nguồn. Cài `HolidayFlow`, `Route.holidayFlow`, form và danh sách tuyến, `DataInitializer`, `Holiday` và `HolidayCalendar`, cùng 17 test mới. `mvnw test` 143/143. Verify trên bản sao DB: các màn dự báo giống hệt từng byte, thao tác tạo/sửa/xoá đúng. Cập nhật `database_schema.md`, `Proj_functions_summary.md`, `current_functional_spec.md`, file quyết định và roadmap | Code app đổi; DB thật không đổi (checksum giống hệt) | Chưa |
+| 2026-10-21 (sau GĐ1) | Chủ dự án hỏi về tuyến giữa hai TP lớn và tác động của nhãn tới dự báo. Chốt: không thêm giá trị mới; thêm quy tắc "chỉ gán khi biết chắc chiều đông, không chắc thì để trống" vào QĐ-8; tuyến 6 giữ để trống | Không đổi; DB chỉ `SELECT` | Chưa |
+| 2026-10-21 (commit GĐ1) | Chủ dự án test xong và gán nhãn (kiểm bằng `SELECT`). Chạy `verify` chỉ đọc trên DB thật. Commit code `79ba96c` và một commit tài liệu; chưa push. Bắt đầu vòng thảo luận GĐ2 | Không đổi | `79ba96c` và commit docs; chưa push |
 
 ---
 
@@ -101,7 +198,8 @@ Thêm một dòng mới vào cuối bảng sau mỗi phiên; không sửa các d
 - **Mỗi bước đi theo vòng:** lập kế hoạch → chủ dự án duyệt → làm → verify → cập nhật file này và roadmap → chủ dự án tự test → **chỉ commit khi chủ dự án bảo**.
   - Commit không mang trailer Co-Authored-By.
   - Tách commit theo loại: feature / fix / docs / refactor.
-- **Ghi vào DB thật** chỉ xảy ra ở bước 1: phải có backup và chủ dự án xác nhận lần cuối.
+- **Mỗi giai đoạn bắt đầu bằng một vòng thảo luận**: đối chiếu với project, phản biện, đưa lựa chọn có lý do, chủ dự án chốt. Sau đó ghi vào `forecast_decisions.md`, rồi mới làm.
+- **Ghi vào DB thật** chỉ xảy ra ở GĐ3: phải có backup và chủ dự án xác nhận lần cuối.
 - **Lưu ý khi bật app:** `TripService.java:76` có `@Scheduled(fixedRate = 10_000)`. Các phiên nghiên cứu đã không bật app.
 - **Quyết định mới hay thay đổi quyết định:** ghi vào `forecast_decisions.md` (mục 6, lịch sử). Không đổi im lặng trong code.
 - **Chạy lại thí nghiệm Python:** xem `forecast_research/step0/README.md`.

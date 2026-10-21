@@ -135,6 +135,7 @@ Route definitions. Departure and destination are derived from the ordered `route
 | `distance_km`         | `Double`    | nullable            | Total route distance in kilometers             |
 | `estimated_duration`  | `Integer`   | nullable            | Estimated duration in minutes                  |
 | `suitable_bus_type_id`| `Integer`   | FK → `bus_types.id` | Optional **recommended** bus type — a preference, not a rule (Group C(a), 2026-09-23): no validator checks it; dropdowns list matching buses first, AI auto-assign filters by it |
+| `holiday_flow`        | `String`    | nullable; enum `HolidayFlow` stored by constant name — the column is a MySQL native `ENUM('LEAVING_HUB','TOWARD_HUB')` | Holiday passenger flow (forecast redesign, decision QĐ-8 in `docs/development/forecast_decisions.md`): `LEAVING_HUB` = carries passengers away from a labour hub (Hà Nội, TP.HCM), `TOWARD_HUB` = toward one, `NULL` = no flow. Optional, set by the Admin on the route form; reserved for demand forecasting (nothing reads it yet as of GĐ1, 2026-10-21). `ddl-auto=update` will not widen the `ENUM` if a constant is added — alter it by hand |
 
 **Relationships:**
 - `OneToMany` → `route_stations` (`cascade = CascadeType.ALL`, `@BatchSize(20)`)
@@ -381,6 +382,7 @@ erDiagram
         Double distanceKm
         Integer estimatedDuration
         Integer suitableBusTypeId FK
+        String holidayFlow
     }
     route_stations {
         Long routeId PK,FK

@@ -11,6 +11,7 @@ Nothing here is part of the application; nothing here writes to the database.
 | `per_origin.py` | Per-origin breakdown of `compare_methods.py` |
 | `queries.sql` | Every read-only SQL query used, including the export (Q0) |
 | `step0/`, `step0_data/` | Step 0 (2026-10-20): algorithm selection on real Hong Kong border data and on a new censored synthetic generator; needs numpy/pandas/scipy/statsmodels/prophet/lightgbm. See `step0/README.md`; results in `../forecast_discussion.md` §12 |
+| `holiday_calendar_check.py` | GĐ1 (2026-10-21): independent GMT+7 re-implementation of Ho Ngoc Duc's Vietnamese lunar-calendar algorithm, used to cross-check the Tết / Giỗ Tổ table in `HolidayCalendar.java` (2022–2033). Plain Python, no packages: `python -I holiday_calendar_check.py` |
 | `2026-10-20-chưa xong.txt` | The owner's own terminal copy of the 2026-10-20 morning session (summarised in `../forecast_discussion.md` §11) |
 
 Run from this folder (plain Python 3, no numpy):

@@ -282,11 +282,16 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
 ## 7. Current Progress
 
 - **Current phase:** Phase 0 through **Phase 8 COMPLETED** (Phase 8 finished 2026-07-25; **committed as `3316796` and pushed to `origin/temp` on 2026-07-31**). Next is **Phase 9 (Customer Portal)**, the last phase. Phase 7 held three steps: Vehicle Replacement MVP (2026-07-22), Recommendation Engine core / revenue (2026-07-23), and parametric cost/profit (2026-07-24). See Phases 7-8 in Section 5.
-- **Demand Forecast redesign — DECISIONS APPROVED 2026-10-21, IMPLEMENTATION NOT STARTED, NO APP CODE CHANGED:**
+- **Demand Forecast redesign — DECISIONS APPROVED 2026-10-21; GĐ1 IMPLEMENTED 2026-10-21, NOT COMMITTED; the forecast itself is unchanged:**
   - **2026-10-14 → 16:** the advisor questioned the linear-regression model, and a measured rolling-origin backtest showed it losing to Holt-Winters and to a 4-week seasonal naive.
   - **2026-10-20:** the owner leaned towards slot demand as the unit (B1) and holidays/seasons learned from data (C2). Step 0 was done: a Python-only experiment on real Hong Kong border data and on a new censored synthetic generator.
   - **2026-10-21:** the owner approved seven decisions (QĐ-1…QĐ-7): a calendar Poisson regression with EM, hand-written in Java; slot demand as the unit; holidays learned from data, used only after ≥ 2 past occurrences; a direction attribute on `Route` (schema change); 7-day horizon for cards and up to 35 days for a preview; the §4 Non-Goal reworded; a new generator with the history deleted and regenerated (backup first).
-  - **Next:** a detailed plan for steps 1–4, approved by the owner before any code.
+  - **Plan (2026-10-21, later):** steps 1–4 are split into seven stages, GĐ1–GĐ7 (`forecast_progress.md` §2–3). GĐ1's design is decided as QĐ-8 (`Route.holidayFlow`) and QĐ-9 (holiday calendar).
+  - **GĐ1 implemented and committed (2026-10-21) as `79ba96c`, not pushed:** `Route.holidayFlow` (enum `HolidayFlow`) on the route form and list, plus the shared holiday calendar `domain/Holiday` + `domain/HolidayCalendar`.
+    - `mvnw test` 143/143.
+    - Verified on a DB clone: every forecast-consuming page is byte-identical to before.
+    - The owner tested it and labelled the 8 routes on the real DB, matching the QĐ-8 table.
+  - **Next:** the GĐ2 discussion round (new generator). Every stage starts with its own discussion round.
   - **Multi-session workstream. Read, in order:** `docs/development/forecast_progress.md` (status, step checklist, session log), then `forecast_decisions.md` (the decisions and the open design items M-1…M-12). Read `forecast_discussion.md` §11–12 only for the reasoning and the measured numbers.
 - **Last completed milestone:** **Phase 8 (2026-07-25)** — What-if Simulation. `/admin/analytics/what-if` mô phỏng năng lực đội xe và độ phủ nhu cầu dự báo dưới 4 cần gạt (Δxe, Δtài xế, hệ số nhu cầu %, ghi đè chi phí in-memory), aggregate-only, recompute-per-view, **writes nothing, no new entity/schema/query, `TripService` untouched, engine never re-run**. Throughput derived by cycle-time (`window ÷ (avgDur + prepBuffer)` = 15.0h ÷ 4.0h = 3.75/bus/day), not utilization; bus-vs-driver bottleneck + Forecast Coverage + honesty banner. Verified by driving the real app — baseline's 17 hot slots match Phase 7 exactly, all four levers reconcile field-for-field (incl. a proven negative profit and cost-override that leaves `cost_parameters` untouched), `mvnw test` **21/21**, DB identical before/after. **Committed as `3316796` and pushed to `origin/temp`** (2026-07-31), carrying the defect #7 coverage fix and the defect #8 note correction with it. See Section 5 "As delivered" (Phase 8), the 2026-07-25 Session Log entry, and the 2026-07-31 commit entry.
 - **Group C(a) and C(c) fixed as discussed — Group C closed (2026-09-23, later session) — NOT COMMITTED:** the owner asked for the rest of Group C to be done *"theo như đã bàn"*, i.e. the two recommendations of the 2026-09-22 discussion. **C(a) — a route's `suitableBusType` is a preference, not a rule:** `getAvailableBusesForTrip()` (approve + edit dropdowns) no longer hard-filters by type; it offers every `READY` bus that passes the same busy/maintenance filters, route-type buses first and then by km since service; approve/edit options now show capacity and `★ đúng loại tuyến`; the create form gets the same ordering and mark from a `data-type` attribute its own comment had promised but never rendered, plus `typeId` in the REST DTO. The validator is untouched (a preference has no rule), and **`findBestAvailableBus()` deliberately keeps its hard filter** — the unattended path may offer a subset — recorded as a possible separate ruling. `Route.getSuitableBusType()`'s javadoc promise (§12 item 4) deleted rather than implemented. The trigger case was the owner's own trip 3492: created with a *Ghế ngồi* bus on a Limousine route, then offered only Limousines by the edit form. **C(c) — editing a route's distance under a `DEPARTED` trip warns, it does not block:** `RouteService.updateRoute()` now returns a warning (the `createManualTrip` channel) when the distance actually changes and `countByRouteIdAndStatus(id, DEPARTED) > 0`; `ACTIVE`/`COMPLETED` do not trigger it; the save still happens; `route-list.html` gained the `warning` alert it never had. Tests **114 → 121/121** (18 classes), four non-vacuity probes each reddening exactly one test. Driven on a `mysqldump` clone (second JVM, 8098): warning on route 1 (2 departed) and silence in the three counter-cases; trip 3492's dropdown reconciled bus-for-bus and in order against SQL; *Ghế ngồi* bus 8 now selectable and saved; #22 still refuses 50 seats on a 22-seat bus; manual approval with an other-type bus succeeds; 31/32 pages 200 (the 302 is #20 on the just-approved clone trip); real DB byte-identical. See the 2026-09-23 (later session) Session Log entry.
@@ -1247,7 +1252,7 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
 
 ---
 
-### 2026-10-21 — Demand Forecast redesign: seven decisions approved; decision record and progress tracker created — DOCS ONLY, NO APP CODE CHANGED, COMMITTED (NOT PUSHED)
+### 2026-10-21 — Demand Forecast redesign: seven decisions approved; decision record and progress tracker created — DOCS ONLY, NO APP CODE CHANGED, COMMITTED `2eebc25` AND PUSHED
 
 - **Not a phase.** The owner first asked for a recap of 10-20 and for two explanations:
   - whether "G1' + EM, K=0" is a Poisson regression (yes: a ridge-penalised Poisson GLM fitted by IRLS, with EM wrapped around it and a frozen trend);
@@ -1266,8 +1271,78 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
   - M-10: record the generator trend-reset bug in a register?
   - M-12: order of this work against Phase 9.
 - **Not changed:** Java, templates, tests, data. Tests not run (no code changed).
-- **Committed the same day** at the owner's request (*"commit đi bro"*), not pushed. It is one `docs:` commit carrying all forecast docs from 10-14 to 10-21: this entry, the 10-14 → 16 and 10-20 entries (their "NOT COMMITTED" titles are historical, per Rule 7), `forecast_*.md` and `forecast_research/`.
+- **Committed the same day as `2eebc25`** at the owner's request (*"commit đi bro"*), then **pushed to `origin/temp`** (*"push đi"*). It is one `docs:` commit carrying all forecast docs from 10-14 to 10-21: this entry, the 10-14 → 16 and 10-20 entries (their "NOT COMMITTED" titles are historical, per Rule 7), `forecast_*.md` and `forecast_research/`.
   - Left out: the owner's terminal transcript `forecast_research/2026-10-20-chưa xong.txt` (transcripts have never been committed), and the unrelated `docs/study/05`/`06` lesson changes.
+
+---
+
+### 2026-10-21 (later) — Forecast redesign split into seven stages; GĐ1 designed (QĐ-8, QĐ-9) — DOCS ONLY, NO APP CODE CHANGED, NOT COMMITTED
+
+- **What the owner asked:** read the project in detail and split the forecast change into phases. Then discuss GĐ1 the same way as before: check it against the project, argue against it, give options with reasons.
+- **The plan.** Steps 1–4 become seven stages, recorded in `forecast_progress.md` §2–3. Each stage leaves the app runnable.
+  - GĐ1: `Route` attribute and holiday calendar.
+  - GĐ2: new generator, run on a DB clone, plus a Python re-check.
+  - GĐ3: replace the history on the real DB.
+  - GĐ4: Java math core with tests and a speed benchmark, in parallel with GĐ2–3.
+  - GĐ5: new `ForecastService`, cache and forecast screen.
+  - GĐ6: Recommendation and What-if.
+  - GĐ7: docs.
+- **Ten measured facts** are listed in `forecast_progress.md` §3. Among them:
+  - the 0.90 threshold stays the single definition: ⌈d/(0.9·s)⌉ ≥ 2 holds exactly when d/s > 0.90;
+  - §4's "No daily cron job" rules out a `@Scheduled` daily recompute;
+  - deleting the old history would double-count the odometer unless its km is subtracted from both columns;
+  - the JDBC URL sets `foreign_key_checks=0`;
+  - the delete set is exactly 2,206 generator-shaped trips; the other 17 are the owner's.
+- **GĐ1 decisions** (the owner took every proposal, and asked for English column values):
+  - **QĐ-8:** `Route.holidayFlow`, an enum `HolidayFlow { LEAVING_HUB, TOWARD_HUB }` stored as STRING. The column is nullable; null means no flow. Optional on the form. Labels for the 8 routes are proposed in the decision file.
+  - **QĐ-9:** a shared Java holiday calendar covering the 5 legal holidays (Labour Code 2019, Art. 112), anchored on the legal or lunar date. It uses a sourced lookup table for 2023–2032 and warns beyond that range.
+- **New open items:** M-13 (fleet shortage at Tết in the generator) and M-14 (several extra trips in one slot would pick the same bus).
+- **DB access:** `SELECT` only.
+- **Not changed:** Java, templates, tests, data.
+
+---
+
+### 2026-10-21 (implementation) — Forecast redesign GĐ1 implemented: `Route.holidayFlow` and the holiday calendar — COMMITTED `79ba96c` (NOT PUSHED)
+
+- **What the owner asked:** *"hãy làm như đã chốt đi, đảm bảo mọi thứ đều hoàn hảo, logic và nhất quán so với project"*. This approved GĐ1's task list. The owner also confirmed the calendar stays 2023–2032 and that history must not go back to 2020; the start date stays open as M-8.
+- **Lunar dates verified before they were typed.** All 24 Tết and Giỗ Tổ dates for 2022–2033 match across two sources:
+  - an independent GMT+7 re-implementation of Ho Ngoc Duc's Vietnamese lunar algorithm (`forecast_research/holiday_calendar_check.py`, new);
+  - the Báo Hà Tĩnh lunar-calendar tool, checked date by date.
+
+  Tết 2030 is 02/02 in Vietnam and 03/02 in China. That date lies inside the coverage range, so it is the concrete reason not to use a Chinese-calendar library.
+- **Code:**
+  - `domain/HolidayFlow` (new enum). `Route.holidayFlow` uses `@Enumerated(STRING)` and `@Column(name = "holiday_flow")`; it is nullable.
+  - `RouteService.updateRoute()` copies the new field.
+  - `AdminRouteController` passes `HolidayFlow.values()` to the form.
+  - `route-form.html`: an optional select. `route-list.html`: a new column.
+  - `DataInitializer`: the 6 demo routes are labelled.
+  - `domain/Holiday` and `domain/HolidayCalendar` (new):
+    - 5 legal holidays; windows taken from step 0 for now, to be fixed in GĐ2;
+    - coverage 01/01/2023 → 31/12/2032; out of range is **refused**, not answered as an ordinary day;
+    - the lunar table is 2022–2033, with two edge years so dates near the ends of the range see the neighbouring year's window.
+- **Tests:**
+  - `HolidayCalendarTest` (13) and `RouteServiceHolidayFlowTest` (4) are new.
+  - Removing the field copy turns exactly the 2 update tests red, so they are not vacuous.
+  - `mvnw test` **143/143** across 20 classes (126 before + 17 new).
+- **Verification by driving the app on a clone** (port 8098; PID 4924 matched the log; the pool was only on `busmanagement_test`):
+  - A baseline of 8 pages was captured from the unmodified code on the same clone, the same day.
+  - After the change, forecast, recommendation, what-if, dashboard and analytics are **byte-identical**. The route list gained exactly one column.
+  - create `LEAVING_HUB` → edit to `TOWARD_HUB` → edit to empty gives `NULL` in the DB. The edit form preselects the stored value.
+  - Labelling route 1 (451 trips) through the form left km, duration, bus type and stops unchanged.
+  - `holidayFlow=FOO` → 400 with no write. Deleting the probe route cascades its stops.
+  - 11 other admin pages return 200.
+  - **Real DB: counts and checksums of 5 tables identical before and after; it does not have the column yet.**
+- **Docs:**
+  - `database_schema.md`: `routes.holiday_flow`, described as what the DB really has, a MySQL native `ENUM`.
+  - `Proj_functions_summary.md` §1, `current_functional_spec.md` (route management), `forecast_decisions.md` (QĐ-8/QĐ-9 "Đã cài"; QĐ-9 edge years and the 2030 example), `forecast_progress.md`, `forecast_research/README.md`, §7 and this entry, a §9 note.
+- **Seen, not changed (unrelated to GĐ1, for the owner to rule on):**
+  - `database_schema.md` describes every enum column as "Enum as VARCHAR", but MySQL holds them as native `ENUM` (e.g. `buses.status enum('READY','REPAIRING','TRAVELING')`).
+  - Its `suitable_bus_type_id` row still says "AI auto-assign filters by it", which has been out of date since the 2026-09-24 ruling (#26).
+- **Later the same day:**
+  - The owner asked about routes between two hubs. Ruling: no new enum value; QĐ-8 gains the rule "label only when the busy direction is certain, otherwise leave it empty"; route 6 stays empty.
+  - The owner then tested, labelled the 8 routes on the real DB (checked by `SELECT`: it matches QĐ-8), and said *"test xong rồi, commit đi"*.
+  - A read-only `verify` against the owner's running instance passed, with the real DB unchanged.
+  - Committed as `79ba96c` (code and tests), followed by a `docs:` commit. Not pushed.
 
 ---
 
@@ -1325,6 +1400,15 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
 - **Why Booking's seat-decrement needs pessimistic locking:** The original thesis proposal (`.agent_instructions/03_functional_spec.md`, section IV.2) explicitly called out the concurrent double-booking race condition as a requirement to handle. `Trip.ticketsSold` today has zero concurrency protection because only a single Admin edits it manually; once real customer bookings exist, this becomes a genuine multi-writer field.
 - **Why `AdminBusController` (not `AdminTripManagementController`) is the required template for new controllers:** `AdminTripManagementController` injects `TripRepository`/`RouteRepository`/`BusRepository`/`DriverRepository` directly alongside `TripService` — a known, already-documented layering violation (`docs/reports/project_report.md`, Warn #4). New controllers in Phase 1/2 must not copy this pattern.
 - **Why Demand Forecast predicts the occupancy RATE and not `ticketsSold` (decided 2026-07-22; the first proposal was `ticketsSold` and was reversed):** the statistical argument is real but secondary — `ticketsSold = occupancy × the capacity of whichever bus was rotated in`, the fleet holds three capacities (22/40/50) which **all appear in all 15 series**, and the measured coefficient of variation is 0.32–0.35 for `ticketsSold` against 0.08–0.11 for occupancy, while mean occupancy by capacity is 0.700/0.705/0.702. So most of `ticketsSold`'s movement is which bus was assigned, not whether passengers came. **The decisive argument is architectural.** The system already has exactly one definition of "this trip is running hot": `Trip.getOccupancyRate() > 0.90` (`Trip.needsReinforcement()`), and it already drives the whole extra-trip flow in `TripService.scanAndSuggestExtraTrips()`; `DashboardService` even annotates its copy of the constant with *"không định nghĩa lại 'hot trip'"*. Forecasting in occupancy means Phase 7's Candidate Trip Generation reuses that threshold with a predicted value substituted for an actual one. Forecasting in tickets would force Phase 7 to invent a second threshold in units the codebase has never used — the exact duplication Section 3 forbids. Absolute passenger counts remain available downstream: multiply the forecast by the capacity of the bus that Bus Selection actually picks, which happens *after* candidate generation in the approved pipeline anyway. **Do not "improve" this into a ticket-count forecast.** *(2026-10-21: the owner approved changing the unit to slot demand, decision QĐ-2 in `docs/development/forecast_decisions.md`. The deciding reason: the rate is clamped at 100%, so it cannot show demand above one bus. This note stays because it is still true of the current code until redesign steps 2–3 ship. Its threshold argument — one definition of "running hot" — must be answered in step 3's design (open item M-4), not dropped.)*
+- **Why `Route.holidayFlow` is Admin-chosen and the holiday calendar is a code table (forecast redesign GĐ1, 2026-10-21; decisions QĐ-8 and QĐ-9 in `forecast_decisions.md`):**
+  - **The flow label is a business judgement, not a derivation.** A "hub" is where workers concentrate (Hà Nội, TP.HCM), not an administrative rank: Hải Phòng, Cần Thơ and Huế are also centrally governed cities. So no rule infers it from stations.
+  - **Null is a valid choice.** It means "no flow" and clears a previous value on edit, like `suitableBusType`'s "Không giới hạn". `updateRoute()` therefore copies it verbatim; a missed copy would silently erase it, the #16 pattern.
+  - **Adding an enum constant needs a manual `ALTER`.** The column is a MySQL native `ENUM`, and `ddl-auto=update` never widens an existing column.
+  - **The calendar is code because holidays are facts,** like days of the week. They are not operator decisions like `CostParameters`.
+  - **It refuses dates outside 2023–2032** instead of answering "ordinary day", because a silent miss at Tết would wreck the forecast exactly when it matters.
+  - **Its lunar table carries edge years 2022/2033,** so the coverage limits are exact.
+  - **It stays GMT+7.** Tết 2030 is 02/02 in Vietnam and 03/02 in China, so a Chinese-calendar library would be wrong inside the range.
+  - **The windows in `Holiday` are model parameters, not facts.** They are taken from step 0 and are to be re-measured in GĐ2.
 - **Why Demand Forecast got its own page although Phase 6's scope line said "a new tab" (owner-approved 2026-07-22):** the roadmap contradicted itself. Phase 6's scope says *"wired into a new tab in the existing `dashboard-analytics.html`"*, while Phase 4's Developer Note argues that a Pillar-2 (Decision Support) deliverable must stay visibly distinct from Pillar-1 analytics because *"a 7th tab would bury exactly the distinction being defended"* — and Demand Forecast is equally Pillar-2. Note the two reasons Phase 4 gave are separable: the **mechanical** one (`getOverview()` takes no parameters) genuinely does not apply to Phase 6, which needs no parameters and could have been a tab; only the **conceptual** one carries over. The owner was given both readings and chose the own page, so `/admin/analytics/forecast` follows the Phase 4 shape: own controller, own template, under `/admin/analytics/`, linked from the Analytics "Lấp đầy" tab. The existing `tab-ai` was considered as a counter-precedent and rejected — it reports *counts of past AI suggestions*, which is descriptive analytics about a feature, not a predictive output.
 - **Why the day-of-week index is pooled across all series instead of fitted per series:** each series holds ~78 observations, which is ~11 per weekday — enough to be noisy, not enough to be stable, and a wrong weekday factor multiplies straight into every prediction for that day. Pooling over all qualifying observations gives ~170 per weekday. This is also the honest reading of the phenomenon: a weekend travel peak is a property of the calendar, not of one route at one hour. If a route ever genuinely has its own weekly shape (a commuter route, say), that is a real modelling change to raise with the owner, not something to slip in by switching the grouping.
 - **Why the backtest recomputes the seasonal index from the training window only:** the obvious implementation passes the already-computed global factors into the backtest, and it is wrong — those factors were fitted on all data including the 14 held-out days, so information from the test window leaks into the model and the reported error comes out better than the model deserves. The reported 4.26% would have been a number nobody could defend. `backtest()` therefore builds its own factors from the training pool. **Do not refactor this to reuse the outer factors "to avoid duplicate work"** — the duplicate work is the entire point.
