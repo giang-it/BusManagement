@@ -1,0 +1,1913 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 06 Kiểm tra ràng buộc nghiệp vụ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</a></li>
+<li><a href="#2-ban-do-tong-quan">§2. Bản đồ tổng quan</a></li>
+<li><a href="#3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</a></li>
+<li><a href="#4-luong-loi-duyet-thu-cong-voi-xe-sap-toi-han-bao-duong">§4. Luồng lỗi — Duyệt thủ công với xe sắp tới hạn bảo dưỡng</a></li>
+<li><a href="#5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</a></li>
+<li><a href="#6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</a></li>
+<li><a href="#7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</a></li>
+<li><a href="#8-vi-du-tinh-tay">§8. Ví dụ tính tay</a></li>
+<li><a href="#9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</a></li>
+<li><a href="#10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</a></li>
+<li><a href="#11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 06 · CHỨC NĂNG</span>
+      <h1>Bài 06 — Business Rule Validation (Kiểm tra ràng buộc nghiệp vụ: xe, tài xế, phụ xe)</h1>
+    </header>
+<aside class="callout"><p>Bài chức năng thứ sáu, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN B), ngày 2026-10-06.
+Học sau Bài 00a, 00b, 01–05. Số dòng là ảnh chụp ngày viết — lệch thì grep lại.</p>
+<p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết
+ra · <span class="tag tag-guess">SUY LUẬN</span> suy luận của người viết (&quot;chưa kiểm chứng&quot; nếu chưa chạy thử).</p>
+<p>Viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>, <code>test/</code> =
+<code>src/test/java/giang/com/BusManagement/</code>, <code>tpl/</code> = <code>src/main/resources/templates/</code>,
+<code>TS</code> = <code>…/service/TripService.java</code>, <code>TR</code> = <code>…/repository/TripRepository.java</code>.</p>
+<p><strong>Phạm vi.</strong> Giống Bài 05, chức năng này <strong>không có màn hình riêng</strong>: nó là hai method private
+trong <code>TripService</code> — <code>validateBusForTrip()</code> (<code>TS:1106-1211</code>) và <code>validateStaffForTrip()</code>
+(<code>TS:1226-1367</code>) — cùng hai &quot;vỏ bọc&quot; public không ném lỗi (<code>TS:1407-1443</code>, Phase 3). Năm nơi gọi
+vào chúng thuộc Bài 07 (tạo/sửa), Bài 09 (duyệt) và Bài 17 (Recommendation). Bài này có 🧮: §8
+bắt buộc tính tay.</p>
+</aside>
+<hr>
+<h2 id="1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</h2>
+<p><strong>Vấn đề thật của nhà xe.</strong> Mỗi lần xếp một chuyến, có những điều <strong>không được sai</strong>: xe đang sửa
+thì không chạy được; một xe không thể ở hai chuyến cùng lúc; xe sắp tới hạn bảo dưỡng thì không nên
+nhận chuyến đường dài; tài xế đã nghỉ việc hoặc bằng lái hết hạn vào ngày chạy thì không được cầm
+lái; một người không được lái quá 8 tiếng một ngày; chuyến dài hơn 8 tiếng phải có đủ người thay ca
+và một phụ xe. Bán nhiều vé hơn số ghế thật của xe cũng là sai.</p>
+<p>Đây là <strong>ràng buộc nghiệp vụ</strong> (<em>business rule</em> — &quot;luật của nghề, không phải của máy&quot;). Chức năng
+này gom <strong>mọi</strong> luật đó vào <strong>hai</strong> method và bắt mọi lối lưu chuyến đi qua chúng. Không có nó thì
+mỗi màn hình tự kiểm một kiểu, và chỉ cần một màn quên là có chuyến chạy bằng xe đang sửa.</p>
+<p>Phase 3 thêm một cách hỏi thứ hai: <strong>dry-run</strong> (<em>&quot;chạy thử — hỏi xem có hợp lệ không, nhưng không
+báo lỗi ầm ĩ&quot;</em>). Màn Gợi ý tăng cường (Bài 17) cần hỏi &quot;phương án này còn hợp lệ không?&quot; cho hàng
+chục ứng viên; với nó, &quot;không hợp lệ&quot; là <strong>kết quả bình thường</strong>, không phải sự cố.</p>
+<p><strong>Một kịch bản cụ thể</strong> (minh hoạ). Chị admin tạo chuyến Hà Nội → Vinh ngày mai, 06:00–16:00 (10
+tiếng). Chị chọn xe 29A-001.05, tài xế chính anh An, tài xế phụ anh Bình, phụ xe chị Chi. Bấm Lưu →
+<em>&quot;Lỗi: Tài xế phụ Bình đã được phân công lái 4.0h trong ngày …, thêm chuyến này (5.0h) sẽ vượt
+8h/ngày!&quot;</em>. Chị đổi chuyến tối của anh Bình ngắn đi 1 tiếng, lưu lại → <em>&quot;Tạo chuyến xe thành công!&quot;</em>.
+Hôm sau chị duyệt một chuyến tăng cường, chọn một xe đã chạy gần đủ km bảo dưỡng → <em>&quot;⛔ Vi phạm ràng
+buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này…&quot;</em>. Chị chọn xe khác.</p>
+<hr>
+<h2 id="2-ban-do-tong-quan">§2. Bản đồ tổng quan</h2>
+<h3 id="2-1-cac-manh-ghep">2.1. Các mảnh ghép</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Loại</th>
+<th>File</th>
+<th>Trách nhiệm (1 dòng)</th>
+</tr>
+</thead><tbody><tr>
+<td>Service — luật xe</td>
+<td><code>TS:1106-1211</code> <code>validateBusForTrip()</code></td>
+<td>6 luật xe, ném <code>IllegalArgumentException</code> ở luật đầu tiên bị vi phạm; trả <code>String</code> cảnh báo (luôn <code>null</code>)</td>
+</tr>
+<tr>
+<td>Service — luật người</td>
+<td><code>TS:1226-1367</code> <code>validateStaffForTrip()</code></td>
+<td>Số tài xế, phụ xe, trùng vai, rồi từng người: hoạt động / bằng lái / bận / giờ lái</td>
+</tr>
+<tr>
+<td>Service — dry-run</td>
+<td><code>TS:1407-1413</code>, <code>:1436-1443</code></td>
+<td>Bọc hai validator trong <code>try/catch (IllegalArgumentException)</code>, trả <code>ValidationResult</code></td>
+</tr>
+<tr>
+<td>Kết quả</td>
+<td><code>…/service/ValidationResult.java</code></td>
+<td>Bất biến: <code>valid</code>, <code>failureReason</code> (tối đa <strong>một</strong>), <code>warning</code>; tạo qua <code>pass()</code> / <code>pass(w)</code> / <code>fail(r)</code></td>
+</tr>
+<tr>
+<td>Service — hàm phụ</td>
+<td><code>TS:352-377</code> <code>isBusBusy()</code>; <code>:701-735</code> <code>isDriverBusyInWindow()</code>; <code>:740-835</code> <code>getDrivingHoursForDate()</code> + <code>sumDrivingHours()</code>; <code>:397-434</code> ba predicate</td>
+<td>Xe bận? người bận? giờ lái trong ngày?</td>
+</tr>
+<tr>
+<td>Service — hằng số</td>
+<td><code>TS:33</code> <code>MIN_REST_BETWEEN_TRIPS_MINUTES = 30</code>; <code>:39</code> <code>BUS_PREP_BUFFER_HOURS = 1</code></td>
+<td>Đệm 30 phút cho người, 1 giờ cho xe</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>TR:118-129</code>, <code>:137-147</code>, <code>:158-166</code>, <code>:173-184</code>; <code>:350</code></td>
+<td>3 câu &quot;có trùng lịch không&quot;, 1 câu &quot;chuyến của tài xế trong ngày&quot;, 1 câu &quot;xe có chuyến DEPARTED không&quot;</td>
+</tr>
+<tr>
+<td>Entity</td>
+<td><code>…/domain/Bus.java:42-76</code>; <code>…/domain/Driver.java:47-61</code></td>
+<td><code>getKmSinceLastMaintenance()</code>, <code>needsMaintenance()</code>, <code>isNearMaintenance(km)</code>; <code>isLicenseValid(LocalDate)</code></td>
+</tr>
+<tr>
+<td>Lớp &quot;không-mời&quot;</td>
+<td><code>TS:1483-1685</code> (dropdown), <code>:308-332</code> + <code>:472-523</code> (AI), <code>TripRestController.java:47-86</code> (API form Tạo)</td>
+<td>Lọc trước những gì validator sẽ từ chối</td>
+</tr>
+<tr>
+<td>Người gọi (throw)</td>
+<td><code>TS:929-930</code>, <code>:1007-1008</code>, <code>:1051-1052</code>, <code>:1076-1077</code></td>
+<td><code>confirmAutoAssignedTrip</code>, <code>approveTrip</code>, <code>createManualTrip</code>, <code>updateManualTrip</code></td>
+</tr>
+<tr>
+<td>Người gọi (dry-run)</td>
+<td><code>…/service/RecommendationService.java:236-245</code></td>
+<td>Cổng xác nhận cuối của thẻ gợi ý</td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/service/TripServiceValidationDryRunTest.java</code> (12), <code>TripServiceSeatCapacityTest</code> (9), <code>TripServiceDriverShareTest</code> (9), <code>TripServiceAssistantAvailabilityTest</code> (4), <code>TripServiceAvailabilityContextTest</code> (3)</td>
+<td>§9.4</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-2-bang-endpoint-du-moi-diem-bat-dau">2.2. Bảng endpoint — đủ mọi điểm bắt đầu</h3>
+<p>Validator không có endpoint riêng. Đây là mọi lối <strong>dẫn tới</strong> nó. <code>ATM</code> =
+<code>AdminTripManagementController.java</code>, <code>ATC</code> = <code>AdminTripController.java</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>HTTP / trigger</th>
+<th>URL</th>
+<th>Controller method</th>
+<th>Được gọi từ đâu</th>
+<th>Service chính</th>
+<th>Kết quả</th>
+</tr>
+</thead><tbody><tr>
+<td>POST</td>
+<td><code>/admin/trip-management/trips/create</code></td>
+<td><code>ATM.createTrip()</code> <code>:120-177</code></td>
+<td>nút Lưu ở <code>trip-create-form.html</code> (Bài 07)</td>
+<td><code>createManualTrip()</code> → cả hai validator, <code>excludeTripId = null</code> (<code>TS:1051-1052</code>)</td>
+<td>thành công: redirect danh sách + <code>success</code>; lỗi: redirect <code>/trips/create</code> + <code>error</code> &quot;Lỗi: …&quot;</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/trip-management/trips/update</code></td>
+<td><code>ATM.updateTrip()</code> <code>:339-444</code></td>
+<td>nút Lưu ở <code>trip-edit-form.html</code> (Bài 07)</td>
+<td><code>updateManualTrip()</code> → cả hai, <code>excludeTripId = id chuyến</code> (<code>TS:1076-1077</code>)</td>
+<td>lỗi: redirect form sửa + &quot;Lỗi: …&quot;</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/trips/approve</code></td>
+<td><code>ATC.processManualApproval()</code> <code>:166-201</code></td>
+<td>MANUAL MODE ở <code>approve-form.html</code> (Bài 09)</td>
+<td><code>approveTrip()</code> → cả hai, <code>excludeTripId = tripId</code> (<code>TS:1007-1008</code>)</td>
+<td>lỗi: <code>catch (IllegalArgumentException)</code> → &quot;⛔ Vi phạm ràng buộc: …&quot; → <code>/admin/trips/approve/{id}</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/trips/confirm</code></td>
+<td><code>ATC.confirmAutoAssigned()</code> <code>:135-156</code></td>
+<td>nút Xác nhận AUTO MODE (Bài 09)</td>
+<td><code>confirmAutoAssignedTrip()</code> → cả hai (<code>TS:929-930</code>)</td>
+<td>lỗi validator: <code>catch (Exception)</code> → &quot;Lỗi xác nhận: …&quot; → <code>/admin/trips/approve/{id}</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/analytics/recommendation</code></td>
+<td><code>RecommendationController</code> <code>:35-38</code></td>
+<td>menu Analytics (Bài 17)</td>
+<td><code>buildRecommendations()</code> → <code>buildCard()</code> → <strong>hai bản dry-run</strong> (<code>RecommendationService.java:236-237</code>)</td>
+<td>thẻ <code>RECOMMENDED</code> hoặc <code>STALE</code> kèm lý do (<code>recommendation.html:171</code>, <code>:204</code>)</td>
+</tr>
+<tr>
+<td>GET (<code>fetch</code>)</td>
+<td><code>/api/admin/trips/available-resources</code></td>
+<td><code>TripRestController.getAvailableResources()</code> <code>:47-86</code></td>
+<td>JS form Tạo (<code>trip-create-form.html:482-484</code>)</td>
+<td>3 bộ lọc <code>…ForTimeRange</code> — <strong>lớp không-mời</strong>, không gọi validator</td>
+<td>JSON <code>buses</code>, <code>drivers</code>, <code>assistants</code></td>
+</tr>
+<tr>
+<td><code>@Scheduled</code></td>
+<td>—</td>
+<td><code>TS.scanAndSuggestExtraTrips()</code> <code>:76-78</code></td>
+<td>job 10 giây (Bài 08)</td>
+<td>AI chọn bằng <code>findBestAvailableBus/Driver</code> — <strong>không</strong> gọi validator; validator chạy lại lúc Admin xác nhận</td>
+<td>chuyến <code>PENDING_APPROVAL</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="2-3-so-do-toan-canh">2.3. Sơ đồ toàn cảnh</h3>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    subgraph OFFER["Lớp không-mời - lọc trước"]
+        API["API form Tạo&lt;br/&gt;...ForTimeRange"]
+        DD["Dropdown Duyệt, Sửa&lt;br/&gt;getAvailable...ForTrip"]
+        AI["AI tự phân công&lt;br/&gt;findBestAvailableBus, Driver"]
+    end
+    subgraph GATE["Lớp chặn thật - TripService"]
+        VB["validateBusForTrip&lt;br/&gt;6 luật xe"]
+        VS["validateStaffForTrip&lt;br/&gt;luật người"]
+    end
+    subgraph CALL["Người gọi"]
+        CM["createManualTrip"]
+        UM["updateManualTrip"]
+        AP["approveTrip"]
+        CF["confirmAutoAssignedTrip"]
+        DRY["validate...DryRun&lt;br/&gt;Phase 3"]
+    end
+    REC["RecommendationService&lt;br/&gt;cổng cuối của thẻ"]
+    H["isBusBusy, isDriverBusyInWindow,&lt;br/&gt;getDrivingHoursForDate"]
+    R["TripRepository&lt;br/&gt;3 câu trùng lịch, 1 câu giờ lái"]
+    CM &amp; UM &amp; AP &amp; CF --&gt; VB &amp; VS
+    REC --&gt; DRY --&gt; VB &amp; VS
+    VB &amp; VS --&gt; H --&gt; R
+    API -.-&gt;|cùng luật, chạy trước| H
+    DD -.-&gt; H
+    AI -.-&gt; H</pre></figure>
+<p>Thứ tự kiểm (<strong>fail-fast</strong> — <em>&quot;gặp lỗi đầu tiên là dừng, không kiểm tiếp&quot;</em>):</p>
+<figure class="diagram"><pre class="mermaid">flowchart TD
+    B1["Xe REPAIRING?"] --&gt; B2["Xe TRAVELING mà không chuyến DEPARTED nào giải thích?"]
+    B2 --&gt; B3["Xe trùng lịch trong cửa sổ trừ 1h, cộng 1h?"]
+    B3 --&gt; B4["Xe đã quá hạn bảo trì?"]
+    B4 --&gt; B5["Cộng km tuyến thì chạm 90 phần trăm ngưỡng?"]
+    B5 --&gt; B6["Số ghế mở bán lớn hơn sức chứa xe?"]
+    B6 --&gt; S1["Có tài xế chính?"]
+    S1 --&gt; S2["Đủ ceil của thời lượng chia 8 tài xế?"]
+    S2 --&gt; S3["Trên 8h mà thiếu phụ xe?"]
+    S3 --&gt; S4["Một người giữ hai vai?"]
+    S4 --&gt; S5["Tài xế chính: hoạt động, bằng lái, bận, giờ lái"]
+    S5 --&gt; S6["Từng tài xế phụ: hoạt động, bằng lái, bận, giờ lái"]
+    S6 --&gt; S7["Phụ xe: hoạt động, bằng lái, bận - KHÔNG xét giờ lái"]
+    S7 --&gt; OK["Hợp lệ"]</pre></figure>
+<p>Mỗi ô là một chỗ có thể ném <code>IllegalArgumentException</code>. Mọi người gọi đều chạy <strong>xe trước, người
+sau</strong> (<code>TS:929-930</code>, <code>:1007-1008</code>, <code>:1051-1052</code>, <code>:1076-1077</code>).</p>
+<h3 id="2-4-dieu-cot-loi-can-nho">2.4. Điều cốt lõi cần nhớ</h3>
+<ol>
+<li><strong>Một nơi giữ luật, nhiều nơi hỏi.</strong> Bốn lối lưu chuyến cùng gọi hai validator; màn Gợi ý gọi
+qua bản dry-run — bản này <strong>không chép</strong> luật, chỉ bắt exception (<code>TS:1407-1413</code>). Đổi luật ở
+validator thì mọi lối đổi theo.</li>
+<li><strong>Ném <code>IllegalArgumentException</code> ở luật đầu tiên bị vi phạm.</strong> Nên mỗi lần chỉ báo <strong>một</strong> lý do,
+kể cả bản dry-run (chủ dự án duyệt, roadmap §9).</li>
+<li><strong>Hai cửa sổ thời gian</strong>: xe bận khi có chuyến giao khoảng <code>[khởi hành − 1h, đến + 1h]</code>; người
+bận khi giao <code>[khởi hành − 30&#39;, đến + 30&#39;]</code>. &quot;Giao&quot; là <strong>giao thật</strong> — chạm đúng mép không tính.</li>
+<li><strong>Luật 8 giờ tính theo phần chia</strong>: chuyến dài chia đều cho số người lái, mỗi phần tối đa 8h;
+cộng với giờ của các chuyến <strong>khởi hành cùng ngày lịch</strong>; phụ xe tính 0h. Giờ nền mock
+<code>totalDrivingHours24h</code> chỉ cộng khi ngày đó là <strong>hôm nay</strong>.</li>
+<li><strong>Hai lớp bảo vệ.</strong> Dropdown, API form Tạo và AI lọc trước (lớp không-mời) — nguyên tắc &quot;một
+chiều&quot;: lớp mời <strong>không được rộng hơn</strong> validator. Validator là lớp chặn thật duy nhất.</li>
+</ol>
+<hr>
+<h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
+<p><strong>Chọn luồng nào và vì sao.</strong></p>
+<ul>
+<li><strong>Luồng A — Tạo chuyến 10 tiếng có tài xế phụ và phụ xe, đi qua đủ mọi luật và qua ở biên 8h.</strong>
+Đây là đường throw đầy đủ nhất: đi qua cả 6 luật xe, mọi luật người, với <strong>4 loại truy vấn</strong> khác
+nhau, và dừng đúng ở biên <code>8.0 ≤ 8.0</code> của luật giờ lái.</li>
+<li><strong>Luồng B — Cổng dry-run của màn Gợi ý tăng cường.</strong> Đây là sản phẩm của Phase 3: cùng validator
+nhưng hỏi bằng dữ liệu thay vì exception. Cho thấy vì sao chỉ bắt <code>IllegalArgumentException</code>.</li>
+</ul>
+<h3 id="3-1-luong-a-tao-chuyen-10-tieng">3.1. Luồng A — Tạo chuyến 10 tiếng</h3>
+<p><strong>Số liệu minh hoạ.</strong> Ngày mai, 06:00 → 16:00 (10h), tuyến 450 km. Xe #5 <code>READY</code>, loại 40 chỗ,
+<code>odometer = 9000</code>, <code>lastMaintenanceOdometer = 5000</code> (⇒ đã chạy 4000 km kể từ lần bảo dưỡng), ngưỡng
+5000 km; <code>totalSeats = 40</code>. Tài xế chính An: ngày mai chưa có chuyến. Tài xế phụ Bình: ngày mai có
+chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang hoạt động, bằng lái còn hạn.</p>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant C as AdminTripManagementController
+    participant P as Proxy Transactional
+    participant S as TripService
+    participant R as TripRepository
+    participant DB as MySQL
+    A-&gt;&gt;C: POST /admin/trip-management/trips/create
+    C-&gt;&gt;C: nạp route, bus, driver, co-driver, assistant theo id, đặt status ACTIVE
+    C-&gt;&gt;P: createManualTrip(trip)
+    P-&gt;&gt;S: mở transaction
+    S-&gt;&gt;S: tripwire id, giờ đến sau giờ đi
+    Note over S: validateBusForTrip - REPAIRING, TRAVELING bỏ qua vì xe READY
+    S-&gt;&gt;R: existsOverlappingTripForBus - cửa sổ 05:00 đến 17:00
+    R-&gt;&gt;DB: SELECT COUNT trips cùng xe giao cửa sổ
+    DB--&gt;&gt;S: false
+    S-&gt;&gt;S: needsMaintenance 4000 lớn hơn hoặc bằng 5000? không
+    S-&gt;&gt;S: isNearMaintenance(450) 4450 lớn hơn hoặc bằng 4500? không
+    S-&gt;&gt;S: 40 ghế lớn hơn 40 chỗ? không
+    Note over S: validateStaffForTrip - 10h, cần 2 tài xế, có 2, có phụ xe, không trùng vai
+    loop An rồi Bình
+        S-&gt;&gt;R: existsOverlappingTripForDriver, ForAssistant - cửa sổ 05:30 đến 16:30
+        S-&gt;&gt;R: findTripsForDriverOnDate - cả ngày mai
+        R-&gt;&gt;DB: SELECT chuyến của người đó khởi hành ngày mai
+        S-&gt;&gt;S: giờ đã có cộng 5.0 lớn hơn 8.0?
+    end
+    S-&gt;&gt;R: Chi - chỉ hai câu kiểm bận, không xét giờ lái
+    S-&gt;&gt;S: changeStatusToActive, đóng dấu saleOpenedAt
+    S-&gt;&gt;R: save(trip)
+    R-&gt;&gt;DB: INSERT trips, rồi INSERT trip_co_drivers lúc commit
+    P--&gt;&gt;C: commit
+    C--&gt;&gt;A: flash Tạo chuyến xe thành công, redirect danh sách</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Controller</td>
+<td><code>ATM:120-158</code></td>
+<td><code>createTrip()</code></td>
+<td><code>@ModelAttribute Trip</code> + <code>routeId</code>, <code>busId</code>, <code>driverId</code>, <code>assistantId</code>, <code>coDriverIds</code></td>
+<td>nạp từng entity bằng <code>findById</code> của <strong>repository</strong> (controller inject thẳng repository — anti-pattern đã biết, roadmap §3); gắn vào <code>trip</code>; <code>coDrivers = [Bình]</code></td>
+<td><code>trip</code> chưa có id</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Controller</td>
+<td><code>ATM:161-165</code></td>
+<td>đặt trạng thái + gọi service</td>
+<td>—</td>
+<td><code>setStatus(ACTIVE)</code>, <code>setExtraTrip(false)</code>, rồi <code>tripService.createManualTrip(trip)</code> trong <code>try</code></td>
+<td>→ proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Proxy</td>
+<td><code>TS:1038</code></td>
+<td><code>@Transactional</code></td>
+<td>—</td>
+<td>mở transaction</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Service</td>
+<td><code>TS:1040-1048</code></td>
+<td>tripwire + giờ</td>
+<td>—</td>
+<td><code>id != null</code> ⇒ ném (lỗi #21); giờ đến <strong>khác null</strong> mà trước giờ đi ⇒ ném. Giờ đến <code>null</code> thì <strong>không</strong> bị chặn ở đây (lỗi #28, §9.3)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Service</td>
+<td><code>TS:1051</code> → <code>:1106-1110</code></td>
+<td><code>validateBusForTrip(bus, trip, null)</code> — luật 1</td>
+<td><code>status = READY</code></td>
+<td>không phải <code>REPAIRING</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Service</td>
+<td><code>TS:1146-1155</code></td>
+<td>luật 2 — cờ <code>TRAVELING</code></td>
+<td><code>READY</code></td>
+<td>không phải <code>TRAVELING</code> ⇒ <strong>bỏ qua cả nhánh</strong>, không truy vấn</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Service</td>
+<td><code>TS:1157-1163</code></td>
+<td>cửa sổ xe</td>
+<td>06:00, 16:00</td>
+<td>giờ đến <code>null</code> thì lấy <code>departure + 5h</code>; <code>windowStart = 05:00</code>, <code>windowEnd = 17:00</code> (<code>BUS_PREP_BUFFER_HOURS = 1</code>, <code>TS:39</code>)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Service → DB</td>
+<td><code>TS:1165</code> → <code>:352-371</code> → <code>TR:158-166</code></td>
+<td>luật 3 — <code>isBusBusy</code> → <code>existsOverlappingTripForBus</code></td>
+<td>xe #5, trạng thái bận <code>ACTIVE, DEPARTED, PENDING_APPROVAL</code></td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) &gt; 0 FROM trips t WHERE t.bus_id = 5 AND t.status IN (&#39;ACTIVE&#39;,&#39;DEPARTED&#39;,&#39;PENDING_APPROVAL&#39;) AND t.departure_time &lt; &#39;…17:00&#39; AND t.arrival_time_expected &gt; &#39;…05:00&#39; AND t.is_deleted = false</code> (vế <code>excludeTripId</code> luôn đúng vì tham số <code>null</code>)</td>
+<td><code>false</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Service</td>
+<td><code>TS:1173-1178</code> → <code>Bus.java:48-52</code></td>
+<td>luật 4 — <code>needsMaintenance()</code></td>
+<td>kmSince = 9000 − 5000 = 4000</td>
+<td>4000 ≥ 5000? Không</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service</td>
+<td><code>TS:1186-1194</code> → <code>Bus.java:72-76</code></td>
+<td>luật 5 — <code>isNearMaintenance(450)</code></td>
+<td>—</td>
+<td>4000 + 450 = 4450 ≥ 5000 × 0,9 = 4500? Không</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Service</td>
+<td><code>TS:1203-1208</code> → <code>:1219-1221</code></td>
+<td>luật 6 — sức chứa</td>
+<td><code>capacity = 40</code></td>
+<td>40 &gt; 40? Không (lỗi #22). Xe chưa gán loại ⇒ <code>capacity = null</code> ⇒ bỏ qua</td>
+<td><code>return null</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Service</td>
+<td><code>TS:1052</code> → <code>:1227-1235</code></td>
+<td><code>validateStaffForTrip(trip, null)</code></td>
+<td>—</td>
+<td><code>durationHours = 600 phút / 60 = 10.0</code>; <code>requiredDrivers = ceil(10/8) = 2</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Service</td>
+<td><code>TS:1238-1253</code></td>
+<td>có tài xế chính? đủ người?</td>
+<td>—</td>
+<td><code>driver != null</code>; <code>assigned = 1 + coDrivers.size() = 2</code> ≥ 2</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Service</td>
+<td><code>TS:1256-1259</code></td>
+<td>phụ xe cho chuyến dài</td>
+<td>—</td>
+<td><code>10.0 &gt; 8.0</code> và có Chi ⇒ qua</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Service</td>
+<td><code>TS:1262-1292</code></td>
+<td>trùng vai</td>
+<td>—</td>
+<td><code>HashSet</code> id: An; Bình khác An và chưa có ⇒ thêm; Chi khác An và chưa có ⇒ thêm. Chỉ ghi vào biến cục bộ</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Service</td>
+<td><code>TS:1296-1299</code></td>
+<td>cửa sổ người + phần chia</td>
+<td>—</td>
+<td><code>windowStart = 05:30</code>, <code>windowEnd = 16:30</code> (<code>TS:33</code>); <code>shareDuration = 10/2 = 5.0</code>; <code>effectiveHours = min(5.0, 8.0) = 5.0</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Service</td>
+<td><code>TS:1302-1310</code> → <code>Driver.java:47-49</code></td>
+<td>An: hoạt động, bằng lái</td>
+<td>—</td>
+<td><code>Boolean.TRUE.equals(isActive)</code>; <code>isLicenseValid(ngày mai)</code> = hạn bằng <strong>sau hẳn</strong> ngày khởi hành (Bài 04 §8.1)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>18</td>
+<td>Service → DB</td>
+<td><code>TS:1311</code> → <code>:714-728</code> → <code>TR:118-129</code>, <code>:137-147</code></td>
+<td>An bận?</td>
+<td>trạng thái bận <code>PENDING_APPROVAL, ACTIVE, DEPARTED</code></td>
+<td>hai câu: <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) &gt; 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = An OR cd.user_id = An) AND t.status IN (…) AND t.departure_time &lt; &#39;…16:30&#39; AND t.arrival_time_expected &gt; &#39;…05:30&#39; AND t.is_deleted = false</code>, rồi câu tương tự với <code>t.assistant_id = An</code></td>
+<td><code>false</code>, <code>false</code></td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>19</td>
+<td>Service → DB</td>
+<td><code>TS:1315</code> → <code>:752-772</code> → <code>TR:173-184</code></td>
+<td>giờ lái của An ngày mai</td>
+<td>thêm <code>COMPLETED</code> vào tập trạng thái (<code>TS:756-757</code>)</td>
+<td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT DISTINCT t.*, cd.* FROM trips t LEFT JOIN trip_co_drivers cd … WHERE (t.driver_id = An OR cd.user_id = An OR t.assistant_id = An) AND t.status IN (4 trạng thái) AND t.departure_time &gt;= &#39;mai 00:00&#39; AND t.departure_time &lt; &#39;mốt 00:00&#39; AND t.is_deleted = false</code></td>
+<td>danh sách rỗng</td>
+<td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>20</td>
+<td>Service</td>
+<td><code>TS:782-834</code> <code>sumDrivingHours()</code></td>
+<td>—</td>
+<td>rỗng</td>
+<td>tổng 0; ngày mai ≠ hôm nay ⇒ <strong>không</strong> cộng giờ nền mock</td>
+<td><code>0.0</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>21</td>
+<td>Service</td>
+<td><code>TS:1316</code></td>
+<td>luật 8h của An</td>
+<td>0.0 + 5.0</td>
+<td><code>&gt; 8.0</code>? Không</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>22</td>
+<td>Service</td>
+<td><code>TS:1324-1346</code></td>
+<td>Bình: như bước 17–21</td>
+<td>—</td>
+<td>bận? chuyến 18:00–21:00: <code>18:00 &lt; 16:30</code>? <strong>Không</strong> ⇒ không giao ⇒ không bận. Giờ lái: chuyến đó khởi hành ngày mai, Bình lái một mình ⇒ <code>min(3/1, 8) = 3.0</code></td>
+<td>3.0 + 5.0 = <strong>8.0</strong> <code>&gt; 8.0</code>? <strong>Không</strong> ⇒ qua đúng ở biên</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>23</td>
+<td>Service</td>
+<td><code>TS:1349-1366</code></td>
+<td>Chi (phụ xe)</td>
+<td>—</td>
+<td>hoạt động, bằng lái, hai câu kiểm bận; <strong>không</strong> có luật giờ lái</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>24</td>
+<td>Service</td>
+<td><code>TS:1054</code> → <code>:1910-1915</code></td>
+<td><code>changeStatusToActive()</code></td>
+<td>—</td>
+<td><code>ACTIVE</code> + <code>saleOpenedAt = now()</code> (Bài 05)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>25</td>
+<td>Service → DB</td>
+<td><code>TS:1055</code></td>
+<td><code>tripRepository.save(trip)</code></td>
+<td><code>id = null</code></td>
+<td><code>persist</code>; <code>IDENTITY</code> ⇒ <code>INSERT INTO trips …</code> chạy <strong>ngay</strong>; dòng <code>trip_co_drivers (trip_id, user_id = Bình)</code> ghi khi flush/commit</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>26</td>
+<td>Proxy</td>
+<td>—</td>
+<td>commit</td>
+<td>—</td>
+<td>đóng transaction</td>
+<td><code>warning = null</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>27</td>
+<td>Controller</td>
+<td><code>ATM:167-171</code></td>
+<td>flash + redirect</td>
+<td>—</td>
+<td><code>success</code> = &quot;Tạo chuyến xe thành công!&quot;; <code>warning</code> chỉ thêm khi khác <code>null</code> (không bao giờ, §9.3) → <code>redirect:/admin/trip-management/trips</code></td>
+<td>302</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Ranh giới transaction:</strong> một transaction (bước 3 → 26). Toàn bộ validator <strong>chỉ đọc</strong>: không
+setter, không <code>save()</code> trên entity nào, chỉ ghi vào một <code>HashSet</code> cục bộ (roadmap §9 &quot;dry-run
+wrappers are genuinely side-effect free&quot;, đã kiểm). Số truy vấn của luồng này <span class="tag tag-guess">SUY LUẬN</span>: 1 (xe) +
+3 × 2 (An, Bình) + 2 (Chi) = <strong>9 SELECT</strong> trước câu <code>INSERT</code>.</p>
+<p><strong>Nếu chuyến tối của Bình là 17:00–21:00</strong> (4h): bước 22 thành 4.0 + 5.0 = 9.0 &gt; 8.0 ⇒ ném
+<em>&quot;Tài xế phụ Bình đã được phân công lái 4.0h trong ngày …, thêm chuyến này (5.0h) sẽ vượt 8h/ngày!&quot;</em>
+(<code>TS:1340-1345</code>) → rollback (chưa ghi gì) → <code>catch (Exception)</code> <code>ATM:173-175</code> → flash &quot;Lỗi: …&quot; →
+<code>redirect:/admin/trip-management/trips/create</code> → khung đỏ <code>trip-create-form.html:93-94</code>. Form trở về
+<strong>trống</strong> — dữ liệu vừa gõ mất (cùng hạn chế Bài 03, 04). Để ý: 17:00 vẫn <strong>không</strong> đụng cửa sổ bận
+(<code>17:00 &lt; 16:30</code> sai) — Bình không bận, chỉ quá giờ.</p>
+<p><strong>(c) Code then chốt</strong></p>
+<p><code>TS:1296-1321</code> — phần quan trọng nhất của luật người:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES); // −30 phút
+LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);      // +30 phút
+double shareDuration = durationHours / assignedDriversCount;   // chia đều cho số người lái
+double effectiveHours = Math.min(shareDuration, 8.0);          // mỗi phần tối đa 8h
+
+if (!Boolean.TRUE.equals(driver.getIsActive())) {              // đã khoá (Bài 04)
+    throw new IllegalArgumentException("Tài xế chính ... đã bị khóa (ngừng hoạt động)!");
+}
+if (!driver.isLicenseValid(departure.toLocalDate())) {         // bằng lái xét NGÀY KHỞI HÀNH
+    throw new IllegalArgumentException(String.format("Bằng lái của tài xế chính %s hết hạn ngày %s ...", ...));
+}
+if (isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId)) {  // trùng lịch, mọi vai
+    throw new IllegalArgumentException("Tài xế chính ... đang bận ở chuyến khác!");
+}
+double driverAssignedHours = getDrivingHoursForDate(driver, departure, excludeTripId); // giờ đã có trong ngày
+if (driverAssignedHours + effectiveHours &gt; 8.0) {              // &gt; chứ không &gt;= : đúng 8.0 là được
+    throw new IllegalArgumentException(String.format("Tài xế chính %s đã được phân công lái %.1fh ...", ...));
+}</code></pre></div>
+<p><code>TS:782-813</code> — luật tính giờ duy nhất của hệ thống (Stream + lambda):</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">double hoursFromTrips = trips.stream()
+        .mapToDouble(t -&gt; {
+            if (t.getAssistant() != null &amp;&amp; t.getAssistant().getUserId().equals(driver.getUserId())) {
+                return 0.0;                                   // làm phụ xe ở chuyến này: 0h
+            }
+            boolean isDriving = (driver chính) || (nằm trong coDrivers);
+            if (!isDriving) return 0.0;
+            LocalDateTime arr = (giờ đến != null) ? giờ đến : giờ đi + 5h;
+            double dur = phút giữa giờ đi và arr / 60.0;
+            int totalDrivers = 1 + số coDrivers;
+            return Math.min(dur / totalDrivers, 8.0);         // phần chia, trần 8h
+        })
+        .sum();</code></pre></div>
+<p>Viết lại bằng vòng <code>for</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">double hoursFromTrips = 0.0;
+for (Trip t : trips) {                                        // các chuyến khởi hành cùng ngày
+    if (t.getAssistant() != null &amp;&amp; t.getAssistant().getUserId().equals(driver.getUserId())) {
+        continue;                                             // phụ xe: cộng 0
+    }
+    boolean isDriving = t.getDriver() != null &amp;&amp; t.getDriver().getUserId().equals(driver.getUserId());
+    if (!isDriving &amp;&amp; t.getCoDrivers() != null) {
+        for (Driver cd : t.getCoDrivers()) {
+            if (cd.getUserId().equals(driver.getUserId())) { isDriving = true; break; }
+        }
+    }
+    if (!isDriving) continue;
+    LocalDateTime arr = t.getArrivalTimeExpected() != null ? t.getArrivalTimeExpected()
+                                                           : t.getDepartureTime().plusHours(5);
+    double dur = Duration.between(t.getDepartureTime(), arr).toMinutes() / 60.0;
+    int totalDrivers = 1 + (t.getCoDrivers() != null ? t.getCoDrivers().size() : 0);
+    hoursFromTrips += Math.min(dur / totalDrivers, 8.0);
+}
+if (date.toLocalDate().equals(LocalDateTime.now().toLocalDate()) &amp;&amp; driver.getTotalDrivingHours24h() != null) {
+    hoursFromTrips += driver.getTotalDrivingHours24h();      // giờ nền mock — CHỈ khi xét hôm nay
+}</code></pre></div>
+<h3 id="3-2-luong-b-cong-dry-run-cua-man-goi-y-tang-cuong">3.2. Luồng B — Cổng dry-run của màn Gợi ý tăng cường</h3>
+<p>Tình huống: Admin mở <code>/admin/analytics/recommendation</code>. Dự báo nói khung 07:00 thứ Bảy của một tuyến
+sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến <strong>tạm</strong> (không lưu). Trước khi gắn nhãn
+<code>RECOMMENDED</code>, thẻ đi qua cổng xác nhận cuối.</p>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant RC as RecommendationController
+    participant P as Proxy Transactional readOnly
+    participant RS as RecommendationService
+    participant TS as TripService
+    participant DB as MySQL
+    A-&gt;&gt;RC: GET /admin/analytics/recommendation
+    RC-&gt;&gt;P: buildRecommendations()
+    P-&gt;&gt;RS: mở transaction chỉ đọc
+    loop mỗi khung dự báo đông
+        RS-&gt;&gt;RS: dựng Trip tạm - route, giờ đi, giờ đến
+        RS-&gt;&gt;TS: selectBestAvailableBus, selectBestAvailableDriver
+        RS-&gt;&gt;RS: gắn bus, driver, totalSeats = sức chứa
+        RS-&gt;&gt;TS: validateBusForTripDryRun(bus, candidate, null)
+        TS-&gt;&gt;TS: try validateBusForTrip
+        TS-&gt;&gt;DB: các câu kiểm như Luồng A
+        alt không ném gì
+            TS--&gt;&gt;RS: ValidationResult.pass(warning)
+        else ném IllegalArgumentException
+            TS--&gt;&gt;RS: ValidationResult.fail(thông điệp gốc)
+        end
+        RS-&gt;&gt;TS: validateStaffForTripDryRun(candidate, null)
+        TS--&gt;&gt;RS: pass hoặc fail
+        RS-&gt;&gt;RS: cả hai valid thì RECOMMENDED, không thì STALE kèm lý do
+    end
+    P--&gt;&gt;RC: RecommendationViewDto
+    RC--&gt;&gt;A: recommendation.html - thẻ và lý do</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Controller</td>
+<td><code>RecommendationController.java:35-38</code></td>
+<td>GET</td>
+<td>—</td>
+<td>gọi <code>buildRecommendations()</code>, đưa kết quả vào Model key <code>view</code></td>
+<td>view <code>admin/recommendation</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Proxy</td>
+<td><code>RecommendationService.java:95</code></td>
+<td><code>@Transactional(readOnly = true)</code></td>
+<td>—</td>
+<td>mở transaction <strong>chỉ đọc</strong> — bắt buộc, vì validator đọc quan hệ LAZY (javadoc <code>TS:1397-1398</code>)</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Service</td>
+<td><code>RecommendationService.java:170-180</code></td>
+<td>dựng <code>candidate</code></td>
+<td>khung dự báo</td>
+<td><code>new Trip()</code>: route, giờ đi, giờ đến = giờ đi + <code>estimatedDuration</code>. <strong>Không lưu</strong></td>
+<td>Trip tạm, <code>id = null</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Service</td>
+<td><code>:186-211</code></td>
+<td>chọn tài nguyên</td>
+<td>—</td>
+<td><code>selectBestAvailableBus/Driver</code> (lớp không-mời, dùng <code>AvailabilityContext</code> nạp sẵn). Không có ⇒ thẻ <code>NO_RESOURCE</code>, <strong>không</strong> tới cổng</td>
+<td><code>bus</code>, <code>driver</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Service</td>
+<td><code>:233-235</code></td>
+<td>gắn tài nguyên</td>
+<td>—</td>
+<td><code>setBus</code>, <code>setDriver</code>, <code>setTotalSeats(capacity)</code> — để luật #22 có số mà so</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Service</td>
+<td><code>:236</code> → <code>TS:1407-1413</code></td>
+<td><code>validateBusForTripDryRun(bus, candidate, null)</code></td>
+<td>—</td>
+<td><code>try { return ValidationResult.pass(validateBusForTrip(...)); }</code> — gọi <strong>đúng</strong> validator gốc, <strong>đi đường DB</strong> (không dùng context nạp sẵn)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Service</td>
+<td><code>TS:1410-1411</code></td>
+<td><code>catch (IllegalArgumentException e)</code></td>
+<td>—</td>
+<td>vi phạm luật ⇒ <code>ValidationResult.fail(e.getMessage())</code> — <strong>nguyên văn</strong> câu của validator</td>
+<td><code>busGate</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>exception loại khác</td>
+<td>vd <code>bus == null</code></td>
+<td><strong>không</strong> bắt: <code>NullPointerException</code> bay ra ngoài, làm hỏng cả request — có chủ đích (§9.1)</td>
+<td>↑</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Service</td>
+<td><code>:237</code> → <code>TS:1436-1443</code></td>
+<td><code>validateStaffForTripDryRun(candidate, null)</code></td>
+<td>—</td>
+<td>như trên; validator trả <code>void</code> nên hợp lệ là <code>pass()</code> rỗng</td>
+<td><code>staffGate</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Service</td>
+<td><code>:239-245</code></td>
+<td>quyết định thẻ</td>
+<td>hai kết quả</td>
+<td>cả hai <code>isValid()</code> ⇒ <code>RECOMMENDED</code>, note &quot;Đủ điều kiện phân công…&quot;; ngược lại <code>STALE</code>, note = lý do của <strong>cổng xe</strong> nếu xe hỏng, không thì của cổng người</td>
+<td>thẻ</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Proxy</td>
+<td>—</td>
+<td>kết thúc transaction chỉ đọc</td>
+<td>—</td>
+<td>không có gì để ghi</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>View</td>
+<td><code>recommendation.html:171</code>, <code>:204</code></td>
+<td>nhãn + ghi chú</td>
+<td><code>view</code></td>
+<td><code>STALE</code> hiện badge vàng; cột ghi chú in <code>c.note</code> — chính câu tiếng Việt của validator</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Vì sao cổng này cần thiết dù bộ chọn đã lọc?</strong> Roadmap §9 (<em>&quot;Why the Recommendation Engine&#39;s final
+Business Rule Validation gate reuses validateBusForTrip/validateStaffForTrip…&quot;</em>): cùng khuôn đã có ở
+<code>confirmAutoAssignedTrip()</code> — chọn bằng bộ lọc, rồi <strong>xác nhận lại</strong> bằng validator ngay trước khi
+dùng, vì trạng thái có thể đổi giữa lúc chọn và lúc dùng; một thẻ gợi ý có thể nằm đó nhiều giờ.
+Ngoài ra bộ chọn <strong>không</strong> kiểm sức chứa (#22) — chỉ validator có luật đó.</p>
+<p><strong>(c) Code then chốt</strong> — <code>TS:1407-1413</code>, <code>:1436-1443</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">public ValidationResult validateBusForTripDryRun(Bus bus, Trip trip, Long excludeTripId) {
+    try {
+        return ValidationResult.pass(validateBusForTrip(bus, trip, excludeTripId)); // chuyển tiếp warning
+    } catch (IllegalArgumentException e) {        // CHỈ loại báo vi phạm nghiệp vụ
+        return ValidationResult.fail(e.getMessage()); // giữ nguyên văn câu báo
+    }                                             // NPE, lỗi DB... không bắt: bay ra ngoài
+}
+
+public ValidationResult validateStaffForTripDryRun(Trip trip, Long excludeTripId) {
+    try {
+        validateStaffForTrip(trip, excludeTripId);   // void
+        return ValidationResult.pass();
+    } catch (IllegalArgumentException e) {
+        return ValidationResult.fail(e.getMessage());
+    }
+}</code></pre></div>
+<p><code>ValidationResult.java:22-58</code> — constructor <code>private</code>, chỉ tạo được qua ba &quot;cửa&quot; có tên:
+<code>pass()</code>, <code>pass(warning)</code>, <code>fail(reason)</code>. Gọi là <em>static factory</em> — nôm na &quot;hàm tạo có tên, nói rõ
+mình tạo cái gì&quot;. Các field <code>final</code> nên tạo xong không ai sửa được (<em>immutable</em> — bất biến).</p>
+<hr>
+<h2 id="4-luong-loi-duyet-thu-cong-voi-xe-sap-toi-han-bao-duong">§4. Luồng lỗi — Duyệt thủ công với xe sắp tới hạn bảo dưỡng</h2>
+<p>Chọn luồng này vì nó cho thấy <strong>rollback thật sự cứu dữ liệu</strong>: <code>approveTrip()</code> sửa entity đang được
+quản lý <strong>trước</strong> khi validator chạy.</p>
+<p>Tình huống minh hoạ: chuyến tăng cường #50 <code>PENDING_APPROVAL</code>, tuyến 520 km. Admin chọn xe #9 có
+kmSince = 4000, ngưỡng 5000.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Bước</th>
+<th>Chuyện gì xảy ra</th>
+<th>Vị trí</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td><code>POST /admin/trips/approve</code> <code>tripId=50&amp;busId=9&amp;driverId=…</code> → <code>approveTrip(...)</code> trong <code>try</code></td>
+<td><code>ATC:166-174</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Proxy mở transaction; <code>findById(50)</code> ⇒ <code>trip</code> <strong>managed</strong>; <code>requirePendingApproval</code> qua</td>
+<td><code>TS:955-961</code></td>
+<td><span class="tag tag-spring">SPRING</span>+<span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Nạp xe, tài xế; <strong>sửa entity</strong>: <code>setBus(xe 9)</code>, <code>setDriver</code>, <code>setTotalSeats(sức chứa xe 9)</code>, xoá rồi gắn lại <code>coDrivers</code>, đặt <code>assistant</code></td>
+<td><code>TS:963-1005</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>validateBusForTrip(xe 9, trip, 50)</code>: không <code>REPAIRING</code>, không <code>TRAVELING</code>, không bận, <code>needsMaintenance</code> 4000 ≥ 5000? không</td>
+<td><code>TS:1007</code> → <code>:1106-1178</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>isNearMaintenance(520)</code>: 4000 + 520 = 4520 ≥ 4500 ⇒ <strong>ném</strong> <code>IllegalArgumentException(&quot;Xe … (Odo: 4000km) sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này — vui lòng chọn xe khác hoặc đưa xe đi bảo trì trước!&quot;)</code></td>
+<td><code>TS:1189-1194</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Exception unchecked ⇒ proxy <strong>rollback</strong>: mọi thay đổi ở bước 3 không xuống DB. <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> Trước câu truy vấn ở bước 4, Hibernate có thể đã <em>auto-flush</em> (tự đẩy) <code>UPDATE trips SET bus_id = 9 …</code> vì câu truy vấn đụng bảng <code>trips</code>; rollback hoàn tác cả câu đó</td>
+<td>—</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>catch (IllegalArgumentException e)</code> ⇒ flash <code>error</code> = &quot;⛔ Vi phạm ràng buộc: &quot; + câu bước 5</td>
+<td><code>ATC:180-183</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>redirect:/admin/trips/approve/50</code> → khung đỏ <code>approve-form.html:56-57</code>; chuyến vẫn <code>PENDING_APPROVAL</code>, xe cũ (hoặc chưa có xe)</td>
+<td><code>ATC:183</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p>Để ý chữ &quot;<strong>Odo</strong>&quot; trong câu báo thật ra in <code>getKmSinceLastMaintenance()</code> (km kể từ lần bảo dưỡng),
+<strong>không</strong> phải đồng hồ tổng (<code>TS:1191</code>) — dễ hiểu nhầm khi đọc.</p>
+<p><strong>Các lỗi khác và đường về:</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>Nguyên nhân</th>
+<th>Ném ở</th>
+<th>Loại</th>
+<th>Quay về đâu</th>
+</tr>
+</thead><tbody><tr>
+<td>Bất kỳ luật nào khi <strong>tạo</strong></td>
+<td><code>TS:1106-1366</code></td>
+<td><code>IllegalArgumentException</code></td>
+<td><code>ATM:173-175</code> &quot;Lỗi: …&quot; → form Tạo trống</td>
+</tr>
+<tr>
+<td>Bất kỳ luật nào khi <strong>sửa</strong></td>
+<td>như trên</td>
+<td>như trên</td>
+<td><code>ATM:440-442</code> &quot;Lỗi: …&quot; → form Sửa nạp lại từ DB. Bước sửa là transaction 1; chưa chạm bước đổi trạng thái (Bài 05 §5)</td>
+</tr>
+<tr>
+<td>Bất kỳ luật nào khi <strong>xác nhận AUTO</strong></td>
+<td>như trên</td>
+<td>như trên</td>
+<td><code>ATC:151-153</code> gộp chung <code>catch (Exception)</code>: &quot;Lỗi xác nhận: …&quot; → <code>/approve/{id}</code></td>
+</tr>
+<tr>
+<td>Chuyến AUTO chưa có xe / tài xế</td>
+<td><code>TS:920-926</code> — kiểm <strong>trước</strong> validator</td>
+<td><code>IllegalStateException</code></td>
+<td><code>ATC:145-150</code> &quot;⛔ …&quot; → <code>/admin/trips/pending</code></td>
+</tr>
+<tr>
+<td>Dry-run được gọi với <code>bus = null</code></td>
+<td><code>TS:1107</code> (<code>bus.getStatus()</code>)</td>
+<td><code>NullPointerException</code></td>
+<td><strong>không</strong> bắt — lỗi kỹ thuật bay ra, có test chốt (§9.4)</td>
+</tr>
+<tr>
+<td>Xe chưa gán loại</td>
+<td>—</td>
+<td>không lỗi</td>
+<td>luật sức chứa <strong>bỏ qua</strong> (<code>TS:1203-1204</code>)</td>
+</tr>
+<tr>
+<td>Xe không có ngưỡng bảo dưỡng</td>
+<td>—</td>
+<td>không lỗi</td>
+<td><code>needsMaintenance()</code>/<code>isNearMaintenance()</code> trả <code>false</code> (<code>Bus.java:49</code>, <code>:73</code>)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</h2>
+<ul>
+<li><strong>Sửa chuyến</strong> — <code>[trip-edit-form.html]</code> → <code>ATM.updateTrip()</code> (pre-check FSM, chép field) →
+<code>updateManualTrip()</code> <code>TS:1063-1082</code>: giờ đến trước giờ đi ⇒ ném; <code>totalSeats &lt; ticketsSold</code> ⇒ ném
+(<code>:1070-1073</code>) → <code>validateBusForTrip(…, existing.getId())</code> → <code>validateStaffForTrip(…, existing.getId())</code>
+→ <code>save</code>. Khác Luồng A ở <strong><code>excludeTripId</code> = id của chính chuyến</strong>: mọi câu kiểm bận và câu giờ lái
+có vế <code>t.id &lt;&gt; :excludeTripId</code>, nên chuyến không tự đụng lịch của chính nó.</li>
+<li><strong>Xác nhận AUTO</strong> — <code>[approve-form.html, nút Xác nhận]</code> → <code>ATC.confirmAutoAssigned()</code> →
+<code>confirmAutoAssignedTrip()</code> <code>TS:910-948</code>: <code>requirePendingApproval</code> → xe/tài xế khác <code>null</code> →
+hai validator <strong>trên chính tài nguyên AI đã chọn</strong> (<code>:929-930</code>) → kích hoạt. Đây là &quot;double-check&quot;:
+AI chọn bằng bộ lọc lúc tạo đề xuất, validator kiểm lại lúc Admin bấm — có thể cách nhau nhiều ngày.</li>
+<li><strong>Duyệt thủ công thành công</strong> — như §4 nhưng qua hết luật ⇒ <code>changeStatusToActive</code> → <code>save</code> →
+&quot;✅ Chuyến xe #… đã được phân công và kích hoạt thành công!&quot; → <code>/admin/trips/pending</code>.</li>
+<li><strong>Lấy danh sách cho form Tạo</strong> — <code>[JS trip-create-form.html:482-484, fetch GET /api/admin/trips/available-resources?departure=…&amp;arrival=…]</code> → <code>TripRestController</code> <code>:47-86</code>: giờ
+đến ≤ giờ đi ⇒ 400 JSON <code>error</code> → ba bộ lọc <code>getAvailable…ForTimeRange</code> (<code>TS:1590-1685</code>) → Jackson
+trả JSON <code>buses</code>/<code>drivers</code>/<code>assistants</code> → JS đổ vào dropdown. <strong>Không</strong> gọi validator; dùng lại
+<code>isBusBusy</code>, <code>isDriverBusyInWindow</code>, <code>getDrivingHoursForDate</code>, <code>driverShareHours</code> (Bài 07).</li>
+<li><strong>Dropdown màn Duyệt / Sửa</strong> — <code>getAvailableBusesForTrip</code>, <code>…DriversForTrip</code>, <code>…AssistantsForTrip</code>
+(<code>TS:1483-1565</code>), có <code>excludeTripId = tripId</code>. Màn Sửa <strong>cưỡng bức thêm</strong> xe đang gán vào danh sách
+dù nó không còn hợp lệ (<code>ATM:266-270</code>) — để Admin thấy mình đang dùng xe nào.</li>
+<li><strong>AI tự phân công</strong> — <code>@Scheduled</code> → <code>createExtraTrip()</code> → <code>autoAssignResources()</code> →
+<code>findBestAvailableBus()</code> <code>TS:308-332</code> (xe <code>READY</code>, không bận, không chạm ngưỡng bảo dưỡng; đúng loại
+tuyến xếp trước, rồi ít km nhất) và <code>findBestAvailableDriver()</code> <code>:472-523</code> (ưu tiên bằng còn hạn<aside class="callout"><p>7 ngày, ít giờ lái nhất). AI <strong>không</strong> gọi validator; validator chạy khi Admin xác nhận (Bài 08).</p>
+</aside>
+</li>
+</ul>
+<hr>
+<h2 id="6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</h2>
+<h3 id="6-1-bang-khong-moi-chan-that">6.1. Bảng &quot;không-mời / chặn thật&quot;</h3>
+<p>Nguyên tắc <strong>một chiều</strong> (roadmap §8, ghi lại ở test <code>dropdownNeverOffersWhatTheValidatorWouldReject</code>):
+lớp mời được phép <strong>hẹp hơn</strong> validator, <strong>không</strong> được rộng hơn — nếu không, Admin chọn một thứ được
+mời rồi bị từ chối lúc lưu.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Luật</th>
+<th>Lớp không-mời</th>
+<th>Lớp chặn thật</th>
+<th>Một chiều có giữ không</th>
+</tr>
+</thead><tbody><tr>
+<td>Xe không <code>REPAIRING</code></td>
+<td>mọi bộ lọc chỉ lấy xe <code>READY</code> (<code>TS:318</code>, <code>:1500</code>, <code>:1596</code>)</td>
+<td><code>TS:1107-1110</code></td>
+<td>Giữ — mời hẹp hơn (loại cả <code>TRAVELING</code>)</td>
+</tr>
+<tr>
+<td>Cờ <code>TRAVELING</code> phải có chuyến <code>DEPARTED</code> giải thích</td>
+<td>(như trên — không mời <code>TRAVELING</code> nào)</td>
+<td><code>TS:1146-1155</code></td>
+<td>Giữ. Màn Sửa cưỡng bức thêm xe hiện tại — lý do #19 chọn &quot;giữ tín hiệu&quot; thay vì chặn mọi xe <code>TRAVELING</code></td>
+</tr>
+<tr>
+<td>Xe không trùng lịch ±1h</td>
+<td><code>isBusBusy</code> trong mọi bộ lọc</td>
+<td><code>TS:1165-1167</code></td>
+<td>Giữ — cùng một hàm</td>
+</tr>
+<tr>
+<td>Xe chưa quá hạn bảo dưỡng</td>
+<td><code>!needsMaintenance()</code></td>
+<td><code>TS:1173-1178</code></td>
+<td>Giữ</td>
+</tr>
+<tr>
+<td>Xe không chạm 90% ngưỡng sau chuyến</td>
+<td>AI và dropdown Duyệt/Sửa: <code>isNearMaintenance(km tuyến)</code>; <strong>API form Tạo: <code>isNearMaintenance(0)</code></strong> (<code>TS:1599</code>)</td>
+<td><code>TS:1189-1194</code></td>
+<td><strong>Không giữ ở form Tạo</strong> — lỗi #30 (chưa sửa): API mời xe mà bước lưu chắc chắn từ chối với tuyến dài</td>
+</tr>
+<tr>
+<td>Số ghế ≤ sức chứa (#22)</td>
+<td>form Tạo điền sẵn và khoá ô số ghế theo <code>data-capacity</code>; AI và màn Duyệt <strong>đặt</strong> số ghế = sức chứa (<code>TS:985</code>)</td>
+<td><code>TS:1203-1208</code></td>
+<td>Giữ</td>
+</tr>
+<tr>
+<td>Có tài xế chính</td>
+<td>form bắt buộc <code>driverId</code></td>
+<td><code>TS:1238-1241</code></td>
+<td>Giữ</td>
+</tr>
+<tr>
+<td>Đủ <code>ceil(h/8)</code> tài xế</td>
+<td>JS form (Bài 07)</td>
+<td><code>TS:1248-1253</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Trên 8h phải có phụ xe</td>
+<td>—</td>
+<td><code>TS:1256-1259</code></td>
+<td>Chỉ có lớp chặn thật</td>
+</tr>
+<tr>
+<td>Không một người hai vai</td>
+<td>AI loại trừ người đã chọn (<code>TS:486-487</code>)</td>
+<td><code>TS:1262-1292</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Người đang hoạt động, bằng còn hạn <strong>vào ngày khởi hành</strong></td>
+<td>mọi bộ lọc (<code>TS:484-492</code>, <code>:1531-1532</code>, <code>:1560-1561</code>, <code>:1632-1633</code>, <code>:1680-1681</code>)</td>
+<td><code>TS:1302-1310</code>, <code>:1326-1334</code>, <code>:1350-1361</code></td>
+<td>Giữ (lỗi #1 đã đưa cả hai về ngày khởi hành)</td>
+</tr>
+<tr>
+<td>Người không trùng lịch ±30&#39; ở mọi vai</td>
+<td><code>isDriverBusyInWindow</code> trong mọi bộ lọc</td>
+<td><code>TS:1311-1314</code>, <code>:1335-1338</code>, <code>:1362-1365</code></td>
+<td>Giữ</td>
+</tr>
+<tr>
+<td>Tài xế ≤ 8h/ngày</td>
+<td>dropdown dùng <code>driverShareHours()</code> — phần chia ở <strong>số người tối thiểu</strong> (<code>TS:1718-1721</code>); AI chia cho số người nó định gán</td>
+<td><code>TS:1316-1321</code>, <code>:1340-1345</code></td>
+<td>Giữ — lỗi #12 đã sửa; test quét 9 thời lượng × 6 mức nhân sự</td>
+</tr>
+<tr>
+<td>Phụ xe <strong>không</strong> chịu luật 8h</td>
+<td>danh sách phụ xe riêng, không lọc giờ (<code>TS:1549-1565</code>, <code>:1675-1685</code>)</td>
+<td>validator không kiểm giờ phụ xe</td>
+<td>Giữ — lỗi #13 đã sửa (trước đó mời <strong>hẹp</strong> hơn)</td>
+</tr>
+<tr>
+<td>Giờ đến bắt buộc, ghế ≥ 1, giá ≥ 0</td>
+<td>chỉ <code>required</code>/<code>min</code> của HTML</td>
+<td><strong>Không có</strong> ở service</td>
+<td>Lỗi #28 (chưa sửa) — §9.3</td>
+</tr>
+<tr>
+<td>Giờ khởi hành không ở quá khứ</td>
+<td>—</td>
+<td><strong>Không có</strong></td>
+<td>Sổ lỗi ghi là &quot;cần ruling&quot; (2026-09-24)</td>
+</tr>
+</tbody></table></div>
+<h3 id="6-2-bang-thay-doi-gi-trong-db">6.2. Bảng &quot;thay đổi gì trong DB&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Thao tác</th>
+<th>Ghi gì</th>
+</tr>
+</thead><tbody><tr>
+<td>Hai validator, hai bản dry-run, mọi bộ lọc</td>
+<td><strong>Không ghi DB</strong> — chỉ đọc (roadmap §9 đã kiểm)</td>
+</tr>
+<tr>
+<td>Validator ném lỗi giữa <code>createManualTrip</code> / <code>updateManualTrip</code> / <code>approveTrip</code> / <code>confirmAutoAssignedTrip</code></td>
+<td>Không ghi gì — rollback, kể cả thay đổi đã đặt lên entity managed (§4)</td>
+</tr>
+<tr>
+<td>Validator qua</td>
+<td>Người gọi mới ghi: <code>INSERT</code>/<code>UPDATE trips</code>, <code>trip_co_drivers</code>; xem Bài 05, 07, 09</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation / cơ chế</th>
+<th>Nghĩa đời thường</th>
+<th>Tác dụng ở đây</th>
+<th>Bỏ đi thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td><code>IllegalArgumentException</code> làm tín hiệu nghiệp vụ</td>
+<td>&quot;Đầu vào vi phạm luật&quot; — quy ước dự án (Bài 00b §5.1); khác <code>IllegalStateException</code> = &quot;sai trạng thái&quot;</td>
+<td>mọi <code>throw</code> trong hai validator</td>
+<td>Không phân biệt được &quot;luật nói không&quot; với &quot;code hỏng&quot; — chính điều bản dry-run dựa vào</td>
+</tr>
+<tr>
+<td>Fail-fast</td>
+<td>&quot;Gặp lỗi đầu tiên thì dừng&quot;</td>
+<td>mỗi luật một <code>throw</code></td>
+<td>Muốn báo đủ mọi lỗi phải viết lại validator gom lỗi vào danh sách — roadmap cấm ở Phase 3</td>
+</tr>
+<tr>
+<td>Wrapper <code>try/catch</code> hẹp</td>
+<td>&quot;Bọc lại, chỉ hứng đúng loại lỗi mình hiểu&quot;</td>
+<td><code>TS:1408-1412</code>, <code>:1437-1442</code></td>
+<td><code>catch (Exception)</code> sẽ biến <code>NullPointerException</code> thành một câu tiếng Việt hợp lý — Phase 7 âm thầm bỏ một xe tốt</td>
+</tr>
+<tr>
+<td>Static factory + constructor <code>private</code> + field <code>final</code></td>
+<td>&quot;Chỉ tạo qua cửa có tên; tạo xong không sửa&quot;</td>
+<td><code>ValidationResult.java:39-58</code></td>
+<td>Ai cũng <code>new</code> được với tổ hợp vô lý (<code>valid = true</code> kèm <code>failureReason</code>)</td>
+</tr>
+<tr>
+<td>Lombok <code>@Getter</code></td>
+<td>&quot;Sinh sẵn hàm <code>getX()</code>&quot; (Bài 00a §9)</td>
+<td><code>ValidationResult.java:22</code> — với <code>boolean valid</code> Lombok sinh <code>isValid()</code></td>
+<td>Phải viết tay ba getter</td>
+</tr>
+<tr>
+<td>Cửa sổ có đệm</td>
+<td>&quot;Kiểm rộng hơn khoảng chạy thật&quot;</td>
+<td><code>TS:1162-1163</code> (±1h xe), <code>:1296-1297</code> (±30&#39; người)</td>
+<td>Hai chuyến nối đuôi sát nhau được chấp nhận, không có thời gian dọn xe / nghỉ</td>
+</tr>
+<tr>
+<td>So sánh chặt <code>&lt;</code> / <code>&gt;</code> trong JPQL</td>
+<td>&quot;Chạm mép không phải trùng&quot;</td>
+<td><code>TR:123</code>, <code>:141</code>, <code>:159</code></td>
+<td>Dùng <code>&lt;=</code> thì một chuyến khởi hành đúng lúc đệm kết thúc bị coi là trùng</td>
+</tr>
+<tr>
+<td><code>:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId</code></td>
+<td>&quot;Bỏ qua chính chuyến đang sửa&quot;</td>
+<td><code>TR:122</code>, <code>:140</code>, <code>:160</code>, <code>:177</code></td>
+<td>Sửa một chuyến sẽ luôn báo &quot;đang bận&quot; — vì nó trùng với chính nó</td>
+</tr>
+<tr>
+<td><code>LEFT JOIN t.coDrivers cd</code></td>
+<td>&quot;Ghép thêm bảng tài xế phụ, giữ cả chuyến không có ai&quot;</td>
+<td><code>TR:119</code>, <code>:174</code></td>
+<td><code>JOIN</code> thường làm mất các chuyến không có tài xế phụ — tài xế chính của chúng thành &quot;không bận&quot;</td>
+</tr>
+<tr>
+<td><code>@Transactional(readOnly = true)</code> bao quanh dry-run</td>
+<td>&quot;Mở phiên đọc để chạm được quan hệ LAZY&quot;</td>
+<td><code>RecommendationService.java:95</code></td>
+<td>Validator đọc <code>trip.getRoute()</code>, <code>bus.getBusType()</code>… ngoài phiên ⇒ <code>LazyInitializationException</code> — bản dry-run <strong>không</strong> bắt lỗi này (đúng ý)</td>
+</tr>
+<tr>
+<td><code>Math.ceil</code> + ép <code>(int)</code></td>
+<td>&quot;Làm tròn lên rồi bỏ phần thập phân&quot;</td>
+<td><code>TS:1233</code>, <code>:1719</code></td>
+<td><code>(int)(10/8)</code> = 1 — chuyến 10h chỉ đòi 1 tài xế</td>
+</tr>
+<tr>
+<td><code>Boolean.TRUE.equals(x)</code></td>
+<td>&quot;So an toàn với null&quot; (Bài 04)</td>
+<td><code>TS:1302</code>, <code>:1326</code>, <code>:1350</code></td>
+<td><code>isActive</code> null ⇒ <code>NullPointerException</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="8-vi-du-tinh-tay">§8. Ví dụ tính tay</h2>
+<p>Chức năng có 🧮 — bắt buộc. Mọi số là <strong>minh hoạ</strong> trừ chỗ ghi rõ &quot;thật&quot;.</p>
+<h3 id="8-1-can-bao-nhieu-nguoi-moi-nguoi-lai-bao-nhieu">8.1. Cần bao nhiêu người, mỗi người lái bao nhiêu</h3>
+<p>Công thức validator (<code>TS:1232-1235</code>, <code>:1298-1299</code>): <code>requiredDrivers = max(1, ceil(h / 8))</code>;
+<code>effectiveHours = min(h / assigned, 8)</code>. Công thức dropdown (<code>TS:1718-1721</code>):
+<code>driverShareHours(h) = min(h / requiredDrivers, 8)</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Thời lượng <code>h</code></th>
+<th><code>h / 8</code></th>
+<th><code>requiredDrivers</code></th>
+<th>Cần phụ xe? (<code>h &gt; 8</code>)</th>
+<th>Phần chia validator nếu gán đúng tối thiểu</th>
+<th>Phần chia dropdown</th>
+</tr>
+</thead><tbody><tr>
+<td>6</td>
+<td>0,75 → ceil 1</td>
+<td>1</td>
+<td>Không</td>
+<td>6 / 1 = <strong>6</strong></td>
+<td>6</td>
+</tr>
+<tr>
+<td>8</td>
+<td>1,0 → ceil 1</td>
+<td>1</td>
+<td><strong>Không</strong> (8 &gt; 8 sai)</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>8,5</td>
+<td>1,0625 → ceil 2</td>
+<td>2</td>
+<td>Có</td>
+<td>8,5 / 2 = <strong>4,25</strong></td>
+<td>4,25</td>
+</tr>
+<tr>
+<td>10</td>
+<td>1,25 → 2</td>
+<td>2</td>
+<td>Có</td>
+<td><strong>5</strong></td>
+<td>5</td>
+</tr>
+<tr>
+<td>17</td>
+<td>2,125 → 3</td>
+<td>3</td>
+<td>Có</td>
+<td>17 / 3 ≈ <strong>5,67</strong></td>
+<td>5,67</td>
+</tr>
+<tr>
+<td>75 (thật — tuyến 4500 phút trong <code>TripServiceDriverShareTest</code>)</td>
+<td>9,375 → 10</td>
+<td>10</td>
+<td>Có</td>
+<td><strong>7,5</strong></td>
+<td>7,5</td>
+</tr>
+</tbody></table></div>
+<p>Nếu Admin gán <strong>nhiều hơn</strong> tối thiểu — chuyến 10h với 3 tài xế — validator chia 10 / 3 ≈ 3,33, nhỏ
+hơn 5 của dropdown. Dropdown &quot;khắt khe hơn&quot; ⇒ không bao giờ mời người mà validator sẽ từ chối (bất
+biến một chiều).</p>
+<h3 id="8-2-luat-8-gio-cho-mot-nguoi-du-moi-thanh-phan">8.2. Luật 8 giờ cho một người, đủ mọi thành phần</h3>
+<p>Tài xế Dũng. Xét chuyến mới <strong>hôm nay</strong> 13:00–19:00 (6h), Dũng lái chính, có 1 tài xế phụ.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Thành phần</th>
+<th>Chuyến</th>
+<th>Cách tính (<code>sumDrivingHours</code>, <code>TS:782-834</code>)</th>
+<th>Giờ</th>
+</tr>
+</thead><tbody><tr>
+<td>Chuyến A hôm nay 05:00–07:00, Dũng lái một mình, <code>COMPLETED</code></td>
+<td><code>COMPLETED</code> <strong>có</strong> trong tập tính giờ (<code>TS:756-757</code>)</td>
+<td>min(2 / 1, 8)</td>
+<td>2,0</td>
+</tr>
+<tr>
+<td>Chuyến B hôm nay 08:00–10:00, Dũng làm <strong>phụ xe</strong></td>
+<td>—</td>
+<td>phụ xe ⇒ 0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Chuyến C <strong>hôm qua</strong> 22:00 → hôm nay 04:00 (6h), Dũng lái</td>
+<td>khởi hành <strong>hôm qua</strong> ⇒ không nằm trong ngày (<code>TR:178</code>)</td>
+<td>không tính</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Giờ nền mock <code>totalDrivingHours24h = 1,5</code></td>
+<td>ngày xét là <strong>hôm nay</strong> (<code>TS:827</code>)</td>
+<td>cộng thẳng</td>
+<td>1,5</td>
+</tr>
+<tr>
+<td><strong>Đã có</strong></td>
+<td></td>
+<td>2 + 0 + 0 + 1,5</td>
+<td><strong>3,5</strong></td>
+</tr>
+<tr>
+<td>Chuyến mới</td>
+<td>6h / 2 người</td>
+<td>min(3, 8)</td>
+<td>3,0</td>
+</tr>
+<tr>
+<td><strong>Kiểm</strong> (<code>TS:1316</code>)</td>
+<td></td>
+<td>3,5 + 3,0 = 6,5 &gt; 8?</td>
+<td><strong>Qua</strong></td>
+</tr>
+</tbody></table></div>
+<p>Cửa sổ bận của chuyến mới: <code>[12:30, 19:30]</code>. Chuyến B (08:00–10:00) không giao; chuyến A không giao —
+Dũng không bận.</p>
+<p>Nếu cùng chuyến đó được xếp vào <strong>ngày mai</strong> với cùng lịch: giờ nền 1,5 <strong>không</strong> được cộng (chỉ cộng
+khi xét hôm nay) ⇒ 2 + 3 = 5. Đây là lý do giờ nền được gọi là <strong>mock</strong> (roadmap §4, comment
+<code>TS:816-826</code>).</p>
+<p>Số liệu <strong>thật</strong> về giờ nền: lỗi #12 đo phân bố <code>totalDrivingHours24h</code> của 33 tài xế đang hoạt động
+là <code>{0 × 21, 1, 2 × 2, 3, 5, 6, 7, 7.9, 8, 9, 10, 11}</code>. Ba người có giờ nền 9, 10, 11 <strong>&gt; 8</strong> — hôm
+nay họ không nhận được <strong>bất kỳ</strong> chuyến lái nào (mọi chuyến cộng thêm &gt; 0).</p>
+<h3 id="8-3-xe-cua-so-ban-va-nguong-bao-duong">8.3. Xe: cửa sổ bận và ngưỡng bảo dưỡng</h3>
+<p>Chuyến mới 06:00–16:00 ⇒ cửa sổ xe <code>[05:00, 17:00]</code>. Điều kiện bận (<code>TR:159</code>): <code>dep &lt; 17:00</code> <strong>và</strong>
+<code>arr &gt; 05:00</code>.</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Chuyến khác của cùng xe</th>
+<th><code>dep &lt; 17:00</code>?</th>
+<th><code>arr &gt; 05:00</code>?</th>
+<th>Bận?</th>
+</tr>
+</thead><tbody><tr>
+<td>01:00–04:00</td>
+<td>Có</td>
+<td>04:00 &gt; 05:00? Không</td>
+<td>Không</td>
+</tr>
+<tr>
+<td>01:00–05:00</td>
+<td>Có</td>
+<td>05:00 &gt; 05:00? <strong>Không</strong> (chạm mép)</td>
+<td><strong>Không</strong></td>
+</tr>
+<tr>
+<td>01:00–05:30</td>
+<td>Có</td>
+<td>Có</td>
+<td><strong>Có</strong></td>
+</tr>
+<tr>
+<td>17:00–20:00</td>
+<td>17:00 &lt; 17:00? <strong>Không</strong></td>
+<td>Có</td>
+<td><strong>Không</strong></td>
+</tr>
+<tr>
+<td><code>ACTIVE</code> 14:00, giờ đến <code>NULL</code></td>
+<td>Có</td>
+<td><code>NULL &gt; 05:00</code> ⇒ UNKNOWN ⇒ loại</td>
+<td><strong>Không</strong> — lỗi #28</td>
+</tr>
+</tbody></table></div>
+<p>Ngưỡng bảo dưỡng (<code>Bus.java:42-76</code>), ngưỡng 5000 ⇒ vùng cảnh báo từ 4500:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>kmSince</th>
+<th>Tuyến</th>
+<th><code>needsMaintenance</code> (kmSince ≥ 5000)</th>
+<th><code>isNearMaintenance</code> (kmSince + tuyến ≥ 4500)</th>
+<th>Kết quả</th>
+</tr>
+</thead><tbody><tr>
+<td>4000</td>
+<td>450</td>
+<td>Không</td>
+<td>4450 — Không</td>
+<td>Qua</td>
+</tr>
+<tr>
+<td>4000</td>
+<td>520</td>
+<td>Không</td>
+<td>4520 — <strong>Có</strong></td>
+<td>Chặn ở luật 5</td>
+</tr>
+<tr>
+<td>4600</td>
+<td>0</td>
+<td>Không</td>
+<td>4600 — Có</td>
+<td>Chặn ở luật 5 (kể cả tuyến 0 km)</td>
+</tr>
+<tr>
+<td>5100</td>
+<td>100</td>
+<td><strong>Có</strong></td>
+<td>(Có)</td>
+<td>Chặn ở luật 4 — câu báo &quot;QUÁ HẠN&quot;</td>
+</tr>
+</tbody></table></div>
+<p>Luật 4 thật ra đã <strong>nằm trong</strong> luật 5 (≥ 5000 thì chắc chắn ≥ 4500). Nó đứng trước để câu báo nói đúng
+bệnh: &quot;đã quá hạn&quot; khác &quot;sẽ sắp quá hạn&quot;.</p>
+<hr>
+<h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>
+<h3 id="9-1-cac-quyet-dinh-thiet-ke">9.1. Các quyết định thiết kế</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Quyết định</th>
+<th>Tránh được gì</th>
+<th>Vì sao không làm cách đơn giản hơn</th>
+<th>Nguồn</th>
+</tr>
+</thead><tbody><tr>
+<td>Business Rule Validation là thành phần <strong>độc lập</strong> với Dự báo</td>
+<td>Trộn &quot;có hợp lệ không&quot; với &quot;có nên làm không&quot;</td>
+<td>Decision Support dùng cả hai, không cái nào nuốt cái kia</td>
+<td>roadmap §3</td>
+</tr>
+<tr>
+<td>Dry-run là <strong>vỏ bọc</strong>, không viết lại luật</td>
+<td>Hai bộ luật trôi lệch</td>
+<td>Viết bản &quot;không ném&quot; riêng ⇒ hai chỗ phải sửa đồng thời mãi mãi</td>
+<td>roadmap §5 Phase 3; test so <code>equals</code> câu báo của hai đường</td>
+</tr>
+<tr>
+<td>Chỉ bắt <code>IllegalArgumentException</code></td>
+<td>Biến lỗi kỹ thuật thành &quot;không hợp lệ&quot; giả, Phase 7 âm thầm bỏ xe tốt</td>
+<td><code>catch (Exception)</code> tiện hơn nhưng giấu bug</td>
+<td>roadmap §9 (chủ dự án duyệt 2026-07-20)</td>
+</tr>
+<tr>
+<td>Một lý do mỗi lần (fail-fast)</td>
+<td>Viết lại vùng code nhạy nhất cho một người dùng không cần</td>
+<td>Cổng Phase 7 chỉ hỏi đạt / không đạt</td>
+<td>roadmap §9 (chủ dự án duyệt)</td>
+</tr>
+<tr>
+<td>Tên mới <code>…DryRun</code> thay vì overload</td>
+<td>—</td>
+<td>Java không overload được khi chỉ khác kiểu trả về; đổi chữ ký cũ phải sửa bốn lối gọi</td>
+<td>roadmap §9</td>
+</tr>
+<tr>
+<td>Bằng lái xét <strong>ngày khởi hành</strong></td>
+<td>Duyệt hôm nay cho chuyến tháng sau với bằng hết hạn tuần sau</td>
+<td>So với hôm nay là cách cũ, đã gây lỗi #1</td>
+<td>lỗi #1 (2026-07-20)</td>
+</tr>
+<tr>
+<td>Hằng <code>8.0</code> <strong>không</strong> gom thành một hằng số</td>
+<td>Nối ba luật độc lập: ngân sách giờ/ngày, trần phần chia mỗi người, ngưỡng &quot;chuyến dài&quot;</td>
+<td>Một <code>MAX_DRIVING_HOURS</code> sẽ sai nghĩa; đổi một luật kéo theo cả ba</td>
+<td>roadmap §9 (2026-07-20)</td>
+</tr>
+<tr>
+<td>Phụ xe tính 0h, không chịu luật 8h</td>
+<td>—</td>
+<td>Phụ xe không cầm lái; vẫn phải có mặt nên vẫn kiểm bận và bằng lái</td>
+<td><code>current_functional_spec.md:177</code>; lỗi #13</td>
+</tr>
+<tr>
+<td>Cờ <code>TRAVELING</code> chỉ chặn khi không chuyến <code>DEPARTED</code> nào giải thích</td>
+<td>Siết: chặn xe chạy hôm nay nhận chuyến tuần sau (vận hành bình thường) và form Sửa mời đúng xe nó từ chối. Nới: xe lệch trạng thái (xe 19) thành gán được</td>
+<td>Cả hai hướng đều sai ở một ca khác nhau</td>
+<td>lỗi #19; comment <code>TS:1111-1145</code></td>
+</tr>
+<tr>
+<td>Luật sức chứa ở <strong>validator</strong></td>
+<td>Bán ghế không tồn tại</td>
+<td>Một chỗ duy nhất phủ cả 5 lối (tạo, sửa, 2 lối duyệt, dry-run)</td>
+<td>lỗi #22</td>
+</tr>
+<tr>
+<td>Không validate trong <code>updateTripStatus</code> (FSM)</td>
+<td>Trộn hai trách nhiệm; NPE khi chuyến chưa có xe</td>
+<td>—</td>
+<td>lỗi #10 (Bài 05)</td>
+</tr>
+<tr>
+<td>Recommendation xác nhận lại bằng validator dù bộ chọn đã lọc</td>
+<td>Thẻ gợi ý cũ vài giờ vẫn hiện &quot;đủ điều kiện&quot;</td>
+<td>Cùng khuôn <code>confirmAutoAssignedTrip()</code></td>
+<td>roadmap §9</td>
+</tr>
+</tbody></table></div>
+<h3 id="9-2-bug-that-da-tung-xay-ra-o-chuc-nang-nay">9.2. Bug thật đã từng xảy ra ở chức năng này</h3>
+<p><strong>Lỗi #1 — bằng lái xét theo hôm nay (2026-07-20).</strong> <code>Driver.isLicenseValid()</code> so với
+<code>LocalDate.now()</code>. Chuyến 2027-01-01 vẫn duyệt được cho tài xế hết bằng 2026-08-01. <em>Hiểu sai:</em> &quot;còn
+hạn&quot; là thuộc tính của <strong>tài xế</strong>, trong khi thật ra là thuộc tính của <strong>cặp tài xế – ngày chạy</strong>.
+Bằng chứng ý định ban đầu: tầng ưu tiên của AI đã so với <code>departure + 7 ngày</code>, chỉ bộ lọc gốc chưa
+sửa theo. <em>Sửa:</em> overload <code>isLicenseValid(LocalDate)</code>, cả 6 chỗ trong <code>TripService</code> truyền ngày khởi
+hành. Một ngày sau (2026-07-21, Decision A), phụ xe cũng bị bắt kiểm bằng lái theo ngày khởi hành —
+trước đó validator chỉ kiểm hoạt động + bận cho phụ xe.</p>
+<p><strong>Lỗi #12 — dropdown dùng toàn bộ thời lượng thay vì phần chia (2026-08-04).</strong> Dropdown lọc
+<code>giờ đã có + min(h, 8) ≤ 8</code> — mô hình &quot;một người lái trọn chuyến&quot;, đúng kịch bản validator <strong>từ
+chối</strong>. Với tuyến 9h, công thức cũ chỉ hiện 21 người, validator chấp nhận 25 (đo từ phân bố thật).
+<em>Sửa:</em> <code>driverShareHours()</code>. &quot;Sai lệch hiện tại bằng 0&quot; trên các tuyến đang có, nhưng là mìn chờ
+tuyến 9h.</p>
+<p><strong>Lỗi #13 — dropdown phụ xe bị lọc bằng luật 8h (2026-09-11).</strong> Validator chưa bao giờ áp luật 8h cho
+phụ xe, nhưng form Tạo dùng chung danh sách tài xế cho ô phụ xe ⇒ giấu người hợp lệ. <em>Sửa:</em> danh sách
+riêng <code>getAvailableAssistantsForTimeRange()</code>.</p>
+<p><strong>Lỗi #19 — guard <code>TRAVELING</code> chỉ sống ở 1/4 lối gọi (2026-08-12).</strong> Bản cũ hỏi
+<code>excludeTripId.equals(trip.getId())</code> dưới tên biến <code>travelingForThisTrip</code> — một câu về <strong>chuyến</strong>
+mang tên một khẳng định về <strong>xe</strong>. Cùng một xe <code>TRAVELING</code>: form Tạo từ chối, màn Duyệt nhận. <em>Bài học
+ghi trong roadmap:</em> đo bán kính của guard <strong>trước</strong> khi khuyến nghị hướng sửa.</p>
+<p><strong>Lỗi #22 — số ghế không bao giờ được so với sức chứa (2026-09-19).</strong> AI chép số ghế chuyến gốc
+<strong>trước</strong> khi chọn xe; chuyến 6 (DEPARTED) bán 40 ghế trên xe 22 chỗ. <em>Sửa:</em> luật thứ 6 của
+<code>validateBusForTrip</code>, và AI/màn Duyệt đặt số ghế theo xe được chọn. <strong>#26</strong> (2026-09-24) là hệ quả:
+màn Duyệt đánh ★ cho xe mà #22 chắc chắn từ chối, vì số ghế tạm còn sót — sửa bằng cách cho
+<code>approveTrip()</code> đặt số ghế = sức chứa xe được chọn.</p>
+<h3 id="9-3-cam-bay-va-diem-la-ghi-lai-khong-sua">9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)</h3>
+<ol>
+<li><strong>Lỗi #28 (chưa sửa) — giờ đến <code>NULL</code> làm chuyến vô hình với mọi câu kiểm trùng lịch.</strong> Ba câu
+JPQL có vế <code>arrivalTimeExpected &gt; :start</code>; <code>NULL</code> so sánh ra UNKNOWN ⇒ không bao giờ &quot;bận&quot;. Còn
+validator của chính chuyến đó lấy <code>departure + 5h</code> nên nó lưu được. Sổ lỗi tái hiện bằng POST tự
+chế: hai chuyến cùng xe, cùng tài xế, cùng giờ, đều lưu được; thêm cả <code>totalSeats = -5</code>, giá <code>-1</code>,
+<code>ticketsSold = 999</code>. Bán kính trên DB thật hôm nay <strong>0</strong> — form thật không sinh ra được.</li>
+<li><strong>Lỗi #30 (chưa sửa) — API form Tạo mời xe sẽ bị từ chối.</strong> Lọc <code>isNearMaintenance(0)</code> với lý do
+&quot;chưa biết tuyến&quot; — sổ lỗi chỉ ra lý do đó đã sai (JS buộc chọn tuyến trước). Phá nguyên tắc một
+chiều với tuyến dài.</li>
+<li><strong>&quot;Cần ruling&quot;: giờ khởi hành trong quá khứ vẫn tạo / duyệt được</strong> — không lối nào kiểm
+<code>departureTime &gt; now</code> (chỉ job AI có cổng này).</li>
+<li><strong>Kênh cảnh báo luôn <code>null</code>.</strong> <code>validateBusForTrip</code> trả <code>String</code> warning nhưng không nhánh nào trả
+khác <code>null</code> (javadoc <code>TS:1100-1104</code>); các controller vẫn đặt flash <code>warning</code> khi khác null.
+<code>trip-list.html:322-325</code> có hiển thị <code>warning</code>, còn <code>pending-trips.html</code> (nơi <code>confirm</code>/<code>approve</code>
+redirect về) <strong>không</strong> có chỗ hiển thị — vô hại hôm nay, nhưng nếu ai thêm cảnh báo thật thì nó
+biến mất ở màn Duyệt.</li>
+<li><strong>&quot;Một ngày&quot; là ngày lịch của giờ khởi hành.</strong> Chuyến 22:00 → 04:00 cộng trọn 6h vào ngày khởi hành
+và 0h vào hôm sau (§8.2). Đúng như đặc tả nói &quot;single calendar day&quot;
+(<code>current_functional_spec.md:174</code>), nhưng nên biết khi bị hỏi về chuyến đêm.</li>
+<li><strong><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> Câu tính giờ lái có thể đếm thiếu tài xế phụ.</strong>
+<code>findTripsForDriverOnDate</code> (<code>TR:173-178</code>) vừa <code>LEFT JOIN FETCH t.coDrivers cd</code> vừa lọc
+<code>cd = :driver</code>. Với một chuyến mà người được xét là <strong>tài xế phụ</strong> và chuyến có <strong>từ hai</strong> tài xế phụ,
+Hibernate có thể nạp collection <code>coDrivers</code> chỉ gồm các dòng thoả điều kiện ⇒ <code>totalDrivers</code> nhỏ hơn
+thật ⇒ phần chia <strong>lớn</strong> hơn thật ⇒ validator khắt khe hơn (chặn nhầm, không cho lọt). Chỉ xảy ra với
+chuyến &gt; 16h. Test tương đương <code>TripServiceAvailabilityContextTest</code> chỉ dựng chuyến <strong>một</strong> tài xế
+phụ nên không chạm ca này. Không thấy trong <code>current_bugs_found.md</code> hay <code>project_report.md</code>; nêu như
+một nghi vấn cần kiểm, không phải lỗi đã xác nhận.</li>
+<li><strong>Chữ &quot;Odo&quot; trong câu báo bảo dưỡng</strong> in km <strong>kể từ lần bảo dưỡng</strong>, không phải đồng hồ tổng (§4).</li>
+<li><strong>Mâu thuẫn comment ↔ code (code thắng):</strong><ul>
+<li>Comment <code>TS:1180-1185</code> nói <code>findBestAvailableBus()</code> dùng xe sắp/quá hạn &quot;làm fallback cuối cùng kèm
+log cảnh báo&quot;. Code <code>TS:326-331</code> <strong>không có</strong> fallback nào — xe chạm ngưỡng bị lọc hẳn. (Ví dụ đã
+biết trong LUẬT CHUNG.) <code>findBestAvailableDriver()</code> thì <strong>có</strong> fallback, nhưng về bằng lái sắp hết
+hạn, không phải bảo dưỡng.</li>
+<li>Javadoc <code>findBestAvailableDriver()</code> (<code>TS:440-446</code>) liệt kê &quot;Tổng giờ lái trong 24h + thời lượng
+chuyến mới ≤ 8 giờ&quot; — code dùng <strong>phần chia</strong> (<code>TS:479-480</code>), không phải thời lượng.</li>
+<li><code>trip_lifecycle_fsm.md</code> §7 ghi luật bằng lái là <code>licenseExpiryDate &lt;= today</code> — code xét ngày khởi
+hành (đã nêu ở Bài 05).</li>
+<li><code>Proj_functions_summary.md</code> mục 7.6 về fallback bảo trì của AI — đã biết là lệch code (LUẬT CHUNG).</li>
+<li>Sổ lỗi #28 trích <code>createManualTrip()</code> ở <code>TripService:1006</code> — số dòng của ảnh chụp 2026-09-24; nay ở
+<code>TS:1039</code>.</li>
+</ul>
+</li>
+</ol>
+<h3 id="9-4-test-dang-giu-chuc-nang-nay">9.4. Test đang giữ chức năng này</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Test</th>
+<th>Chốt luật gì</th>
+</tr>
+</thead><tbody><tr>
+<td><code>TripServiceValidationDryRunTest.busDryRun_cleanBus_returnsPassWithNoWarning</code> (<code>:137</code>) / <code>staffDryRun_cleanDriver_returnsPass</code> (<code>:147</code>)</td>
+<td>Dữ liệu sạch ⇒ <code>pass</code>, warning <code>null</code></td>
+</tr>
+<tr>
+<td><code>…busDryRun_travelingBusWithNoRunningTrip_fails</code> (<code>:183</code>)</td>
+<td>Cờ <code>TRAVELING</code> không có chuyến giải thích ⇒ từ chối (#19)</td>
+</tr>
+<tr>
+<td><code>…travelingBusExplainedByRunningTrip_nonOverlappingWindow_returnsPass</code> (<code>:201</code>)</td>
+<td>Có chuyến <code>DEPARTED</code> giải thích và cửa sổ không giao ⇒ qua</td>
+</tr>
+<tr>
+<td><code>…travelingBusExplainedByRunningTrip_overlappingWindow_fails</code> (<code>:220</code>)</td>
+<td>Có giải thích nhưng cửa sổ giao ⇒ luật trùng lịch chặn</td>
+</tr>
+<tr>
+<td><code>…travelingBus_sameAnswerWhetherNewAssignmentOrExistingTrip</code> (<code>:242</code>)</td>
+<td>Cùng xe, cùng câu trả lời dù là tạo mới hay sửa — đúng bệnh của #19 cũ</td>
+</tr>
+<tr>
+<td><code>…busDryRun_repairingBus_failsWithSameMessageAsThrowingPath</code> (<code>:263</code>)</td>
+<td><strong>Tương đương</strong>: câu báo dry-run <code>equals</code> câu <code>createManualTrip()</code> ném</td>
+</tr>
+<tr>
+<td><code>…staffDryRun_missingPrimaryDriver_failsWithSameMessageAsThrowingPath</code> (<code>:280</code>)</td>
+<td>Như trên cho luật người</td>
+</tr>
+<tr>
+<td><code>…staffDryRun_multipleViolations_reportsOnlyTheFirst</code> (<code>:303</code>)</td>
+<td>Thiếu tài xế chính <strong>và</strong> &gt; 8h thiếu phụ xe ⇒ chỉ báo lỗi đầu</td>
+</tr>
+<tr>
+<td><code>…staffDryRun_expiredAssistantLicense_…</code> (<code>:326</code>) / <code>…validAssistantLicense_returnsPass</code> (<code>:349</code>)</td>
+<td>Phụ xe hết bằng vào ngày khởi hành ⇒ từ chối; còn hạn ⇒ qua</td>
+</tr>
+<tr>
+<td><code>…busDryRun_nullBus_propagatesNpeInsteadOfFailing</code> (<code>:371</code>)</td>
+<td><code>bus = null</code> ⇒ <code>NullPointerException</code> bay ra, <strong>không</strong> thành <code>fail</code></td>
+</tr>
+<tr>
+<td><code>TripServiceSeatCapacityTest</code> (<code>:108</code>–<code>:214</code>, 9 test)</td>
+<td>30 &gt; 22 bị từ chối kèm số trong câu báo; = 22 và &lt; 22 qua; xe không loại ⇒ bỏ qua; đường throw cùng luật; AI và màn Duyệt đặt số ghế theo xe; không nhận xe nhỏ hơn số vé đã bán</td>
+</tr>
+<tr>
+<td><code>TripServiceDriverShareTest</code> (9 test, JUnit thuần)</td>
+<td>Bảng phần chia §8.1; biên 8h vẫn 1 người; tuyến 9h lệch 3,5h (21 → 25 người); bất biến một chiều; phần chia ≤ 8h</td>
+</tr>
+<tr>
+<td><code>TripServiceAssistantAvailabilityTest</code> (4 test)</td>
+<td>Người trượt luật 8h vắng ở danh sách tài xế nhưng có ở danh sách phụ xe; phụ xe vẫn bị loại khi khoá / hết bằng / trùng lịch; validator nhận đúng người đó</td>
+</tr>
+<tr>
+<td><code>TripServiceAvailabilityContextTest</code> (3 test)</td>
+<td>Nhánh nạp sẵn (Phase 7) cho <strong>cùng</strong> kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày</td>
+</tr>
+</tbody></table></div>
+<p><strong>Chưa có test tự động</strong> cho: luật đủ <code>ceil(h/8)</code> tài xế và luật trùng vai (grep <code>src/test</code> không thấy
+&quot;yêu cầu ít nhất&quot; hay &quot;Nhân sự trùng lặp&quot;), luật 8h <strong>qua validator</strong> cho tài xế chính và tài xế phụ
+(grep không thấy &quot;vượt 8h&quot;; phần số học chỉ được chốt ở <code>TripServiceDriverShareTest</code> cho dropdown), và
+hai luật bảo dưỡng qua validator (grep không thấy &quot;SẮP/QUÁ&quot; hay &quot;QUÁ HẠN&quot; trong <code>src/test</code>). Phase 3 đã kiểm câu báo
+12h/1 tài xế bằng app thật (roadmap §8, 2026-07-20).</p>
+<h3 id="9-5-lien-ket">9.5. Liên kết</h3>
+<ul>
+<li><strong>Chức năng này ảnh hưởng tới:</strong> mọi lối tạo / sửa / duyệt chuyến (Bài 07, 09); thẻ gợi ý (Bài 17);
+gián tiếp màn Gợi ý tài xế (Bài 15 dùng cùng <code>getDrivingHoursForDate</code>) và Dashboard (<code>topLoadedDrivers</code>).</li>
+<li><strong>Bị ảnh hưởng bởi:</strong> trạng thái xe và odometer do FSM ghi (Bài 05) và màn Quản lý xe (Bài 01);
+<code>isActive</code>, hạn bằng, giờ nền (Bài 04); <code>distanceKm</code>, <code>estimatedDuration</code> của tuyến (Bài 03); sức
+chứa theo loại xe (Bài 01).</li>
+</ul>
+<hr>
+<h2 id="10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</h2>
+<h3 id="10-1-tom-tat-1-phut">10.1. Tóm tắt 1 phút</h3>
+<aside class="callout"><p>Mọi luật vận hành khi xếp chuyến nằm ở hai method trong <code>TripService</code>: <code>validateBusForTrip</code> kiểm
+sáu luật của xe — không đang sửa, cờ đang chạy phải có chuyến giải thích, không trùng lịch với đệm
+một giờ, chưa quá hạn và không chạm 90% ngưỡng bảo dưỡng sau chuyến, và số ghế không vượt sức chứa.
+<code>validateStaffForTrip</code> kiểm đủ số tài xế theo thời lượng chia tám, phụ xe cho chuyến trên tám giờ,
+không ai giữ hai vai, rồi từng người phải đang hoạt động, còn bằng lái vào ngày khởi hành, không trùng
+lịch với đệm ba mươi phút, và tài xế không vượt tám giờ lái mỗi ngày. Cả bốn lối lưu chuyến đều gọi
+chúng. Ở Phase 3 em thêm hai bản dry-run chỉ bọc validator lại để trả kết quả thay vì ném lỗi, dùng làm
+cổng xác nhận cuối cho màn gợi ý tăng cường.</p>
+</aside>
+<h3 id="10-2-cau-hoi-hoi-dong-goi-y-tra-loi">10.2. Câu hỏi hội đồng + gợi ý trả lời</h3>
+<p><strong>1. (Cái gì) Hệ thống kiểm những luật nào khi xếp xe?</strong>
+Sáu luật theo thứ tự trong <code>validateBusForTrip</code> (<code>TS:1106-1211</code>): không <code>REPAIRING</code>; nếu mang cờ
+<code>TRAVELING</code> thì phải có chuyến <code>DEPARTED</code> giải thích; không trùng lịch trong <code>[đi − 1h, đến + 1h]</code>;
+chưa quá hạn bảo dưỡng; km kể từ bảo dưỡng cộng km tuyến chưa chạm 90% ngưỡng; số ghế không vượt sức
+chứa loại xe. Gặp luật đầu tiên bị vi phạm là ném <code>IllegalArgumentException</code>.</p>
+<p><strong>2. (Thế nào) Luật 8 giờ được tính ra sao?</strong>
+Lấy mọi chuyến <strong>khởi hành trong ngày</strong> của tài xế ở trạng thái chờ duyệt / đang bán / đang chạy / đã
+xong; mỗi chuyến tài xế lái được tính bằng thời lượng chia số người lái, tối đa 8h; chuyến làm phụ xe
+tính 0 (<code>TS:782-813</code>). Nếu ngày đó là hôm nay thì cộng giờ nền mock. Cộng phần chia của chuyến mới, lớn
+hơn 8 thì từ chối (<code>TS:1316</code>). Đúng 8.0 vẫn được.</p>
+<p><strong>3. (Vì sao) Sao không gom thành một hằng <code>MAX_HOURS = 8</code>?</strong>
+Vì số 8 mang ba nghĩa khác nhau: ngân sách giờ lái mỗi ngày, trần phần chia của mỗi người trên một
+chuyến, và ngưỡng &quot;chuyến dài&quot; buộc có phụ xe và thêm tài xế. Gom lại thì đổi một luật kéo theo hai luật
+kia (roadmap §9).</p>
+<p><strong>4. (Thế nào) Dry-run là gì, khác validator gốc ở đâu?</strong>
+Hai method public bọc validator gốc trong <code>try/catch (IllegalArgumentException)</code>, trả <code>ValidationResult</code>
+(<code>TS:1407-1443</code>). Không thêm, không sửa luật nào — nên test có thể khẳng định câu báo của hai đường
+giống hệt nhau. Màn gợi ý dùng nó vì &quot;không hợp lệ&quot; ở đó là kết quả bình thường.</p>
+<p><strong>5. (Vì sao) Sao bản dry-run không bắt mọi <code>Exception</code> cho chắc?</strong>
+Vì như thế một <code>NullPointerException</code> hay lỗi mất kết nối DB sẽ biến thành một câu &quot;không hợp lệ&quot; nghe
+rất hợp lý; màn gợi ý sẽ âm thầm bỏ một xe tốt mà log không có gì. Lỗi kỹ thuật phải bay ra ngoài; có
+test <code>busDryRun_nullBus_propagatesNpeInsteadOfFailing</code> chốt (roadmap §9, chủ dự án duyệt).</p>
+<p><strong>6. (Nếu… thì sao) Một chuyến vi phạm ba luật thì Admin thấy mấy lỗi?</strong>
+Một — lỗi đầu tiên theo thứ tự kiểm. Đó là quyết định đã duyệt ở Phase 3: muốn báo đủ phải viết lại
+validator gom lỗi, chạm vào vùng code nhạy nhất cho một nhu cầu (cổng đạt / không đạt) không cần nó. Test
+<code>staffDryRun_multipleViolations_reportsOnlyTheFirst</code> chốt hành vi này.</p>
+<p><strong>7. (Vì sao) Dropdown đã lọc rồi, sao còn validate lúc lưu?</strong>
+Dropdown là lớp &quot;không-mời&quot;, chạy trên trình duyệt có thể cũ hoặc bị vượt bằng request tự chế; giữa lúc
+mở form và lúc bấm lưu, người khác có thể đã xếp tài xế đó. Validator là lớp chặn thật duy nhất. Nguyên
+tắc một chiều: dropdown chỉ được hẹp hơn validator — lỗi #12, #13 là hai lần nó bị lệch và đã sửa.</p>
+<p><strong>8. (Thế nào) Sửa một chuyến thì sao nó không tự &quot;trùng&quot; với chính nó?</strong>
+Mọi câu kiểm có vế <code>(:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId)</code> (<code>TR:122</code>, <code>:140</code>, <code>:160</code>,
+<code>:177</code>). Khi sửa, <code>updateManualTrip</code> truyền id chính chuyến (<code>TS:1076-1077</code>); khi tạo mới truyền <code>null</code>.</p>
+<p><strong>9. (Vì sao) Sao bằng lái xét theo ngày khởi hành chứ không phải hôm nay?</strong>
+Vì tài xế phải có bằng hợp lệ <strong>lúc lái</strong>. Trước 2026-07-20 hệ thống so với hôm nay, nên duyệt được chuyến
+tháng sau cho người hết bằng tuần sau (lỗi #1). Nay mọi chỗ gọi <code>isLicenseValid(departure.toLocalDate())</code>.</p>
+<p><strong>10. (Hạn chế) Phần này còn thiếu gì?</strong>
+Nói thật: service chưa kiểm giờ đến bắt buộc, ghế ≥ 1, giá ≥ 0 — một request tự chế không có giờ đến sẽ
+&quot;vô hình&quot; với kiểm trùng lịch (lỗi #28, chưa sửa); API form Tạo còn mời xe sẽ bị từ chối với tuyến dài
+(#30); chưa có luật cấm giờ khởi hành trong quá khứ (chờ ruling); và mỗi lần chỉ báo một lỗi. Giờ nền
+<code>totalDrivingHours24h</code> là dữ liệu mock.</p>
+<p><strong>11. (Thế nào) Cửa sổ ±1h và ±30 phút có ý nghĩa gì? Chạm mép có tính là trùng?</strong>
+Xe cần một giờ dọn dẹp, người cần ba mươi phút nghỉ, nên khoảng kiểm rộng hơn khoảng chạy thật
+(<code>TS:1162-1163</code>, <code>:1296-1297</code>). So sánh trong JPQL là <code>&lt;</code>/<code>&gt;</code> chặt: một chuyến đến đúng lúc khoảng đệm
+bắt đầu thì <strong>không</strong> coi là trùng (§8.3).</p>
+<h3 id="10-3-diem-phai-noi-that">10.3. Điểm phải nói thật</h3>
+<ul>
+<li><strong>Rule-based, không phải AI.</strong> Toàn bộ là luật viết tay. Chữ &quot;AI&quot; trong <code>findBestAvailableBus/Driver</code>
+và log &quot;[AI]&quot; chỉ là tên gọi; AI chọn bằng chính các hàm kiểm này.</li>
+<li><strong><code>totalDrivingHours24h</code> là giờ nền mock</strong>, chỉ cộng khi xét <strong>hôm nay</strong>, không tự reset (không có
+cron — roadmap §4); comment nói về &quot;IoT/GPS&quot; là hướng tương lai, hệ thống không có GPS (<code>TS:816-826</code>).</li>
+<li><strong>Không có đăng nhập / CSRF tắt</strong> — các &quot;POST tự chế&quot; trong bài gửi được chính vì thế.</li>
+<li><strong>Lịch sử chuyến là mô phỏng</strong> (profile <code>backfill</code>) và được dựng <strong>không qua</strong> validator; tính hợp lệ
+được bảo đảm &quot;bằng cách dựng&quot; (roadmap §9 Phase 5).</li>
+<li><strong>Các lỗ còn mở</strong>: #28, #30, giờ quá khứ (chờ ruling) — nêu thẳng nếu bị hỏi về kiểm dữ liệu đầu vào.</li>
+</ul>
+<hr>
+<h2 id="11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Chuyến 8 giờ đúng có cần phụ xe không? Cần mấy tài xế?</li>
+<li>Validator chạy luật xe trước hay luật người trước? Nếu xe đang <code>REPAIRING</code> <strong>và</strong> thiếu tài xế chính,
+Admin thấy câu nào?</li>
+<li>Vì sao <code>findTripsForDriverOnDate</code> tính cả chuyến <code>COMPLETED</code>, còn các câu kiểm bận thì không?</li>
+<li>Phụ xe đang có 7,5h lái trong ngày được nhận thêm một chuyến 3h làm phụ xe không? Vì sao?</li>
+<li><code>validateBusForTripDryRun(null, trip, null)</code> trả về gì?</li>
+<li>Một chuyến khác của cùng xe chạy 17:00–20:00. Chuyến mới 06:00–16:00 có bị coi là trùng không? Nếu
+chuyến kia chạy 16:30–20:00 thì sao?</li>
+<li>Kênh <code>warning</code> của <code>validateBusForTrip</code> hôm nay có khi nào khác <code>null</code> không?</li>
+</ol>
+<p><strong>Bài tự trace.</strong> Admin <strong>sửa</strong> chuyến #70 (đang <code>ACTIVE</code>, tài xế chính Em), chỉ đổi giờ đến muộn thêm
+1 tiếng. Ngày đó Em đã có chuyến #71 khởi hành ngay sau giờ đến mới 20 phút. Viết chuỗi
+<code>Controller → Service → Repository → view</code>, nói rõ <code>excludeTripId</code> bằng mấy, câu nào chặn, câu báo và
+màn hình Admin thấy.</p>
+<p><strong>Câu đọc code.</strong> <code>TS:1233-1235</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">int requiredDrivers = (int) Math.ceil(durationHours / 8.0);
+if (requiredDrivers &lt; 1)
+    requiredDrivers = 1;</code></pre></div>
+<p>Khi nào dòng <code>if</code> có tác dụng? Nếu đổi <code>Math.ceil</code> thành <code>Math.round</code>, chuyến 10h và chuyến 13h đòi
+mấy tài xế, và luật 8h của từng người còn đúng không?</p>
+<p><strong>Bài tính tay 🧮.</strong> Tài xế Giang, xét ngày <strong>mai</strong>. Ngày mai Giang có: chuyến P 05:00–09:00 làm tài xế
+chính cùng 1 tài xế phụ (<code>ACTIVE</code>); chuyến Q 10:00–11:30 làm phụ xe; giờ nền mock 4. Admin muốn xếp
+Giang làm tài xế phụ (tổng 2 tài xế) cho chuyến 14:00–23:00. (a) Giờ đã có? (b) Phần chia chuyến mới? (c)
+Qua luật 8h không? (d) Chuyến mới có cần phụ xe không?</p>
+<details><summary>Đáp án</summary>
+
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Không cần phụ xe: luật là <code>h &gt; 8.0</code> (<code>TS:1257</code>), 8 &gt; 8 sai. <code>ceil(8/8) = 1</code> tài xế.</li>
+<li>Xe trước: mọi lối gọi <code>validateBusForTrip</code> rồi mới <code>validateStaffForTrip</code>. Thấy <em>&quot;Xe … đang được bảo
+trì/sửa chữa, không thể gán vào chuyến!&quot;</em> — fail-fast nên không tới luật người.</li>
+<li>Giờ lái là lượng <strong>đã lái hoặc sẽ lái trong ngày</strong> — chuyến xong sáng nay vẫn là giờ đã lái
+(<code>TS:756-757</code>). Bận là câu hỏi <strong>có đang chiếm khoảng thời gian này không</strong> — chuyến đã xong không
+chiếm gì nữa (<code>TS:716-717</code>).</li>
+<li>Được, nếu không trùng lịch, đang hoạt động và còn bằng: validator <strong>không</strong> kiểm giờ lái của phụ xe
+(<code>TS:1349-1366</code>), và chuyến làm phụ xe tính 0h.</li>
+<li>Không trả gì — ném <code>NullPointerException</code> ở <code>bus.getStatus()</code> (<code>TS:1107</code>); wrapper chỉ bắt
+<code>IllegalArgumentException</code> (test <code>:371</code>).</li>
+<li>Cửa sổ xe <code>[05:00, 17:00]</code>. Chuyến 17:00–20:00: <code>17:00 &lt; 17:00</code> sai ⇒ không trùng. Chuyến 16:30–20:00:
+<code>16:30 &lt; 17:00</code> và <code>20:00 &gt; 05:00</code> ⇒ <strong>trùng</strong> (&quot;Xe … đang bận trong khoảng thời gian này!&quot;).</li>
+<li>Không — mọi nhánh hoặc ném, hoặc <code>return null</code> (<code>TS:1210</code>).</li>
+</ol>
+<p><strong>Bài tự trace</strong></p>
+<p><code>POST /admin/trip-management/trips/update</code> → <code>ATM.updateTrip()</code>: nạp chuyến, <code>editRefusalReason</code> (ACTIVE
+sửa được), pre-check trạng thái (không đổi) → chép giờ mới vào <code>existingTrip</code> → <code>updateManualTrip()</code>
+(transaction): giờ đến sau giờ đi, ghế ≥ vé → <code>validateBusForTrip(bus, trip, 70)</code> (giả sử xe qua) →
+<code>validateStaffForTrip(trip, 70)</code>: cửa sổ người = <code>[đi − 30&#39;, đến mới + 30&#39;]</code>. Chuyến #71 khởi hành <strong>20
+phút</strong> sau giờ đến mới ⇒ nằm trong 30 phút đệm ⇒ <code>existsOverlappingTripForDriver(Em, …, excludeTripId = 70)</code> trả <code>true</code> (chuyến #71 khác 70 nên không bị loại) ⇒ ném <em>&quot;Tài xế chính Em đang bận ở chuyến khác!&quot;</em>
+→ rollback → <code>catch (Exception)</code> <code>ATM:440-442</code> → flash &quot;Lỗi: Tài xế chính Em đang bận ở chuyến khác!&quot; →
+<code>redirect:/admin/trip-management/trips/edit/70</code> → form sửa nạp lại <strong>từ DB</strong> với giờ đến cũ.</p>
+<p><strong>Câu đọc code</strong></p>
+<p><code>if</code> có tác dụng khi <code>durationHours ≤ 0</code> (giờ đến trùng hoặc trước giờ đi — <code>ceil(0) = 0</code>), bảo đảm tối
+thiểu 1. Đổi sang <code>Math.round</code>: 10h → round(1,25) = 1 tài xế; 13h → round(1,625) = 2. Chuyến 10h với 1
+tài xế: phần chia = min(10/1, 8) = 8 — luật 8h vẫn chặn <strong>ngày</strong> nếu đã có giờ khác, nhưng một người
+được phép &quot;lái&quot; một chuyến 10h vì phần chia bị cắt ở 8; tức trần mỗi người bị lách. <code>ceil</code> bảo đảm
+<code>h / requiredDrivers ≤ 8</code> luôn đúng.</p>
+<p><strong>Bài tính tay</strong></p>
+<p>(a) Chuyến P: 4h / 2 người = 2,0. Chuyến Q: phụ xe ⇒ 0. Giờ nền: ngày mai ≠ hôm nay ⇒ <strong>không</strong> cộng.
+Tổng <strong>2,0</strong>. (b) Chuyến mới 9h, 2 tài xế ⇒ min(9/2, 8) = <strong>4,5</strong>. (c) 2,0 + 4,5 = 6,5 ≤ 8 ⇒ <strong>qua</strong> luật
+8h (với điều kiện không trùng lịch: cửa sổ <code>[13:30, 23:30]</code>, Q kết thúc 11:30 ⇒ không giao). (d) 9 &gt; 8 ⇒
+<strong>cần</strong> phụ xe; <code>ceil(9/8) = 2</code> tài xế — đã đủ.</p>
+</details>
+
+<hr>
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li><strong>Hai validator</strong> trong <code>TripService</code> giữ mọi luật: 6 luật xe, rồi luật người; ném
+<code>IllegalArgumentException</code> ở lỗi đầu tiên. Bốn lối lưu chuyến cùng gọi chúng, xe trước người sau.</li>
+<li><strong>Hai cửa sổ</strong>: xe ±1h, người ±30&#39;; &quot;trùng&quot; là giao thật, chạm mép không tính; <code>excludeTripId</code> để
+chuyến đang sửa không trùng chính nó.</li>
+<li><strong>Luật 8h tính theo phần chia</strong> (<code>min(h / số người lái, 8)</code>), cộng các chuyến khởi hành cùng ngày lịch,
+phụ xe 0h, giờ nền mock chỉ khi xét hôm nay; đúng 8.0 vẫn qua.</li>
+<li><strong>Dry-run (Phase 3)</strong> chỉ là vỏ bọc, bắt đúng <code>IllegalArgumentException</code>, trả một lý do; dùng làm cổng
+cuối của màn Gợi ý.</li>
+<li><strong>Hai lớp bảo vệ, một chiều</strong>: dropdown/API/AI chỉ được hẹp hơn validator. Lỗ còn mở: #28 (không kiểm
+dữ liệu đầu vào, giờ đến NULL), #30 (API form Tạo), giờ khởi hành quá khứ (chờ ruling).</li>
+</ol>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>
