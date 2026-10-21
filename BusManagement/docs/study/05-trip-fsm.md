@@ -565,6 +565,7 @@ Hai lớp đã học ở Bài 00b §5.2. Ở chức năng này, lớp chặn th�
 | Chuyến đang chạy không đổi xe / tuyến | nút Sửa ẩn với `DEPARTED` | `editRefusalReason()` ở cả GET và POST sửa (`ATM:256`, `:363`) (lỗi #14/#18) | Bị chặn — đây là thứ giữ cặp `TRAVELING`↔`READY` |
 | Xe có chuyến chưa kết thúc không đặt `REPAIRING` | — | `BusService.updateBus()` (Bài 01; lỗi #15) | Bị chặn — để FSM không xoá âm thầm dấu sửa chữa |
 | Xuất phát đúng giờ | **Không có** | **Không có** | Xuất phát được một chuyến của tuần sau |
+| Mỗi xe chỉ một chuyến `DEPARTED` cùng lúc | **Không có** — nhóm "Trễ giờ" vẫn hiện nút Xuất phát | **Không có** | Lỗi #29 (chưa sửa, §9.3 mục 0) |
 | Từ chối chỉ áp cho chuyến chờ duyệt | nút Từ chối chỉ ở màn chờ duyệt | **Không có riêng** — chỉ có bảng luật | [SUY LUẬN — chưa kiểm chứng] POST `/admin/trips/reject/{id}` cho chuyến `ACTIVE` sẽ **hủy** nó (bước hợp lệ), báo "Đã từ chối chuyến tăng cường" |
 
 ### 6.2. Bảng "thay đổi gì trong DB"
@@ -726,8 +727,20 @@ trong `updateTripStatus()` là bản sửa của lỗi đó; Bug #3 *"`cancelTri
 
 ### 9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)
 
+0. **Lỗi #29 (ghi 2026-09-24, CHƯA SỬA) — một xe "chạy" hai chuyến cùng lúc.** Vào `DEPARTED`
+   (`TS:677-679`) không xét xe còn chuyến `DEPARTED` khác; vào `COMPLETED` (`TS:680-681`) đặt `READY`
+   **vô điều kiện**. Hai chuyến không giao giờ được dùng chung một xe, nên: chuyến A đang chạy, bấm Xuất
+   phát chuyến B cùng xe (B quá giờ, nằm ở nhóm "Trễ giờ") → hoàn thành A ⇒ xe về `READY` trong lúc B vẫn
+   `DEPARTED`. Sổ lỗi tái hiện trên bản sao DB (xe 7, chuyến 3 và 14: odometer 14620 → 14920, xe `READY`,
+   chuyến 14 vẫn `DEPARTED`) và chỉ ra dữ liệu thật đang có đúng hình dạng này. Không mất dữ liệu (#15
+   vẫn chặn `REPAIRING`; hoàn thành chuyến 14 sau đó đặt lại `READY` và cộng km đúng), nhưng trạng thái xe
+   và KPI Dashboard sai trong lúc đó. Bản sửa đề xuất (đụng `TripService` ⇒ chờ ruling): từ chối vào
+   `DEPARTED` khi xe còn chuyến `DEPARTED` khác. Đây là mặt thứ ba của cùng bất biến §2.4 điều 5: cặp
+   `TRAVELING`↔`READY` giả định **một** chuyến đang chạy trên mỗi xe.
 1. **FSM không có điều kiện thời gian.** Xuất phát được một chuyến của tuần sau, hoàn thành ngay sau
-   khi xuất phát; `Trip` không có giờ đến thực tế (roadmap §9, #18).
+   khi xuất phát; `Trip` không có giờ đến thực tế (roadmap §9, #18). Sổ lỗi ghi một mục "cần ruling"
+   gần với điều này (2026-09-24): tạo / duyệt chuyến có giờ khởi hành **trong quá khứ** vẫn được — không
+   lối nào kiểm `departureTime > now`.
 2. **Chuyến thủ công sinh ra ở `ACTIVE`, bỏ qua `PENDING_APPROVAL`.** `project_report.md` Warn #2 vẫn
    ghi **CÒN MỞ** — chờ chủ dự án quyết định có nên đi qua bước duyệt không.
 3. **`rejectTrip()` không tự kiểm `PENDING_APPROVAL`** (§4, §6.1) — "từ chối" một chuyến `ACTIVE` qua
@@ -868,7 +881,8 @@ nằm ở FSM: nó không nhớ đã đánh `TRAVELING` cho xe nào, lúc hoàn 
 cho đổi, xe cũ kẹt `TRAVELING` mãi (lỗi #14). Em giữ bất biến này bằng cách khoá chuyến, không sửa FSM.
 
 **10. (Hạn chế) FSM còn thiếu gì?**
-Không có điều kiện thời gian (xuất phát được chuyến của tuần sau); không có bước `DEPARTED → CANCELLED`
+Không có điều kiện thời gian (xuất phát được chuyến của tuần sau); chưa chặn một xe xuất phát chuyến thứ
+hai khi chuyến trước còn chạy (lỗi #29, đã ghi, chờ ruling); không có bước `DEPARTED → CANCELLED`
 nên không ghi được "xe hỏng giữa đường"; hủy chuyến không hoàn vé (không có module vé); chuyến tạo tay
 bỏ qua bước duyệt (Warn #2 còn mở). Đó là các giới hạn đã biết và ghi trong tài liệu.
 

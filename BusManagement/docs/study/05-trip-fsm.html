@@ -1273,6 +1273,12 @@ odometer cho chuyến <code>COMPLETED</code> nó tạo ra, <strong>đúng như F
 <td>Xuất phát được một chuyến của tuần sau</td>
 </tr>
 <tr>
+<td>Mỗi xe chỉ một chuyến <code>DEPARTED</code> cùng lúc</td>
+<td><strong>Không có</strong> — nhóm &quot;Trễ giờ&quot; vẫn hiện nút Xuất phát</td>
+<td><strong>Không có</strong></td>
+<td>Lỗi #29 (chưa sửa, §9.3 mục 0)</td>
+</tr>
+<tr>
 <td>Từ chối chỉ áp cho chuyến chờ duyệt</td>
 <td>nút Từ chối chỉ ở màn chờ duyệt</td>
 <td><strong>Không có riêng</strong> — chỉ có bảng luật</td>
@@ -1633,9 +1639,21 @@ lưu (transaction 1) trước khi FSM từ chối (transaction 2). <em>Sửa:</e
 trong <code>updateTripStatus()</code> là bản sửa của lỗi đó; Bug #3 <em>&quot;<code>cancelTrip()</code> bypass FSM&quot;</em> — nay gọi
 <code>updateTripStatus(id, CANCELLED)</code>.</p>
 <h3 id="9-3-cam-bay-va-diem-la-ghi-lai-khong-sua">9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)</h3>
-<ol>
+<ol start="0">
+<li><strong>Lỗi #29 (ghi 2026-09-24, CHƯA SỬA) — một xe &quot;chạy&quot; hai chuyến cùng lúc.</strong> Vào <code>DEPARTED</code>
+(<code>TS:677-679</code>) không xét xe còn chuyến <code>DEPARTED</code> khác; vào <code>COMPLETED</code> (<code>TS:680-681</code>) đặt <code>READY</code>
+<strong>vô điều kiện</strong>. Hai chuyến không giao giờ được dùng chung một xe, nên: chuyến A đang chạy, bấm Xuất
+phát chuyến B cùng xe (B quá giờ, nằm ở nhóm &quot;Trễ giờ&quot;) → hoàn thành A ⇒ xe về <code>READY</code> trong lúc B vẫn
+<code>DEPARTED</code>. Sổ lỗi tái hiện trên bản sao DB (xe 7, chuyến 3 và 14: odometer 14620 → 14920, xe <code>READY</code>,
+chuyến 14 vẫn <code>DEPARTED</code>) và chỉ ra dữ liệu thật đang có đúng hình dạng này. Không mất dữ liệu (#15
+vẫn chặn <code>REPAIRING</code>; hoàn thành chuyến 14 sau đó đặt lại <code>READY</code> và cộng km đúng), nhưng trạng thái xe
+và KPI Dashboard sai trong lúc đó. Bản sửa đề xuất (đụng <code>TripService</code> ⇒ chờ ruling): từ chối vào
+<code>DEPARTED</code> khi xe còn chuyến <code>DEPARTED</code> khác. Đây là mặt thứ ba của cùng bất biến §2.4 điều 5: cặp
+<code>TRAVELING</code>↔<code>READY</code> giả định <strong>một</strong> chuyến đang chạy trên mỗi xe.</li>
 <li><strong>FSM không có điều kiện thời gian.</strong> Xuất phát được một chuyến của tuần sau, hoàn thành ngay sau
-khi xuất phát; <code>Trip</code> không có giờ đến thực tế (roadmap §9, #18).</li>
+khi xuất phát; <code>Trip</code> không có giờ đến thực tế (roadmap §9, #18). Sổ lỗi ghi một mục &quot;cần ruling&quot;
+gần với điều này (2026-09-24): tạo / duyệt chuyến có giờ khởi hành <strong>trong quá khứ</strong> vẫn được — không
+lối nào kiểm <code>departureTime &gt; now</code>.</li>
 <li><strong>Chuyến thủ công sinh ra ở <code>ACTIVE</code>, bỏ qua <code>PENDING_APPROVAL</code>.</strong> <code>project_report.md</code> Warn #2 vẫn
 ghi <strong>CÒN MỞ</strong> — chờ chủ dự án quyết định có nên đi qua bước duyệt không.</li>
 <li><strong><code>rejectTrip()</code> không tự kiểm <code>PENDING_APPROVAL</code></strong> (§4, §6.1) — &quot;từ chối&quot; một chuyến <code>ACTIVE</code> qua
@@ -1805,7 +1823,8 @@ Không đổi được: chuyến <code>DEPARTED</code> không sửa được tr�
 nằm ở FSM: nó không nhớ đã đánh <code>TRAVELING</code> cho xe nào, lúc hoàn thành nó đọc lại <code>trip.getBus()</code>. Nếu
 cho đổi, xe cũ kẹt <code>TRAVELING</code> mãi (lỗi #14). Em giữ bất biến này bằng cách khoá chuyến, không sửa FSM.</p>
 <p><strong>10. (Hạn chế) FSM còn thiếu gì?</strong>
-Không có điều kiện thời gian (xuất phát được chuyến của tuần sau); không có bước <code>DEPARTED → CANCELLED</code>
+Không có điều kiện thời gian (xuất phát được chuyến của tuần sau); chưa chặn một xe xuất phát chuyến thứ
+hai khi chuyến trước còn chạy (lỗi #29, đã ghi, chờ ruling); không có bước <code>DEPARTED → CANCELLED</code>
 nên không ghi được &quot;xe hỏng giữa đường&quot;; hủy chuyến không hoàn vé (không có module vé); chuyến tạo tay
 bỏ qua bước duyệt (Warn #2 còn mở). Đó là các giới hạn đã biết và ghi trong tài liệu.</p>
 <p><strong>11. (Thế nào) Vì sao trạng thái chuyến và xe không bao giờ lệch nhau giữa chừng?</strong>
