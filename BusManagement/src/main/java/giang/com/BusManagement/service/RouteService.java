@@ -64,7 +64,7 @@ public class RouteService {
      * Tripwire dưới đây cùng khuôn BusService.saveBus() (lỗi #16).
      *
      * @param route      thông tin tuyến (distanceKm, estimatedDuration,
-     *                   suitableBusType); id phải trống.
+     *                   suitableBusType, holidayFlow); id phải trống.
      * @param stationIds danh sách id trạm THEO ĐÚNG THỨ TỰ lộ trình; stopOrder
      *                   được đánh lại 1..n theo vị trí trong danh sách này.
      */
@@ -90,10 +90,12 @@ public class RouteService {
      * IncidentService.updateIncident(), thay cho merge nguyên object form (merge
      * ghi đè cả cột mà form không gửi).
      *
-     * Ba field chép nguyên như form gửi: quãng đường và thời lượng là input
-     * `required`; loại xe phù hợp cho phép "-- Không giới hạn --" (null) và null ở
-     * đó là ý định hợp lệ của Admin, nên KHÔNG áp luật "trống = giữ nguyên" của
-     * BusService cho ô này.
+     * Bốn field chép nguyên như form gửi: quãng đường và thời lượng là input
+     * `required`; loại xe phù hợp cho phép "-- Không giới hạn --" (null) và hướng
+     * dòng khách dịp lễ cho phép "-- Không theo chiều --" (null) — null ở hai ô đó
+     * là ý định hợp lệ của Admin, nên KHÔNG áp luật "trống = giữ nguyên" của
+     * BusService cho chúng. Field nào thêm vào Route mà Admin sửa được thì phải
+     * được chép ở đây, nếu không mỗi lần sửa tuyến giá trị sẽ mất im lặng.
      *
      * Lộ trình: xoá toàn bộ RouteStation cũ rồi dựng lại. Khoá chính của
      * RouteStation là tổ hợp (routeId, stationId) nên không thể "sửa" stationId
@@ -135,6 +137,7 @@ public class RouteService {
         existing.setDistanceKm(form.getDistanceKm());
         existing.setEstimatedDuration(form.getEstimatedDuration());
         existing.setSuitableBusType(form.getSuitableBusType());
+        existing.setHolidayFlow(form.getHolidayFlow());
 
         // Buông tham chiếu tới collection cũ trước khi xoá các dòng của nó, y như
         // saveRoute() trước đây (merge với routeStations = null): cascade = ALL

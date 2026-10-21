@@ -47,12 +47,13 @@
                                 <th>Quãng Đường</th>
                                 <th>Thời Gian Dự Kiến</th>
                                 <th>Loại Xe Phù Hợp</th>
+                                <th>Dòng Khách Dịp Lễ</th>
                                 <th class="text-center">Hành Động</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr th:if="${#lists.isEmpty(routes)}">
-                                <td colspan="7" class="text-center text-muted py-4">
+                                <td colspan="8" class="text-center text-muted py-4">
                                     Chưa có tuyến đường nào. Bấm <strong>Thêm Tuyến Mới</strong> để bắt đầu.
                                 </td>
                             </tr>
@@ -81,6 +82,12 @@
                                     <span th:if="${route.suitableBusType != null}" class="badge bg-info text-dark"
                                         th:text="${route.suitableBusType.typeName}"></span>
                                     <span th:if="${route.suitableBusType == null}" class="text-muted">Không giới hạn</span>
+                                </td>
+                                <td>
+                                    <span th:if="${route.holidayFlow != null}" class="badge bg-light text-dark border"
+                                        th:text="${route.holidayFlow.name() == 'LEAVING_HUB'} ? 'Rời TP lớn'
+                                               : (${route.holidayFlow.name() == 'TOWARD_HUB'} ? 'Về TP lớn' : ${route.holidayFlow.name()})"></span>
+                                    <span th:if="${route.holidayFlow == null}" class="text-muted">Không theo chiều</span>
                                 </td>
                                 <td class="text-center">
                                     <a th:href="@{/admin/routes/edit/{id}(id=${route.id})}"

@@ -171,23 +171,26 @@ public class DataInitializer implements CommandLineRunner {
         Station hue = createStation("Bến xe Huế", "Huế");
         Station ct = createStation("Bến xe Cần Thơ", "Cần Thơ");
 
+        // Hướng dòng khách dịp lễ theo QĐ-8 (docs/development/forecast_decisions.md):
+        // rời / về Hà Nội, TP.HCM; null = không theo chiều (hai đầu tuyến tương đương).
+
         // Tuyến ngắn (2h) — Limousine: Mỹ Đình -> Niệm Nghĩa
-        Route tuyenHN_HP = createRoute(hn, hp, 120.0, 120, limousine);
+        Route tuyenHN_HP = createRoute(hn, hp, 120.0, 120, limousine, HolidayFlow.LEAVING_HUB);
 
         // Tuyến trung bình (6h) — Limousine: Miền Đông -> Đà Lạt
-        Route tuyenSG_DL = createRoute(sg, dl, 300.0, 360, limousine);
+        Route tuyenSG_DL = createRoute(sg, dl, 300.0, 360, limousine, HolidayFlow.LEAVING_HUB);
 
         // Tuyến ngắn (2h) — Giường nằm: Đà Nẵng -> Huế
-        Route tuyenDN_Hue = createRoute(dn, hue, 100.0, 120, giuongNam);
+        Route tuyenDN_Hue = createRoute(dn, hue, 100.0, 120, giuongNam, null);
 
         // Tuyến cao tốc ngắn (1.5h): Niệm Nghĩa -> Mỹ Đình
-        Route tuyenHP_HN = createRoute(hp, hn, 120.0, 90, giuongNam);
+        Route tuyenHP_HN = createRoute(hp, hn, 120.0, 90, giuongNam, HolidayFlow.TOWARD_HUB);
 
         // Tuyến miền Tây (3.5h) — Limousine: Cần Thơ -> Miền Đông
-        Route tuyenCT_SG = createRoute(ct, sg, 180.0, 210, limousine);
+        Route tuyenCT_SG = createRoute(ct, sg, 180.0, 210, limousine, HolidayFlow.TOWARD_HUB);
 
-        // Tuyến siêu dài (30h) — Giường nằm: Mỹ Đình -> Miền Đông
-        Route tuyenHN_SG = createRoute(hn, sg, 1700.0, 1800, giuongNam);
+        // Tuyến siêu dài (30h) — Giường nằm: Mỹ Đình -> Miền Đông (hai đầu đều là TP lớn)
+        Route tuyenHN_SG = createRoute(hn, sg, 1700.0, 1800, giuongNam, null);
 
         // =====================================================================
         // 6. CÁC CHUYẾN XE — TẤT CẢ STATUS = ACTIVE
@@ -234,11 +237,13 @@ public class DataInitializer implements CommandLineRunner {
      * đi, stopOrder=2 cho điểm đến), gắn Route vào hệ thống Station thật.
      * KHÔNG còn nhận String tự do — đây là điểm hợp nhất 2 luồng dữ liệu.
      */
-    private Route createRoute(Station from, Station to, double dist, int duration, BusType type) {
+    private Route createRoute(Station from, Station to, double dist, int duration, BusType type,
+            HolidayFlow holidayFlow) {
         Route r = new Route();
         r.setDistanceKm(dist);
         r.setEstimatedDuration(duration);
         r.setSuitableBusType(type);
+        r.setHolidayFlow(holidayFlow);
         r = routeRepository.save(r);
 
         linkRouteStation(r, from, 1);

@@ -54,6 +54,20 @@
                                     </select>
                                     <div class="form-text text-muted">Bỏ trống nếu tuyến chạy được mọi loại xe.</div>
                                 </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Hướng Dòng Khách Dịp Lễ</label>
+                                    <select class="form-select" name="holidayFlow">
+                                        <option value="">-- Không theo chiều --</option>
+                                        <option th:each="f : ${holidayFlows}" th:value="${f.name()}"
+                                            th:text="${f.name() == 'LEAVING_HUB'} ? 'Rời TP lớn'
+                                                   : (${f.name() == 'TOWARD_HUB'} ? 'Về TP lớn' : ${f.name()})"
+                                            th:selected="${route.holidayFlow != null and route.holidayFlow.name() == f.name()}">
+                                        </option>
+                                    </select>
+                                    <div class="form-text text-muted">Chỉ dùng cho dự báo nhu cầu dịp lễ. TP lớn là nơi
+                                        tập trung người lao động (Hà Nội, TP.HCM): dịp Tết khách rời TP lớn trước Tết và
+                                        trở lại sau Tết. Bỏ trống nếu hai đầu tuyến tương đương.</div>
+                                </div>
                             </div>
 
                             <hr class="my-4">

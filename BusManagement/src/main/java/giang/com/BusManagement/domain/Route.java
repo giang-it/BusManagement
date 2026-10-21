@@ -4,7 +4,10 @@ import java.util.Comparator;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -67,6 +70,18 @@ public class Route {
     public BusType getSuitableBusType() {
         return this.suitableBusType;
     }
+
+    /**
+     * Hướng dòng khách dịp lễ (QĐ-8), do Admin chọn ở form tuyến, KHÔNG bắt buộc;
+     * null = "Không theo chiều". Chỉ dành cho Demand Forecast — xem HolidayFlow;
+     * không luật phân công, validation hay giá vé nào đọc nó.
+     *
+     * Cột cho phép null để ddl-auto=update thêm được vào bảng đã có dữ liệu (cùng lý
+     * do Trip.createdAt nullable).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "holiday_flow")
+    private HolidayFlow holidayFlow;
 
     // =====================================================================
     // HELPER METHODS — Điểm đi/đến được suy ra từ RouteStation (stopOrder),

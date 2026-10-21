@@ -1,5 +1,6 @@
 package giang.com.BusManagement.controller.admin;
 
+import giang.com.BusManagement.domain.HolidayFlow;
 import giang.com.BusManagement.domain.Route;
 import giang.com.BusManagement.service.BusService;
 import giang.com.BusManagement.service.RouteService;
@@ -108,5 +109,6 @@ public class AdminRouteController {
     private void addFormOptions(Model model) {
         model.addAttribute("stations", routeService.findAllStations());
         model.addAttribute("busTypes", busService.findAllBusTypes());
+        model.addAttribute("holidayFlows", HolidayFlow.values());
     }
 }
