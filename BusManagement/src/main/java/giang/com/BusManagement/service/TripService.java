@@ -1792,6 +1792,25 @@ public class TripService {
                 since);
     }
 
+    /**
+     * Danh sách cho màn Quản lý chuyến (QĐ-12): mọi chuyến CHƯA KẾT THÚC, bất kể ngày —
+     * chúng còn chờ Admin xử lý, kể cả chuyến DEPARTED bị bỏ quên từ lâu —, cộng chuyến
+     * ĐÃ KẾT THÚC khởi hành từ {@code since} trở đi. Mới nhất lên đầu.
+     *
+     * "Đã kết thúc" được SUY từ whitelist FSM, không khai lại: trạng thái mà từ đó không
+     * đi tiếp được sang trạng thái nào khác (canTransition — hiện là COMPLETED và
+     * CANCELLED).
+     *
+     * @param status trạng thái cần lọc; null = mọi trạng thái
+     */
+    public List<Trip> getTripsForList(TripStatus status, LocalDateTime since) {
+        List<TripStatus> statuses = status != null ? List.of(status) : List.of(TripStatus.values());
+        List<TripStatus> finished = java.util.Arrays.stream(TripStatus.values())
+                .filter(s -> allowedTransitionsFrom(s).equals(List.of(s)))
+                .toList();
+        return tripRepository.findForTripList(statuses, finished, since);
+    }
+
     public Trip getTripById(Long id) {
         return tripRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe với ID: " + id));

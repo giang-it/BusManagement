@@ -9,6 +9,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -25,33 +26,48 @@ public class AdminTripManagementController {
     private final DriverRepository driverRepository;
     private final TripService tripService;
 
-    // ==================== DANH SÁCH TẤT CẢ TRIPS ====================
+    // ==================== DANH SÁCH TRIPS ====================
 
     /**
-     * Xem tất cả các chuyến xe (tất cả trạng thái)
+     * Cửa sổ (ngày) cho chuyến ĐÃ KẾT THÚC trên danh sách; chuyến chưa kết thúc luôn hiện
+     * (QĐ-12, docs/development/forecast_decisions.md). Không có lựa chọn "tất cả": với lịch
+     * sử mô phỏng từ 2023 (~21 nghìn chuyến) trang nạp toàn bộ sẽ nặng ~80 MB — lịch sử
+     * đầy đủ được đọc qua các màn Thống kê / Dự báo, không qua bảng này.
+     */
+    static final List<Integer> FINISHED_WINDOW_DAYS_OPTIONS = List.of(7, 30, 90);
+    static final int DEFAULT_FINISHED_WINDOW_DAYS = 30;
+
+    /**
+     * Danh sách chuyến xe: mọi chuyến chưa kết thúc, cộng chuyến đã kết thúc trong
+     * DEFAULT_FINISHED_WINDOW_DAYS ngày gần nhất.
      */
     @GetMapping("/trips")
     public String listAllTrips(Model model) {
-        // SỬA: Dùng findAllWithDetails() thay vì findAll()
-        populateTripList(model, tripRepository.findAllWithDetails());
+        showTripList(model, null, DEFAULT_FINISHED_WINDOW_DAYS);
         return "admin/trip-list";
     }
 
     /**
-     * Lọc trips theo trạng thái
+     * Lọc trips theo trạng thái và cửa sổ ngày của chuyến đã kết thúc. Giá trị days không
+     * nằm trong danh sách lựa chọn thì dùng mặc định.
      */
     @GetMapping("/trips/filter")
-    public String filterTrips(@RequestParam(required = false) String status, Model model) {
-        if (status != null && !status.isEmpty()) {
-            TripStatus tripStatus = TripStatus.valueOf(status);
-            // SỬA: Dùng findByStatusWithDetails() thay vì findByStatus()
-            populateTripList(model, tripRepository.findByStatusWithDetails(tripStatus));
-        } else {
-            // SỬA: Dùng findAllWithDetails() thay vì findAll()
-            populateTripList(model, tripRepository.findAllWithDetails());
-        }
+    public String filterTrips(@RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer days, Model model) {
+        TripStatus tripStatus = (status != null && !status.isEmpty()) ? TripStatus.valueOf(status) : null;
+        int windowDays = days != null && FINISHED_WINDOW_DAYS_OPTIONS.contains(days)
+                ? days
+                : DEFAULT_FINISHED_WINDOW_DAYS;
+        showTripList(model, tripStatus, windowDays);
         model.addAttribute("selectedStatus", status);
         return "admin/trip-list";
+    }
+
+    private void showTripList(Model model, TripStatus status, int windowDays) {
+        LocalDateTime since = LocalDate.now().minusDays(windowDays).atStartOfDay();
+        populateTripList(model, tripService.getTripsForList(status, since));
+        model.addAttribute("windowDays", windowDays);
+        model.addAttribute("windowDaysOptions", FINISHED_WINDOW_DAYS_OPTIONS);
     }
 
     /**

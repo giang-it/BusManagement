@@ -40,8 +40,16 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        // =========================================================================
 
        /**
-        * Lấy TẤT CẢ chuyến với đầy đủ relationships (route, bus, driver, assistant).
-        * Dùng cho trang danh sách chuyến xe.
+        * Chuyến cho trang danh sách chuyến xe, với đầy đủ relationships (route, bus,
+        * driver, assistant, coDrivers) — xem TripService.getTripsForList.
+        *
+        * Thay cho findAllWithDetails() (nạp TẤT CẢ chuyến): với lịch sử mô phỏng từ
+        * 2023 (~21 nghìn chuyến) trang đó sẽ nặng ~80 MB (QĐ-12). Hai điều kiện:
+        * - status IN :statuses — bộ lọc trạng thái của trang (mọi trạng thái nếu
+        *   không lọc);
+        * - chuyến CHƯA kết thúc vào hết, bất kể ngày; chuyến ĐÃ kết thúc
+        *   (:finishedStatuses) chỉ khi khởi hành từ :since trở đi.
+        * Mới nhất lên đầu, cùng tiền lệ findRunningAndRecentTrips.
         */
        @Query("""
                      SELECT DISTINCT t FROM Trip t
@@ -53,8 +61,13 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      LEFT JOIN FETCH t.assistant a
                      LEFT JOIN FETCH a.user
                      LEFT JOIN FETCH t.coDrivers cd
+                     WHERE t.status IN :statuses
+                       AND (t.status NOT IN :finishedStatuses OR t.departureTime >= :since)
+                     ORDER BY t.departureTime DESC
                      """)
-       List<Trip> findAllWithDetails();
+       List<Trip> findForTripList(@Param("statuses") Collection<TripStatus> statuses,
+                     @Param("finishedStatuses") Collection<TripStatus> finishedStatuses,
+                     @Param("since") LocalDateTime since);
 
        /**
         * Lấy chuyến theo trạng thái với đầy đủ relationships.
