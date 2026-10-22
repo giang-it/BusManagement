@@ -28,8 +28,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -80,6 +82,10 @@ import java.util.Set;
  * <ul>
  * <li>mỗi xe và mỗi tài xế tối đa MỘT chuyến mỗi ngày, chỉ sinh tuyến ≤ 8h — nên không
  * trùng lịch và không ai vượt 8h lái/ngày;</li>
+ * <li>chuyến CÓ SẴN trong DB (Admin tự tạo, hay chuyến thật về sau) giữ xe, tài xế, phụ xe
+ * và tài xế phụ của nó trong MỌI ngày nó chạy — hôm đó bộ sinh không xếp thêm chuyến cho
+ * họ (GĐ3, lỗi #33). Bản GĐ2, như bản Phase 5, chỉ xét chuyến do chính nó sinh nên đã để
+ * một xe chạy hai chuyến cùng lúc;</li>
  * <li>bằng lái phải CÒN HẠN vào ngày khởi hành — hỏi chính Driver.isLicenseValid(date).
  * Bộ sinh cũ thiếu điều kiện này và đã xếp 69 chuyến cho tài xế hết hạn bằng (lỗi #32);</li>
  * <li>số vé không vượt số ghế; số ghế là sức chứa của chính xe được xếp.</li>
@@ -138,6 +144,26 @@ public class HistoricalDataBackfill implements CommandLineRunner {
 
     /** Phút khởi hành của chuyến thêm thứ 1, 2, 3 trong cùng khung. */
     private static final int[] EXTRA_MINUTES = { 30, 40, 50 };
+
+    /**
+     * Chuyến có sẵn ở trạng thái nào thì đã chiếm xe và người: mọi trạng thái trừ CANCELLED —
+     * cùng danh sách mà TripService.buildAvailabilityContext nạp. Khác luật "bận" khi xếp
+     * chuyến TƯƠNG LAI (isBusBusy chỉ tính ACTIVE/DEPARTED/PENDING_APPROVAL): với lịch sử,
+     * chuyến đã COMPLETED cũng đã thật sự dùng xe và người hôm đó.
+     */
+    private static final Set<TripStatus> OCCUPYING_STATUSES = EnumSet.complementOf(EnumSet.of(TripStatus.CANCELLED));
+
+    /** Xe và người (userId của Driver) mà các chuyến CÓ SẴN đã chiếm trong một ngày. */
+    record Occupied(Set<Long> busIds, Set<Long> staffIds) {
+        static final Occupied NONE = new Occupied(Set.of(), Set.of());
+    }
+
+    /**
+     * Một chuyến có sẵn, không do bộ sinh tạo: khoảng [departure, end) nó chạy, xe, và mọi
+     * người trên xe (tài xế, phụ xe, tài xế phụ).
+     */
+    record ExistingTrip(LocalDateTime departure, LocalDateTime end, Long busId, Set<Long> staffIds) {
+    }
 
     /** Một chuyến đã lên kế hoạch, chưa là entity. */
     record PlannedTrip(Bus bus, Driver driver, int seats, int tickets, int minute, boolean extra) {
@@ -217,6 +243,16 @@ public class HistoricalDataBackfill implements CommandLineRunner {
                 HistorySimulation.EPOCH, lastDay, routes.size(), HistorySimulation.DEPARTURE_HOURS.size(),
                 buses.size(), drivers.size());
 
+        Map<LocalDate, Occupied> occupied = loadOccupied(routes, existingDays, lastDay);
+        int occupiedDays = 0;
+        for (LocalDate day : occupied.keySet()) {
+            if (!day.isBefore(HistorySimulation.EPOCH) && !day.isAfter(lastDay) && !existingDays.contains(day)) {
+                occupiedDays++;
+            }
+        }
+        System.out.printf("[Backfill] Chuyến có sẵn (không do bộ sinh tạo) giữ xe hoặc người trong %d ngày cần sinh "
+                + "— hôm đó không xếp thêm chuyến cho họ.%n", occupiedDays);
+
         Map<Long, Double> kmByBusId = new HashMap<>();
         List<String> truthRows = new ArrayList<>();
         int created = 0;
@@ -231,7 +267,8 @@ public class HistoricalDataBackfill implements CommandLineRunner {
                 skippedDays++;
                 continue;
             }
-            List<PlannedSlot> plan = planDay(day, routes, profiles, buses, drivers, simulation);
+            List<PlannedSlot> plan = planDay(day, routes, profiles, buses, drivers,
+                    occupied.getOrDefault(day, Occupied.NONE), simulation);
             List<Trip> regular = new ArrayList<>();
             for (PlannedSlot slot : plan) {
                 if (!slot.trips().isEmpty()) {
@@ -295,16 +332,20 @@ public class HistoricalDataBackfill implements CommandLineRunner {
      * Kế hoạch chạy xe của một ngày: mỗi khung một chuyến thường, rồi chuyến tăng cường
      * trong giới hạn xe và tài xế còn rảnh. Thứ tự xếp các khung được xáo theo ngày (tất
      * định) để không khung nào luôn là khung nhận xe "lệch loại".
+     *
+     * Xe và người trong occupied đã có chuyến khác hôm đó (lỗi #33), nên được coi như đã
+     * dùng ngay từ đầu — cho cả chuyến thường lẫn chuyến thêm. Ngày không có chuyến có sẵn
+     * nhận Occupied.NONE và cho đúng kế hoạch như trước khi có tham số này.
      */
     static List<PlannedSlot> planDay(LocalDate day, List<Route> routes, Map<Long, RouteProfile> profiles,
-            List<Bus> buses, List<Driver> drivers, HistorySimulation simulation) {
+            List<Bus> buses, List<Driver> drivers, Occupied occupied, HistorySimulation simulation) {
 
         int dayIndex = (int) ChronoUnit.DAYS.between(HistorySimulation.EPOCH, day);
         List<Driver> licensed = drivers.stream().filter(d -> d.isLicenseValid(day)).toList();
         List<Bus> busOrder = rotate(buses, dayIndex * 7);
         List<Driver> driverOrder = rotate(licensed, dayIndex * 11);
-        Set<Long> busesUsed = new HashSet<>();
-        Set<Long> driversUsed = new HashSet<>();
+        Set<Long> busesUsed = new HashSet<>(occupied.busIds());
+        Set<Long> driversUsed = new HashSet<>(occupied.staffIds());
 
         record Draft(Route route, int hourIndex, double mean, int demand, boolean closed, boolean cancelled,
                 List<Bus> buses, List<Driver> drivers) {
@@ -394,6 +435,34 @@ public class HistoricalDataBackfill implements CommandLineRunner {
         return plan;
     }
 
+    /**
+     * Mỗi chuyến có sẵn chiếm xe và người của nó trong MỌI ngày lịch mà khoảng
+     * [departure, end) chạm tới: chuyến qua đêm chiếm cả hai ngày, còn chuyến đến đúng 00:00
+     * thì không chạm sang ngày sau. Giữ cả ngày chứ không chỉ giờ trùng — đúng luật "mỗi xe,
+     * mỗi người một chuyến/ngày" mà bộ sinh dựng cho chính nó.
+     */
+    static Map<LocalDate, Occupied> occupiedByDay(Collection<ExistingTrip> trips) {
+        Map<LocalDate, Set<Long>> busIds = new HashMap<>();
+        Map<LocalDate, Set<Long>> staffIds = new HashMap<>();
+        for (ExistingTrip trip : trips) {
+            LocalDate first = trip.departure().toLocalDate();
+            LocalDate last = trip.end().isAfter(trip.departure()) ? trip.end().minusNanos(1).toLocalDate() : first;
+            for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+                if (trip.busId() != null) {
+                    busIds.computeIfAbsent(day, d -> new HashSet<>()).add(trip.busId());
+                }
+                staffIds.computeIfAbsent(day, d -> new HashSet<>()).addAll(trip.staffIds());
+            }
+        }
+        Map<LocalDate, Occupied> occupied = new HashMap<>();
+        Set<LocalDate> days = new HashSet<>(busIds.keySet());
+        days.addAll(staffIds.keySet());
+        for (LocalDate day : days) {
+            occupied.put(day, new Occupied(busIds.getOrDefault(day, Set.of()), staffIds.getOrDefault(day, Set.of())));
+        }
+        return occupied;
+    }
+
     /** Danh sách xoay vòng bắt đầu từ vị trí offset — để tải trải đều qua các ngày. */
     private static <T> List<T> rotate(List<T> items, int offset) {
         if (items.isEmpty()) {
@@ -437,21 +506,75 @@ public class HistoricalDataBackfill implements CommandLineRunner {
      * phút của chuyến thêm). Nạp một lần thay vì hỏi từng khung.
      */
     private Set<LocalDate> existingGeneratorDays(List<Route> routes, LocalDate lastDay) {
-        Set<Integer> minutes = new HashSet<>();
-        minutes.add(0);
-        for (int minute : EXTRA_MINUTES) {
-            minutes.add(minute);
-        }
         Set<LocalDate> days = new HashSet<>();
         List<Long> routeIds = routes.stream().map(Route::getId).toList();
         for (LocalDateTime departure : tripRepository.findDepartureTimesByRouteIdsBetween(routeIds,
                 HistorySimulation.EPOCH.atStartOfDay(), lastDay.plusDays(1).atStartOfDay())) {
-            if (HistorySimulation.DEPARTURE_HOURS.contains(departure.getHour())
-                    && minutes.contains(departure.getMinute())) {
+            if (hasGeneratorTime(departure)) {
                 days.add(departure.toLocalDate());
             }
         }
         return days;
+    }
+
+    /** Giờ khởi hành dạng bộ sinh: 06/12/18 giờ, phút 0 (chuyến thường) hoặc phút của chuyến thêm. */
+    private static boolean hasGeneratorTime(LocalDateTime departure) {
+        if (!HistorySimulation.DEPARTURE_HOURS.contains(departure.getHour())) {
+            return false;
+        }
+        int minute = departure.getMinute();
+        if (minute == 0) {
+            return true;
+        }
+        for (int extraMinute : EXTRA_MINUTES) {
+            if (minute == extraMinute) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Xe và người mà các chuyến CÓ SẴN đã giữ, theo ngày, trên đoạn còn phải sinh — từ ngày
+     * đầu tiên chưa có dữ liệu bộ sinh tới lastDay (lỗi #33). Một truy vấn scalar cho cả
+     * đoạn. Chuyến dạng bộ sinh bị bỏ qua: chúng thuộc những ngày đã được bỏ qua cả ngày,
+     * và bỏ qua chúng giữ cho một lần chạy bổ sung ra đúng như một lần chạy liền.
+     * Package-private để test gọi thẳng được.
+     */
+    Map<LocalDate, Occupied> loadOccupied(List<Route> routes, Set<LocalDate> existingDays, LocalDate lastDay) {
+        LocalDate firstMissing = HistorySimulation.EPOCH;
+        while (!firstMissing.isAfter(lastDay) && existingDays.contains(firstMissing)) {
+            firstMissing = firstMissing.plusDays(1);
+        }
+        if (firstMissing.isAfter(lastDay)) {
+            return Map.of();
+        }
+        Set<Long> generatorRouteIds = new HashSet<>();
+        routes.forEach(r -> generatorRouteIds.add(r.getId()));
+
+        // Một chuyến có n tài xế phụ trả về n dòng (LEFT JOIN coDrivers): gom lại theo id.
+        Map<Long, ExistingTrip> trips = new HashMap<>();
+        for (Object[] row : tripRepository.findResourceUseBetween(OCCUPYING_STATUSES,
+                firstMissing.atStartOfDay(), lastDay.plusDays(1).atStartOfDay())) {
+            Long tripId = (Long) row[0];
+            LocalDateTime departure = (LocalDateTime) row[1];
+            LocalDateTime arrival = (LocalDateTime) row[2];
+            Long routeId = (Long) row[3];
+            Integer routeMinutes = (Integer) row[4];
+            if (departure == null || (generatorRouteIds.contains(routeId) && hasGeneratorTime(departure))) {
+                continue;
+            }
+            LocalDateTime end = arrival != null ? arrival
+                    : routeMinutes != null ? departure.plusMinutes(routeMinutes) : departure;
+            ExistingTrip trip = trips.computeIfAbsent(tripId,
+                    id -> new ExistingTrip(departure, end, (Long) row[5], new HashSet<>()));
+            for (int column = 6; column <= 8; column++) {
+                if (row[column] != null) {
+                    trip.staffIds().add((Long) row[column]);
+                }
+            }
+        }
+        return occupiedByDay(trips.values());
     }
 
     private Trip toTrip(PlannedSlot slot, PlannedTrip planned, LocalDate day, Trip parent) {

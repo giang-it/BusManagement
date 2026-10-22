@@ -1,5 +1,7 @@
 package giang.com.BusManagement.config;
 
+import giang.com.BusManagement.config.HistoricalDataBackfill.ExistingTrip;
+import giang.com.BusManagement.config.HistoricalDataBackfill.Occupied;
 import giang.com.BusManagement.config.HistoricalDataBackfill.PlannedSlot;
 import giang.com.BusManagement.config.HistoricalDataBackfill.PlannedTrip;
 import giang.com.BusManagement.config.HistorySimulation.RouteProfile;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -72,7 +75,8 @@ class HistoricalDataBackfillPlanTest {
         simulation = new HistorySimulation(HistoricalDataBackfill.RANDOM_SEED, List.copyOf(profiles.values()),
                 LAST_DAY);
         for (LocalDate d = HistorySimulation.EPOCH; !d.isAfter(LAST_DAY); d = d.plusDays(1)) {
-            PLANS.put(d, HistoricalDataBackfill.planDay(d, routes, profiles, buses, drivers, simulation));
+            PLANS.put(d, HistoricalDataBackfill.planDay(d, routes, profiles, buses, drivers, Occupied.NONE,
+                    simulation));
         }
     }
 
@@ -187,6 +191,71 @@ class HistoricalDataBackfillPlanTest {
             }
         }
         assertTrue(closedDays > 0, "có ngày đóng tuyến vì bão");
+    }
+
+    /**
+     * Lỗi #33: xe và người mà chuyến có sẵn đã giữ thì không được xếp thêm chuyến nào hôm đó,
+     * kể cả chuyến tăng cường (vốn chọn xe LỚN NHẤT còn rảnh). Lấy đúng ngày nhiều chuyến
+     * thêm nhất, và giữ chính những xe, người mà kế hoạch không có chuyến có sẵn đã dùng —
+     * nên test không thể đậu suông.
+     */
+    @Test
+    void occupiedBusesAndStaff_areNeverUsedThatDay_notEvenForExtraTrips() {
+        LocalDate day = PLANS.entrySet().stream()
+                .max(Comparator.comparingInt(e -> e.getValue().stream()
+                        .mapToInt(s -> s.trips().size() - 1).sum()))
+                .orElseThrow().getKey();
+        List<PlannedTrip> before = PLANS.get(day).stream().flatMap(s -> s.trips().stream()).toList();
+        List<PlannedTrip> extrasBefore = before.stream().filter(PlannedTrip::extra).toList();
+        assertTrue(extrasBefore.size() >= 2, day + " phải có chuyến thêm để test có nghĩa");
+
+        // Giữ: xe của hai chuyến thêm và của một chuyến thường; tài xế của ba chuyến đó.
+        Set<Long> heldBuses = new HashSet<>();
+        Set<Long> heldStaff = new HashSet<>();
+        for (PlannedTrip trip : List.of(extrasBefore.get(0), extrasBefore.get(1), before.get(0))) {
+            heldBuses.add(trip.bus().getId());
+            heldStaff.add(trip.driver().getUserId());
+        }
+
+        List<PlannedSlot> plan = HistoricalDataBackfill.planDay(day, routes, profiles, buses, drivers,
+                new Occupied(heldBuses, heldStaff), simulation);
+
+        int extras = 0;
+        for (PlannedSlot slot : plan) {
+            assertFalse(slot.trips().isEmpty(), day + ": vẫn đủ xe cho mọi chuyến thường");
+            for (PlannedTrip trip : slot.trips()) {
+                assertFalse(heldBuses.contains(trip.bus().getId()), day + ": xe " + trip.bus().getId() + " đang bận");
+                assertFalse(heldStaff.contains(trip.driver().getUserId()),
+                        day + ": tài xế " + trip.driver().getUserId() + " đang bận");
+                extras += trip.extra() ? 1 : 0;
+            }
+        }
+        assertTrue(extras <= 20 - heldBuses.size() - 15, "chuyến thêm chỉ trong số xe CÒN rảnh: " + extras);
+    }
+
+    /** Chuyến có sẵn giữ xe và người trong MỌI ngày nó chạm tới — không hơn, không kém. */
+    @Test
+    void occupiedByDay_holdsEveryCalendarDayATripTouches() {
+        LocalDate d16 = LocalDate.of(2026, 7, 16);
+        Map<LocalDate, Occupied> occupied = HistoricalDataBackfill.occupiedByDay(List.of(
+                // qua đêm: giữ cả hai ngày
+                new ExistingTrip(d16.atTime(21, 53), d16.plusDays(1).atTime(3, 53), 2L, Set.of(7L, 8L)),
+                // tới đúng 00:00: không chạm sang ngày sau
+                new ExistingTrip(d16.plusDays(3).atTime(18, 0), d16.plusDays(4).atStartOfDay(), 5L, Set.of(9L)),
+                // chạy hai ngày, năm người trên xe
+                new ExistingTrip(d16.plusDays(16).atTime(11, 29), d16.plusDays(17).atTime(17, 29), 7L,
+                        Set.of(2L, 3L, 5L, 6L, 7L)),
+                // chưa gán xe, không có giờ đến: chỉ giữ người, chỉ ngày khởi hành
+                new ExistingTrip(d16.plusDays(20).atTime(10, 0), d16.plusDays(20).atTime(10, 0), null, Set.of(4L))));
+
+        assertEquals(Set.of(2L), occupied.get(d16).busIds());
+        assertEquals(Set.of(7L, 8L), occupied.get(d16.plusDays(1)).staffIds());
+        assertEquals(Set.of(5L), occupied.get(d16.plusDays(3)).busIds());
+        assertFalse(occupied.containsKey(d16.plusDays(4)), "tới đúng 00:00 không giữ ngày sau");
+        assertEquals(Set.of(2L, 3L, 5L, 6L, 7L), occupied.get(d16.plusDays(17)).staffIds());
+        assertEquals(Set.of(), occupied.get(d16.plusDays(20)).busIds());
+        assertEquals(Set.of(4L), occupied.get(d16.plusDays(20)).staffIds());
+        assertEquals(6, occupied.size());
     }
 
     // =====================================================================

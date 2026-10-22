@@ -360,6 +360,31 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
        /**
+        * Xe và người của mọi chuyến có trạng thái trong :statuses mà khoảng thời gian
+        * giao với [from, to).
+        *
+        * Dùng bởi HistoricalDataBackfill (GĐ3, lỗi #33): chuyến có sẵn — Admin tự tạo,
+        * hay chuyến thật về sau — giữ xe và người của nó trong ngày, bộ sinh không xếp
+        * thêm chuyến lịch sử cho họ. Mỗi dòng gồm: id chuyến, giờ khởi hành, giờ đến dự
+        * kiến, id tuyến, thời lượng tuyến (phút), id xe, tài xế, phụ xe, MỘT tài xế phụ.
+        * Chuyến có n tài xế phụ cho n dòng (LEFT JOIN coDrivers); không có thì một dòng,
+        * cột cuối null.
+        *
+        * Điều kiện giao khoảng cùng dạng findScheduleForAvailability (kèm nhánh NULL cho
+        * chuyến thiếu giờ đến — bộ sinh tự tính giờ kết thúc theo thời lượng tuyến). Chỉ
+        * scalar, không nạp entity, nên không vướng LAZY khi bộ sinh chạy ngoài session —
+        * cùng khuôn findDemandHistoryByStatus. Chuyến xóa mềm tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t.id, t.departureTime, t.arrivalTimeExpected, r.id, r.estimatedDuration, " +
+                     "b.id, d.userId, a.userId, cd.userId FROM Trip t " +
+                     "LEFT JOIN t.route r LEFT JOIN t.bus b LEFT JOIN t.driver d LEFT JOIN t.assistant a " +
+                     "LEFT JOIN t.coDrivers cd " +
+                     "WHERE t.status IN :statuses AND t.departureTime < :to " +
+                     "AND (t.arrivalTimeExpected IS NULL OR t.arrivalTimeExpected > :from)")
+       List<Object[]> findResourceUseBetween(@Param("statuses") Collection<TripStatus> statuses,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+       /**
         * Kiểm tra xe có đang bận ở các chuyến đi có trạng thái nằm trong
         * danh sách chỉ định hay không
         * Thường dùng để chặn không cho xe đi bảo trì (REPAIRING) khi đang có lịch
