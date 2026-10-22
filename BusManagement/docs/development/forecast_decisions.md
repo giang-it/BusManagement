@@ -36,7 +36,8 @@
 | QĐ-13 | Đo lại bằng Python | Đo lại K, quy tắc "ít nhất 2 lần", λ, EM, cửa sổ lễ, chiều tuyến (kể cả trên dữ liệu Hồng Kông) trên dữ liệu mới |
 | QĐ-14 | Cách làm GĐ3 | Sửa bộ sinh để né xe/người của chuyến có sẵn (lỗi #33); sao lưu và khôi phục thử; tổng duyệt lại trên bản sao; làm ngay; xuất nhu cầu thật; sửa tài liệu; giữ bản sao tới hết GĐ5 |
 | QĐ-15 | Lõi toán Java (GĐ4) | `SlotDemandModel` và `ArrowSolver`, package-private trong `service`, chưa nối vào app; giải hệ theo khối "mũi tên"; bước E cộng phần đuôi nhị thức âm; phải khớp bản Python đã đo trên dữ liệu thật đóng băng (tới một phần triệu); mục tiêu ≤ 2 giây mỗi lần khớp |
-| QĐ-16 | `ForecastService` mới (GĐ5) | Nhu cầu khung từ chuyến `COMPLETED`; khớp lõi GĐ4 và nhớ kết quả trong bộ nhớ; dự báo số khách 7 ngày (thẻ) và 35 ngày (xem trước); cầu nối `predictedOccupancy` cho Recommendation, What-if tới GĐ6; số chuyến cần = max(1; ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉); tự chấm điểm trên số vé thật bằng min(dự báo; số ghế), so với SN4 sạch |
+| QĐ-16 | `ForecastService` mới (GĐ5) | Nhu cầu khung từ chuyến `COMPLETED`; khớp lõi GĐ4 và nhớ kết quả trong bộ nhớ; dự báo số khách 7 ngày (thẻ) và 35 ngày (xem trước); cầu nối `predictedOccupancy` cho Recommendation, What-if tới GĐ6 (bỏ ở GĐ6); số chuyến cần = max(1; ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉); tự chấm điểm trên số vé thật bằng min(dự báo; số ghế), so với SN4 sạch |
+| QĐ-17 | Recommendation và What-if theo nhu cầu (GĐ6) | Mỗi chuyến thêm một thẻ; chuyến thêm chở **khách tràn kỳ vọng** rơi vào ghế của nó (phân phối nhị thức âm của mô hình); giữ chỗ xe + tài xế giữa các thẻ, xét theo lãi kỳ vọng giảm dần; chuyến lỗ vẫn có thẻ, gắn nhãn; What-if nhân hệ số vào số khách, đếm theo chuyến thêm, có dòng "chỉ chạy chuyến có lãi"; bỏ cầu nối `predictedOccupancy` |
 
 Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
@@ -82,7 +83,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
 **Hệ quả đã biết.**
 - Tính toán nặng: bản Python mất 10–25 giây cho mỗi lần khớp. Bản Java (GĐ4) chỉ mất khoảng 0,2–0,6 giây nhờ giải theo khối.
-- Dự báo được 3 màn gọi: màn Dự báo gọi `buildForecastPage()` (`ForecastController.java:47`); `RecommendationService.java:100` và `WhatIfSimulationService.java:147` gọi `buildForecast()`.
+- Dự báo được 3 màn gọi: màn Dự báo gọi `buildForecastPage()` (`ForecastController.java:47`); `RecommendationService.java:134` và `WhatIfSimulationService.java:159` gọi `buildForecast()`.
 - Vì vậy phải nhớ kết quả. Cách làm đã chốt ở QĐ-16 (G5-4): nhớ trong bộ nhớ, khớp lại khi lịch sử đổi; phần tự chấm điểm chỉ màn Dự báo trả.
 
 ### QĐ-2. Đơn vị: nhu cầu của khung giờ (B1)
@@ -92,7 +93,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 **Vì sao** (§11, §12.4):
 - Tỉ lệ lấp đầy bị kẹp ở 100%, nên không thấy được nhu cầu vượt quá một xe. Ở thí nghiệm mô phỏng, app hiện tại có recall cờ tăng cường 0,09 và bỏ lại 18,4% khách dịp Tết.
 - Chỉ đơn vị nhu cầu mới trả lời được câu "cần mấy chuyến".
-- Doanh thu chuyến tăng cường đúng ra là phần khách tràn. Hiện code tính bằng tỉ lệ × sức chứa (`RecommendationService.java:213-215`).
+- Doanh thu chuyến tăng cường đúng ra là phần khách tràn. Tới GĐ5 code còn tính bằng tỉ lệ × sức chứa; GĐ6 (QĐ-17) đổi sang khách tràn kỳ vọng (`ForecastService.extraTripPassengers`).
 - Đã chọn C2 thì bắt buộc phải B1: Tết làm nhu cầu gấp đôi cũng chỉ hiện ra là 100%.
 
 **Hệ quả.**
@@ -459,6 +460,30 @@ Chủ dự án duyệt cả tám đề xuất (*"oke, bạn hãy thực hiện �
     - 41 ô cần tăng cường trên màn Dự báo = 41 thẻ Đề xuất = 41 khung đông của What-if;
     - Đề xuất mất 5,0–6,7 giây với 41 thẻ (trước GĐ5: 14 thẻ, 2,45 giây). What-if ở 70% nhu cầu báo 0 khung đông, trong khi tính theo đơn vị nhu cầu là 2 — hạn chế tạm của cầu nối, GĐ6 sửa;
     - 18 trang trả 200, log sạch; DB thật giữ nguyên (11 bảng, số dòng và `CHECKSUM TABLE`).
+- **Cầu nối G5-1 đã bỏ ở GĐ6** (QĐ-17, G6-6): `ForecastPointDto` không còn `predictedOccupancy`.
+
+### QĐ-17. Recommendation và What-if theo đơn vị nhu cầu — cách làm GĐ6 (chốt 2026-10-23, G6-1…G6-7; đóng M-14)
+
+Vòng thảo luận GĐ6 mở ngày 2026-10-22. Chủ dự án nhờ giải thích lại từng điểm kèm ví dụ và ưu nhược, rồi duyệt cả bảy đề xuất (*"oke, bạn hãy thực hiện đi, tôi đồng ý hết"*). Số liệu của vòng thảo luận ở `forecast_discussion.md` §16.
+
+| # | Quyết định |
+|---|---|
+| G6-1 | **Một chuyến thêm chở khách tràn kỳ vọng (phương án C).** Gọi EO(c) = E[(nhu cầu − c)⁺]: số khách kỳ vọng không có chỗ khi khung chỉ có c ghế, với nhu cầu theo phân phối nhị thức âm quanh dự báo, cùng tham số size mà bước E cuối của lần khớp đã dùng. Chuyến thêm thứ k chở EO(ghế trước nó) − EO(ghế trước nó + ghế của nó); ghế trước nó = xe chuẩn + các chuyến thêm trước nó trong khung. Ghế của một chuyến = sức chứa xe được chọn; chưa chọn được xe thì tính bằng xe chuẩn. Doanh thu = số khách đó × giá vé lịch sử của khung. Không chọn: A — giữ cầu nối "tỉ lệ × sức chứa", coi mọi chuyến thêm là đầy xe (tuần 23–29/10/2026: 41/41 có lãi, +134,8 triệu); B — nhu cầu − số ghế, đơn giản nhưng khung 90–100% luôn ra 0 khách |
+| G6-2 | **Mỗi chuyến thêm một thẻ (C),** ghi "chuyến thêm k/(N − 1)", mỗi thẻ có doanh thu biên của riêng nó. Không chọn: A — mỗi khung một chuyến (bỏ sót chuyến thứ hai đáng chạy dịp Tết); B — một thẻ gồm N − 1 chuyến (che mất chuyến thứ hai lỗ) |
+| G6-3 | **Giữ chỗ tạm giữa các thẻ (B; đóng M-14):** thẻ đủ điều kiện thì xe + tài xế của nó được thêm vào `AvailabilityContext` như một chuyến `PENDING_APPROVAL` — trạng thái của chuyến tăng cường mới tạo — nên các luật sẵn có của `TripService` coi xe, tài xế đó là bận và cộng giờ lái. `TripService` không đổi một dòng. Bỏ cảnh báo "trùng khung". Cổng kiểm tra cuối chạy SQL nên không thấy chuyến giữ chỗ; việc tránh trùng là của bước chọn. Không chọn: A — giữ thẻ độc lập kèm cảnh báo (41 thẻ của tuần 23–29/10 dùng chung 2 xe và 1 tài xế) |
+| G6-4 | **Mọi chuyến thêm đều có thẻ, xét và xếp theo lãi kỳ vọng (C).** Thứ tự xét (và giữ chỗ): lãi kỳ vọng với xe chuẩn, giảm dần, vì lúc đó chưa chọn xe. Thứ tự hiển thị: lợi nhuận với xe được chọn, giảm dần. Thẻ lỗ gắn nhãn "lỗ dự kiến"; phần tóm tắt ghi "X chuyến có lãi · Y chuyến lỗ dự kiến". Ngưỡng 90% vẫn là định nghĩa duy nhất của "cần tăng cường"; chạy hay không do Admin quyết. Nhãn trạng thái `RECOMMENDED` đổi thành "Đủ điều kiện" để không đọc thành "hệ thống khuyên chạy chuyến lỗ". Không chọn: B — chỉ chọn xe cho chuyến có lãi (nhanh hơn, nhưng là chính sách mới: hệ thống tự quyết "không chạy") |
+| G6-5 | **What-if theo nhu cầu (A):** hệ số nhân thẳng vào số khách, không kẹp; số chuyến thêm cần = Σ(số chuyến cần − 1), tính bằng chính `ForecastService.tripsNeeded` — bỏ hằng 0,90 khai báo lại trong `WhatIfSimulationService`; độ phủ vẫn đối chiếu theo ngày bằng `coverableSlots`, mỗi chuyến thêm một phần tử; tiền theo G6-1 với xe chuẩn; trong mỗi ngày, kế hoạch phủ được lấy chuyến có lãi cao trước (cùng thứ tự màn Đề xuất); thêm dòng "nếu chỉ chạy chuyến có lãi". Không chọn: B — chỉ sửa lỗi kẹp (vẫn lệch màn Đề xuất); C — như A nhưng không có dòng chuyến có lãi |
+| G6-6 | **Bỏ cầu nối `predictedOccupancy`** khỏi `ForecastPointDto`; ba test GĐ5 đang kiểm nó đổi sang `demandRatio` |
+| G6-7 | **Kiểm chứng và tài liệu ngay ở GĐ6:** test mới (giữ chỗ, chuyến thêm thứ k, doanh thu biên, thứ tự, hết xe, hạn 8 giờ lái, hàm khách tràn so với scipy); đối chiếu từng thẻ trên màn với Python; chạy app chỉ đọc trên DB thật; viết phần tài liệu What-if còn thiếu; dời số dòng trong các bài học |
+
+- **Giới hạn biết trước, giữ nguyên từ Phase 7/8:** lịch chạy thường lệ của những ngày tới chưa có trong DB, nên xe và tài xế của chuyến chính không bị trừ. Trang Đề xuất chậm theo số thẻ (mỗi thẻ chọn xe, tài xế và qua cổng SQL): tuần thường khoảng 5–7 giây, tuần Tết ước 8–10 giây.
+- **Đã cài ngày 2026-10-23 (commit `81b94af`):**
+  - `SlotDemandModel.expectedOverflow` (khách tràn kỳ vọng, cùng hằng đẳng thức với bước E); `ForecastService.extraTripPassengers`; `ForecastPointDto` bỏ `predictedOccupancy`.
+  - `AvailabilityContext.reserve()` (chỉ thêm dữ liệu); `TripService` không đổi.
+  - `RecommendationService` viết lại phần dựng thẻ: lập danh sách chuyến thêm, xét theo lãi kỳ vọng, giữ chỗ, hiển thị theo lợi nhuận; `RecommendationCardDto`, `RecommendationViewDto` (bỏ `sharedSlotContention`, thêm số khung đông và số thẻ lãi/lỗ); `recommendation.html` (bỏ cảnh báo trùng khung, thêm tóm tắt lãi/lỗ, nhãn "chuyến thêm k/N" và "lỗ dự kiến", trạng thái "Đủ điều kiện").
+  - `WhatIfSimulationService` đếm theo chuyến thêm, tiền theo khách tràn, kế hoạch phủ được lấy chuyến có lãi trước; bỏ hằng 0,90; `WhatIfOutcomeDto` thêm số chuyến thêm cần và dòng chuyến có lãi; `what-if.html`.
+  - **Test:** mới `RecommendationServiceTest` (6) và `WhatIfSimulationServiceTest` (3); thêm vào `ForecastServiceRulesTest` (2), `SlotDemandModelReferenceTest` (1, so với `reference_overflow.csv` do `forecast_research/gd6/overflow_reference.py` tạo bằng scipy), `TripServiceAvailabilityContextTest` (1); `ForecastServiceTest` đổi ba chỗ kiểm cầu nối sang `demandRatio`. 15 lần thử làm hỏng (1 đối chứng + 14 lỗi cài cố ý) đều đúng test đỏ. `mvnw test` **217/217**, 32 lớp.
+  - **Chạy app trên DB thật (chỉ đọc), chân trời 24–30/10/2026:** 41 thẻ, 4 có lãi · 37 lỗ dự kiến, cả tuần −19.113.706đ (chỉ chạy chuyến có lãi +1.750.444đ); mọi thẻ khớp Python tới từng đồng; 41 thẻ dùng 5 xe và 9 tài xế, 0 trùng xe, 0 trùng tài xế, không ai quá 8 giờ lái (trước GĐ6: 2 xe, 1 tài xế). What-if khớp phép tính độc lập ở 70/100/130/150% (70%: 2 chuyến thêm thay cho 0). Đề xuất 4,9–6,0 giây, What-if 0,2–0,3 giây. 17 trang 200, log sạch; DB thật giữ nguyên (11 bảng, số dòng và `CHECKSUM TABLE`).
 
 ---
 
@@ -500,7 +525,7 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | M-11 | **Vé đặt trước (câu F)** | Đề xuất ngày 20/10: không làm trong đợt này; khi thiết kế Booking ở Phase 9 thì lưu thời điểm đặt vé. Chưa duyệt riêng |
 | M-12 | **Thứ tự so với Phase 9** (Customer Portal) | Chưa quyết |
 | M-13 | ~~Thiếu xe dịp Tết trong bộ sinh~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** giữ "mỗi xe 1 chuyến/ngày"; chuyến thêm chỉ trong số xe rảnh (5/ngày) |
-| M-14 | **Nhiều chuyến tăng cường cho cùng một khung.** Recommendation đánh giá từng thẻ độc lập, nên các thẻ cùng khung sẽ đề xuất cùng một xe. Giữ chỗ xe và tài xế đã chọn giữa các thẻ, hay mỗi khung chỉ một thẻ ghi "cần N chuyến"? | Thuộc GĐ6. Phát hiện ngày 2026-10-21 |
+| M-14 | ~~Nhiều chuyến tăng cường cho cùng một khung~~ **ĐÃ CHỐT 2026-10-23, thành QĐ-17 (G6-2, G6-3).** Câu hỏi cũ: Recommendation đánh giá từng thẻ độc lập, nên các thẻ cùng khung sẽ đề xuất cùng một xe. Giữ chỗ xe và tài xế đã chọn giữa các thẻ, hay mỗi khung chỉ một thẻ ghi "cần N chuyến"? | Chốt cả hai vế: mỗi chuyến thêm một thẻ, và giữ chỗ giữa các thẻ. Phát hiện ngày 2026-10-21 |
 | M-15 | ~~Hai đề xuất sau lần đo lại GĐ2~~ (`forecast_discussion.md` §13.5): (1) quy tắc (b) thay quy tắc (a) "ít nhất 2 lần"; (2) EM 5 vòng thay vì 15 | **ĐÃ CHỐT CẢ HAI NGÀY 2026-10-22.** Ý 2 vào QĐ-1, ý 1 vào QĐ-3 (viết lại); đóng M-6. Số đo bổ sung cho ý 1: §13.7 |
 | M-16 | **Chạy bổ sung lịch sử về sau:** chuyến Admin tạo tay đúng 06:00/12:00/18:00 (phút 0, 30, 40, 50) trên một tuyến ≤ 8 giờ sẽ bị bộ sinh coi là chuyến của nó, nên ngày đó bị bỏ qua cả ngày và lịch sử ngày đó chỉ còn chuyến tay. Đánh dấu chuyến bộ sinh (cột mới) hay nhận diện chặt hơn? | Phát hiện khi rà GĐ3 (2026-10-22). GĐ3 không bị: 19 chuyến của chủ dự án không có giờ nào như vậy. Chỉ cần khi chạy bổ sung trước buổi demo sau này |
 
@@ -535,3 +560,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-22 (GĐ3 trên DB thật) | QĐ-11, QĐ-14: ghi kết quả chạy trên DB thật (giống hệt bản sao tổng duyệt tới từng chuyến) |
 | 2026-10-22 (GĐ4) | Thảo luận GĐ4, chủ dự án duyệt G4-1…G4-8: thêm QĐ-15 và dòng của nó ở mục 1. QĐ-1: ghi bản Java và tốc độ đo được. M-5: ghi tốc độ GĐ4 đo được |
 | 2026-10-22 (GĐ5) | Thảo luận GĐ5, chủ dự án duyệt G5-1…G5-8: thêm QĐ-16 và dòng của nó ở mục 1; đóng M-3, M-4 (sớm hơn kế hoạch), M-5, M-9. QĐ-16: thêm "Đã cài" kèm số đo. QĐ-1: ghi nơi gọi dự báo sau GĐ5 |
+| 2026-10-23 (GĐ6) | Thảo luận GĐ6 (mở 2026-10-22), giải thích lại từng điểm kèm ví dụ và ưu nhược; chủ dự án duyệt G6-1…G6-7: thêm QĐ-17 và dòng của nó ở mục 1; đóng M-14. QĐ-16: ghi cầu nối G5-1 đã bỏ. QĐ-17: thêm "Đã cài" kèm số đo |

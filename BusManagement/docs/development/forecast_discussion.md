@@ -968,7 +968,80 @@ Tuyến 1 (chiều rời TP), 06:00:
 
 - Mọi số ở đây đo trên dữ liệu **mô phỏng**; giới hạn ở §12.7 và §13.6 vẫn còn nguyên.
 - Cách 3 dùng số ghế **đã chạy**, một con số chỉ biết sau sự việc. Như vậy vẫn hợp lệ để *chấm điểm*, vì số ghế là quyết định của nhà xe chứ không phải nhu cầu. Nhưng đó không phải dự báo số ghế.
-- 41 ô "cần tăng cường" là chuẩn của GĐ5. Recommendation và What-if đọc chúng qua cầu nối `predictedOccupancy` tới GĐ6 (QĐ-16, G5-1), nên doanh thu thẻ vẫn tính "đầy xe × giá vé".
+- 41 ô "cần tăng cường" là chuẩn của GĐ5. Recommendation và What-if đọc chúng qua cầu nối `predictedOccupancy` tới GĐ6 (QĐ-16, G5-1), nên doanh thu thẻ vẫn tính "đầy xe × giá vé". GĐ6 bỏ cầu nối đó, xem §16.
+
+---
+
+## 16. GĐ6: một chuyến thêm thực sự chở bao nhiêu khách, và các thẻ tranh nhau tài nguyên (2026-10-22 → 23)
+
+> **Số của vòng thảo luận** tái lập được bằng `forecast_research/gd6/discussion_numbers.py` (đọc `reference_forecast.csv`; giá vé, km, thời lượng, xe chuẩn và tham số chi phí của DB thật ngày 2026-10-22). Size nhị thức âm 82,2 là của lần khớp 21/10/2026, dùng cho cả hai tuần để minh họa. **Số trên màn thật** (§16.5) đo ngày 2026-10-23 bằng app chạy chỉ đọc. Quyết định rút ra là QĐ-17.
+
+### 16.1 Cầu nối GĐ5 làm mọi chuyến thêm "có lãi"
+
+Cầu nối G5-1 tính số khách của chuyến thêm = round(min(1; nhu cầu ÷ ghế xe chuẩn) × sức chứa), tức coi chuyến thêm chở đầy như chuyến chính. Nhưng chuyến thêm chỉ chở **khách tràn**. Ba cách tính cho tuần 23–29/10/2026 (41 khung đông, mỗi khung cần đúng 2 chuyến, tức 41 chuyến thêm):
+
+| Cách tính khách của chuyến thêm | Chuyến có lãi | Chuyến lỗ | Lãi cả tuần | Chỉ chạy chuyến có lãi |
+|---|---|---|---|---|
+| Cầu nối GĐ5 (đầy xe) | 41 | 0 | +134,8 triệu | +134,8 triệu |
+| B: nhu cầu − ghế xe chuẩn | 2 | 39 | −28,3 triệu | +1,6 triệu |
+| **C: khách tràn kỳ vọng (chọn)** | **4** | **37** | **−19,1 triệu** | **+1,8 triệu** |
+
+- 21/41 khung chỉ ở mức 90–100% một xe chuẩn: cách B luôn ra 0 khách cho chúng.
+- Một chuyến thêm cần khoảng 7 khách tràn mới hòa vốn: tuyến 1 cần 6,8; tuyến 2: 7,0; tuyến 3: 7,0; tuyến 4: 6,6; tuyến 5: 7,0.
+- **Cách C** coi nhu cầu một ngày là phân phối nhị thức âm quanh con số dự báo (chính phân phối bước E của mô hình dùng): EO(c) = E[(nhu cầu − c)⁺], và chuyến thêm thứ k chở EO(k·s) − EO((k + 1)·s).
+
+| Khung | Nhu cầu / ghế | Cầu nối | B | C (số khách → lãi) |
+|---|---|---|---|---|
+| Tuyến 1, 06:00, 23/10 | 20,1 / 22 | +1,58 triệu | −0,82 triệu | 1,2 khách → −0,68 triệu |
+| Tuyến 4, 18:00, 25/10 | 57,6 / 40 | +4,00 triệu | +1,32 triệu | 17,7 khách → +1,32 triệu |
+| Tuyến 5, 18:00, 25/10 | 28,8 / 22 | +2,71 triệu | −0,03 triệu | 7,1 khách → +0,03 triệu |
+| Tuyến 3, 18:00, 27/10 | 36,2 / 40 | +2,90 triệu | −0,70 triệu | 1,4 khách → −0,56 triệu |
+
+Vòng thảo luận đã dẫn "+1,33 triệu" cho tuyến 4: số đó tính khách tràn của cả khung, EO(40), chứ chưa trừ phần còn tràn sau chuyến thêm, EO(80) ≈ 0,07 khách. Công thức đã cài trừ phần đó, nên ra +1,32 triệu.
+
+### 16.2 Tuần Tết: một khung cần nhiều chuyến thêm (M-14, phần 2)
+
+Tuần 08–14/02/2026, dự báo từ ngày gốc 25/01/2026: **57 khung đông** (36 khung cần 2 chuyến, 17 khung cần 3, 4 khung cần 4), tức **82 chuyến thêm**. Theo cách C: 52 có lãi, 30 lỗ; cả tuần +73,9 triệu, chỉ chạy chuyến có lãi +93,3 triệu.
+
+| Khung | Nhu cầu / ghế | Chuyến thêm 1 | Chuyến thêm 2 |
+|---|---|---|---|
+| Tuyến 1, 06:00, 13/02 | 53,8 / 22 | 21,4 khách → +1,74 triệu | 9,9 khách → +0,37 triệu |
+| Tuyến 2, 06:00, 10/02 | 43,4 / 22 | 18,4 khách → +3,43 triệu | 2,9 khách → −1,22 triệu |
+| Tuyến 1, 06:00, 11/02 | 43,2 / 22 | 18,3 khách → +1,38 triệu | 2,8 khách → −0,48 triệu |
+| Tuyến 2, 06:00, 11/02 | 40,8 / 22 | 17,0 khách → +3,00 triệu | 1,8 khách → −1,55 triệu |
+
+Mỗi khung một thẻ "N − 1 chuyến" sẽ che mất chuyến thứ hai lỗ; mỗi khung chỉ một chuyến thêm sẽ bỏ sót chuyến thứ hai còn lãi (13/02). Vì vậy chọn mỗi chuyến thêm một thẻ (G6-2).
+
+### 16.3 Các thẻ tranh nhau xe và tài xế (M-14, phần 1)
+
+Màn Đề xuất trước GĐ6, mở ngày 2026-10-22: **41 thẻ của 7 ngày chỉ dùng 2 xe** (11A-111.11 cho tuyến xe 22 chỗ, 29A-001.04 cho tuyến xe 40 chỗ) **và đúng 1 tài xế**. Ngày 23/10 người này có 4 chuyến cùng khởi hành 06:00 trên 4 tuyến, cộng hai chuyến Đà Lạt 6 giờ. Lý do: mỗi thẻ chọn độc lập "xe tốt nhất, tài xế rảnh nhất", nên thẻ nào cũng chọn cùng một chỗ. Màn chỉ hiện cảnh báo "trùng khung".
+
+### 16.4 What-if theo nhu cầu (tuần 23–29/10, mọi chuyến thêm được phủ)
+
+| Mức nhu cầu | Chuyến thêm cần | Cầu nối GĐ5 đếm | Có lãi | Chạy hết | Chỉ chạy chuyến có lãi |
+|---|---|---|---|---|---|
+| 70% | 2 | 0 khung | 0 | −1,4 triệu | — |
+| 100% | 41 | 41 khung | 4 | −19,1 triệu | +1,8 triệu |
+| 130% | 88 | 87 khung | 38 | −12,3 triệu | +24,8 triệu |
+| 150% | 103 | 100 khung | 51 | +28,6 triệu | +60,0 triệu |
+
+Ở 70%, cầu nối nhân hệ số vào tỉ lệ **đã kẹp** ở 100% (khung cần 1,5 xe thành "100% × 0,7 = 70%"), nên báo 0. Từ 130%, có khung cần 3 chuyến, nên số chuyến thêm vượt số khung.
+
+### 16.5 Trên màn thật sau khi cài (2026-10-23, chỉ đọc)
+
+Hôm nay là 23/10 nên chân trời là 24–30/10. Thứ Sáu 30/10 có đúng dự báo của thứ Sáu 23/10 (xu hướng đóng băng, không có lễ), nên mọi con số tổng của tuần trùng với §16.1.
+- **Màn Đề xuất:** 41 khung đông → 41 thẻ, cả 41 "Đủ điều kiện"; **4 có lãi · 37 lỗ dự kiến**; cả tuần −19.113.706đ, chỉ chạy chuyến có lãi +1.750.444đ.
+- **Đối chiếu Python từng thẻ** (EO cộng trực tiếp bằng scipy, size 82,2086 của lần khớp Python cùng ngày gốc): số khách khớp ở 1 chữ số thập phân, doanh thu, chi phí, lợi nhuận khớp **tới từng đồng** ở cả 41 thẻ.
+- **M-14 đã hết:** 41 thẻ dùng **5 xe và 9 tài xế**; 0 cặp trùng xe (cửa sổ ±1 giờ), 0 cặp trùng tài xế (±30 phút), không ai quá 8 giờ lái; nhiều nhất 6 giờ/người/ngày.
+- **What-if** khớp phép tính độc lập ở 70/100/130/150% (số chuyến thêm, độ phủ, chi phí, doanh thu, lợi nhuận, dòng "chỉ chạy chuyến có lãi" — tới từng đồng). Ở 100%, tiền What-if bằng tổng các thẻ vì mọi thẻ chạy xe chuẩn.
+- **Tốc độ:** màn Đề xuất 4,9–6,0 giây (41 thẻ); What-if 0,2–0,3 giây; màn Dự báo lần đầu 6,7 giây, lần sau 0,16 giây.
+
+### 16.6 Điều phải nói thật
+
+- Mọi số ở đây vẫn trên dữ liệu **mô phỏng** (§12.7, §13.6, §15.5).
+- "Khách tràn kỳ vọng" dựa vào giả định nhu cầu một ngày theo nhị thức âm với **một** độ phân tán chung cho mọi chuỗi — đúng giả định bước E của mô hình. Nó không tính sai số của chính con số dự báo.
+- Lỗ dự kiến của đa số chuyến thêm tuần thường là kết luận **kinh doanh** về giá vé và chi phí đang cấu hình, không phải lỗi của ngưỡng 90%: ngưỡng là quy tắc dịch vụ (chừa chỗ, không bỏ khách), còn lãi/lỗ là thông tin cho Admin.
+- Lịch chạy thường lệ của những ngày tới không có trong DB, nên xe của chuyến chính không bị trừ khi giữ chỗ.
 
 ---
 

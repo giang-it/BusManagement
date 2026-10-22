@@ -2218,16 +2218,16 @@ Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
   - Hiện thông báo "Chưa đủ dữ liệu lịch sử để dự báo" kèm ngưỡng và đúng lệnh chạy profile `backfill`
   - Khối tự chấm điểm, biểu đồ và bảng hệ số lễ **tự ẩn** thay vì hiện 0
 
-### TC_FC_009 — Cầu nối: Đề xuất và What-if vẫn chạy trên dự báo mới
+### TC_FC_009 — Đề xuất và What-if đọc cùng một dự báo
 
 - **Mã TC:** TC_FC_009
-- **Tên Kịch Bản:** Regression — hai màn đọc dự báo không phải sửa (G5-1, tạm tới GĐ6)
+- **Tên Kịch Bản:** Regression — hai màn tiêu thụ dự báo theo đơn vị nhu cầu (GĐ6, QĐ-17; trước đó là cầu nối tạm G5-1)
 - **Các bước thực hiện:** Mở `/admin/analytics/recommendation` và `/admin/analytics/what-if` cùng lúc với trang Dự báo
 - **Kết quả mong đợi:**
   - HTTP 200 cả hai
-  - Số thẻ Đề xuất **đúng bằng** số ô đỏ của bảng 7 ngày (TC_RC_002 vẫn đúng)
-  - Số khung đông của What-if ở hệ số nhu cầu 100% bằng số ô đỏ
-  - Biết trước, tới GĐ6: doanh thu thẻ vẫn "đầy xe × giá vé"; What-if dưới 100% nhu cầu đếm thiếu khung nóng vì tỉ lệ bị kẹp 100% trước khi nhân
+  - Số khung đông của màn Đề xuất và của What-if ở hệ số nhu cầu 100% **đúng bằng** số ô đỏ của bảng 7 ngày
+  - Số thẻ Đề xuất = số "Chuyến thêm cần" của What-if ở 100% = Σ(số chuyến cần − 1) của các ô đỏ (TC_RC_002, TC_WI_001)
+  - Doanh thu theo khách tràn, không còn "đầy xe × giá vé" (TC_RC_001); What-if dưới 100% vẫn đếm đúng (TC_WI_002)
 
 ---
 
@@ -2286,65 +2286,155 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/vehicle-replacem
 
 ---
 
-## MODULE 10 — ĐỀ XUẤT TĂNG CƯỜNG (Phase 7, bước 2)
+## MODULE 10 — ĐỀ XUẤT TĂNG CƯỜNG (Phase 7, bước 2–3; chuyển sang đơn vị nhu cầu ở GĐ6 của đợt thiết kế lại dự báo, 2026-10-23, QĐ-17)
 
-Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`. Điều kiện chung: đã chạy `backfill` để Dự báo có dữ liệu.
+Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`. Điều kiện chung: đã chạy `backfill` để Dự báo có dữ liệu. Mỗi thẻ là **một chuyến thêm**. Các luật còn được khoá bằng test tự động: `RecommendationServiceTest` (6, đi qua DB test), `ForecastServiceRulesTest` và `SlotDemandModelReferenceTest` (số khách tràn), `TripServiceAvailabilityContextTest` (giữ chỗ).
 
-### TC_RC_001 — Thẻ dựng đúng và doanh thu khớp công thức
+### TC_RC_001 — Mỗi chuyến thêm một thẻ; số khách và tiền khớp phép tính độc lập
 
 - **Mã TC:** TC_RC_001
-- **Tên Kịch Bản:** Happy path — mỗi tín hiệu tăng cường thành một thẻ, doanh thu đúng
+- **Tên Kịch Bản:** Happy path — số trên thẻ phải khớp phép tính độc lập
 - **Điều kiện tiên quyết:** Dự báo có ít nhất một ngày-khung vượt ngưỡng tăng cường; đội xe/tài xế còn tài nguyên rảnh cho các khung tương lai
-- **Các bước thực hiện:** Mở `/admin/analytics/recommendation`
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/recommendation`
+  2. Với vài thẻ, tính lại bằng Python (`scipy`): số khách = EO(ghế trước nó) − EO(ghế trước nó + ghế xe của thẻ), EO(c) = E[(nhu cầu − c)⁺] với nhu cầu theo nhị thức âm quanh dự báo của ô đó trên trang Dự báo, cùng size của lần khớp; ghế trước nó = xe chuẩn + các thẻ "chuyến thêm" trước nó của cùng khung
+  3. Đối chiếu giá vé bằng SQL: giá của chuyến `COMPLETED` gần nhất cùng (tuyến, giờ khởi hành)
 - **Kết quả mong đợi:**
   - **HTTP 200**, không ném `TemplateProcessingException`/`SpelEvaluationException`/`LazyInitializationException`
-  - Số thẻ **đúng bằng** số ngày-khung `needsReinforcement = true` của Dự báo (không hơn, không kém)
-  - Với thẻ RECOMMENDED: `Số khách KV = round(tỉ lệ dự báo × sức chứa xe được chọn)`, và `Doanh thu = Số khách KV × giá vé`; giá vé = giá của chuyến COMPLETED gần nhất cùng (tuyến, giờ) — đối chiếu bằng SQL độc lập
-  - Thẻ xếp theo tỉ lệ dự báo **giảm dần**
+  - Số thẻ của một khung = "cần N chuyến" trên trang Dự báo − 1; thẻ ghi "Chuyến thêm k/(N − 1)"
+  - "Số khách KV" khớp bước 2 (1 chữ số thập phân); doanh thu = số khách × giá vé (làm tròn tới đồng); chi phí = nhiên liệu/km × km + lương/giờ × giờ × số tài xế; lợi nhuận = doanh thu − chi phí
+  - Ví dụ trên DB thật (2026-10-23): tuyến Niệm Nghĩa → Mỹ Đình, 18:00, 25/10: 57,6 khách / xe 40 chỗ, chuyến thêm chở 17,7 khách, lãi 1.324.275đ
   - Trang **không** tạo chuyến/không phân công (DB không đổi trước và sau khi mở nhiều lần)
+  - ⚠️ Nếu thẻ của khung 20,1 khách / xe 22 chỗ hiện ~20 khách (đầy xe) thì cầu nối cũ đã quay lại
 
-### TC_RC_002 — Engine chỉ đọc `needsReinforcement`, không tự định nghĩa "hot"
+### TC_RC_002 — Engine không tự định nghĩa "hot"
 
 - **Mã TC:** TC_RC_002
-- **Tên Kịch Bản:** Regression — không sinh chỗ thứ tư cho ngưỡng 0.90
+- **Tên Kịch Bản:** Regression — không sinh chỗ mới cho ngưỡng 0.90
 - **Điều kiện tiên quyết:** Như TC_RC_001
-- **Các bước thực hiện:** Đối chiếu số thẻ với số ô đỏ ("cần tăng cường") trên trang Dự báo cùng thời điểm
+- **Các bước thực hiện:** Đối chiếu với trang Dự báo cùng thời điểm: số khung đông và tổng (số chuyến cần − 1) của các ô đỏ
 - **Kết quả mong đợi:**
-  - Số thẻ khớp chính xác số ô `needsReinforcement` bên Dự báo
+  - "Chuyến thêm cần … cho X khung dự báo đông" khớp chính xác: X = số ô đỏ; số chuyến thêm = Σ(N − 1)
   - ⚠️ Nếu ai đó nhét lại việc so sánh với 0.90 vào `RecommendationService`, con số sẽ lệch khỏi Dự báo — case này bắt được
 
-### TC_RC_003 — Cảnh báo trùng khung (đánh giá độc lập)
+### TC_RC_003 — Giữ chỗ: các thẻ "Đủ điều kiện" chạy được cùng lúc
 
 - **Mã TC:** TC_RC_003
-- **Tên Kịch Bản:** Trung thực — hai thẻ cùng (ngày, giờ) có thể trùng tài nguyên
-- **Điều kiện tiên quyết:** Có từ hai tuyến trở lên cùng được dự báo đông ở cùng một ngày + giờ khởi hành
-- **Các bước thực hiện:** Mở trang, quan sát khối cảnh báo
+- **Tên Kịch Bản:** Thay case "cảnh báo trùng khung" cũ (đã bỏ ở GĐ6, M-14)
+- **Điều kiện tiên quyết:** Có nhiều thẻ cùng ngày và giờ khởi hành, hoặc một khung cần từ 3 chuyến
+- **Các bước thực hiện:** Mở trang; liệt kê xe và tài xế của các thẻ "Đủ điều kiện" cùng thời lượng tuyến
 - **Kết quả mong đợi:**
-  - Hiện cảnh báo "danh sách gợi ý, không phải lịch phân công khả thi đồng thời" khi `sharedSlotContention = true`
-  - Cảnh báo **không** hiện khi không có khung nào trùng (tính từ dữ liệu, không viết cứng)
+  - **Không** xe nào xuất hiện ở hai thẻ có khoảng [giờ đi − 1h, giờ đến + 1h] giao nhau
+  - **Không** tài xế nào ở hai thẻ có khoảng [giờ đi − 30 phút, giờ đến + 30 phút] giao nhau, và không ai quá 8 giờ lái trong một ngày
+  - Không còn cảnh báo "danh sách gợi ý, không phải lịch phân công khả thi đồng thời"
+  - Trên DB thật (2026-10-23): 41 thẻ dùng 5 xe và 9 tài xế, 0 trùng xe, 0 trùng tài xế, nhiều nhất 6 giờ lái/người/ngày. Trước GĐ6: 41 thẻ dùng chung 2 xe và 1 tài xế
+  - Tự động: `RecommendationServiceTest.slotNeedingThreeTrips_…`, `…oneBus_…`, `…reservedTrips_countTowardTheEightHourDrivingLimit`
 
-### TC_RC_004 — Thiếu tài nguyên: thẻ vẫn hiện, không doanh thu
+### TC_RC_004 — Thiếu tài nguyên: thẻ vẫn hiện, tính với xe chuẩn
 
 - **Mã TC:** TC_RC_004
-- **Tên Kịch Bản:** Edge case — không có xe/tài xế hợp lệ rảnh cho khung
-- **Điều kiện tiên quyết:** Một khung được dự báo đông nhưng mọi xe (đúng loại, chưa quá hạn bảo trì) hoặc mọi tài xế đều bận/không hợp lệ trong cửa sổ đó
+- **Tên Kịch Bản:** Edge case — không có xe/tài xế hợp lệ rảnh cho chuyến thêm
+- **Điều kiện tiên quyết:** Một khung cần nhiều chuyến thêm hơn số xe (hoặc tài xế) còn rảnh trong cửa sổ đó — ví dụ chỉ còn một xe phù hợp
 - **Các bước thực hiện:** Mở trang
 - **Kết quả mong đợi:**
-  - Thẻ mang trạng thái **NO_RESOURCE**, nêu rõ thiếu xe hay thiếu tài xế
-  - **Không** hiển thị doanh thu (không có xe ⇒ không có sức chứa để quy ra số khách)
+  - Thẻ mang trạng thái **Thiếu tài nguyên**, ghi rõ thiếu xe hay thiếu tài xế
+  - Thiếu xe: không có biển số; số khách, doanh thu, lợi nhuận **vẫn hiện**, tính với xe chuẩn (ghi chú nói rõ "số khách tính với xe chuẩn N chỗ")
   - Trang vẫn **HTTP 200**, không crash
+  - Tự động: `RecommendationServiceTest.oneBus_theSecondExtraTripOfTheSameHour_hasNoResource`
 
-### TC_RC_005 — Predicate in-memory ≡ điều kiện SQL (test tự động)
+### TC_RC_005 — Predicate in-memory ≡ điều kiện SQL, và chuyến giữ chỗ (test tự động)
 
 - **Mã TC:** TC_RC_005
-- **Tên Kịch Bản:** Tương đương — tối ưu preload không đổi hành vi
+- **Tên Kịch Bản:** Tương đương — tối ưu preload không đổi hành vi; giữ chỗ đi qua đúng luật cũ
 - **Điều kiện tiên quyết:** Chạy `mvnw test` (integration test `TripServiceAvailabilityContextTest`, DB `busmanagement_test`)
 - **Các bước thực hiện:** `./mvnw test`
 - **Kết quả mong đợi:**
   - `isBusBusy` / `isDriverBusyInWindow` / `getDrivingHoursForDate` cho **đúng cùng kết quả** ở nhánh SQL (`ctx = null`) và nhánh preload (`ctx != null`) qua mọi ca biên: chạm/vượt biên khoảng thời gian, loại trừ chuyến, CANCELLED/COMPLETED, thiếu giờ đến (null), và ba vai trò tài xế chính/phụ/phụ xe
+  - Một chuyến giữ chỗ (`PENDING_APPROVAL`, chưa lưu) làm xe bận, tài xế bận và cộng giờ lái ở nhánh preload; nhánh SQL **không** thấy nó (không ghi DB)
   - Có "neo" khẳng định ca dương thật-sự-dương để test không pass rỗng nghĩa
   - ⚠️ Nếu ai sửa một nhánh mà quên nhánh kia, hoặc thu hẹp phạm vi preload sai, case này vỡ
-  - **Bảo toàn hành vi (kiểm bằng tay):** bật/tắt tối ưu preload cho ra trang recommendation **byte-identical** (đã xác minh khi ship: ~18,7s → ~0,97s, nội dung không đổi)
+  - **Bảo toàn hành vi (kiểm bằng tay):** bật/tắt tối ưu preload cho ra trang recommendation **byte-identical** (đã xác minh khi ship Phase 7: ~18,7s → ~0,97s, nội dung không đổi)
+
+### TC_RC_006 — Chuyến lỗ dự kiến vẫn có thẻ; xếp theo lãi
+
+- **Mã TC:** TC_RC_006
+- **Tên Kịch Bản:** Trung thực — ngưỡng 90% vẫn là định nghĩa duy nhất, lãi/lỗ là thông tin (G6-4)
+- **Điều kiện tiên quyết:** Có khung vừa quá 90% xe chuẩn (khách tràn ít)
+- **Các bước thực hiện:** Mở trang, xem cột lợi nhuận và khối tóm tắt "Lãi / lỗ dự kiến"
+- **Kết quả mong đợi:**
+  - Thẻ lỗ vẫn hiện, lợi nhuận đỏ kèm nhãn **"lỗ dự kiến"**; trạng thái vẫn có thể là "Đủ điều kiện" (chạy được ≠ có lãi)
+  - Thẻ xếp theo lợi nhuận **giảm dần**; khối tóm tắt đếm đúng số thẻ lãi và lỗ
+  - Trên DB thật (2026-10-23): 4 chuyến có lãi · 37 chuyến lỗ dự kiến; nếu chỉ chạy 4 chuyến có lãi thì lãi 1.750.444đ
+  - Tự động: `RecommendationServiceTest.slotNeedingThreeTrips_…` (chuyến thêm 2/2 lỗ, xếp sau)
+
+### TC_RC_007 — Xe khan hiếm về chuyến có lãi trước
+
+- **Mã TC:** TC_RC_007
+- **Tên Kịch Bản:** Thứ tự xét — chuyến lãi cao giữ xe trước, không phải chuyến sớm nhất (G6-4)
+- **Điều kiện tiên quyết:** Hai khung chồng giờ trên cùng tuyến, chỉ một xe phù hợp: khung sớm vừa quá 90% (chuyến thêm lỗ), khung muộn đông hẳn (chuyến thêm có lãi)
+- **Các bước thực hiện:** Mở trang
+- **Kết quả mong đợi:**
+  - Chuyến thêm có lãi của khung muộn "Đủ điều kiện"; chuyến thêm lỗ của khung sớm "Thiếu tài nguyên"
+  - Tự động: `RecommendationServiceTest.scarceBus_goesToTheMostProfitableExtraTrip_notTheEarliest`
+
+---
+
+## MODULE 11 — MÔ PHỎNG KỊCH BẢN / WHAT-IF (Phase 8; chuyển sang đơn vị nhu cầu ở GĐ6, 2026-10-23, QĐ-17)
+
+Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô phỏng. Trang là `GET /admin/analytics/what-if`, nhận `deltaBuses`, `deltaDrivers`, `demandFactorPercent`, `fuelCostPerKm`, `driverWagePerHour`. Các luật còn được khoá bằng `WhatIfSimulationServiceTest` (3, đi qua DB test) và `WhatIfCoverageTest` (11, JUnit thuần).
+
+### TC_WI_001 — Ở 100% nhu cầu, What-if khớp màn Đề xuất
+
+- **Mã TC:** TC_WI_001
+- **Tên Kịch Bản:** Happy path — hai màn cùng nói về một kế hoạch
+- **Các bước thực hiện:** Mở `/admin/analytics/what-if` (không tham số) và `/admin/analytics/recommendation`
+- **Kết quả mong đợi:**
+  - HTTP 200 cả hai; hai cột Hiện trạng và Kịch bản giống nhau
+  - "Khung dự báo đông" = số khung đông của màn Đề xuất; "Chuyến thêm cần" = số thẻ
+  - Khi mọi thẻ đều chạy xe chuẩn và đội xe phủ hết: chi phí, doanh thu, lợi nhuận và dòng "Nếu chỉ chạy chuyến có lãi" bằng tổng của các thẻ, tới từng đồng
+  - Trên DB thật (2026-10-23): 41 khung, 41 chuyến thêm, phủ 41/41, lỗ 19.113.706đ; chỉ chạy chuyến có lãi: 4 chuyến, lãi 1.750.444đ
+  - Phần "Throughput được suy từ dữ liệu" ghi 15,0h ÷ (3,0h + 1,0h) = 3,75 chuyến/xe/ngày
+
+### TC_WI_002 — Hệ số nhu cầu nhân vào số khách, không kẹp trước
+
+- **Mã TC:** TC_WI_002
+- **Tên Kịch Bản:** Regression — lỗi cũ "50% tới 90% đều ra 0 khung đông"
+- **Các bước thực hiện:** Mở `/admin/analytics/what-if?demandFactorPercent=70`, rồi `=130`, `=150`
+- **Kết quả mong đợi:**
+  - 70%: vẫn còn chuyến thêm khi khung cần quá 1,1 xe chuẩn (trên DB thật: 2 chuyến, lỗ 1.436.922đ) — trước GĐ6 trang báo 0
+  - 130% và 150%: số chuyến thêm **lớn hơn** số khung đông, vì có khung cần từ 3 chuyến (trên DB thật: 87 khung / 88 chuyến; 100 khung / 103 chuyến, lãi 28.637.628đ)
+  - Tự động: `WhatIfSimulationServiceTest.demandFactor_scalesPassengers_notAClampedRate`
+
+### TC_WI_003 — Độ phủ đối chiếu theo từng ngày (lỗi #7)
+
+- **Mã TC:** TC_WI_003
+- **Tên Kịch Bản:** Regression — năng lực ngày vắng không "cho vay" sang ngày cao điểm
+- **Các bước thực hiện:** Giảm mạnh tài xế hoặc xe (ví dụ `deltaDrivers=-32`)
+- **Kết quả mong đợi:**
+  - Độ phủ < 100% và nút thắt đúng bên bị giảm; số "phủ được" = ⌊Σ theo ngày của min(chuyến thêm cần trong ngày, năng lực một ngày)⌋
+  - Tự động: `WhatIfCoverageTest` (11 test)
+
+### TC_WI_004 — Thiếu năng lực: kế hoạch phủ được lấy chuyến có lãi trước
+
+- **Mã TC:** TC_WI_004
+- **Tên Kịch Bản:** Tiền của kế hoạch phủ được nói về đúng các chuyến sẽ chạy
+- **Các bước thực hiện:** Giảm xe để năng lực một ngày nhỏ hơn số chuyến thêm cần trong ngày đông nhất
+- **Kết quả mong đợi:**
+  - Trong mỗi ngày, các chuyến có lãi kỳ vọng cao được phủ trước (cùng thứ tự màn Đề xuất giữ xe)
+  - Dòng "Nếu chỉ chạy chuyến có lãi" không bao giờ lớn hơn số chuyến phủ được
+  - Ví dụ trên DB thật: 3 xe, 3 tài xế, 300% nhu cầu → phủ 56/249 chuyến thêm (22,5%), nút thắt tài xế, cả 56 chuyến được phủ đều có lãi
+  - Tự động: `WhatIfSimulationServiceTest.whenCapacityIsShort_theCoveredPlanTakesTheMostProfitableTripsFirst`
+
+### TC_WI_005 — Ghi đè chi phí không lưu, giá trị vô nghĩa bị bỏ qua
+
+- **Mã TC:** TC_WI_005
+- **Tên Kịch Bản:** Edge case — đầu vào của phiên mô phỏng
+- **Các bước thực hiện:**
+  1. Mở trang với `fuelCostPerKm=9000&driverWagePerHour=60000`, rồi mở `/admin/cost-parameters`
+  2. Mở trang với `fuelCostPerKm=0`, `demandFactorPercent=10`, `demandFactorPercent=500`
+- **Kết quả mong đợi:**
+  - Bước 1: cột Kịch bản đổi chi phí; màn tham số chi phí và DB **không** đổi
+  - Bước 2: giá 0 hoặc âm bị coi là "không ghi đè" (dùng giá cấu hình); hệ số bị kẹp về 50% và 300%; HTTP 200
 
 ---
 
@@ -2414,6 +2504,13 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
 > TC_INC_012/TC_INC_013. Phase 4 (Đề xuất tài xế khả dụng) cũng chưa có case nào. Đây là nợ
 > tài liệu, không phải nợ tính năng.
+
+> **Viết lại 2026-10-23 (đợt thiết kế lại dự báo, GĐ6, QĐ-17):** Module 10 viết lại theo đơn vị nhu cầu:
+> 7 case `TC_RC_001`–`TC_RC_007` (TC_RC_003 cũ "cảnh báo trùng khung" thành "giữ chỗ" vì cảnh báo đó đã bỏ;
+> thêm TC_RC_006 chuyến lỗ dự kiến, TC_RC_007 xe khan hiếm về chuyến có lãi). Thêm Module 11 — What-if, 5 case
+> `TC_WI_001`–`TC_WI_005` (Phase 8 trước đây chưa có case nào). TC_FC_009 viết lại. Các luật mới còn được khoá
+> bằng `RecommendationServiceTest`, `WhatIfSimulationServiceTest`, `ForecastServiceRulesTest`. Bảng thống kê phía
+> trên vẫn **cố ý chưa cộng thêm**, cùng lý do ghi ở dưới.
 
 > **Viết lại 2026-10-22 (đợt thiết kế lại dự báo, GĐ5, QĐ-16):** Module 8 viết lại theo dự báo nhu cầu
 > của khung: 9 case `TC_FC_001`–`TC_FC_009` (TC_FC_003 cũ "chu kỳ cuối tuần" bỏ cùng mô hình cũ; TC_FC_004 cũ

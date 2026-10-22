@@ -552,16 +552,21 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
   **Quyết định vẫn đúng** (fetch bag + `DISTINCT` vẫn là vấn đề riêng), chỉ lý do
   là lạc hậu. Cùng loại với defect #3.
 - **What-if: khung thiếu giá vé lịch sử vào chi phí nhưng không vào doanh thu**
-  (`WhatIfSimulationService.java:242-262`) → lợi nhuận bị hụt, màn không nói có bao
-  nhiêu khung được định giá. Phase 7 không bị vì thẻ thiếu giá thì `profit = null`.
+  (`WhatIfSimulationService.java:258-266` và `286-294`; từ GĐ6 đơn vị là chuyến thêm, luật
+  không đổi) → lợi nhuận bị hụt, màn không nói có bao nhiêu chuyến được định giá; dòng
+  "nếu chỉ chạy chuyến có lãi" của GĐ6 bỏ qua chuyến không có giá. Phase 7 không bị vì thẻ thiếu giá thì `profit = null`.
   Hiện chưa cắn: cả 15 chuỗi đều cần ≥28 chuyến `COMPLETED` tại (tuyến, giờ) đó và
   `findPriceHistoryByStatus` đã lọc `price IS NOT NULL`.
 - **What-if: công thức throughput thoái hoá nếu chỉ còn 1 khung giờ đủ điều kiện**
-  (`deriveThroughput`, dòng 294-302): `operatingWindow = maxHour + avgDur − minHour`
+  (`deriveThroughput`, dòng 404-427): `operatingWindow = maxHour + avgDur − minHour`
   → còn đúng `avgDur` → `tripsPerBusPerDay = avgDur/(avgDur+1) < 1`, tức một xe không
   chạy nổi một chuyến/ngày. Chưa xảy ra (dữ liệu có 06/12/18 → window 15.0h, đã đo).
   `MIN_OBSERVATIONS = 28` không bảo đảm có ≥2 khung giờ.
-- **What-if: mọi hệ số nhu cầu từ 50% đến 90% đều cho kết quả y hệt nhau** (0 khung
+- ~~**What-if: mọi hệ số nhu cầu từ 50% đến 90% đều cho kết quả y hệt nhau**~~ **✅ HẾT TỪ
+  GĐ6 (2026-10-23, QĐ-17 G6-5, chủ dự án duyệt):** hệ số giờ nhân vào **số khách** dự báo,
+  không kẹp, và số chuyến thêm tính bằng `ForecastService.tripsNeeded`. Trên DB thật, 70%
+  nhu cầu báo 2 chuyến thêm (lỗ 1,44 triệu) thay cho 0; khoá bằng
+  `WhatIfSimulationServiceTest.demandFactor_scalesPassengers_notAClampedRate`. Mô tả cũ: (0 khung
   đông, cả cột thành "—", badge xanh "Đủ năng lực"). Toán học: cần
   `predicted × factor > 0.90` mà `ForecastService.predict()` kẹp `predicted ≤ 1.0`
   ⇒ phải có `factor > 0.90`. Đã kiểm ở 90% và 70%: giống hệt.
@@ -578,7 +583,8 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
   `DashboardService`/`ForecastService`/`DriverRecommendationService` và
   `DispatchController`/`RecommendationService`, vì bản gốc là `private` trong
   `TripService` và mở rộng visibility cho một màn chỉ-đọc không đáng đánh đổi.
-  **Là tính năng.** (Xem thêm #8: chỉ nửa "đọc cờ ở hệ số 100%" của ghi chú đó là
+  **Là tính năng.** *(GĐ6, 2026-10-23: What-if không còn khai lại `0.90` — nó gọi
+  `ForecastService.tripsNeeded`; `8.0` và `PREP_BUFFER_HOURS` vẫn khai lại như cũ.)* (Xem thêm #8: chỉ nửa "đọc cờ ở hệ số 100%" của ghi chú đó là
   chưa được hiện thực.)
 - **Nhân bản `estimateCost` và `loadLatestPrices()` sang `WhatIfSimulationService`:**
   đúng là nhân bản (12 dòng `loadLatestPrices` giống từng chữ, cùng công thức chi
@@ -586,7 +592,9 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
   `RecommendationService`, nên tái dùng đòi hỏi đúng cái mở-rộng-visibility mà chủ
   dự án **đã từ chối** cho hằng số ⇒ nhất quán về tinh thần với một khuôn đã duyệt.
   Và đã kiểm: hai bản ra **cùng con số** (khác biệt duy nhất là `round(Σ)` so với
-  `Σ round()`, lệch < 1đ/khung). **Không tính là lỗi**; nếu muốn gom về một chỗ thì
+  `Σ round()`, lệch < 1đ/khung). *(GĐ6: What-if làm tròn từng chuyến như màn Đề xuất —
+  hàm `tripCost` — nên ở 100% nhu cầu, tiền hai màn bằng nhau tới từng đồng khi thẻ chạy xe
+  chuẩn; đo trên DB thật 2026-10-23.)* **Không tính là lỗi**; nếu muốn gom về một chỗ thì
   đó là quyết định kiến trúc của chủ dự án.
 - **Dòng "Tổng ghế đội xe" tự mâu thuẫn với dòng "Xe khả dụng":** dự đoán ban đầu
   là Δxe = −13 sẽ ra 0 xe mà vẫn còn ghê. Đo thật: `AVG(capacity)` toàn đội = 35.30,

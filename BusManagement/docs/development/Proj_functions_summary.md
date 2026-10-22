@@ -352,9 +352,10 @@ Hai hàm `...Assistants...` áp **ba** điều kiện đầu trừ trần 8h —
 - **API kiểm tra nghiệp vụ dạng dry-run** (Phase 3) — `ValidationResult` + `TripService.validateBusForTripDryRun()` / `validateStaffForTripDryRun()`: bọc `try`/`catch` quanh **chính hai validator sẵn có** (mục 6.7), trả về kết quả đạt/không đạt thay vì ném exception. Hai validator gốc và cả 4 nơi gọi kiểu ném exception **không bị sửa một dòng nào**. Chỉ bắt `IllegalArgumentException` — loại mà validator dùng để báo vi phạm nghiệp vụ; lỗi kỹ thuật (NPE, lỗi truy cập dữ liệu…) vẫn được ném lên chứ không bị biến thành "tài nguyên không hợp lệ". Giữ nguyên fail-fast nên mỗi kết quả chỉ mang **một** lý do — quy tắc đầu tiên bị vi phạm. Không có UI: đây là API để Decision Support (Phase 7) gọi.
 - **Bộ sinh dữ liệu lịch sử** (Phase 5; viết lại ở GĐ2 của đợt thiết kế lại dự báo, 2026-10-21) — `HistoricalDataBackfill` + `HistorySimulation`, `@Profile("backfill")`: mô phỏng **nhu cầu** của từng khung từ 01/01/2023 tới hôm qua rồi cắt theo số ghế mà một "nhà xe quá khứ" thật sự chạy (vé = min(nhu cầu, ghế)), làm đầu vào cho Dự báo nhu cầu, vì dữ liệu vận hành thật không tích lũy kịp trong thời gian làm đồ án. Tất định theo từng ngày (mốc cố định, không phụ thuộc ngày chạy); chạy lại bỏ qua cả ngày đã có, không nhân đôi, không cần cột đánh dấu nào vào `Trip`; từ chối chạy khi DB còn dữ liệu của bộ sinh cũ. Mỗi xe, mỗi tài xế một chuyến/ngày, kể cả với chuyến có sẵn trong DB — chuyến chưa hủy giữ xe, tài xế, phụ xe và tài xế phụ của nó trong mọi ngày nó chạm tới (GĐ3, lỗi #33, `TripRepository.findResourceUseBetween`); bằng lái còn hạn vào ngày chạy (xem `setup_guide.md` §4.3). Km của chuyến hoàn thành được cộng vào **cả** `odometer` **lẫn** `lastMaintenanceOdometer`, nên `kmSinceLastMaintenance` — và do đó mọi quy tắc bảo dưỡng — không đổi.
 - **Đề xuất tài xế khả dụng** (Phase 4, đọc-only, xem mục 15) — deliverable trụ cột 2 đầu tiên: ai còn hạn mức giờ lái trong một ngày Admin chọn, lọc theo đúng ràng buộc mà `validateStaffForTrip()` sẽ áp.
-- **Dự báo nhu cầu** (Phase 6, đọc-only, xem mục 16) — module duy nhất có tính dự đoán: tỉ lệ lấp đầy theo tuyến × khung giờ cho 7 ngày tới, kèm tự chấm điểm sai số trên dữ liệu giữ lại.
+- **Dự báo nhu cầu** (Phase 6, đọc-only, xem mục 16; viết lại ở GĐ5 của đợt thiết kế lại dự báo) — module duy nhất có tính dự đoán: số khách muốn đi của từng tuyến × khung giờ, 7 ngày cho thẻ và 35 ngày xem trước, kèm tự chấm điểm trên số vé thật.
 - **Đề xuất thay thế phương tiện** (Phase 7 bước 1, đọc-only, xem mục 17) — xếp hạng cả đội xe theo km trọn đời và tần suất sự cố. Đây cũng là **đường đọc đầu tiên** của dữ liệu sự cố: trước đó `incidents` chỉ được ghi vào chứ chưa nuôi quyết định nào.
-- **Đề xuất tăng cường** (Phase 7 bước 2, đọc-only, xem mục 18) — người điều phối ghép Dự báo + Chọn tài nguyên + Cổng ràng buộc: mỗi khung giờ được dự báo đông thành một thẻ kèm xe, tài xế và doanh thu ước tính (chỉ doanh thu; chi phí bị chặn). Tính lại mỗi lần xem, không tạo chuyến. Có `AvailabilityContext` nạp lịch một lần để chọn tài nguyên trên bộ nhớ (~19× nhanh hơn) mà luật vẫn nằm nguyên trong `TripService`.
+- **Đề xuất tăng cường** (Phase 7 bước 2–3, đọc-only, xem mục 18; chuyển sang đơn vị nhu cầu ở GĐ6) — người điều phối ghép Dự báo + Chọn tài nguyên + Cổng ràng buộc: mỗi chuyến thêm mà khung dự báo đông cần là một thẻ, kèm xe, tài xế, số khách tràn nó chở được, doanh thu, chi phí và lợi nhuận. Xe + tài xế được giữ chỗ giữa các thẻ. Tính lại mỗi lần xem, không tạo chuyến. Có `AvailabilityContext` nạp lịch một lần để chọn tài nguyên trên bộ nhớ (~19× nhanh hơn) mà luật vẫn nằm nguyên trong `TripService`.
+- **Mô phỏng kịch bản (What-if)** (Phase 8, đọc-only, xem mục 19) — thêm/bớt xe, tài xế, đổi nhu cầu hay chi phí thì phục vụ được bao nhiêu chuyến thêm cần thiết, với chi phí và lãi bao nhiêu. Số học tổng hợp, không chạy lại engine phân công.
 
 **Chưa làm (có trong spec nhưng không có code):**
 - Đặt vé, chọn ghế, thanh toán online (Client/User module — toàn bộ).
@@ -454,6 +455,7 @@ Thành phần **AI Prediction**, và là module **duy nhất có tính dự đo�
 - **Controller:** `ForecastController` — 1 `GET`, không tham số, gọi `buildForecastPage()`. Chỉ inject Service.
 - **Service:** `ForecastService` — `@Transactional(readOnly = true)`, inject `TripRepository`, `RouteRepository`, `BusRepository`. Hai cửa:
   - `buildForecast()` cho Recommendation, What-if và phần chính của màn;
+  - hai hàm tĩnh dùng chung cho hai màn kia: `tripsNeeded()` (số chuyến cần) và `extraTripPassengers()` (số khách một chuyến thêm chở được, mục 18.4);
   - `buildForecastPage()` thêm phần tự chấm điểm, chỉ màn Dự báo dùng.
 - **Lõi toán:** `SlotDemandModel` (mô hình) và `ArrowSolver` (đại số), package-private trong `service`, viết ở GĐ4 (QĐ-15), khớp bản Python đã đo tới 10⁻⁸. `ForecastService` chỉ gom dữ liệu, gọi mô hình và dựng màn hình.
 - **DTO:**
@@ -475,10 +477,7 @@ Một **khung** = một tuyến, một giờ khởi hành, một ngày; một **
 **Nhu cầu**: số khách muốn đi cả khung, không kẹp ở số ghế (QĐ-2). Tỉ lệ lấp đầy của mô hình cũ kẹp ở 100%, nên không thấy được nhu cầu vượt một xe: Tết làm nhu cầu gấp đôi cũng chỉ hiện ra là "100%".
 - **Cần tăng cường** khi nhu cầu > 90% số ghế **xe chuẩn** của tuyến. Đây đúng là ngưỡng `Trip.needsReinforcement()`, chỉ thay số vé thật bằng nhu cầu dự báo. Xe chuẩn là `Route.suitableBusType`; tuyến chưa có loại xe thì lấy sức chứa trung bình đội xe, như What-if.
 - **Số chuyến cần** = max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉). Số này ≥ 2 đúng khi cần tăng cường, nên vẫn chỉ một định nghĩa "chuyến nóng".
-- **Cầu nối tới GĐ6:** hai trường `predictedOccupancy` = min(1, nhu cầu ÷ ghế xe chuẩn) và `needsReinforcement` giữ nguyên tên, nên Recommendation và What-if chạy tiếp mà không sửa code. Hệ quả tạm:
-  - số thẻ Đề xuất đổi theo dự báo mới;
-  - doanh thu thẻ vẫn tính "đầy xe × giá vé";
-  - What-if dưới 100% nhu cầu đếm thiếu khung nóng, vì tỉ lệ đã bị kẹp trước khi nhân.
+- **Recommendation và What-if đọc thẳng nhu cầu** (GĐ6, QĐ-17): mỗi khung cần (số chuyến cần − 1) chuyến thêm, và một chuyến thêm chở **khách tràn kỳ vọng** rơi vào ghế của nó, theo phân phối nhị thức âm mà mô hình học được (mục 18.4). Trường cầu nối `predictedOccupancy` của GĐ5 đã bỏ.
 
 ### 16.4. Mô hình
 Hồi quy Poisson theo lịch, khớp chung mọi chuỗi (QĐ-1, QĐ-3):
@@ -557,39 +556,108 @@ Service tự tính số xe chưa có sự cố nào; khi con số đó chiếm t
 
 ## 18. Module: Đề xuất tăng cường (Recommendation Engine) — `RecommendationController` (`/admin/analytics/recommendation`)
 
-Bước 2 của Phase 7 (chỉ doanh thu — phần chi phí bị chặn vì domain không có dữ liệu chi phí). Trả lời *"khung giờ nào sắp tới được dự báo đông, và ta có thể chạy chuyến tăng cường bằng xe + tài xế nào, thu về bao nhiêu?"*. Là **người điều phối**, không phải bộ dự báo hay bộ luật: nó ghép nối Dự báo (mục 16) + Chọn tài nguyên (`TripService`) + Cổng ràng buộc (Phase 3). Chỉ đọc: không tạo chuyến, không phân công ai.
+Bước 2–3 của Phase 7; chuyển sang đơn vị nhu cầu ở GĐ6 của đợt thiết kế lại dự báo (2026-10-23, QĐ-17 trong `forecast_decisions.md`). Trả lời *"khung giờ nào sắp tới được dự báo đông, cần thêm mấy chuyến, mỗi chuyến thêm chạy bằng xe + tài xế nào, chở thêm được bao nhiêu khách, lãi hay lỗ bao nhiêu?"*. Là **người điều phối**, không phải bộ dự báo hay bộ luật: nó ghép nối Dự báo (mục 16) + Chọn tài nguyên (`TripService`) + Cổng ràng buộc (Phase 3). Chỉ đọc: không tạo chuyến, không phân công ai.
 
 ### 18.1. Cấu trúc
 - **Controller:** `RecommendationController` — 1 `GET`, không tham số. Chỉ inject Service.
-- **Service:** `RecommendationService` — `@Transactional(readOnly = true)`, inject `ForecastService`, `TripService`, `RouteRepository`, `TripRepository`.
-- **DTO:** `RecommendationCardDto` (một thẻ), `RecommendationViewDto` (toàn màn hình, kèm độ tươi dữ liệu forecast), `RecommendationStatus` (enum: `RECOMMENDED` / `STALE` / `NO_RESOURCE`).
+- **Service:** `RecommendationService` — `@Transactional(readOnly = true)`, inject `ForecastService`, `TripService`, `RouteRepository`, `TripRepository`, `CostParameterService`.
+- **DTO:**
+  - `RecommendationCardDto`: một chuyến thêm — khung, nhu cầu và xe chuẩn, "chuyến thêm k/(N − 1)", xe, tài xế, số khách, giá vé, doanh thu, chi phí, lợi nhuận;
+  - `RecommendationViewDto`: toàn màn hình — số khung đông, số chuyến thêm, số thẻ đủ điều kiện / thiếu tài nguyên / có lãi / lỗ dự kiến, độ tươi dữ liệu dự báo, tham số chi phí đang dùng;
+  - `RecommendationStatus`: `RECOMMENDED` (màn hình ghi "Đủ điều kiện") / `STALE` / `NO_RESOURCE`.
+- **`AvailabilityContext`:** lịch nạp sẵn một lần (mục 18.7), có `reserve()` để giữ chỗ tạm (mục 18.5).
 - **Template:** `admin/recommendation.html`.
-- Hai truy vấn projection mới trên `TripRepository`: `findPriceHistoryByStatus(...)` (giá vé lịch sử) và `findScheduleForAvailability(...)` (nạp lịch một lần cho preload).
+- Hai truy vấn projection trên `TripRepository`: `findPriceHistoryByStatus(...)` (giá vé lịch sử) và `findScheduleForAvailability(...)` (nạp lịch một lần cho preload).
 
-### 18.2. Dây chuyền (đúng thiết kế roadmap, không đổi)
+### 18.2. Dây chuyền
 ```
 buildForecast() [gọi ĐÚNG 1 lần]
-   → mỗi ForecastPointDto có needsReinforcement = true
-   → dựng Trip TẠM (tuyến + ngày + khung giờ, giống createExtraTrip())
-   → chọn xe (selectBestAvailableBus)  +  chọn tài xế (selectBestAvailableDriver)
-   → doanh thu = round(tỉ lệ dự báo × sức chứa xe được chọn) × giá vé lịch sử
-   → cổng Business Rule Validation (dry-run Phase 3)
-   → thẻ: RECOMMENDED / STALE / NO_RESOURCE
+   → mỗi ForecastPointDto có needsReinforcement: (tripsNeeded − 1) chuyến thêm
+   → mỗi chuyến thêm: lãi kỳ vọng nếu chạy xe chuẩn (khách tràn × giá vé − chi phí)
+   → xét lần lượt theo lãi kỳ vọng giảm dần:
+        dựng Trip TẠM (tuyến + ngày + khung giờ, giống createExtraTrip())
+        → chọn xe (selectBestAvailableBus) + chọn tài xế (selectBestAvailableDriver) trên AvailabilityContext
+        → số khách = khách tràn rơi vào ghế của xe được chọn; doanh thu, chi phí, lợi nhuận
+        → cổng Business Rule Validation (dry-run Phase 3)
+        → qua cổng: giữ chỗ xe + tài xế trong AvailabilityContext
+   → thẻ RECOMMENDED / STALE / NO_RESOURCE, hiển thị theo lợi nhuận giảm dần
 ```
 
-### 18.3. Chỉ đọc `needsReinforcement`, KHÔNG biết ngưỡng 0.90
-Quyết định "đông" đã được nướng sẵn vào `ForecastPointDto.needsReinforcement` (mục 16). Engine chỉ đọc cờ boolean đó ⇒ ngưỡng 0.90 vẫn nằm đúng ba chỗ cũ (`Trip`, `DashboardService`, `ForecastService`), không sinh chỗ thứ tư. Đây là cách "dùng lại ngưỡng" đúng nghĩa: tiêu thụ **quyết định**, không tiêu thụ **con số**.
+### 18.3. Không biết ngưỡng 0,90
+Engine đọc `needsReinforcement` và `tripsNeeded` của dự báo (mục 16.3), và hỏi `ForecastService.extraTripPassengers()` một chuyến thêm chở được bao nhiêu khách. Ngưỡng 0,90 và phân phối nhu cầu đều thuộc về dự báo; engine không giữ con số nào của riêng nó. Đây là cách "dùng lại ngưỡng" đúng nghĩa: tiêu thụ **quyết định**, không tiêu thụ **con số**.
 
-### 18.4. Doanh thu lấy giá từ đâu
-Chuyến ứng viên chưa có `Trip` nên chưa có giá. Giá = `Trip.price` của **chuyến COMPLETED gần nhất cùng (tuyến, giờ khởi hành)** — giá THẬT đã tồn tại, "consume as-is" đúng Non-Goal của Section 4, không bịa số. Lấy qua projection scalar (`findPriceHistoryByStatus`), không nạp entity `Trip`.
+### 18.4. Một chuyến thêm chở bao nhiêu khách (G6-1)
+Chuyến thêm chỉ chở khách **tràn**: phần nhu cầu mà xe chuẩn và các chuyến thêm trước nó không chở hết. Nhu cầu của một ngày là một phân phối — nhị thức âm quanh con số dự báo, với độ phân tán mà mô hình học được ở bước EM — nên số khách tràn là một **kỳ vọng**:
+- EO(c) = E[(nhu cầu − c)⁺]: số khách kỳ vọng không có chỗ khi khung chỉ có c ghế (`SlotDemandModel.expectedOverflow`, đối chiếu với scipy);
+- chuyến thêm thứ k chở EO(ghế trước nó) − EO(ghế trước nó + ghế của nó), với ghế trước nó = xe chuẩn + các chuyến thêm trước nó trong khung;
+- ghế của một chuyến = sức chứa xe được chọn; chưa chọn được xe thì tính bằng xe chuẩn, để thẻ vẫn cho biết chuyến đó đáng giá bao nhiêu.
 
-### 18.5. Thẻ tính lại mỗi lần xem, không lưu DB (chốt của chủ dự án)
-Không entity mới, không ghi, không tạo chuyến — nhất quán với hai màn Decision Support kia. Hệ quả đã ghi rõ: `STALE` gần như không xuất hiện trong mô hình này (chọn và cổng chạy sát nhau trên cùng một ảnh chụp), nhưng vẫn giữ để trung thực khi cổng thật sự trượt và làm lưới an toàn nếu logic chọn/validate về sau lệch nhau. Cổng validation cuối chạy **SQL trực tiếp** (độc lập với dữ liệu preload) — tái xác nhận đúng khuôn `confirmAutoAssignedTrip`.
+Ví dụ tuyến 1, 06:00, 23/10/2026: dự báo 20,1 khách, xe chuẩn 22 chỗ. Phép trừ "nhu cầu − ghế" ra 0; cầu nối cũ của GĐ5 coi như chuyến thêm chở đầy 20 khách; tính theo phân phối thì có ngày tới 25 người, và trung bình chuyến thêm chở khoảng 1,2 khách.
 
-### 18.6. Tối ưu hiệu năng bằng preload — luật vẫn một nguồn
-Tái dùng `findBestAvailableDriver` cho từng thẻ khiến trang mất ~18,7s (mỗi thẻ quét N tài xế × truy vấn giờ/bận). Thêm `AvailabilityContext` (class **chỉ chứa dữ liệu**) nạp toàn bộ lịch liên quan **một lần**, cùng các overload nhận `ctx` trên `findBestAvailableBus/Driver` và ba leaf (`isBusBusy`, `isDriverBusyInWindow`, `getDrivingHoursForDate`): `ctx == null` → SQL như cũ (đường phân công **không đụng tới**); `ctx != null` → xét trên dữ liệu preload. Kết quả **~0,97s (≈19×)**, nội dung **byte-identical**. Luật tính giờ tách vào `sumDrivingHours(...)` (một chỗ); predicate giao-khoảng/vai-trò là phép toán nền tảng, có test `TripServiceAvailabilityContextTest` chốt Java ≡ SQL ở các ca biên.
+Tiền:
+- doanh thu = số khách × giá vé của chuyến `COMPLETED` gần nhất cùng (tuyến, giờ khởi hành), lấy qua projection scalar, không nạp entity `Trip`;
+- chi phí = nhiên liệu/km × quãng đường + lương/giờ × thời lượng × số tài xế, theo `CostParameters` (Admin cấu hình);
+- lợi nhuận = doanh thu − chi phí, **có thể âm**. Với giá và chi phí hiện tại, một chuyến thêm cần khoảng 7 khách tràn mới hòa vốn.
 
-### 18.7. Giới hạn có chủ đích
-- **Mỗi thẻ được đánh giá độc lập**, pool không "giữ chỗ" giữa các thẻ — hai thẻ cùng (ngày, giờ) có thể cùng đề xuất một xe/tài xế. Giao diện bật cảnh báo khi phát hiện trùng khung. Đây là **danh sách gợi ý**, không phải lịch phân công khả thi đồng thời.
-- **Chỉ doanh thu, chưa có chi phí** — domain không có trường chi phí nào; ước tính chi phí (bước 3) bị chặn chờ chủ dự án quyết.
-- **MVP một tài xế chính**: mọi tuyến vào được forecast đều ≤ 8h nên `requiredDrivers` luôn = 1; chuyến > 8h (cần tài xế phụ + phụ xe) nằm ngoài phạm vi bước 2.
+### 18.5. Mỗi chuyến thêm một thẻ, giữ chỗ giữa các thẻ (G6-2, G6-3, G6-4)
+- Khung cần N chuyến có N − 1 thẻ, ghi "chuyến thêm k/(N − 1)", mỗi thẻ có doanh thu biên của riêng nó. Dịp Tết, chuyến thêm thứ hai của một khung có thể lỗ trong khi chuyến thứ nhất lãi.
+- **Thứ tự xét:** lãi kỳ vọng tính với xe chuẩn, giảm dần — lúc đó chưa chọn xe. Trong một khung, chuyến thêm sau chở ít khách tràn hơn chuyến trước, nên các chuyến của một khung luôn được xét theo thứ tự 1, 2, …
+- **Giữ chỗ tạm:** thẻ qua cổng thì xe + tài xế của nó được thêm vào `AvailabilityContext` như một chuyến `PENDING_APPROVAL` (trạng thái của chuyến tăng cường mới tạo). Các luật sẵn có của `TripService` coi xe, tài xế đó là bận và cộng giờ lái của chuyến, nên thẻ sau không chọn trùng xe, trùng tài xế hay vượt 8 giờ lái. `TripService` không đổi một dòng. Chuyến xét trước được giữ xe trước, nên khi thiếu xe, chuyến đáng chạy nhất có xe.
+- **Mọi chuyến thêm đều có thẻ**, kể cả chuyến lỗ: thẻ lỗ mang nhãn "lỗ dự kiến", phần tóm tắt ghi "X chuyến có lãi · Y chuyến lỗ dự kiến". Ngưỡng 90% vẫn là định nghĩa duy nhất của "cần tăng cường"; chạy hay không do Admin quyết. Trạng thái `RECOMMENDED` hiện là "Đủ điều kiện" — nó nói chuyến **chạy được**, không nói chuyến có lãi.
+- **Hiển thị** theo lợi nhuận giảm dần (với xe được chọn), rồi ngày, tuyến, giờ, thứ tự chuyến thêm.
+- Trước GĐ6 mỗi thẻ chọn độc lập: 41 thẻ của tuần 23–29/10/2026 dùng chung 2 xe và 1 tài xế, người này có 4 chuyến cùng khởi hành 06:00 ngày 23/10. Màn hình chỉ cảnh báo "trùng khung"; cảnh báo đó đã bỏ.
+- **Trên DB thật ngày 2026-10-23** (chân trời 24–30/10): 41 khung đông, 41 thẻ, cả 41 đủ điều kiện, dùng 5 xe và 9 tài xế, không trùng xe, không trùng tài xế, nhiều nhất 6 giờ lái/người/ngày; 4 chuyến có lãi · 37 lỗ dự kiến. Số khách và tiền của từng thẻ khớp phép tính Python độc lập tới từng đồng.
+
+### 18.6. Thẻ tính lại mỗi lần xem, không lưu DB (chốt của chủ dự án)
+Không entity mới, không ghi, không tạo chuyến — nhất quán với các màn Decision Support khác. Chuyến giữ chỗ chỉ sống trong `AvailabilityContext` của một lần xem. Hệ quả đã ghi rõ: `STALE` gần như không xuất hiện trong mô hình này (chọn và cổng chạy sát nhau trên cùng một ảnh chụp), nhưng vẫn giữ để trung thực khi cổng thật sự trượt và làm lưới an toàn nếu logic chọn/validate về sau lệch nhau. Cổng validation cuối chạy **SQL trực tiếp** (độc lập với dữ liệu preload) — tái xác nhận đúng khuôn `confirmAutoAssignedTrip`; vì vậy nó không thấy chuyến giữ chỗ, và việc tránh trùng giữa các thẻ là của bước chọn.
+
+### 18.7. Tối ưu hiệu năng bằng preload — luật vẫn một nguồn
+Tái dùng `findBestAvailableDriver` cho từng thẻ khiến trang mất ~18,7s (mỗi thẻ quét N tài xế × truy vấn giờ/bận). Thêm `AvailabilityContext` (class **chỉ chứa dữ liệu**) nạp toàn bộ lịch liên quan **một lần**, cùng các overload nhận `ctx` trên `findBestAvailableBus/Driver` và ba leaf (`isBusBusy`, `isDriverBusyInWindow`, `getDrivingHoursForDate`): `ctx == null` → SQL như cũ (đường phân công **không đụng tới**); `ctx != null` → xét trên dữ liệu preload. Kết quả lúc ship Phase 7 **~0,97s (≈19×)**, nội dung **byte-identical**. Luật tính giờ tách vào `sumDrivingHours(...)` (một chỗ); predicate giao-khoảng/vai-trò là phép toán nền tảng, có test `TripServiceAvailabilityContextTest` chốt Java ≡ SQL ở các ca biên, và (từ GĐ6) chốt rằng một chuyến giữ chỗ được chính các luật đó nhìn thấy.
+
+### 18.8. Giới hạn có chủ đích
+- **Lịch chạy thường lệ của những ngày tới chưa có trong DB** (dữ liệu mô phỏng dừng ở ngày cuối có dữ liệu), nên xe và tài xế của chuyến chính không bị trừ: một thẻ có thể chọn đúng chiếc xe sẽ chạy chuyến chính. Có từ Phase 7, GĐ6 giữ nguyên.
+- **Chậm theo số thẻ:** mỗi thẻ chọn xe, chọn tài xế và qua cổng SQL (~0,1 giây mỗi thẻ). Đo ngày 2026-10-23: 4,9–6,0 giây với 41 thẻ; tuần Tết số thẻ có thể gấp đôi.
+- Luật "sắp tới hạn bảo dưỡng" xét km của **từng chuyến riêng lẻ**, không cộng dồn các chuyến giữ chỗ của cùng một xe — giống hệt khi Admin tự xếp nhiều chuyến tương lai cho một xe.
+- MVP một tài xế chính: mọi tuyến dự báo được đều ≤ 8 giờ; chuyến dài cần tài xế phụ / phụ xe nằm ngoài bước này.
+- `STALE` gần như không xuất hiện (mục 18.6).
+
+---
+
+## 19. Module: Mô phỏng kịch bản (What-if) — `WhatIfController` (`/admin/analytics/what-if`)
+
+Phase 8; chuyển sang đơn vị nhu cầu ở GĐ6 của đợt thiết kế lại dự báo (2026-10-23, QĐ-17). Trả lời *"nếu thêm/bớt xe hay tài xế, nhu cầu tăng hay giảm, giá nhiên liệu hay lương đổi, thì đội xe phục vụ được bao nhiêu chuyến thêm cần thiết, với chi phí và lãi bao nhiêu?"*. Thành phần Decision Support cuối cùng: Dự báo (mục 16) → Đề xuất (mục 18) → What-if. Chỉ đọc.
+
+### 19.1. Cấu trúc
+- **Controller:** `WhatIfController` — 1 `GET`, nhận năm cần gạt qua query param: `deltaBuses`, `deltaDrivers` (có thể âm), `demandFactorPercent` (%, kẹp 50–300), `fuelCostPerKm`, `driverWagePerHour` (để trống = dùng cấu hình). Chỉ inject Service.
+- **Service:** `WhatIfSimulationService` — `@Transactional(readOnly = true)`, inject `ForecastService`, `BusRepository`, `DriverRepository`, `RouteRepository`, `CostParameterService`, `TripRepository`.
+- **DTO:** `WhatIfScenarioDto` (cần gạt), `WhatIfOutcomeDto` (một cột kết quả), `WhatIfViewDto` (hai cột + cách suy năng lực + độ tươi dữ liệu), `WhatIfBottleneck` (nút thắt: không / xe / tài xế / cân bằng).
+- **Template:** `admin/what-if.html`.
+
+### 19.2. Hai cột cạnh nhau
+- **Hiện trạng:** xe `READY` thật, tài xế đang hoạt động, nhu cầu 100%, chi phí đang cấu hình.
+- **Kịch bản:** áp các cần gạt. Ghi đè chi phí **chỉ sống trong phiên mô phỏng**, không bao giờ lưu (màn `/admin/cost-parameters` vẫn là nơi cấu hình duy nhất).
+
+### 19.3. Năng lực: mô hình đếm, không phải phân công
+- Số chuyến một xe chạy được mỗi ngày = cửa sổ vận hành ÷ (thời lượng chuyến trung bình + 1 giờ chuẩn bị xe). Cửa sổ và thời lượng lấy từ chính các tuyến trong dự báo; 1 giờ chuẩn bị là `BUS_PREP_BUFFER_HOURS` của `TripService`, khai báo lại kèm chú thích trỏ nguồn. Trên DB thật: 15 giờ ÷ (3 + 1) giờ = 3,75 chuyến/xe/ngày.
+- Trần theo tài xế = số tài xế × 8 giờ ÷ thời lượng chuyến trung bình. Năng lực mỗi ngày = cái nhỏ hơn trong hai trần; bên nhỏ hơn là nút thắt.
+- **Không** gọi `selectBestAvailableBus/Driver`, không giữ chỗ, không kiểm trùng lịch hay bảo trì từng xe — tính khả thi cụ thể chỉ được xác nhận ở màn Đề xuất (mục 18). Màn hình nói rõ điều này.
+
+### 19.4. Nhu cầu tính bằng số khách (G6-5)
+- Nhu cầu kịch bản = nhu cầu dự báo × hệ số, **không kẹp**.
+- Số chuyến thêm cần = Σ (số chuyến cần − 1), với số chuyến cần tính bằng chính `ForecastService.tripsNeeded()` của màn Dự báo — lớp này không khai báo lại ngưỡng 0,90. Ở 100%, số chuyến thêm bằng số thẻ màn Đề xuất.
+- Trước GĐ6 hệ số nhân vào tỉ lệ lấp đầy **đã kẹp** ở 100%, nên một khung cần 1,5 xe thành "100% × 0,7 = 70%": ở 70% nhu cầu màn báo 0 khung đông, trong khi tính theo số khách còn 2 chuyến thêm.
+
+### 19.5. Độ phủ đối chiếu theo từng ngày (lỗi #7)
+Số chuyến thêm phủ được = ⌊Σ theo ngày của min(số chuyến thêm cần trong ngày, năng lực một ngày)⌋. Năng lực nhàn rỗi của ngày vắng không chuyển sang ngày cao điểm được — một xe rảnh hôm thứ Ba không chạy hộ chuyến thứ Bảy. Đây là sửa chữa của lỗi #7 (`current_bugs_found.md`); công thức gộp cũ báo "đủ năng lực" cả khi đội xe chỉ còn một tài xế.
+
+### 19.6. Tiền của kế hoạch phủ được
+- Mỗi chuyến thêm (xe chuẩn của tuyến) chở khách tràn rơi vào ghế của nó, như mục 18.4; doanh thu và chi phí làm tròn tới đồng **từng chuyến**, cùng cách màn Đề xuất, nên ở 100% nhu cầu và khi các thẻ đều chạy xe chuẩn thì tiền của hai màn bằng nhau.
+- Kế hoạch phủ được chọn theo từng ngày: trong mỗi ngày lấy chuyến có lãi kỳ vọng cao trước — cùng thứ tự màn Đề xuất dùng để giữ xe.
+- Dòng **"Nếu chỉ chạy chuyến có lãi"**: trong kế hoạch phủ được, bao nhiêu chuyến có lãi và tổng lãi của riêng chúng. Không có dòng này, một con số "lỗ" của cả kế hoạch dễ bị đọc thành "tăng cường là lỗ".
+- **Trên DB thật ngày 2026-10-23** (13 xe, 33 tài xế, 48,8 chuyến/ngày): ở 100% cần 41 chuyến thêm, phủ cả 41, lỗ 19,1 triệu, còn nếu chỉ chạy 4 chuyến có lãi thì lãi 1,75 triệu; ở 70% cần 2 chuyến (trước GĐ6 màn báo 0); ở 150% cần 103 chuyến cho 100 khung, lãi 28,6 triệu. Mọi con số khớp phép tính độc lập tới từng đồng.
+
+### 19.7. Giới hạn có chủ đích
+- Mô hình **tổng hợp**: không phân công, không kiểm trùng lịch, loại xe, bằng lái hay bảo trì từng xe.
+- Năng lực là **tổng năng lực** đội xe, chưa trừ lịch chạy thường lệ — ước lượng lạc quan; màn hình ghi rõ.
+- Tiền tính với **xe chuẩn**; màn Đề xuất tính với xe thật được chọn, nên hai màn chỉ bằng nhau khi các thẻ đều chạy xe chuẩn.
+- Δxe quy ra ghế bằng sức chứa trung bình đội xe; không chọn được loại xe thêm vào.
