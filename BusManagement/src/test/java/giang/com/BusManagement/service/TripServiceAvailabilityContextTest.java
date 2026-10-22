@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -204,6 +205,32 @@ class TripServiceAvailabilityContextTest {
         // Neo chống "pass rỗng nghĩa": ngày ref có chuyến D1 lái chính nên giờ > 0.
         assertTrue(tripService.getDrivingHoursForDate(driver, ref, null, null) > 0,
                 "Sanity: D1 phải có giờ lái > 0 ở ngày ref — bảo vệ test khỏi pass rỗng nghĩa");
+    }
+
+    // =====================================================================
+    // GIỮ CHỖ TẠM (GĐ6, QĐ-17, G6-3)
+    // =====================================================================
+
+    /**
+     * Một chuyến giữ chỗ (PENDING_APPROVAL, chưa lưu) làm xe bận, tài xế bận và cộng giờ lái — chính
+     * các luật cũ của TripService đọc nó, không luật nào mới. Nó chỉ sống trong context: nhánh SQL không
+     * thấy, đúng như cổng kiểm tra cuối của Recommendation.
+     */
+    @Test
+    void reservedTrip_isSeenByTheSameRules_onlyInMemory() {
+        LocalDateTime dep = ref.plusDays(4).plusHours(10); // ngày trống trong setUp
+        LocalDateTime arr = dep.plusHours(2);
+        assertFalse(tripService.isBusBusy(bus, dep, arr, null, ctx));
+        assertFalse(tripService.isDriverBusyInWindow(driver, dep, arr, null, ctx));
+        assertEquals(0.0, tripService.getDrivingHoursForDate(driver, dep, null, ctx), 1e-9);
+
+        ctx.reserve(trip(driver, null, null, bus, dep, arr, TripStatus.PENDING_APPROVAL));
+
+        assertTrue(tripService.isBusBusy(bus, dep, arr, null, ctx), "xe đã giữ chỗ");
+        assertTrue(tripService.isDriverBusyInWindow(driver, dep, arr, null, ctx), "tài xế đã giữ chỗ");
+        assertEquals(2.0, tripService.getDrivingHoursForDate(driver, dep, null, ctx), 1e-9, "giờ lái của chuyến giữ chỗ");
+        assertFalse(tripService.isBusBusy(bus, dep, arr, null, null), "không ghi DB: nhánh SQL không thấy");
+        assertFalse(tripService.isDriverBusyInWindow(driver, dep, arr, null, null));
     }
 
     // =====================================================================

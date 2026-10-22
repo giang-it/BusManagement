@@ -11,8 +11,8 @@ import java.time.LocalDate;
  *
  * Giá trị dự báo là NHU CẦU của khung — số khách muốn đi, cộng mọi chuyến của khung —
  * không bị kẹp ở số ghế (QĐ-2, GĐ5 của đợt thiết kế lại; xem javadoc của ForecastService).
- * predictedOccupancy và needsReinforcement là CẦU NỐI cho Recommendation và What-if, hai nơi
- * còn đọc tỉ lệ lấp đầy cho tới GĐ6 (QĐ-16, G5-1).
+ * Recommendation và What-if đọc thẳng predictedDemand và tripsNeeded (GĐ6, QĐ-17); cầu nối tỉ lệ
+ * lấp đầy predictedOccupancy của GĐ5 đã bỏ.
  */
 @Data
 @NoArgsConstructor
@@ -37,13 +37,6 @@ public class ForecastPointDto {
     private double demandRatio;
 
     /**
-     * Cầu nối tới GĐ6: min(1, nhu cầu ÷ ghế xe chuẩn) — tỉ lệ lấp đầy của MỘT xe chuẩn nếu chỉ
-     * chạy một xe. Recommendation nhân nó với sức chứa xe được chọn, What-if nhân với hệ số nhu
-     * cầu; cả hai giả định số đã kẹp trong [0, 1] như mô hình cũ.
-     */
-    private double predictedOccupancy;
-
-    /**
      * Nhu cầu vượt 90% số ghế xe chuẩn — cùng ngưỡng Trip.needsReinforcement() (> 0.90), áp
      * lên nhu cầu dự báo. Đây là tín hiệu Recommendation dùng để sinh thẻ tăng cường.
      */
@@ -51,7 +44,8 @@ public class ForecastPointDto {
 
     /**
      * Số chuyến cần = max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉) (QĐ-16, G5-6). Số này ≥ 2 đúng
-     * khi needsReinforcement — một định nghĩa "chuyến nóng", không phải hai.
+     * khi needsReinforcement — một định nghĩa "chuyến nóng", không phải hai. Recommendation sinh
+     * một thẻ cho mỗi chuyến thêm, tức tripsNeeded − 1 thẻ (QĐ-17, G6-2).
      */
     private int tripsNeeded;
 }

@@ -20,8 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Các luật của ForecastService mới (GĐ5, QĐ-16) mà không cần DB: gom khung (G5-2), cờ tăng cường
- * và số chuyến cần (G5-6), mốc SN4 sạch và cách chấm điểm (G5-7), khóa nhớ (G5-4). JUnit thuần —
- * cùng lý do WhatIfCoverageTest chốt thẳng số học của What-if.
+ * và số chuyến cần (G5-6), mốc SN4 sạch và cách chấm điểm (G5-7), khóa nhớ (G5-4); và số khách của
+ * một chuyến thêm (GĐ6, QĐ-17, G6-1). JUnit thuần — cùng lý do WhatIfCoverageTest chốt thẳng số học
+ * của What-if.
  */
 class ForecastServiceRulesTest {
 
@@ -79,6 +80,50 @@ class ForecastServiceRulesTest {
         assertEquals(3, ForecastService.tripsNeeded(53.8, 22), "tuyến 1, 06:00, 13/02/2026");
         assertEquals(1, ForecastService.tripsNeeded(36.0, 40), "đúng 90% là chưa vượt ngưỡng");
         assertFalse(ForecastService.isHot(30, 0), "chưa rõ xe chuẩn thì không gắn cờ");
+    }
+
+    /**
+     * GĐ6 (QĐ-17, G6-1): chuyến thêm chỉ chở khách TRÀN rơi vào ghế của nó. Số mong đợi lấy từ scipy
+     * (reference_overflow.csv, size 82,2 như lần khớp 21/10/2026) — đúng các ví dụ của vòng thảo luận.
+     */
+    @Test
+    void extraTrip_carriesOnlyTheOverflowThatFallsIntoItsSeats() {
+        double size = 82.2;
+        // 20,1 khách / xe 22 chỗ: phép trừ nhu cầu − ghế ra 0, cầu nối cũ coi như 20 khách; khách tràn kỳ vọng ≈ 1,2.
+        assertEquals(1.2141750040029584 - 4.183368146134918e-05,
+                ForecastService.extraTripPassengers(20.1, 22, 22, size), 1e-9);
+        // 57,6 khách / xe 40 chỗ: tràn nhiều thì gần bằng phép trừ (17,6).
+        assertEquals(17.692793587956434 - 0.07155945868728579,
+                ForecastService.extraTripPassengers(57.6, 40, 40, size), 1e-9);
+        // Tết, tuyến 1 06:00 ngày 11/02/2026, 43,2 khách / 22 chỗ, cần 3 chuyến: chuyến thêm thứ hai chở ít hơn hẳn.
+        assertEquals(21.202763865978955 - 2.860406233287883,
+                ForecastService.extraTripPassengers(43.2, 22, 22, size), 1e-9);
+        assertEquals(2.860406233287883 - 0.015883058036572077,
+                ForecastService.extraTripPassengers(43.2, 44, 22, size), 1e-9);
+    }
+
+    /** Tổng khách của các chuyến thêm + khách vẫn tràn = khách tràn của xe chuẩn; không chuyến nào chở quá ghế của nó. */
+    @Test
+    void extraTrips_neverCarryMoreThanTheOverflow_andEachCarriesLessThanTheOneBefore() {
+        double size = 82.2;
+        for (double demand : new double[] { 5, 20.1, 28.8, 43.2, 53.8, 90 }) {
+            int seats = 22;
+            double carried = 0;
+            double previous = Double.POSITIVE_INFINITY;
+            int seatsSoFar = seats;
+            for (int extraSeats : new int[] { 22, 40, 22, 50 }) {
+                double k = ForecastService.extraTripPassengers(demand, seatsSoFar, extraSeats, size);
+                assertTrue(k >= 0 && k <= extraSeats, demand + ": " + k);
+                carried += k;
+                seatsSoFar += extraSeats;
+                double perSeat = k / extraSeats;
+                assertTrue(perSeat <= previous + 1e-12, "mỗi ghế thêm chở ít khách hơn ghế trước: " + demand);
+                previous = perSeat;
+            }
+            assertEquals(SlotDemandModel.expectedOverflow(demand, seats, size),
+                    carried + SlotDemandModel.expectedOverflow(demand, seatsSoFar, size), 1e-9, "bảo toàn: " + demand);
+        }
+        assertEquals(0.0, ForecastService.extraTripPassengers(0, 22, 22, size), 0.0, "không ai muốn đi");
     }
 
     /** Đúng cách bước 0 đo: 4 NGÀY cùng thứ gần nhất, bỏ ngày lễ; ngày không quan sát vẫn chiếm chỗ. */

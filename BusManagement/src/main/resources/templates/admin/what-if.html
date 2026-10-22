@@ -133,7 +133,8 @@
                                     ? ${#numbers.formatDecimal(view.baseline.coveragePct, 1, 1)} + '%' : '—'">—</div>
                             <div class="small text-muted">
                                 phủ <span th:text="${view.baseline.coverable}">0</span>/<span
-                                    th:text="${view.baseline.hotSlots}">0</span> khung dự báo đông
+                                    th:text="${view.baseline.extraTripsNeeded}">0</span> chuyến thêm cần
+                                (<span th:text="${view.baseline.hotSlots}">0</span> khung dự báo đông)
                             </div>
                         </div>
                     </div>
@@ -148,8 +149,8 @@
                                     ? ${#numbers.formatDecimal(view.scenarioOutcome.coveragePct, 1, 1)} + '%' : '—'">—</div>
                             <div class="small text-muted">
                                 phủ <span th:text="${view.scenarioOutcome.coverable}">0</span>/<span
-                                    th:text="${view.scenarioOutcome.hotSlots}">0</span> khung ·
-                                thiếu <span class="fw-semibold" th:text="${view.scenarioOutcome.gap}">0</span> khung
+                                    th:text="${view.scenarioOutcome.extraTripsNeeded}">0</span> chuyến thêm ·
+                                thiếu <span class="fw-semibold" th:text="${view.scenarioOutcome.gap}">0</span> chuyến
                             </div>
                         </div>
                     </div>
@@ -214,7 +215,12 @@
                                     <td class="text-end fw-semibold" th:text="${view.scenarioOutcome.hotSlots}">0</td>
                                 </tr>
                                 <tr>
-                                    <td>Phủ được / Thiếu</td>
+                                    <td>Chuyến thêm cần</td>
+                                    <td class="text-end" th:text="${view.baseline.extraTripsNeeded}">0</td>
+                                    <td class="text-end fw-semibold" th:text="${view.scenarioOutcome.extraTripsNeeded}">0</td>
+                                </tr>
+                                <tr>
+                                    <td>Phủ được / Thiếu (chuyến)</td>
                                     <td class="text-end">
                                         <span th:text="${view.baseline.coverable}">0</span> /
                                         <span th:text="${view.baseline.gap}">0</span>
@@ -271,6 +277,19 @@
                                         th:text="${view.scenarioOutcome.estimatedProfit != null}
                                             ? ${#numbers.formatDecimal(view.scenarioOutcome.estimatedProfit, 1, 'COMMA', 0, 'POINT')} + 'đ' : '—'">—</td>
                                 </tr>
+                                <tr class="table-light">
+                                    <td>Nếu chỉ chạy chuyến có lãi</td>
+                                    <td class="text-end small">
+                                        <span th:text="${view.baseline.profitableTrips} + ' chuyến'">0 chuyến</span>
+                                        <span th:if="${view.baseline.profitableProfit != null}" class="text-success"
+                                            th:text="' · lãi ' + ${#numbers.formatDecimal(view.baseline.profitableProfit, 1, 'COMMA', 0, 'POINT')} + 'đ'"></span>
+                                    </td>
+                                    <td class="text-end fw-semibold">
+                                        <span th:text="${view.scenarioOutcome.profitableTrips} + ' chuyến'">0 chuyến</span>
+                                        <span th:if="${view.scenarioOutcome.profitableProfit != null}" class="text-success"
+                                            th:text="' · lãi ' + ${#numbers.formatDecimal(view.scenarioOutcome.profitableProfit, 1, 'COMMA', 0, 'POINT')} + 'đ'"></span>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -296,10 +315,16 @@
                         <li>Cửa sổ vận hành và thời lượng chuyến TB lấy từ chính các tuyến trong dự báo.</li>
                         <li>Buffer chuẩn bị tái dùng hằng số <code>BUS_PREP_BUFFER_HOURS</code> của hệ thống.</li>
                         <li>Trần theo tài xế = số tài xế × 8h ÷ thời lượng chuyến TB.</li>
+                        <li><strong>Nhu cầu tính bằng số khách</strong>: hệ số nhu cầu nhân thẳng vào số khách dự báo
+                            (không kẹp ở 100%); mỗi khung cần (số chuyến cần − 1) chuyến thêm, theo đúng quy tắc 90% xe
+                            chuẩn của màn Dự báo. Ở 100%, số chuyến thêm bằng số thẻ của màn Đề xuất.</li>
+                        <li><strong>Tiền tính theo khách tràn</strong>: mỗi chuyến thêm (xe chuẩn của tuyến) chỉ chở
+                            phần khách mà các chuyến trước nó không chở hết, nhân giá vé lịch sử; trong mỗi ngày, kế
+                            hoạch phủ được lấy chuyến có lãi cao trước — cùng thứ tự màn Đề xuất.</li>
                         <li><strong>Độ phủ đối chiếu theo TỪNG NGÀY</strong>, không gộp cả chân trời: mỗi ngày chỉ
                             phủ được tối đa <em>năng lực một ngày</em>, phần nhàn rỗi của ngày vắng
                             <strong>không</strong> chuyển sang ngày cao điểm được — một xe rảnh hôm thứ Ba không chạy
-                            hộ chuyến thứ Bảy. Điều này quan trọng vì nhu cầu dự báo dồn về cuối tuần.</li>
+                            hộ chuyến thứ Bảy. Điều này quan trọng vì nhu cầu dự báo dồn về cuối tuần và dịp lễ.</li>
                         <li>Sức chứa TB đội xe (quy Δxe ra ghế):
                             <strong th:text="${#numbers.formatDecimal(view.avgFleetCapacity, 1, 1)}">0</strong> ghế/xe.</li>
                         <li><em>Cố ý KHÔNG</em> dùng "trung bình chuyến/xe/ngày trong lịch sử" — đó là mức

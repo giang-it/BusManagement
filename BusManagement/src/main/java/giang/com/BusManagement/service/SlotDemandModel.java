@@ -463,6 +463,25 @@ final class SlotDemandModel {
     }
 
     /**
+     * E[(D − c)⁺] với D ~ nhị thức âm (trung bình mu, tham số size): số khách kỳ vọng KHÔNG có chỗ khi
+     * khung chỉ có c ghế. Thêm ở GĐ6 (QĐ-17, G6-1) cho doanh thu của chuyến tăng cường; không đổi gì
+     * của mô hình đã đo. Cùng hằng đẳng thức với meanAtLeast:
+     * Σ_{d ≥ c} d·P(D = d) = mu · P(D' ≥ c − 1), D' ~ NB(r + 1, p), nên
+     * E[(D − c)⁺] = mu · P(D' ≥ c − 1) − c · P(D ≥ c). Hai đuôi cộng trực tiếp như ở meanAtLeast;
+     * kết quả âm vì làm tròn (chỉ khi cả hai đuôi gần bằng 0) được đưa về 0.
+     */
+    static double expectedOverflow(double mu, int c, double size) {
+        if (!(mu > 0)) {
+            return 0.0;
+        }
+        if (c <= 0) {
+            return mu;
+        }
+        double p = size / (size + mu);
+        return Math.max(0.0, mu * upperTail(c - 1, size + 1, p) - c * upperTail(c, size, p));
+    }
+
+    /**
      * P(X ≥ k) với X ~ nhị thức âm(r, p), pmf(j) = C(j + r − 1, j)·p^r·(1 − p)^j. pmf(k) tính trong
      * thang log bằng truy hồi từ pmf(0) = p^r, rồi cộng các số hạng từ k trở lên tới khi chúng
      * không còn đáng kể.

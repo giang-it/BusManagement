@@ -57,10 +57,10 @@ import java.util.stream.Collectors;
  * Trip.needsReinforcement(), chỉ thay số vé thật bằng nhu cầu dự báo. Số chuyến cần =
  * max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉), và số này ≥ 2 đúng khi cờ bật (QĐ-16 G5-6, đóng M-4).
  *
- * Cầu nối tới GĐ6 (G5-1): Recommendation và What-if vẫn đọc predictedOccupancy (đã kẹp [0, 1])
- * và needsReinforcement như với mô hình cũ, nên chưa phải sửa dòng nào. Cái giá biết trước:
- * doanh thu thẻ vẫn tính "đầy xe × giá vé", và What-if dưới 100% nhu cầu đếm thiếu khung nóng vì
- * tỉ lệ đã bị kẹp trước khi nhân. GĐ6 chuyển hai màn đó sang đơn vị nhu cầu.
+ * Recommendation và What-if đọc thẳng nhu cầu (GĐ6, QĐ-17): mỗi khung cần (số chuyến cần − 1)
+ * chuyến thêm, và một chuyến thêm chỉ chở phần khách TRÀN rơi vào ghế của nó — tính bằng
+ * extraTripPassengers() theo đúng phân phối nhị thức âm mà mô hình đã học. Cầu nối tỉ lệ lấp đầy
+ * (predictedOccupancy) của GĐ5 đã bỏ.
  *
  * ====================================================================
  * MÔ HÌNH
@@ -137,7 +137,8 @@ public class ForecastService {
      *
      * Khai báo lại tại đây theo đúng tiền lệ DashboardService.HOT_TRIP_OCCUPANCY_THRESHOLD — không
      * thể gọi Trip.needsReinforcement() vì ở đây không có entity Trip nào, giá trị đang xét là một
-     * con số DỰ BÁO. Nếu ngưỡng trong Trip đổi, phải đổi ở đây.
+     * con số DỰ BÁO. Nếu ngưỡng trong Trip đổi, phải đổi ở đây. What-if không khai báo lại nữa mà
+     * gọi tripsNeeded() của lớp này (GĐ6, QĐ-17).
      */
     private static final double REINFORCEMENT_THRESHOLD = 0.90;
 
@@ -474,7 +475,7 @@ public class ForecastService {
     }
 
     // =========================================================================
-    // NGƯỠNG TĂNG CƯỜNG VÀ SỐ CHUYẾN CẦN (G5-6, đóng M-4)
+    // NGƯỠNG TĂNG CƯỜNG, SỐ CHUYẾN CẦN (G5-6, đóng M-4) VÀ KHÁCH CỦA CHUYẾN THÊM (G6-1)
     // =========================================================================
 
     /** Nhu cầu vượt 90% số ghế xe chuẩn — cùng ngưỡng Trip.needsReinforcement(). */
@@ -494,6 +495,24 @@ public class ForecastService {
         return Math.max(2, (int) Math.ceil(demand / (REINFORCEMENT_THRESHOLD * standardSeats)));
     }
 
+    /**
+     * Số khách kỳ vọng mà MỘT chuyến thêm chở được (QĐ-17, G6-1): phần khách tràn rơi vào ghế của
+     * chính nó, khi khung đã có sẵn seatsBefore ghế — ghế xe chuẩn cộng ghế của các chuyến thêm
+     * trước nó:
+     * <pre>
+     *   EO(seatsBefore) − EO(seatsBefore + extraSeats),  EO(c) = E[(nhu cầu − c)⁺]
+     * </pre>
+     * với nhu cầu theo phân phối nhị thức âm quanh dự báo, cùng tham số size của lần khớp
+     * (DemandForecastViewDto.ModelInfoDto.negativeBinomialSize). Khung 20,1 khách / xe 22 chỗ vẫn
+     * có ngày 25 người tới, nên chuyến thêm chở trung bình khoảng 1,2 khách chứ không phải 0 (phép
+     * trừ nhu cầu − số ghế) hay 20 (cầu nối cũ coi như đầy xe). Tổng các chuyến thêm của một khung
+     * không bao giờ vượt EO(ghế xe chuẩn), số khách tràn kỳ vọng của khung.
+     */
+    static double extraTripPassengers(double demand, int seatsBefore, int extraSeats, double nbSize) {
+        return SlotDemandModel.expectedOverflow(demand, seatsBefore, nbSize)
+                - SlotDemandModel.expectedOverflow(demand, seatsBefore + extraSeats, nbSize);
+    }
+
     private ForecastPointDto point(LocalDate date, double demand, int standardSeats) {
         double ratio = standardSeats > 0 ? demand / standardSeats : 0.0;
         DayOfWeek day = date.getDayOfWeek();
@@ -504,7 +523,6 @@ public class ForecastService {
                 holidayLabel(date),
                 demand,
                 ratio,
-                Math.max(0.0, Math.min(1.0, ratio)),
                 isHot(demand, standardSeats),
                 tripsNeeded(demand, standardSeats));
     }

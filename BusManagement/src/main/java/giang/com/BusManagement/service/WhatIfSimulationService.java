@@ -61,19 +61,34 @@ import java.util.stream.Collectors;
  * (xem Developer Notes trong THESIS_ROADMAP.md).
  *
  * ====================================================================
+ * NHU CẦU TÍNH BẰNG SỐ KHÁCH, ĐẾM THEO CHUYẾN THÊM (GĐ6, QĐ-17, G6-5)
+ * ====================================================================
+ * Hệ số nhu cầu nhân thẳng vào nhu cầu dự báo (số khách, không kẹp), rồi hỏi
+ * ForecastService.tripsNeeded() khung cần mấy chuyến — chính hàm của màn Dự báo và
+ * Đề xuất, nên ở 100% hai màn luôn cùng số chuyến thêm và lớp này không khai báo lại
+ * ngưỡng 0,90. Đơn vị đếm là CHUYẾN THÊM: khung cần 3 chuyến góp 2. Tiền của mỗi
+ * chuyến thêm tính theo khách tràn rơi vào ghế của nó
+ * (ForecastService.extraTripPassengers), với xe chuẩn của tuyến.
+ *
+ * Trước GĐ6 màn này nhân hệ số vào tỉ lệ lấp đầy ĐÃ KẸP ở 100%, nên một khung cần
+ * 1,5 xe thành "100% × 0,7 = 70%" và 70% nhu cầu báo 0 khung đông trong khi tính
+ * theo số khách vẫn còn 2 chuyến thêm; doanh thu cũng coi mọi chuyến thêm là đầy xe.
+ *
+ * ====================================================================
  * NĂNG LỰC ĐỐI CHIẾU THEO NGÀY, KHÔNG GỘP CẢ CHÂN TRỜI
  * ====================================================================
- * Độ phủ = Σ theo từng ngày của min(số khung đông của ngày đó, servablePerDay),
+ * Độ phủ = Σ theo từng ngày của min(số chuyến thêm cần trong ngày đó, servablePerDay),
  * rồi mới làm tròn xuống MỘT LẦN. Đây là ràng buộc đúng đắn, không phải chi tiết
- * cài đặt: công thức gộp min(hotSlots, servablePerDay × số ngày) cho năng lực
+ * cài đặt: công thức gộp min(cần, servablePerDay × số ngày) cho năng lực
  * nhàn rỗi của ngày vắng "cho vay" sang ngày cao điểm — mà một chiếc xe rảnh
  * hôm thứ Ba không thể chạy hộ chuyến của thứ Bảy.
  *
- * Vì sao điều này quan trọng với CHÍNH bộ dữ liệu này: hệ số mùa vụ cuối tuần
- * của ForecastService là ~1,19, nên nhu cầu dự báo dồn cục — đo được 12/17 khung
- * đông của hiện trạng nằm ở T7+CN. Với công thức gộp, hạ đội xe xuống 1 tài xế
- * vẫn báo "phủ 100% — đủ năng lực, không bị bó"; tính theo ngày thì chỉ 58,8% và
- * nút thắt là DRIVER. Xem docs/todo/current_bugs_found.md mục #7.
+ * Vì sao điều này quan trọng với CHÍNH bộ dữ liệu này (đo 2026-07-30, trên mô hình
+ * dự báo cũ, khi đơn vị còn là khung): hệ số mùa vụ cuối tuần là ~1,19, nên nhu cầu
+ * dự báo dồn cục — đo được 12/17 khung đông của hiện trạng nằm ở T7+CN. Với công
+ * thức gộp, hạ đội xe xuống 1 tài xế vẫn báo "phủ 100% — đủ năng lực, không bị bó";
+ * tính theo ngày thì chỉ 58,8% và nút thắt là DRIVER. Xem
+ * docs/todo/current_bugs_found.md mục #7. Nhu cầu dịp lễ còn dồn cục hơn thế.
  *
  * KHÔNG "đơn giản hoá" ngược lại thành một phép nhân với số ngày. Làm tròn xuống
  * từng ngày cũng SAI theo hướng ngược lại — servablePerDay là tỉ lệ thực của mô
@@ -97,14 +112,6 @@ public class WhatIfSimulationService {
     private final TripRepository tripRepository;
 
     /**
-     * Ngưỡng "chuyến đông cần tăng cường". Khai báo lại theo đúng tiền lệ
-     * DashboardService/ForecastService/DriverRecommendationService — ở đây xét
-     * một con số DỰ BÁO (đã nhân hệ số nhu cầu), không có entity Trip để gọi
-     * needsReinforcement(). Nếu ngưỡng trong Trip đổi, đổi ở cả bốn nơi.
-     */
-    private static final double REINFORCEMENT_THRESHOLD = 0.90;
-
-    /**
      * Hạn giờ lái/ngày để suy năng lực theo tài xế. Cùng giá trị với
      * validateStaffForTrip() và RecommendationService.MAX_DAILY_DRIVING_HOURS.
      */
@@ -125,13 +132,18 @@ public class WhatIfSimulationService {
     private static final int MAX_DEMAND_FACTOR = 300;
 
     /**
-     * Một khung được dự báo đông, rút gọn còn những gì việc ước tính cần.
+     * Một chuyến thêm mà nhu cầu của kịch bản đòi, rút gọn còn những gì việc ước tính
+     * cần: doanh thu và chi phí đã tính theo tham số của cột đang xét (null khi thiếu giá
+     * vé lịch sử hoặc thiếu dữ liệu chi phí).
      *
      * {@code date} là BẮT BUỘC, không phải thông tin trang trí: độ phủ được đối
      * chiếu theo từng ngày (xem javadoc của lớp), nên mất ngày là mất luôn khả năng
-     * biết một khung thuộc ngày cao điểm hay ngày vắng.
+     * biết một chuyến thuộc ngày cao điểm hay ngày vắng.
      */
-    private record HotSlot(long routeId, int hour, LocalDate date, double predictedOccupancy) {
+    private record ExtraTrip(LocalDate date, BigDecimal revenue, BigDecimal cost) {
+        BigDecimal profit() {
+            return revenue != null && cost != null ? revenue.subtract(cost) : null;
+        }
     }
 
     /** Kết quả suy throughput theo cycle-time — giữ lại để hiển thị cách suy trên màn. */
@@ -188,7 +200,7 @@ public class WhatIfSimulationService {
 
         // --- Cột HIỆN TRẠNG: nguồn lực thật, nhu cầu 100%, chi phí mặc định ---
         view.setBaseline(computeOutcome(forecast, routesById, prices, der,
-                readyBuses, activeDrivers, baselineSeats, avgFleetCapacity,
+                readyBuses, activeDrivers, baselineSeats,
                 100, costDefaults.getFuelCostPerKm(), costDefaults.getDriverWagePerHour()));
 
         // --- Cột KỊCH BẢN: áp các cần gạt ---
@@ -202,7 +214,7 @@ public class WhatIfSimulationService {
                 ? lever.getDriverWagePerHour() : costDefaults.getDriverWagePerHour();
 
         view.setScenarioOutcome(computeOutcome(forecast, routesById, prices, der,
-                scenarioBuses, scenarioDrivers, scenarioSeats, avgFleetCapacity,
+                scenarioBuses, scenarioDrivers, scenarioSeats,
                 lever.getDemandFactorPercent(), fuelRate, wageRate));
 
         return view;
@@ -214,10 +226,12 @@ public class WhatIfSimulationService {
 
     private WhatIfOutcomeDto computeOutcome(DemandForecastViewDto forecast, Map<Long, Route> routesById,
             Map<Long, Map<Integer, BigDecimal>> prices, Derivation der,
-            int buses, int drivers, long totalSeats, double avgFleetCapacity,
+            int buses, int drivers, long totalSeats,
             int demandFactorPercent, BigDecimal fuelRate, BigDecimal wageRate) {
 
         double factor = demandFactorPercent / 100.0;
+        // Độ phân tán nhu cầu của lần khớp — cùng con số màn Đề xuất dùng để tính khách tràn.
+        double nbSize = forecast.getModel() != null ? forecast.getModel().getNegativeBinomialSize() : 0.0;
 
         // Năng lực: trần theo xe và trần theo tài xế, lấy cái nhỏ hơn.
         double busThroughput = buses * der.tripsPerBusPerDay();
@@ -226,85 +240,113 @@ public class WhatIfSimulationService {
                 : 0.0;
         double servablePerDay = Math.min(busThroughput, driverThroughput);
 
-        // Nhu cầu: đếm lại các khung vượt ngưỡng ở hệ số nhu cầu này.
-        List<HotSlot> hot = new ArrayList<>();
+        // Nhu cầu: nhân hệ số vào số khách rồi hỏi dự báo khung cần mấy chuyến — mỗi chuyến
+        // thêm một phần tử, kèm tiền của nó (G6-5).
+        List<ExtraTrip> extras = new ArrayList<>();
+        int hotSlots = 0;
         for (ForecastSeriesDto series : forecast.getSeries()) {
+            Route route = routesById.get(series.getRouteId());
+            int seats = series.getStandardSeats();
+            BigDecimal price = priceOf(prices, series.getRouteId(), series.getDepartureHour());
+            BigDecimal tripCost = route != null ? tripCost(route, fuelRate, wageRate) : null;
             for (ForecastPointDto point : series.getPoints()) {
-                double scaled = Math.min(1.0, point.getPredictedOccupancy() * factor);
-                if (scaled > REINFORCEMENT_THRESHOLD) {
-                    hot.add(new HotSlot(series.getRouteId(), series.getDepartureHour(),
-                            point.getDate(), scaled));
+                double demand = point.getPredictedDemand() * factor;
+                int count = ForecastService.tripsNeeded(demand, seats) - 1;
+                if (count > 0) {
+                    hotSlots++;
+                }
+                for (int k = 1; k <= count; k++) {
+                    // Doanh thu: khách tràn rơi vào ghế của chuyến thêm thứ k (xe chuẩn) × giá vé
+                    // lịch sử của khung. Không có giá, hoặc tuyến đã bị xóa → không ước được.
+                    BigDecimal revenue = null;
+                    if (price != null && route != null) {
+                        double passengers = ForecastService.extraTripPassengers(demand, k * seats, seats, nbSize);
+                        revenue = price.multiply(BigDecimal.valueOf(passengers)).setScale(0, RoundingMode.HALF_UP);
+                    }
+                    extras.add(new ExtraTrip(point.getDate(), revenue, tripCost));
                 }
             }
         }
-        int hotSlots = hot.size();
+        int needed = extras.size();
 
-        int coverable = coverableSlots(hot.stream().map(HotSlot::date).toList(), servablePerDay);
-        int gap = hotSlots - coverable;
-        Double coveragePct = hotSlots > 0 ? (100.0 * coverable / hotSlots) : null;
+        int coverable = coverableSlots(extras.stream().map(ExtraTrip::date).toList(), servablePerDay);
+        int gap = needed - coverable;
+        Double coveragePct = needed > 0 ? (100.0 * coverable / needed) : null;
         WhatIfBottleneck bottleneck = bottleneckOf(busThroughput, driverThroughput, gap);
 
-        // Tài chính của kế hoạch PHỦ ĐƯỢC = đúng tập khung sẽ chạy. Tập này cũng
+        // Tài chính của kế hoạch PHỦ ĐƯỢC = đúng tập chuyến thêm sẽ chạy. Tập này cũng
         // phải chọn theo ngày, nếu không con số tiền sẽ nói về một kế hoạch khác với
-        // con số độ phủ ngay bên trên.
+        // con số độ phủ ngay bên trên. Kèm phần "chỉ chạy chuyến có lãi" của chính kế hoạch đó.
         BigDecimal cost = BigDecimal.ZERO;
         BigDecimal revenue = BigDecimal.ZERO;
         boolean anyCost = false;
         boolean anyRevenue = false;
-        for (HotSlot slot : selectCoveredSlots(hot, servablePerDay, coverable)) {
-            Route route = routesById.get(slot.routeId());
-            if (route == null) {
-                continue;
-            }
-            int durationMinutes = route.getEstimatedDuration() != null && route.getEstimatedDuration() > 0
-                    ? route.getEstimatedDuration() : DEFAULT_DURATION_MINUTES;
-            double durationHours = durationMinutes / 60.0;
-
-            // Số tài xế cần: mọi tuyến vào forecast hiện đều ≤ 8h ⇒ = 1; vẫn tính
-            // theo ceil(dur/8) cho KHỚP CHÍNH XÁC công thức chi phí Phase 7
-            // (RecommendationService.estimateCost) và bền với tuyến > 8h sau này.
-            int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / MAX_DAILY_DRIVING_HOURS));
-
-            // Chi phí: nhiên liệu theo quãng đường + lương theo thời lượng × số tài
-            // xế. Bỏ qua term thiếu dữ liệu, không đoán.
-            if (route.getDistanceKm() != null && fuelRate != null) {
-                cost = cost.add(fuelRate.multiply(BigDecimal.valueOf(route.getDistanceKm())));
+        int profitableTrips = 0;
+        BigDecimal profitableProfit = BigDecimal.ZERO;
+        for (ExtraTrip trip : selectCoveredTrips(extras, servablePerDay, coverable)) {
+            if (trip.cost() != null) {
+                cost = cost.add(trip.cost());
                 anyCost = true;
             }
-            if (wageRate != null) {
-                cost = cost.add(wageRate.multiply(BigDecimal.valueOf(durationHours))
-                        .multiply(BigDecimal.valueOf(requiredDrivers)));
-                anyCost = true;
-            }
-
-            // Doanh thu: sức chứa đại diện (loại xe phù hợp của tuyến, else TB đội xe)
-            // × giá vé lịch sử của khung. Không có giá → bỏ khung khỏi doanh thu.
-            int capacity = route.getSuitableBusType() != null
-                    ? route.getSuitableBusType().getCapacity()
-                    : (int) Math.round(avgFleetCapacity);
-            BigDecimal price = priceOf(prices, slot.routeId(), slot.hour());
-            if (price != null && capacity > 0) {
-                int passengers = (int) Math.round(slot.predictedOccupancy() * capacity);
-                revenue = revenue.add(price.multiply(BigDecimal.valueOf(passengers)));
+            if (trip.revenue() != null) {
+                revenue = revenue.add(trip.revenue());
                 anyRevenue = true;
             }
+            BigDecimal profit = trip.profit();
+            if (profit != null && profit.signum() > 0) {
+                profitableTrips++;
+                profitableProfit = profitableProfit.add(profit);
+            }
         }
-        BigDecimal estimatedCost = anyCost ? cost.setScale(0, RoundingMode.HALF_UP) : null;
-        BigDecimal estimatedRevenue = anyRevenue ? revenue.setScale(0, RoundingMode.HALF_UP) : null;
+        BigDecimal estimatedCost = anyCost ? cost : null;
+        BigDecimal estimatedRevenue = anyRevenue ? revenue : null;
         BigDecimal estimatedProfit = (estimatedRevenue != null && estimatedCost != null)
                 ? estimatedRevenue.subtract(estimatedCost) : null;
 
         return new WhatIfOutcomeDto(
                 buses, drivers, totalSeats,
                 busThroughput, driverThroughput, servablePerDay, bottleneck,
-                hotSlots, coverable, gap, coveragePct,
-                estimatedCost, estimatedRevenue, estimatedProfit);
+                hotSlots, needed, coverable, gap, coveragePct,
+                estimatedCost, estimatedRevenue, estimatedProfit,
+                profitableTrips, profitableTrips > 0 ? profitableProfit : null);
     }
 
     /**
-     * Số khung phủ được: cộng dồn THEO TỪNG NGÀY của
-     * {@code min(số khung đông của ngày đó, servablePerDay)}, rồi làm tròn xuống
-     * MỘT LẦN ở cuối.
+     * Chi phí một chuyến thêm theo tham số của cột: nhiên liệu theo quãng đường + lương
+     * theo thời lượng × số tài xế — cùng công thức RecommendationService.estimateCost, làm
+     * tròn tới đồng như ở đó, để ở 100% nhu cầu tiền của màn này cộng đúng bằng các thẻ.
+     * Bỏ qua thành phần thiếu dữ liệu, không đoán; thiếu cả hai thì null.
+     */
+    private BigDecimal tripCost(Route route, BigDecimal fuelRate, BigDecimal wageRate) {
+        int durationMinutes = route.getEstimatedDuration() != null && route.getEstimatedDuration() > 0
+                ? route.getEstimatedDuration() : DEFAULT_DURATION_MINUTES;
+        double durationHours = durationMinutes / 60.0;
+
+        // Số tài xế cần: mọi tuyến vào forecast hiện đều ≤ 8h ⇒ = 1; vẫn tính
+        // theo ceil(dur/8) cho KHỚP CHÍNH XÁC công thức chi phí Phase 7
+        // (RecommendationService.estimateCost) và bền với tuyến > 8h sau này.
+        int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / MAX_DAILY_DRIVING_HOURS));
+
+        BigDecimal cost = BigDecimal.ZERO;
+        boolean any = false;
+        if (route.getDistanceKm() != null && fuelRate != null) {
+            cost = cost.add(fuelRate.multiply(BigDecimal.valueOf(route.getDistanceKm())));
+            any = true;
+        }
+        if (wageRate != null) {
+            cost = cost.add(wageRate.multiply(BigDecimal.valueOf(durationHours))
+                    .multiply(BigDecimal.valueOf(requiredDrivers)));
+            any = true;
+        }
+        return any ? cost.setScale(0, RoundingMode.HALF_UP) : null;
+    }
+
+    /**
+     * Số chuyến thêm phủ được: cộng dồn THEO TỪNG NGÀY của
+     * {@code min(số chuyến thêm cần trong ngày đó, servablePerDay)}, rồi làm tròn
+     * xuống MỘT LẦN ở cuối. Mỗi phần tử của danh sách là một chuyến thêm (từ GĐ6; trước
+     * đó là một khung) — khung cần 3 chuyến góp 2 phần tử cùng ngày. Tên hàm giữ nguyên
+     * từ Phase 8.
      *
      * Năng lực nhàn rỗi của ngày vắng KHÔNG được cho vay sang ngày cao điểm — một
      * chiếc xe rảnh hôm thứ Ba không chạy hộ được chuyến của thứ Bảy. Làm tròn một
@@ -314,42 +356,41 @@ public class WhatIfSimulationService {
      *
      * Tách riêng và để package-private để test chốt được trực tiếp trên số học này —
      * cùng lý do {@code TripService.isBusBusy}/{@code getDrivingHoursForDate} là
-     * package-private. Nhận danh sách NGÀY (không phải HotSlot) để hàm thuần và không
-     * phụ thuộc kiểu nội bộ.
+     * package-private. Nhận danh sách NGÀY (không phải ExtraTrip) để hàm thuần và
+     * không phụ thuộc kiểu nội bộ.
      */
-    static int coverableSlots(List<LocalDate> hotSlotDates, double servablePerDay) {
-        double exact = hotSlotDates.stream()
+    static int coverableSlots(List<LocalDate> extraTripDates, double servablePerDay) {
+        double exact = extraTripDates.stream()
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
                 .values().stream()
-                .mapToDouble(hotThatDay -> Math.min(hotThatDay.doubleValue(), servablePerDay))
+                .mapToDouble(neededThatDay -> Math.min(neededThatDay.doubleValue(), servablePerDay))
                 .sum();
         return (int) Math.floor(exact);
     }
 
     /**
-     * Tập khung ĐƯỢC PHỦ, chọn theo từng ngày để khớp với con số {@code coverable}.
+     * Tập chuyến thêm ĐƯỢC PHỦ, chọn theo từng ngày để khớp với con số {@code coverable}.
      *
-     * Trong mỗi ngày lấy các khung đông nhất của chính ngày đó trước — cùng nguyên
-     * tắc "đông nhất lên đầu" mà màn Đề Xuất và Dự Báo đang dùng. Trần mỗi ngày làm
-     * tròn LÊN vì {@code servablePerDay} là tỉ lệ thực và {@code coverable} đã làm
-     * tròn xuống một lần cho cả chân trời; tổng vẫn bị chặn cứng bởi
-     * {@code coverable}, nên không ngày nào và cả kế hoạch đều không thể vượt năng
-     * lực đã tính. Ngày được duyệt theo thứ tự thời gian ({@link TreeMap}) để kết
-     * quả tiền luôn tái lập được.
+     * Trong mỗi ngày lấy các chuyến có lãi kỳ vọng cao nhất của chính ngày đó trước —
+     * cùng thứ tự màn Đề Xuất dùng để giữ xe (GĐ6). Trần mỗi ngày làm tròn LÊN vì
+     * {@code servablePerDay} là tỉ lệ thực và {@code coverable} đã làm tròn xuống một
+     * lần cho cả chân trời; tổng vẫn bị chặn cứng bởi {@code coverable}, nên không ngày
+     * nào và cả kế hoạch đều không thể vượt năng lực đã tính. Ngày được duyệt theo thứ tự
+     * thời gian ({@link TreeMap}) để kết quả tiền luôn tái lập được.
      */
-    private List<HotSlot> selectCoveredSlots(List<HotSlot> hot, double servablePerDay, int coverable) {
+    private List<ExtraTrip> selectCoveredTrips(List<ExtraTrip> extras, double servablePerDay, int coverable) {
         int dayCap = (int) Math.ceil(servablePerDay);
-        Map<LocalDate, List<HotSlot>> byDate = new TreeMap<>(
-                hot.stream().collect(Collectors.groupingBy(HotSlot::date)));
+        Map<LocalDate, List<ExtraTrip>> byDate = new TreeMap<>(
+                extras.stream().collect(Collectors.groupingBy(ExtraTrip::date)));
 
-        List<HotSlot> covered = new ArrayList<>();
-        for (List<HotSlot> slotsOfDay : byDate.values()) {
+        List<ExtraTrip> covered = new ArrayList<>();
+        for (List<ExtraTrip> tripsOfDay : byDate.values()) {
             int budget = Math.min(dayCap, coverable - covered.size());
             if (budget <= 0) {
                 break;
             }
-            slotsOfDay.stream()
-                    .sorted(Comparator.comparingDouble(HotSlot::predictedOccupancy).reversed())
+            tripsOfDay.stream()
+                    .sorted(Comparator.comparing(ExtraTrip::profit, Comparator.nullsLast(Comparator.reverseOrder())))
                     .limit(budget)
                     .forEach(covered::add);
         }

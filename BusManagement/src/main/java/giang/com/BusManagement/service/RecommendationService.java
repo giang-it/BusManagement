@@ -25,18 +25,19 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
  * PHASE 7 — Recommendation Engine (bước 2: doanh thu; bước 3: + chi phí & lợi nhuận).
+ * Chuyển sang đơn vị nhu cầu ở GĐ6 của đợt thiết kế lại dự báo (QĐ-17 trong
+ * docs/development/forecast_decisions.md).
  *
- * Trả lời câu hỏi: <b>"khung giờ nào sắp tới được dự báo đông, và ta có thể chạy
- * chuyến tăng cường bằng xe + tài xế nào, thu về bao nhiêu, lãi bao nhiêu?"</b>
+ * Trả lời câu hỏi: <b>"khung giờ nào sắp tới được dự báo đông, cần thêm mấy chuyến,
+ * mỗi chuyến thêm chạy bằng xe + tài xế nào, chở thêm được bao nhiêu khách, lãi hay
+ * lỗ bao nhiêu?"</b>
  *
  * ====================================================================
  * LÀ NGƯỜI ĐIỀU PHỐI, KHÔNG PHẢI BỘ DỰ BÁO HAY BỘ LUẬT
@@ -45,11 +46,11 @@ import java.util.stream.Collectors;
  * ba thứ đã có:
  * <ul>
  *   <li><b>Dự báo (Phase 6):</b> gọi {@code ForecastService.buildForecast()}
- *       ĐÚNG MỘT LẦN mỗi request, rồi lặp trên kết quả. Nó chỉ đọc cờ
- *       {@code ForecastPointDto.needsReinforcement} — <b>không hề biết ngưỡng
- *       0.90</b>. Ngưỡng đó sống ở Trip/DashboardService/ForecastService; quyết
- *       định "đông" đã được nướng sẵn vào cờ boolean, engine chỉ tiêu thụ quyết
- *       định chứ không tiêu thụ con số.</li>
+ *       ĐÚNG MỘT LẦN mỗi request, rồi lặp trên kết quả. Nó đọc cờ
+ *       {@code needsReinforcement} và {@code tripsNeeded} của từng ngày — <b>không
+ *       hề biết ngưỡng 0.90</b> — và hỏi {@code ForecastService.extraTripPassengers}
+ *       một chuyến thêm chở được bao nhiêu khách. Quyết định "đông" và phép tính
+ *       khách tràn đều thuộc về dự báo; engine chỉ tiêu thụ chúng.</li>
  *   <li><b>Chọn tài nguyên:</b> {@code TripService.selectBestAvailableBus/Driver}
  *       — chính các bộ lọc rule+availability đã kiểm chứng, không nhân bản.</li>
  *   <li><b>Cổng validation (Phase 3):</b> {@code validateBusForTripDryRun} /
@@ -58,23 +59,47 @@ import java.util.stream.Collectors;
  * </ul>
  *
  * ====================================================================
+ * MỖI CHUYẾN THÊM MỘT THẺ, DOANH THU THEO KHÁCH TRÀN (G6-1, G6-2)
+ * ====================================================================
+ * Khung cần N chuyến thì có N − 1 thẻ "chuyến thêm k/(N − 1)". Một chuyến thêm chỉ
+ * chở những khách mà xe chuẩn và các chuyến thêm trước nó không chở hết — khách tràn
+ * kỳ vọng rơi vào ghế của nó, theo phân phối nhu cầu của chính mô hình dự báo. Cầu
+ * nối của GĐ5 (tỉ lệ × sức chứa) coi như chuyến thêm nào cũng đầy khách: tuần
+ * 23–29/10/2026 nó báo 41/41 chuyến có lãi, tính theo khách tràn chỉ có 4.
+ *
+ * ====================================================================
+ * GIỮ CHỖ GIỮA CÁC THẺ, LÃI CAO XÉT TRƯỚC (G6-3, G6-4; đóng M-14)
+ * ====================================================================
+ * Các chuyến thêm được xét theo lãi kỳ vọng GIẢM DẦN — tính với xe chuẩn, vì lúc đó
+ * chưa chọn xe. Thẻ nào đủ điều kiện thì xe + tài xế của nó được giữ chỗ tạm trong
+ * AvailabilityContext, nên thẻ sau không chọn trùng xe, trùng tài xế hay vượt 8 giờ
+ * lái: danh sách là một kế hoạch chạy được cùng lúc, và chuyến đáng chạy nhất được
+ * giữ xe trước. Trước GĐ6 mỗi thẻ chọn độc lập, nên 41 thẻ của tuần 23–29/10/2026
+ * dùng chung 2 xe và 1 tài xế.
+ *
+ * Mọi chuyến thêm đều có thẻ, kể cả chuyến LỖ dự kiến (màn hình gắn nhãn): ngưỡng 90%
+ * vẫn là định nghĩa duy nhất của "cần tăng cường"; chạy hay không do Admin quyết.
+ *
+ * ====================================================================
  * CHỈ ĐỌC, TÍNH LẠI MỖI LẦN XEM (chốt của chủ dự án)
  * ====================================================================
  * Không entity mới, không ghi DB, không tạo chuyến. Mỗi lần mở trang, engine
  * dựng lại các chuyến ứng viên trong bộ nhớ, chọn tài nguyên và ước tính doanh
- * thu tại chỗ. Vì chọn và validate diễn ra sát nhau trong cùng một transaction
- * đọc, một tài nguyên vừa được chọn gần như luôn qua được cổng — nên STALE hiếm
- * khi xuất hiện; nó vẫn tồn tại để trung thực khi cổng thật sự trượt và làm lưới
- * an toàn nếu logic chọn và logic validate về sau lệch nhau.
+ * thu tại chỗ. Chuyến giữ chỗ chỉ sống trong AvailabilityContext của lần xem đó.
+ * Vì chọn và validate diễn ra sát nhau trong cùng một transaction đọc, một tài
+ * nguyên vừa được chọn gần như luôn qua được cổng — nên STALE hiếm khi xuất hiện;
+ * nó vẫn tồn tại để trung thực khi cổng thật sự trượt và làm lưới an toàn nếu
+ * logic chọn và logic validate về sau lệch nhau. Cổng chạy SQL nên không thấy
+ * chuyến giữ chỗ; việc tránh trùng giữa các thẻ là của bước chọn.
  *
  * ====================================================================
- * DOANH THU + CHI PHÍ + LỢI NHUẬN (bước 3, 2026-07-24)
+ * DOANH THU + CHI PHÍ + LỢI NHUẬN (bước 3, 2026-07-24; doanh thu đổi ở GĐ6)
  * ====================================================================
- * Doanh thu tính được ngay: tỉ lệ dự báo × sức chứa xe được chọn × giá vé lịch
- * sử của khung. Chi phí KHÔNG có sẵn trong domain, nên nó là THAM SỐ do Admin
- * cấu hình (CostParameters): chi phí = nhiên liệu/km × quãng đường + lương/giờ ×
- * thời lượng × số tài xế. Lợi nhuận = doanh thu − chi phí. Engine chỉ ĐỌC tham
- * số qua CostParameterService, không tự bịa hằng số — xem CostParameters.
+ * Doanh thu = số khách kỳ vọng của chuyến thêm × giá vé lịch sử của khung. Chi phí
+ * KHÔNG có sẵn trong domain, nên nó là THAM SỐ do Admin cấu hình (CostParameters):
+ * chi phí = nhiên liệu/km × quãng đường + lương/giờ × thời lượng × số tài xế. Lợi
+ * nhuận = doanh thu − chi phí. Engine chỉ ĐỌC tham số qua CostParameterService,
+ * không tự bịa hằng số — xem CostParameters.
  */
 @Service
 @RequiredArgsConstructor
@@ -92,11 +117,20 @@ public class RecommendationService {
     /** Thời lượng mặc định (phút) nếu tuyến thiếu estimatedDuration — cùng giá trị fallback của createExtraTrip(). */
     private static final int DEFAULT_DURATION_MINUTES = 240;
 
+    /**
+     * Một chuyến thêm mà dự báo đòi (G6-2), trước khi chọn xe: khung, thứ tự k trong các
+     * chuyến thêm của khung, và phần không phụ thuộc xe — thời lượng, số tài xế, giá vé, chi
+     * phí, lãi kỳ vọng nếu chạy bằng xe chuẩn. Lãi đó quyết định thứ tự xét và giữ chỗ.
+     */
+    private record ExtraTrip(ForecastSeriesDto series, ForecastPointDto point, Route route, int index, int count,
+            int durationMinutes, int requiredDrivers, BigDecimal price, BigDecimal cost, BigDecimal plannedProfit) {
+    }
+
     @Transactional(readOnly = true)
     public RecommendationViewDto buildRecommendations() {
-        // Gọi ĐÚNG MỘT LẦN: buildForecast() nạp toàn bộ COMPLETED + hồi quy +
-        // backtest, gọi lặp sẽ vừa phí vừa rủi ro hai ảnh chụp lệch nhau. Độ tươi
-        // dữ liệu của trang cũng lấy từ chính DTO này.
+        // Gọi ĐÚNG MỘT LẦN: buildForecast() nạp lịch sử và khớp (hoặc dùng lại) mô hình,
+        // gọi lặp sẽ vừa phí vừa rủi ro hai ảnh chụp lệch nhau. Độ tươi dữ liệu của trang
+        // cũng lấy từ chính DTO này.
         DemandForecastViewDto forecast = forecastService.buildForecast();
 
         Map<Long, Route> routesById = routeRepository.findAllWithStations().stream()
@@ -116,7 +150,13 @@ public class RecommendationService {
                 .plusDays(forecast.getHorizonDays() + 1L).atStartOfDay();
         AvailabilityContext availability = tripService.buildAvailabilityContext(spanStart, spanEnd);
 
-        List<RecommendationCardDto> cards = new ArrayList<>();
+        // Độ phân tán nhu cầu của lần khớp, cho phép tính khách tràn. Chưa có chuỗi nào
+        // thì không có mô hình — và cũng không có chuyến thêm nào cần tới nó.
+        double nbSize = forecast.getModel() != null ? forecast.getModel().getNegativeBinomialSize() : 0.0;
+
+        // ── Lập danh sách chuyến thêm: mỗi khung đông cần (số chuyến cần − 1) chuyến ──
+        List<ExtraTrip> extras = new ArrayList<>();
+        int hotSlots = 0;
         for (ForecastSeriesDto series : forecast.getSeries()) {
             Route route = routesById.get(series.getRouteId());
             if (route == null) {
@@ -124,24 +164,73 @@ public class RecommendationService {
                 continue;
             }
             BigDecimal slotPrice = priceOf(priceByRouteAndHour, series.getRouteId(), series.getDepartureHour());
+            int durationMinutes = route.getEstimatedDuration() != null && route.getEstimatedDuration() > 0
+                    ? route.getEstimatedDuration()
+                    : DEFAULT_DURATION_MINUTES;
+            double durationHours = durationMinutes / 60.0;
+            // MVP một tài xế chính: mọi tuyến vào được forecast đều ≤ 8h theo cách
+            // dựng dữ liệu (HistoricalDataBackfill chỉ nhận tuyến ≤ 8h), nên requiredDrivers
+            // luôn = 1 và không cần tài xế phụ / phụ xe. Vẫn tính requiredDrivers để
+            // trung thực; một tuyến > 8h trong tương lai sẽ lộ ra ở cổng validateStaff
+            // chứ không làm hỏng gì.
+            int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / MAX_DAILY_DRIVING_HOURS));
+            BigDecimal tripCost = estimateCost(route, durationHours, requiredDrivers, cost);
+            int seats = series.getStandardSeats();
+
             for (ForecastPointDto point : series.getPoints()) {
-                if (point.isNeedsReinforcement()) {
-                    cards.add(buildCard(series, point, route, slotPrice, availability, cost));
+                if (!point.isNeedsReinforcement()) {
+                    continue;
+                }
+                hotSlots++;
+                int count = point.getTripsNeeded() - 1;
+                for (int k = 1; k <= count; k++) {
+                    double planned = ForecastService.extraTripPassengers(point.getPredictedDemand(), k * seats, seats,
+                            nbSize);
+                    extras.add(new ExtraTrip(series, point, route, k, count, durationMinutes, requiredDrivers,
+                            slotPrice, tripCost, profitOf(revenueOf(slotPrice, planned), tripCost)));
                 }
             }
         }
 
-        // Đông nhất lên đầu (giống Vehicle Replacement xếp theo điểm, Forecast xếp
-        // theo đỉnh) — rồi tới ngày gần trước, rồi tên tuyến cho ổn định.
-        cards.sort(Comparator.comparingDouble(RecommendationCardDto::getPredictedOccupancy).reversed()
+        // Xét theo lãi kỳ vọng giảm dần: chuyến đáng chạy nhất được giữ xe + tài xế trước.
+        // Trong một khung, chuyến thêm sau chở ít khách tràn hơn chuyến trước, nên lãi của
+        // nó không cao hơn; bằng nhau thì k nhỏ trước. Vì vậy các chuyến thêm của một khung
+        // luôn được xét theo thứ tự 1, 2, … — điều seatsBefore bên dưới dựa vào.
+        extras.sort(Comparator.comparing(ExtraTrip::plannedProfit, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(e -> e.point().getDate())
+                .thenComparing(e -> e.series().getRouteLabel(), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparingInt(e -> e.series().getDepartureHour())
+                .thenComparingInt(ExtraTrip::index));
+
+        // Ghế khung đã có trước chuyến thêm đang xét: xe chuẩn cộng các chuyến thêm trước nó.
+        Map<String, Integer> seatsSoFar = new HashMap<>();
+        List<RecommendationCardDto> cards = new ArrayList<>();
+        for (ExtraTrip extra : extras) {
+            String slot = extra.series().getRouteId() + "@" + extra.series().getDepartureHour() + "@"
+                    + extra.point().getDate();
+            int seatsBefore = seatsSoFar.getOrDefault(slot, extra.series().getStandardSeats());
+            RecommendationCardDto card = buildCard(extra, seatsBefore, nbSize, availability);
+            seatsSoFar.put(slot, seatsBefore + tripSeats(card, extra));
+            cards.add(card);
+        }
+
+        // Hiển thị theo lợi nhuận ước tính giảm dần (chuyến có lãi lên đầu), rồi ngày gần
+        // trước, tên tuyến, giờ và thứ tự chuyến thêm cho ổn định.
+        cards.sort(Comparator.comparing(RecommendationCardDto::getEstimatedProfit,
+                        Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(RecommendationCardDto::getDate)
-                .thenComparing(RecommendationCardDto::getRouteLabel,
-                        Comparator.nullsLast(Comparator.naturalOrder())));
+                .thenComparing(RecommendationCardDto::getRouteLabel, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparingInt(RecommendationCardDto::getDepartureHour)
+                .thenComparingInt(RecommendationCardDto::getExtraIndex));
 
         int recommended = (int) cards.stream()
                 .filter(c -> c.getStatus() == RecommendationStatus.RECOMMENDED).count();
         int noResource = (int) cards.stream()
                 .filter(c -> c.getStatus() == RecommendationStatus.NO_RESOURCE).count();
+        int profitable = (int) cards.stream()
+                .filter(c -> c.getEstimatedProfit() != null && c.getEstimatedProfit().signum() > 0).count();
+        int loss = (int) cards.stream()
+                .filter(c -> c.getEstimatedProfit() != null && c.getEstimatedProfit().signum() < 0).count();
 
         return new RecommendationViewDto(
                 cards,
@@ -149,84 +238,79 @@ public class RecommendationService {
                 forecast.getHistoryStaleDays(),
                 forecast.getForecastFrom(),
                 forecast.getHorizonDays(),
+                hotSlots,
                 cards.size(),
                 recommended,
                 noResource,
-                hasSharedSlotContention(cards),
+                profitable,
+                loss,
                 cost.getFuelCostPerKm(),
                 cost.getDriverWagePerHour());
     }
 
     /**
-     * Dựng một thẻ cho một ngày-khung được dự báo đông.
+     * Dựng thẻ cho một chuyến thêm.
      *
      * Chuyến ứng viên là một Trip TẠM (không lưu), đúng khuôn createExtraTrip():
-     * route + giờ khởi hành + giờ đến suy từ estimatedDuration. Nó chỉ tồn tại để
-     * chạy qua bộ chọn tài nguyên và cổng validation.
+     * route + giờ khởi hành + giờ đến suy từ estimatedDuration. Nó chạy qua bộ chọn
+     * tài nguyên và cổng validation; qua cổng thì được giữ chỗ trong availability.
+     *
+     * @param seatsBefore ghế khung đã có trước chuyến này: xe chuẩn và các chuyến thêm trước nó
      */
-    private RecommendationCardDto buildCard(ForecastSeriesDto series, ForecastPointDto point,
-            Route route, BigDecimal slotPrice, AvailabilityContext availability, CostParameters cost) {
+    private RecommendationCardDto buildCard(ExtraTrip extra, int seatsBefore, double nbSize,
+            AvailabilityContext availability) {
 
+        ForecastSeriesDto series = extra.series();
+        ForecastPointDto point = extra.point();
         LocalDateTime departure = point.getDate().atTime(series.getDepartureHour(), 0);
-        int durationMinutes = route.getEstimatedDuration() != null && route.getEstimatedDuration() > 0
-                ? route.getEstimatedDuration()
-                : DEFAULT_DURATION_MINUTES;
-        LocalDateTime arrival = departure.plusMinutes(durationMinutes);
-        double durationHours = durationMinutes / 60.0;
+        LocalDateTime arrival = departure.plusMinutes(extra.durationMinutes());
+        double durationHours = extra.durationMinutes() / 60.0;
 
         Trip candidate = new Trip();
-        candidate.setRoute(route);
+        candidate.setRoute(extra.route());
         candidate.setDepartureTime(departure);
         candidate.setArrivalTimeExpected(arrival);
 
-        RecommendationCardDto card = baseCard(series, point);
-        card.setTicketPrice(slotPrice);
+        RecommendationCardDto card = baseCard(extra);
+        card.setTicketPrice(extra.price());
+        card.setEstimatedCost(extra.cost());
 
-        // ── Bước: chọn xe ──────────────────────────────────────────────────────
+        // ── Bước: chọn xe, rồi tài xế ─────────────────────────────────────────
         Bus bus = tripService.selectBestAvailableBus(candidate, departure, arrival, availability);
+        Driver driver = null;
+        int capacity = 0;
+        if (bus != null) {
+            card.setBusPlate(bus.getLicensePlate());
+            capacity = capacityOf(bus);
+            card.setBusCapacity(capacity > 0 ? capacity : null);
+            driver = tripService.selectBestAvailableDriver(departure, arrival, durationHours,
+                    extra.requiredDrivers(), List.of(), false, availability);
+            if (driver != null) {
+                card.setDriverName(driverName(driver));
+            }
+        }
+
+        // ── Ước tính khách, doanh thu, lợi nhuận (G6-1) ──────────────────────
+        // Chuyến thêm chở phần khách tràn rơi vào ghế của nó: ghế của xe được chọn, hoặc
+        // của xe chuẩn khi chưa chọn được xe. Lợi nhuận có thể ÂM — hiển thị trung thực.
+        int ownSeats = capacity > 0 ? capacity : series.getStandardSeats();
+        double passengers = ForecastService.extraTripPassengers(point.getPredictedDemand(), seatsBefore, ownSeats,
+                nbSize);
+        card.setExpectedPassengers(passengers);
+        card.setEstimatedRevenue(revenueOf(extra.price(), passengers));
+        card.setEstimatedProfit(profitOf(card.getEstimatedRevenue(), extra.cost()));
+
         if (bus == null) {
             card.setStatus(RecommendationStatus.NO_RESOURCE);
-            card.setNote("Không có xe rảnh và chưa tới ngưỡng bảo dưỡng cho khung giờ này");
+            card.setNote("Không có xe rảnh và chưa tới ngưỡng bảo dưỡng cho khung giờ này"
+                    + " — số khách tính với xe chuẩn " + series.getStandardSeats() + " chỗ");
             return card;
         }
-        card.setBusPlate(bus.getLicensePlate());
-        int capacity = capacityOf(bus);
-        card.setBusCapacity(capacity > 0 ? capacity : null);
-
-        // ── Bước: chọn tài xế ──────────────────────────────────────────────────
-        // MVP một tài xế chính: mọi tuyến vào được forecast đều ≤ 8h theo cách
-        // dựng dữ liệu (HistoricalDataBackfill chỉ nhận tuyến ≤ 8h), nên
-        // requiredDrivers luôn = 1 và không cần tài xế phụ / phụ xe. Vẫn tính
-        // requiredDrivers để trung thực; một tuyến > 8h trong tương lai sẽ lộ ra
-        // ở cổng validateStaff bên dưới chứ không làm hỏng gì.
-        int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / MAX_DAILY_DRIVING_HOURS));
-        Driver driver = tripService.selectBestAvailableDriver(departure, arrival, durationHours,
-                requiredDrivers, List.of(), false, availability);
         if (driver == null) {
             card.setStatus(RecommendationStatus.NO_RESOURCE);
             card.setNote("Có xe " + bus.getLicensePlate()
                     + " nhưng không có tài xế nào hợp lệ và rảnh cho khung giờ này");
             return card;
-        }
-        card.setDriverName(driverName(driver));
-
-        // ── Ước tính doanh thu (dự báo là TỈ LỆ → nhân sức chứa xe được chọn) ────
-        if (capacity > 0) {
-            int passengers = (int) Math.round(point.getPredictedOccupancy() * capacity);
-            card.setExpectedPassengers(passengers);
-            if (slotPrice != null) {
-                card.setEstimatedRevenue(slotPrice.multiply(BigDecimal.valueOf(passengers)));
-            }
-        }
-
-        // ── Ước tính chi phí & lợi nhuận (bước 3 — theo tham số CostParameters) ──
-        // Chi phí không phụ thuộc sức chứa: nhiên liệu theo quãng đường, lương theo
-        // thời lượng × số tài xế. Lợi nhuận chỉ tính được khi có doanh thu (cần giá
-        // vé lịch sử); có thể ÂM khi chi phí vượt doanh thu — hiển thị trung thực.
-        BigDecimal estimatedCost = estimateCost(route, durationHours, requiredDrivers, cost);
-        card.setEstimatedCost(estimatedCost);
-        if (card.getEstimatedRevenue() != null && estimatedCost != null) {
-            card.setEstimatedProfit(card.getEstimatedRevenue().subtract(estimatedCost));
         }
 
         // ── Cổng Business Rule Validation (Phase 3) — xác nhận lần cuối ──────────
@@ -238,7 +322,11 @@ public class RecommendationService {
 
         if (busGate.isValid() && staffGate.isValid()) {
             card.setStatus(RecommendationStatus.RECOMMENDED);
-            card.setNote("Đủ điều kiện phân công — dự báo vượt ngưỡng tăng cường");
+            card.setNote("Đủ điều kiện phân công — xe và tài xế này được giữ cho chuyến này,"
+                    + " các thẻ khác không dùng lại trong cùng giờ");
+            // ── Giữ chỗ tạm (G6-3): như một chuyến tăng cường vừa tạo, đang chờ duyệt ──
+            candidate.setStatus(TripStatus.PENDING_APPROVAL);
+            availability.reserve(candidate);
         } else {
             card.setStatus(RecommendationStatus.STALE);
             card.setNote(!busGate.isValid() ? busGate.getFailureReason() : staffGate.getFailureReason());
@@ -247,7 +335,9 @@ public class RecommendationService {
     }
 
     /** Phần khung dùng chung, chưa gắn tài nguyên/kết cục. */
-    private RecommendationCardDto baseCard(ForecastSeriesDto series, ForecastPointDto point) {
+    private RecommendationCardDto baseCard(ExtraTrip extra) {
+        ForecastSeriesDto series = extra.series();
+        ForecastPointDto point = extra.point();
         RecommendationCardDto card = new RecommendationCardDto();
         card.setRouteId(series.getRouteId());
         card.setRouteLabel(series.getRouteLabel());
@@ -256,8 +346,27 @@ public class RecommendationService {
         card.setDate(point.getDate());
         card.setDayLabel(point.getDayLabel());
         card.setWeekend(point.isWeekend());
-        card.setPredictedOccupancy(point.getPredictedOccupancy());
+        card.setPredictedDemand(point.getPredictedDemand());
+        card.setStandardSeats(series.getStandardSeats());
+        card.setDemandRatio(point.getDemandRatio());
+        card.setExtraIndex(extra.index());
+        card.setExtraCount(extra.count());
         return card;
+    }
+
+    /** Ghế mà chuyến thêm của thẻ góp vào khung — cùng số ghế buildCard() đã dùng để tính khách. */
+    private int tripSeats(RecommendationCardDto card, ExtraTrip extra) {
+        return card.getBusCapacity() != null ? card.getBusCapacity() : extra.series().getStandardSeats();
+    }
+
+    /** Số khách × giá vé, làm tròn tới đồng; null khi khung chưa có giá vé lịch sử. */
+    private BigDecimal revenueOf(BigDecimal price, double passengers) {
+        return price == null ? null
+                : price.multiply(BigDecimal.valueOf(passengers)).setScale(0, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal profitOf(BigDecimal revenue, BigDecimal cost) {
+        return revenue != null && cost != null ? revenue.subtract(cost) : null;
     }
 
     /**
@@ -311,20 +420,5 @@ public class RecommendationService {
 
     private String driverName(Driver driver) {
         return driver.getUser() != null ? driver.getUser().getFullName() : "Tài xế #" + driver.getUserId();
-    }
-
-    /**
-     * Có hai thẻ trở lên rơi vào cùng (ngày, khung giờ) không — khi đó chúng có
-     * thể cùng đề xuất một xe/tài xế vì mỗi thẻ được đánh giá độc lập. Tín hiệu
-     * để giao diện cảnh báo "đây là gợi ý, không phải lịch khả thi đồng thời".
-     */
-    private boolean hasSharedSlotContention(List<RecommendationCardDto> cards) {
-        Set<String> seen = new HashSet<>();
-        for (RecommendationCardDto card : cards) {
-            if (!seen.add(card.getDate() + "@" + card.getDepartureHour())) {
-                return true;
-            }
-        }
-        return false;
     }
 }

@@ -30,9 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * ForecastService đi qua DB thật của test (GĐ5, QĐ-16): chỉ chuyến COMPLETED làm nên lịch sử, chuyến
- * tăng cường gộp vào khung của nó, ngưỡng 28 ngày, dự báo bằng số khách từ ngày mai kèm cầu nối
- * cho Recommendation và What-if, nhớ kết quả tới khi dữ liệu đổi, và phần tự chấm điểm của màn
- * Dự báo. @Transactional nên mọi bản ghi được rollback sau từng test.
+ * tăng cường gộp vào khung của nó, ngưỡng 28 ngày, dự báo bằng số khách từ ngày mai (không kẹp ở
+ * số ghế — cầu nối tỉ lệ lấp đầy của GĐ5 đã bỏ ở GĐ6), nhớ kết quả tới khi dữ liệu đổi, và phần tự
+ * chấm điểm của màn Dự báo. @Transactional nên mọi bản ghi được rollback sau từng test.
  *
  * Ngày lấy theo hôm nay như service (LocalDate.now()); dữ liệu nằm trong những ngày vừa qua.
  */
@@ -66,7 +66,7 @@ class ForecastServiceTest {
     }
 
     @Test
-    void steadySlot_isForecastInPassengersFromTomorrow_withTheBridgeForConsumers() {
+    void steadySlot_isForecastInPassengersFromTomorrow() {
         daily(70, 6, 20, 40);
 
         DemandForecastViewDto view = forecastService.buildForecast();
@@ -85,8 +85,7 @@ class ForecastServiceTest {
         assertEquals(0, s.getSoldOutDays());
         for (ForecastPointDto p : s.getPreview()) {
             assertEquals(20.0, p.getPredictedDemand(), 1e-3, p.getDate().toString());
-            assertEquals(0.5, p.getDemandRatio(), 1e-4);
-            assertEquals(0.5, p.getPredictedOccupancy(), 1e-4, "cầu nối: 20 khách / xe 40 chỗ");
+            assertEquals(0.5, p.getDemandRatio(), 1e-4, "20 khách / xe 40 chỗ");
             assertFalse(p.isNeedsReinforcement());
             assertEquals(1, p.getTripsNeeded());
         }
@@ -147,18 +146,18 @@ class ForecastServiceTest {
             assertEquals(38.0, p.getPredictedDemand(), 1e-3);
             assertTrue(p.isNeedsReinforcement(), "38 / 40 = 95% > 90%");
             assertEquals(2, p.getTripsNeeded());
-            assertEquals(0.95, p.getPredictedOccupancy(), 1e-4);
+            assertEquals(0.95, p.getDemandRatio(), 1e-4);
         }
         assertTrue(s.isAnyReinforcement());
         assertTrue(view.getReinforcementSignalCount() >= 7);
     }
 
     /**
-     * Khung ngày nào cũng bán hết vé: EM đoán nhu cầu VƯỢT số ghế (điều mô hình cũ không thể nói), nhưng
-     * cầu nối cho Recommendation và What-if vẫn kẹp ở 100% như hợp đồng cũ của predictedOccupancy.
+     * Khung ngày nào cũng bán hết vé: EM đoán nhu cầu VƯỢT số ghế (điều mô hình cũ không thể nói), và
+     * tỉ lệ nhu cầu ÷ ghế xe chuẩn không bị kẹp ở 100%.
      */
     @Test
-    void soldOutSlot_isForecastAboveItsSeats_whileTheBridgeStaysClamped() {
+    void soldOutSlot_isForecastAboveItsSeats() {
         daily(60, 6, 40, 40);
 
         ForecastSeriesDto s = series(forecastService.buildForecast(), 6);
@@ -166,8 +165,7 @@ class ForecastServiceTest {
         assertEquals(60, s.getSoldOutDays());
         for (ForecastPointDto p : s.getPoints()) {
             assertTrue(p.getPredictedDemand() > 40, "nhu cầu > số ghế: " + p.getPredictedDemand());
-            assertTrue(p.getDemandRatio() > 1);
-            assertEquals(1.0, p.getPredictedOccupancy(), 0.0, "cầu nối kẹp [0, 1]");
+            assertTrue(p.getDemandRatio() > 1, "không kẹp ở 100%");
             assertTrue(p.getTripsNeeded() >= 2);
         }
     }

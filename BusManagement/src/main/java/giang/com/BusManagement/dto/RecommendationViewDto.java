@@ -23,7 +23,11 @@ import java.util.List;
 @AllArgsConstructor
 public class RecommendationViewDto {
 
-    /** Các thẻ đề xuất, xếp theo tỉ lệ dự báo GIẢM DẦN (đông nhất lên đầu). */
+    /**
+     * Mỗi chuyến thêm một thẻ, xếp theo lợi nhuận ước tính GIẢM DẦN (chuyến có lãi lên đầu).
+     * Xe + tài xế đã được giữ chỗ giữa các thẻ, nên các thẻ "đủ điều kiện" chạy được cùng lúc
+     * (GĐ6, QĐ-17).
+     */
     private List<RecommendationCardDto> cards;
 
     // --- Bối cảnh forecast (chuyển tiếp từ DemandForecastViewDto) ---
@@ -33,19 +37,16 @@ public class RecommendationViewDto {
     private int horizonDays;
 
     // --- Số liệu tổng hợp ---
-    /** Tổng số ngày-khung được dự báo vượt ngưỡng tăng cường (số ứng viên). */
+    /** Số ngày-khung được dự báo vượt ngưỡng tăng cường. */
+    private int hotSlotCount;
+    /** Số chuyến thêm các khung đó cần = số thẻ. */
     private int totalCandidates;
     private int recommendedCount;
     private int noResourceCount;
-
-    /**
-     * Có ít nhất hai thẻ rơi vào CÙNG (ngày, khung giờ) hay không. Khi đúng, các
-     * thẻ đó có thể cùng đề xuất một xe/tài xế vì mỗi thẻ được đánh giá độc lập,
-     * không "giữ chỗ" tài nguyên giữa các thẻ — giao diện cảnh báo rõ để người
-     * đọc hiểu đây là danh sách gợi ý, không phải lịch phân công khả thi đồng
-     * thời. Tính từ dữ liệu, không hardcode.
-     */
-    private boolean sharedSlotContention;
+    /** Số thẻ có lợi nhuận ước tính dương. */
+    private int profitableCount;
+    /** Số thẻ có lợi nhuận ước tính âm ("lỗ dự kiến"). */
+    private int lossCount;
 
     // --- Tham số chi phí đang áp dụng (Phase 7 bước 3) — để trang hiển thị minh
     // bạch "chi phí tính theo giá nào" và dẫn tới màn hình chỉnh. ---

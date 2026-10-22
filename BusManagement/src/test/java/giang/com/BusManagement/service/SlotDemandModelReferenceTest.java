@@ -143,6 +143,24 @@ class SlotDemandModelReferenceTest {
         }
     }
 
+    /**
+     * GĐ6 (QĐ-17, G6-1): khách tràn kỳ vọng E[(D − c)⁺] — doanh thu của chuyến tăng cường — so với
+     * scipy cộng trực tiếp (forecast_research/gd6/overflow_reference.py), một đường tính khác hẳn
+     * hằng đẳng thức mà Java dùng. Sai số tuyệt đối 1e-15 cho những đuôi gần như bằng 0.
+     */
+    @Test
+    void negativeBinomialExpectedOverflow_equalsScipy() {
+        List<String[]> rows = csv("reference_overflow.csv");
+        assertEquals(288, rows.size());
+        for (String[] row : rows) {
+            double expected = Double.parseDouble(row[3]);
+            double actual = SlotDemandModel.expectedOverflow(Double.parseDouble(row[0]), Integer.parseInt(row[1]),
+                    Double.parseDouble(row[2]));
+            assertEquals(expected, actual, 1e-9 * expected + 1e-15,
+                    "mu=" + row[0] + " c=" + row[1] + " size=" + row[2]);
+        }
+    }
+
     /** G4-7: mục tiêu ≤ 2 giây cho một lần khớp đầy đủ; chặn lỏng 15 giây để test không chập chờn. */
     @Test
     void fullSizeFit_isFastEnough() {

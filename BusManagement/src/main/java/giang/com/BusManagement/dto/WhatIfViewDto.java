@@ -34,7 +34,7 @@ public class WhatIfViewDto {
     private double operatingWindowHours;
     private double avgTripDurationHours;
     private double prepBufferHours;
-    /** Sức chứa trung bình đội xe — dùng khi quy Δxe ra ghế và ước số khách. */
+    /** Sức chứa trung bình đội xe — dùng khi quy Δxe ra ghế. */
     private double avgFleetCapacity;
     private int horizonDays;
 

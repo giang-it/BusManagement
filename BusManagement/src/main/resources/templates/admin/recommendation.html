@@ -16,9 +16,10 @@
             <div>
                 <h1 class="h2 mb-0"><i class="bi bi-lightbulb"></i> Đề Xuất Tăng Cường</h1>
                 <small class="text-muted">
-                    <span class="fw-semibold" th:text="${view.totalCandidates}">0</span>
+                    <span class="fw-semibold" th:text="${view.hotSlotCount}">0</span>
                     khung giờ được dự báo vượt ngưỡng tăng cường trong
-                    <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày tới
+                    <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày tới, cần
+                    <span class="fw-semibold" th:text="${view.totalCandidates}">0</span> chuyến thêm
                 </small>
             </div>
             <div>
@@ -40,8 +41,11 @@
             <div>
                 Đây là <strong>đề xuất hỗ trợ quyết định</strong>, không phải phân công tự động. Màn hình
                 <strong>không tạo chuyến và không phân công ai</strong> — mỗi lần mở, hệ thống tính lại từ dự báo,
-                chọn thử xe + tài xế và ước tính doanh thu/chi phí/lợi nhuận để Admin tự quyết. Doanh thu là
-                <strong>ước tính</strong> (tỉ lệ lấp đầy dự báo × sức chứa xe được chọn × giá vé lịch sử của khung).
+                chọn thử xe + tài xế và ước tính doanh thu/chi phí/lợi nhuận để Admin tự quyết. Mỗi thẻ là
+                <strong>một chuyến thêm</strong>; khung cần nhiều chuyến thì có nhiều thẻ ("chuyến thêm 1/2, 2/2").
+                Doanh thu là <strong>ước tính</strong>: chuyến thêm chỉ chở <strong>khách tràn</strong> — phần nhu cầu
+                mà xe chuẩn và các chuyến thêm trước nó không chở hết, tính theo độ dao động của dự báo — nhân giá vé
+                lịch sử của khung.
                 Chi phí là <strong>ước tính theo tham số cấu hình</strong> (nhiên liệu/km × quãng đường + lương/giờ ×
                 thời lượng × số tài xế), <strong>không phải chi phí thật</strong> —
                 <a th:href="@{/admin/cost-parameters}">chỉnh tham số chi phí</a>.
@@ -67,38 +71,45 @@
             </div>
         </div>
 
-        <!-- Cảnh báo: các thẻ được đánh giá độc lập, có thể trùng tài nguyên -->
-        <div class="alert alert-warning d-flex align-items-start" role="alert" th:if="${view.sharedSlotContention}">
-            <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
-            <div>
-                <strong>Đây là danh sách gợi ý, không phải lịch phân công khả thi đồng thời.</strong>
-                Có nhiều khung rơi vào cùng một ngày và giờ khởi hành; mỗi thẻ được đánh giá <strong>độc
-                lập</strong> và không "giữ chỗ" tài nguyên giữa các thẻ, nên hai thẻ cùng khung giờ có thể cùng
-                đề xuất một xe hoặc một tài xế. Khi thực sự phân công, hãy dùng lại luồng tạo/duyệt chuyến để hệ
-                thống kiểm tra trùng lịch.
-            </div>
-        </div>
-
         <!-- ============ TÓM TẮT ============ -->
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-md-3">
+        <div class="row row-cols-2 row-cols-md-5 g-3 mb-4">
+            <div class="col">
                 <div class="card border-0 bg-white h-100 shadow-sm">
                     <div class="card-body">
-                        <div class="small text-muted">Khung được dự báo đông</div>
+                        <div class="small text-muted">Chuyến thêm cần</div>
                         <div class="fs-3 fw-bold" th:text="${view.totalCandidates}">0</div>
+                        <div class="small text-muted">
+                            cho <span th:text="${view.hotSlotCount}">0</span> khung dự báo đông
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col">
+                <div class="card border-0 bg-white h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">Lãi / lỗ dự kiến</div>
+                        <div class="fs-3 fw-bold">
+                            <span class="text-success" th:text="${view.profitableCount}">0</span>
+                            <span class="text-muted fs-5">·</span>
+                            <span class="text-danger" th:text="${view.lossCount}">0</span>
+                        </div>
+                        <div class="small text-muted">
+                            <span th:text="${view.profitableCount}">0</span> chuyến có lãi ·
+                            <span th:text="${view.lossCount}">0</span> chuyến lỗ dự kiến
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
                 <div class="card border-0 bg-white h-100 shadow-sm">
                     <div class="card-body">
                         <div class="small text-muted">Đủ điều kiện phân công</div>
                         <div class="fs-3 fw-bold text-success" th:text="${view.recommendedCount}">0</div>
-                        <div class="small text-muted">có sẵn xe + tài xế hợp lệ</div>
+                        <div class="small text-muted">có sẵn xe + tài xế hợp lệ, không trùng nhau</div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col">
                 <div class="card border-0 h-100 shadow-sm"
                     th:classappend="${view.noResourceCount > 0} ? 'bg-warning bg-opacity-10' : 'bg-white'">
                     <div class="card-body">
@@ -108,7 +119,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
+            <div class="col">
                 <div class="card border-0 bg-white h-100 shadow-sm">
                     <div class="card-body">
                         <div class="small text-muted">Độ trễ dữ liệu</div>
@@ -134,7 +145,7 @@
                             <tr>
                                 <th style="width:3rem;">#</th>
                                 <th>Khung (Tuyến · Giờ · Ngày)</th>
-                                <th class="text-end">Dự Báo</th>
+                                <th class="text-end">Nhu Cầu Dự Báo</th>
                                 <th>Trạng Thái</th>
                                 <th>Xe Đề Xuất</th>
                                 <th>Tài Xế Đề Xuất</th>
@@ -158,12 +169,21 @@
                                         <span class="badge bg-info-subtle text-info-emphasis ms-1"
                                             th:if="${c.weekend}">cuối tuần</span>
                                     </div>
+                                    <span class="badge bg-primary-subtle text-primary-emphasis mt-1"
+                                        th:text="'Chuyến thêm ' + ${c.extraIndex} + '/' + ${c.extraCount}">Chuyến thêm 1/1</span>
                                 </td>
-                                <td class="text-end fw-bold"
-                                    th:text="${#numbers.formatDecimal(c.predictedOccupancy * 100, 1, 0)} + '%'">0%</td>
+                                <td class="text-end">
+                                    <div class="fw-bold">
+                                        <span th:text="${#numbers.formatDecimal(c.predictedDemand, 1, 1)}">0</span>
+                                        <span class="small text-muted fw-normal"
+                                            th:text="'/ ' + ${c.standardSeats} + ' chỗ'">/ 0 chỗ</span>
+                                    </div>
+                                    <div class="small text-muted"
+                                        th:text="${#numbers.formatDecimal(c.demandRatio * 100, 1, 0)} + '% xe chuẩn'">0%</div>
+                                </td>
                                 <td>
                                     <span class="badge bg-success" th:if="${c.status.name() == 'RECOMMENDED'}">
-                                        <i class="bi bi-check-circle"></i> Đề xuất
+                                        <i class="bi bi-check-circle"></i> Đủ điều kiện
                                     </span>
                                     <span class="badge bg-secondary" th:if="${c.status.name() == 'NO_RESOURCE'}">
                                         <i class="bi bi-x-circle"></i> Thiếu tài nguyên
@@ -183,7 +203,7 @@
                                     <span class="text-muted" th:unless="${c.driverName != null}">—</span>
                                 </td>
                                 <td class="text-end"
-                                    th:text="${c.expectedPassengers != null} ? ${c.expectedPassengers} : '—'">—</td>
+                                    th:text="${c.expectedPassengers != null} ? ${#numbers.formatDecimal(c.expectedPassengers, 1, 1)} : '—'">—</td>
                                 <td class="text-end small"
                                     th:text="${c.ticketPrice != null}
                                         ? ${#numbers.formatDecimal(c.ticketPrice, 1, 'COMMA', 0, 'POINT')} + 'đ'
@@ -197,10 +217,14 @@
                                         ? ${#numbers.formatDecimal(c.estimatedCost, 1, 'COMMA', 0, 'POINT')} + 'đ'
                                         : '—'">—</td>
                                 <td class="text-end fw-semibold"
-                                    th:classappend="${c.estimatedProfit == null} ? '' : (${c.estimatedProfit.signum() >= 0} ? 'text-success' : 'text-danger')"
-                                    th:text="${c.estimatedProfit != null}
+                                    th:classappend="${c.estimatedProfit == null} ? '' : (${c.estimatedProfit.signum() >= 0} ? 'text-success' : 'text-danger')">
+                                    <span th:text="${c.estimatedProfit != null}
                                         ? ${#numbers.formatDecimal(c.estimatedProfit, 1, 'COMMA', 0, 'POINT')} + 'đ'
-                                        : '—'">—</td>
+                                        : '—'">—</span>
+                                    <div th:if="${c.estimatedProfit != null and c.estimatedProfit.signum() < 0}">
+                                        <span class="badge bg-danger-subtle text-danger-emphasis">lỗ dự kiến</span>
+                                    </div>
+                                </td>
                                 <td class="small text-muted" th:text="${c.note}"></td>
                             </tr>
                         </tbody>
@@ -213,10 +237,15 @@
                 </div>
             </div>
             <div class="card-footer bg-white small text-muted" th:if="${!#lists.isEmpty(view.cards)}">
-                Xếp theo tỉ lệ lấp đầy dự báo giảm dần (đông nhất lên đầu). "Số khách KV" = số khách kỳ vọng =
-                làm tròn(tỉ lệ dự báo × sức chứa xe được chọn). Trạng thái được suy từ cổng kiểm tra ràng buộc
-                nghiệp vụ — cùng bộ luật mà luồng phân công thật sẽ áp dụng, nên một thẻ "Đề xuất" là chuyến mà
-                hệ thống sẽ chấp nhận nếu Admin tạo ngay bây giờ.
+                Xếp theo lợi nhuận ước tính giảm dần (chuyến có lãi lên đầu). "Số khách KV" = số khách kỳ vọng mà
+                chuyến thêm chở được: khách tràn rơi vào ghế của xe được chọn (chưa chọn được xe thì tính với xe
+                chuẩn của tuyến). Chuyến <strong>lỗ dự kiến</strong> vẫn được liệt kê vì khung đã vượt ngưỡng 90% —
+                chạy hay không do Admin quyết. Trạng thái được suy từ cổng kiểm tra ràng buộc nghiệp vụ — cùng bộ
+                luật mà luồng phân công thật sẽ áp dụng, nên một thẻ "Đủ điều kiện" là chuyến mà hệ thống sẽ chấp
+                nhận nếu Admin tạo ngay bây giờ. Các chuyến được xét theo lãi kỳ vọng giảm dần; xe + tài xế của
+                thẻ đủ điều kiện được giữ, nên các thẻ "Đủ điều kiện" không trùng xe, không trùng tài xế và không
+                vượt 8 giờ lái — chạy được cùng lúc. Lịch chạy thường lệ của những ngày tới chưa có trong hệ thống
+                nên chưa được trừ khỏi đội xe.
             </div>
         </div>
 

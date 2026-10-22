@@ -15,7 +15,11 @@ package giang.com.BusManagement.dto;
  */
 public enum RecommendationStatus {
 
-    /** Chọn được xe + tài xế và cổng validation xác nhận vẫn hợp lệ. */
+    /**
+     * Chọn được xe + tài xế và cổng validation xác nhận vẫn hợp lệ. Từ GĐ6 (QĐ-17) xe + tài
+     * xế này được giữ chỗ, nên các thẻ xét sau không dùng lại chúng trong cùng giờ. Trạng thái
+     * nói về TÍNH KHẢ THI, không nói chuyến có lãi — lãi/lỗ nằm ở estimatedProfit.
+     */
     RECOMMENDED,
 
     /**

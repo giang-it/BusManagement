@@ -33,30 +33,37 @@ public class WhatIfOutcomeDto {
     /** Bên bó nhỏ hơn khi thiếu năng lực — "mua xe hay tuyển tài xế". */
     private WhatIfBottleneck bottleneck;
 
-    // --- Nhu cầu vs độ phủ ---
+    // --- Nhu cầu vs độ phủ (đơn vị: chuyến thêm, từ GĐ6 — QĐ-17) ---
     /** Số ngày-khung vượt ngưỡng tăng cường tại hệ số nhu cầu của kịch bản. */
     private int hotSlots;
+    /** Số chuyến thêm các khung đó cần = Σ (số chuyến cần − 1). Ở 100% bằng số thẻ màn Đề Xuất. */
+    private int extraTripsNeeded;
     /**
-     * Số khung phủ được, cộng dồn THEO TỪNG NGÀY:
-     * {@code floor(Σ_ngày min(số khung đông của ngày, servablePerDay))}.
+     * Số chuyến thêm phủ được, cộng dồn THEO TỪNG NGÀY:
+     * {@code floor(Σ_ngày min(số chuyến thêm cần trong ngày, servablePerDay))}.
      *
-     * Cố ý KHÔNG phải {@code min(hotSlots, servablePerDay × số ngày)} — công thức gộp
-     * đó cho năng lực nhàn rỗi của ngày vắng "cho vay" sang ngày cao điểm, và vì nhu
-     * cầu dự báo dồn vào cuối tuần nên nó báo đủ năng lực trong khi thực tế đang
+     * Cố ý KHÔNG phải {@code min(extraTripsNeeded, servablePerDay × số ngày)} — công
+     * thức gộp đó cho năng lực nhàn rỗi của ngày vắng "cho vay" sang ngày cao điểm, và
+     * vì nhu cầu dự báo dồn cục nên nó báo đủ năng lực trong khi thực tế đang
      * thiếu. Xem javadoc của {@code WhatIfSimulationService} và
      * docs/todo/current_bugs_found.md mục #7.
      */
     private int coverable;
-    /** hotSlots − coverable — số khung nhu cầu cao nhưng không phủ nổi. */
+    /** extraTripsNeeded − coverable — số chuyến thêm cần nhưng không phủ nổi. */
     private int gap;
-    /** coverable ÷ hotSlots (%). null khi hotSlots = 0 (không có nhu cầu để phủ). */
+    /** coverable ÷ extraTripsNeeded (%). null khi không cần chuyến thêm nào. */
     private Double coveragePct;
 
     // --- Tài chính của kế hoạch PHỦ ĐƯỢC (theo tham số chi phí của cột này) ---
-    /** null nếu thiếu tham số/quãng đường cho mọi khung. */
+    /** null nếu thiếu tham số/quãng đường cho mọi chuyến. */
     private BigDecimal estimatedCost;
-    /** null nếu không khung nào có giá vé lịch sử để ước doanh thu. */
+    /** Theo khách tràn của từng chuyến thêm; null nếu không khung nào có giá vé lịch sử. */
     private BigDecimal estimatedRevenue;
     /** revenue − cost; null khi thiếu doanh thu. Có thể âm (hiển thị đỏ). */
     private BigDecimal estimatedProfit;
+
+    /** Trong kế hoạch phủ được, số chuyến thêm có lãi kỳ vọng dương. */
+    private int profitableTrips;
+    /** Lãi nếu chỉ chạy các chuyến đó; null khi không chuyến nào có lãi. */
+    private BigDecimal profitableProfit;
 }
