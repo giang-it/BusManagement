@@ -331,7 +331,7 @@ Chủ dự án duyệt toàn bộ đề xuất GĐ2: *"oke. tôi duyệt tất c
   - tổng odometer giảm đúng **337.860 km**;
   - tổng km kể từ lần bảo dưỡng cuối giữ nguyên **18.355**;
   - sau đó bộ sinh mới chạy khoảng 1 phút.
-- **Ở GĐ3 trên DB thật:** backup, rồi chủ dự án xác nhận lần cuối, rồi chạy hai script, rồi chạy bộ sinh.
+- **Ở GĐ3 trên DB thật:** backup, rồi chủ dự án xác nhận lần cuối, rồi chạy hai script, rồi chạy bộ sinh. **Đã chạy ngày 2026-10-22** theo QĐ-14; kết quả giống hệt lần tổng duyệt.
 
 ### QĐ-12. Màn danh sách chuyến có cửa sổ ngày (chốt 2026-10-21, G2-8)
 
@@ -388,6 +388,14 @@ Chủ dự án duyệt cả bảy đề xuất (*"oke. tôi chốt và hãy bắ
   - G3-2: file `busmanagement_2026-10-22_truoc-GD3.sql` (404 KB). Khôi phục vào bản sao mới: cả 11 bảng giống DB thật cả số dòng lẫn checksum.
   - G3-3 trên bản sao: phần A đúng số dự kiến (2.206 chuyến cũ, 2.061 `COMPLETED`, 337.860 km, 0 tham chiếu); phần B 2.225 → 19 chuyến, odometer 356.245 → 18.385 km, km kể từ bảo dưỡng giữ 18.355; bộ sinh chạy 74 giây: **21.192 chuyến** (342 tăng cường, 1.363 hủy), 01/01/2023 → 21/10/2026, 20,9% khung bán hết; script kiểm sau khi sinh: **0 vi phạm** ở mọi mục. Chạy cùng script trên dữ liệu cũ của DB thật thì bắt đúng các lỗi đã biết (69 chuyến của #32, 8 xe + 12 người của #33), nên script không đậu suông.
   - G3-6 phần trước: trong 7 bài học và `Proj_functions_summary.md`, 121 chỗ trích số dòng được ánh xạ lại theo code mới (từng chỗ đã soát với dòng code cũ), 9 chỗ sửa tay; build lại 7 trang HTML.
+- **Đã chạy trên DB thật ngày 2026-10-22.**
+  - Chủ dự án bảo commit rồi làm DB thật (*"tôi hiểu rồi, bạn commit đi. sau đó bắt đầu làm db thật"*), sau khi đã đọc rằng bước này xoá dữ liệu cũ. Lời đó được coi là xác nhận lần cuối, với điều kiện mọi điều kiện ở trên đều đúng lúc chạy: code đã commit (`09f4a4c`, `71e3486`, `db111c9`), không app nào chạy, DB thật giống hệt lúc sao lưu, phần A giống hệt lần tổng duyệt.
+  - Phần A giống từng ký tự lần tổng duyệt. Phần B: 2.225 → 19 chuyến, odometer 356.245 → 18.385 km, km kể từ bảo dưỡng giữ 18.355.
+  - Bộ sinh từ commit `09f4a4c`, 92 giây: **21.192 chuyến** (342 tăng cường, 1.363 hủy), 01/01/2023 → 21/10/2026, 20,9% khung bán hết.
+  - Phần C: 0 vi phạm ở mọi mục.
+  - **So với bản sao tổng duyệt:** cả 21.192 chuyến giống hệt (giờ, tuyến, xe, tài xế, ghế, vé, trạng thái, chuyến gốc của chuyến thêm, giá, giờ đến, ngày mở bán); odometer, mốc bảo dưỡng và trạng thái từng xe giống hệt; file nhu cầu thật giống từng byte. Không có bản ghi mồ côi.
+  - `verify`: 17 trang và hai bộ lọc của danh sách chuyến trả 200, log sạch. Danh sách chuyến khớp SQL từng mã chuyến (mặc định 462, 7 ngày 117, 90 ngày 1.370). Màn dự báo cũ: MAPE 22,7% so với baseline 23,90% — trạng thái tạm tới GĐ5.
+  - G3-5: file nhu cầu thật `nhu-cau-that_2023-01-01_2026-10-21.csv` để cạnh file sao lưu trong `ProjectBackup\db`.
 
 ---
 
@@ -461,3 +469,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-22 | M-15 ý 2: chủ dự án duyệt EM 5 vòng; sửa QĐ-1. M-15 ý 1 (quy tắc (b)) còn chờ; thêm số đo tách theo tình huống (`forecast_discussion.md` §13.7) |
 | 2026-10-22 (sau) | M-15 ý 1: chủ dự án chọn quy tắc (b). Viết lại QĐ-3 (giữ mô tả quy tắc cũ (a) và lý do thay); sửa bảng mục 1, công thức QĐ-1, ghi chú "sự kiện một lần" ở QĐ-9, tóm tắt QĐ-13. Đóng M-6 và M-15 |
 | 2026-10-22 (GĐ3) | Thảo luận GĐ3, chủ dự án duyệt G3-1…G3-7: thêm QĐ-14 và dòng của nó ở mục 1; QĐ-10 thêm "Bổ sung ở GĐ3" (lỗi #33, chuyến có sẵn giữ xe và người); QĐ-7 ghi rõ số dòng là của bản trước GĐ2. Thêm M-16 (nhận diện chuyến bộ sinh khi chạy bổ sung) |
+| 2026-10-22 (GĐ3 trên DB thật) | QĐ-11, QĐ-14: ghi kết quả chạy trên DB thật (giống hệt bản sao tổng duyệt tới từng chuyến) |

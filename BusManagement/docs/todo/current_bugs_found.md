@@ -3224,7 +3224,7 @@ Chủ dự án duyệt ghi cả hai (thảo luận GĐ2, *"oke. tôi duyệt t�
 `docs/development/forecast_decisions.md`), và cả hai chỉ còn sống trong 2.206 chuyến mà bộ sinh cũ đã
 ghi vào DB thật. Hai script GĐ3 (`forecast_research/gd3_check_old_history.sql`,
 `gd3_delete_old_history.sql`) xoá đúng tập đó; đã tổng duyệt trên bản sao `busmanagement_gd2`.
-**Đóng khi GĐ3 chạy xong trên DB thật.**
+**ĐÃ ĐÓNG 2026-10-22: GĐ3 đã chạy trên DB thật.** Sao lưu trước (khôi phục thử khớp 11/11 bảng), xoá đúng 2.206 chuyến của bộ sinh cũ, sinh lại bằng bộ sinh mới (commit `09f4a4c`). Script phần C `gd3_check_new_history.sql` trên DB thật: 0 chuyến tài xế hết hạn bằng, không còn răng cưa vì mọi ngày tính từ mốc cố định 01/01/2023.
 
 ## 31. Xu hướng của bộ sinh cũ bị đặt lại sau MỖI lần chạy bổ sung — lịch sử có hình răng cưa
 
@@ -3286,7 +3286,7 @@ ghi vào DB thật. Hai script GĐ3 (`forecast_research/gd3_check_old_history.sq
     lúc 22 giờ xe 2 chạy hai chuyến;
   - dữ liệu cũ của bản Phase 5 trên DB thật: 3 cặp cùng lúc (0 cùng xe); theo ngày, script
     `gd3_check_new_history.sql` đếm được 8 lần dùng lại xe và 12 lần dùng lại người.
-- **Đã sửa (GĐ3, 2026-10-22, chưa commit):**
+- **Đã sửa (GĐ3, 2026-10-22, commit `09f4a4c`):**
   - chuyến có sẵn ở mọi trạng thái trừ `CANCELLED` giữ xe, tài xế, phụ xe và tài xế phụ của nó trong
     **mọi ngày lịch** mà nó chạm tới (chuyến qua đêm giữ cả hai ngày). Đọc một lần bằng
     `TripRepository.findResourceUseBetween` (chỉ scalar), `planDay()` nhận thêm `Occupied`;
@@ -3302,7 +3302,7 @@ ghi vào DB thật. Hai script GĐ3 (`forecast_research/gd3_check_old_history.sq
 - **Kiểm lại trên bản sao mới (G3-3):** 16 chuyến của chủ dự án giữ chỗ, **0** lần dùng lại xe, **0** lần
   dùng lại người. So với bản trước khi sửa, chỉ 11 ngày có chuyến của chủ dự án đổi cách xếp xe (cộng ngày
   mới 21/10); mọi ngày khác giống hệt, và nhu cầu thật giống hệt ở cả 20.835 khung.
-- **Đóng khi** commit bản sửa và GĐ3 chạy xong trên DB thật.
+- **ĐÃ ĐÓNG 2026-10-22.** Bản sửa commit thành `09f4a4c`; GĐ3 chạy trên DB thật bằng chính commit đó. Phần C trên DB thật: 16 chuyến của chủ dự án giữ chỗ, **0** lần dùng lại xe, **0** lần dùng lại người; DB thật giống bản sao tổng duyệt tới từng chuyến.
 
 Ghi thêm, không đánh số vì GĐ3 xoá dữ liệu đó: chạy `gd3_check_new_history.sql` trên dữ liệu cũ còn cho
 thấy ngày **02/08/2026** có 16 chuyến thường thay vì 15 và xe 16 chạy hai chuyến — đúng chỗ giao nhau của
