@@ -35,6 +35,7 @@
 | QĐ-12 | Màn danh sách chuyến | Chuyến chưa kết thúc luôn hiện; chuyến đã kết thúc chỉ trong 7/30/90 ngày (mặc định 30) |
 | QĐ-13 | Đo lại bằng Python | Đo lại K, quy tắc "ít nhất 2 lần", λ, EM, cửa sổ lễ, chiều tuyến (kể cả trên dữ liệu Hồng Kông) trên dữ liệu mới |
 | QĐ-14 | Cách làm GĐ3 | Sửa bộ sinh để né xe/người của chuyến có sẵn (lỗi #33); sao lưu và khôi phục thử; tổng duyệt lại trên bản sao; làm ngay; xuất nhu cầu thật; sửa tài liệu; giữ bản sao tới hết GĐ5 |
+| QĐ-15 | Lõi toán Java (GĐ4) | `SlotDemandModel` và `ArrowSolver`, package-private trong `service`, chưa nối vào app; giải hệ theo khối "mũi tên"; bước E cộng phần đuôi nhị thức âm; phải khớp bản Python đã đo trên dữ liệu thật đóng băng (tới một phần triệu); mục tiêu ≤ 2 giây mỗi lần khớp |
 
 Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
@@ -65,7 +66,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
   - Đây là EM dạng thực dụng, không phải EM chính xác (`forecast_discussion.md` §12.7).
 
 **Cài đặt.**
-- Viết tay bằng Java 17 (`pom.xml:30`), không thêm thư viện. Smile có Poisson GLM, nhưng bản đó cần Java 21 (§11).
+- Viết tay bằng Java 17 (`pom.xml:30`), không thêm thư viện. **Đã viết ở GĐ4 (QĐ-15):** `service/SlotDemandModel` và `service/ArrowSolver`, khớp bản Python tới 10⁻⁸. Smile có Poisson GLM, nhưng bản đó cần Java 21 (§11).
 - Python chỉ dùng để nghiên cứu và đối chứng, nằm ngoài app.
 
 **Vì sao chọn** (§12.3–12.6):
@@ -79,7 +80,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 - **Đã kiểm ở GĐ2** (`forecast_discussion.md` §13): K = 0 và λ = 2 giữ nguyên. 5 vòng EM cho kết quả như 15 vòng nên chốt 5 vòng; số lần khớp giảm từ 16 xuống 6.
 
 **Hệ quả đã biết.**
-- Tính toán nặng: bản Python mất 10–25 giây cho mỗi lần khớp.
+- Tính toán nặng: bản Python mất 10–25 giây cho mỗi lần khớp. Bản Java (GĐ4) chỉ mất khoảng 0,2–0,6 giây nhờ giải theo khối.
 - `buildForecast()` hiện được gọi từ 3 nơi: `ForecastController.java:44`, `RecommendationService.java:100` và `WhatIfSimulationService.java:147`.
 - Vì vậy nhiều khả năng phải tính một lần mỗi ngày rồi cache. Cách làm chưa chốt (M-5).
 
@@ -397,6 +398,32 @@ Chủ dự án duyệt cả bảy đề xuất (*"oke. tôi chốt và hãy bắ
   - `verify`: 17 trang và hai bộ lọc của danh sách chuyến trả 200, log sạch. Danh sách chuyến khớp SQL từng mã chuyến (mặc định 462, 7 ngày 117, 90 ngày 1.370). Màn dự báo cũ: MAPE 22,7% so với baseline 23,90% — trạng thái tạm tới GĐ5.
   - G3-5: file nhu cầu thật `nhu-cau-that_2023-01-01_2026-10-21.csv` để cạnh file sao lưu trong `ProjectBackup\db`.
 
+### QĐ-15. Lõi toán Java của dự báo — cách làm GĐ4 (chốt 2026-10-22, G4-1…G4-8)
+
+Chủ dự án duyệt cả tám đề xuất (*"oke, bạn hãy thực hiện đi, tôi đồng ý hết"*).
+
+| # | Quyết định |
+|---|---|
+| G4-1 | **Phạm vi:** chỉ lõi toán — dựng các cột theo lịch, hồi quy Poisson có ridge (IRLS), EM, chỉnh mức 28 ngày, dự báo, hệ số lễ. Không đọc DB (M-3), không cache (M-5), không màn hình (M-9): đó là việc của GĐ5 |
+| G4-2 | **Vị trí:** code nằm cạnh nơi dùng nó — hai lớp package-private trong `service`: `SlotDemandModel` (mô hình) và `ArrowSolver` (đại số), như `HistorySimulation` nằm cạnh bộ sinh |
+| G4-3 | **Vào:** số vé và tổng số ghế của từng khung theo ngày (NaN = không quan sát), nhóm chiều của từng chuỗi, ngày gốc. **Ra:** nhu cầu kỳ vọng theo ngày × chuỗi, hệ số lễ gộp, số liệu chẩn đoán. Cách tính "số vé của khung" từ các chuyến (M-3) để GĐ5 chốt |
+| G4-4 | **Giải hệ theo khối "mũi tên"** (bù Schur): mỗi chuỗi một khối riêng; phần lễ gộp của nhóm chiều là cán chung. Chi phí tăng tuyến tính theo số tuyến, kể cả khi mọi tuyến dồn vào một nhóm |
+| G4-5 | **Bước E cộng trực tiếp phần ĐUÔI** nhị thức âm từ số ghế trở lên, không lấy 1 − phần dưới. Sửa câu cũ "số ghế ≤ 50": ngưỡng là tổng số ghế của cả khung, kể cả chuyến tăng cường, tới 172 |
+| G4-6 | **Chứng minh bằng đối chiếu Python:** lịch sử thật đóng băng thành file test; `forecast_research/gd4/reference.py` chạy đúng `slot_glm` của GĐ2 với cấu hình cuối ở 2 ngày gốc; Java phải khớp mọi dự báo tới một phần triệu, hệ số lễ tới 10⁻⁶ |
+| G4-7 | **Tốc độ:** mục tiêu ≤ 2 giây cho một lần khớp đầy đủ; test chặn lỏng 15 giây; chậm hơn mục tiêu thì dừng lại bàn |
+| G4-8 | **Test:** bộ giải so với khử Gauss; bước E so với scipy; các tính chất trên dữ liệu dựng tay; đối chiếu Python; tốc độ; thử làm hỏng code |
+
+- **Cấu hình cuối đã được đo chung** (EM 5 vòng cùng quy tắc (b) — ở GĐ2 hai thứ chỉ được đo riêng), trên dữ liệu GĐ2:
+  - sai số 22,35% / 22,58% (tầm 1–7 / 15–35 ngày): tốt hơn mô hình chính GĐ2 0,21 / 0,17 điểm, hơn app hiện tại 3,11 / 2,83 điểm;
+  - Tết 2024 −2,57, Tết 2025 −0,18, Tết 2026 +0,29; lễ nhỏ −1,11; ngày thường không đổi;
+  - tức giống hệt khi đo riêng quy tắc (b): hai thay đổi không ảnh hưởng nhau. Chi tiết ở `forecast_discussion.md` §14.
+- **Đã cài ngày 2026-10-22 (commit `c5a830c`):**
+  - `service/SlotDemandModel.java`, `service/ArrowSolver.java`. Chưa có nơi nào trong app gọi tới; GĐ5 nối vào `ForecastService`.
+  - Dữ liệu test `src/test/resources/forecast/`: `slot_history.csv` (19.487 khung có chuyến hoàn thành, xuất từ DB thật bằng `forecast_research/gd4/export_slot_history.sql`, khớp 19.487/19.487 với file nhu cầu thật của GĐ3) và `routes.csv`; kết quả Python `reference_forecast.csv` (1.050 dự báo), `reference_holiday_effects.csv` (402 hệ số), `reference_nb.csv` (168 giá trị bước E).
+  - **Java khớp Python:** 1.050/1.050 dự báo, sai lệch tương đối lớn nhất 9,7·10⁻⁹; 402/402 hệ số lễ; 168/168 giá trị bước E (tới 10⁻⁹).
+  - **Tốc độ:** một lần khớp đầy đủ (19.487 quan sát, 4.078 khung bán hết, 18 vòng IRLS cho cả 6 lần khớp) mất 0,22–0,26 giây khi chạy riêng, 0,56 giây khi chạy chung cả bộ test. Python mất 3,5–14 giây.
+  - Test: `ArrowSolverTest` (2), `SlotDemandModelTest` (8), `SlotDemandModelReferenceTest` (4). Năm lần thử làm hỏng (tắt ridge phần lễ gộp, 15 vòng EM, xu hướng không đóng băng, bỏ bước bù Schur, cửa sổ chỉnh mức 21 ngày) đều làm đỏ đúng test. `mvnw test` **184/184**, 27 lớp.
+
 ---
 
 ## 3. Thứ tự thực hiện
@@ -428,7 +455,7 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | M-2 | ~~Chiều tuyến: chi tiết của QĐ-4~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-8** |
 | M-3 | **"Nhu cầu khung giờ" và "bán hết vé" đo thế nào trên DB:** gộp các chuyến cùng (tuyến, giờ, ngày), kể cả chuyến tăng cường; tính những trạng thái nào; xử lý chuyến `CANCELLED` ra sao | Hiện Phase 6 chỉ tính `COMPLETED` (roadmap §9). **Dữ liệu GĐ2 đã sinh theo cách hiểu này**, và lần đo lại QĐ-13 dùng đúng nó: cộng các chuyến `COMPLETED` cùng (tuyến, ngày, HOUR); chuyến thêm ở phút 30/40/50 nên tự rơi vào đúng khung; bán hết khi vé ≥ tổng số ghế; khung bị hủy là không quan sát được. Định nghĩa chính thức cho `ForecastService` chốt ở GĐ5 |
 | M-4 | **Ngưỡng 0,90 và số chuyến cần:** giữ một định nghĩa "chuyến nóng" duy nhất như thế nào | Bước 0 đo bằng: số chuyến cần = max(1, ⌈nhu cầu / (0,9 × số ghế xe chuẩn)⌉) (§12.2) |
-| M-5 | **Tính toán và cache:** tính một lần mỗi ngày? Lưu ở đâu? Ai kích hoạt? | QĐ-1, hệ quả |
+| M-5 | **Tính toán và cache:** tính một lần mỗi ngày? Lưu ở đâu? Ai kích hoạt? | QĐ-1, hệ quả. GĐ4 đo được 0,2–0,6 giây một lần khớp đầy đủ, nhẹ hơn dự kiến nhiều; vẫn chốt ở GĐ5 |
 | M-6 | ~~Đếm "ít nhất 2 lần" theo toàn hệ thống hay theo từng tuyến~~ | **ĐÃ ĐÓNG 2026-10-22:** không còn đếm số lần, vì QĐ-3 đổi sang quy tắc (b) |
 | M-7 | ~~Ngày bão, lũ~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** bão là đóng tuyến, mọi chuyến hôm đó `CANCELLED`; không dùng Incident |
 | M-8 | ~~Bộ sinh: độ lớn, số năm, phạm vi xóa~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10 và QĐ-11** |
@@ -470,3 +497,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-22 (sau) | M-15 ý 1: chủ dự án chọn quy tắc (b). Viết lại QĐ-3 (giữ mô tả quy tắc cũ (a) và lý do thay); sửa bảng mục 1, công thức QĐ-1, ghi chú "sự kiện một lần" ở QĐ-9, tóm tắt QĐ-13. Đóng M-6 và M-15 |
 | 2026-10-22 (GĐ3) | Thảo luận GĐ3, chủ dự án duyệt G3-1…G3-7: thêm QĐ-14 và dòng của nó ở mục 1; QĐ-10 thêm "Bổ sung ở GĐ3" (lỗi #33, chuyến có sẵn giữ xe và người); QĐ-7 ghi rõ số dòng là của bản trước GĐ2. Thêm M-16 (nhận diện chuyến bộ sinh khi chạy bổ sung) |
 | 2026-10-22 (GĐ3 trên DB thật) | QĐ-11, QĐ-14: ghi kết quả chạy trên DB thật (giống hệt bản sao tổng duyệt tới từng chuyến) |
+| 2026-10-22 (GĐ4) | Thảo luận GĐ4, chủ dự án duyệt G4-1…G4-8: thêm QĐ-15 và dòng của nó ở mục 1. QĐ-1: ghi bản Java và tốc độ đo được. M-5: ghi tốc độ GĐ4 đo được |

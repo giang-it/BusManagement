@@ -874,6 +874,39 @@ Chênh WAPE so với mô hình chính (điểm %, tầm 1–35 nếu không ghi 
 3. Vậy **(b) không chỉ an toàn khi thiếu dữ liệu, mà còn tốt hơn hoặc ngang ở chính tình huống app sẽ chạy.**
 4. Lần tách này chỉ là cách nhìn khác trên **cùng các lần chạy** của §13.2–13.3, không chỉnh thêm tham số nào. Điều đã nói ở §13.6 vẫn đúng: (b) được nghĩ ra sau khi xem kết quả.
 
+## 14. GĐ4: cấu hình cuối đo chung, và bản Java tái hiện bản Python (2026-10-22)
+
+> **Chỉ nghiên cứu và test.** Không đụng app đang chạy hay DB. Đây là phần nghiên cứu của QĐ-15.
+
+### 14.1 Cấu hình cuối chưa từng được đo chung
+
+Sau M-15, mô hình là "EM 5 vòng + quy tắc (b)". Ở GĐ2 hai thay đổi này chỉ được đo **riêng** quanh mô hình chính. Lần này chạy cả hai cùng lúc, trên đúng dữ liệu và 72 ngày gốc của §13 (`forecast_research/gd4/run_final.py`: `run_gd2.py` giữ nguyên, thêm một biến thể; chấm bằng `step0/compare.py`):
+
+| | Tầm 1–7 | Tầm 15–35 | Tết 2024 | Tết 2025 | Tết 2026 | Lễ nhỏ | Ngày thường |
+|---|---|---|---|---|---|---|---|
+| Cấu hình cuối (WAPE %) | **22,35** | **22,58** | 33,19 | 24,82 | 25,26 | 26,56 | 21,48 |
+| So với mô hình chính GĐ2 | −0,21 (KTC chạm 0) | **−0,17** | **−2,57** | −0,18 (KTC chứa 0) | **+0,29** | **−1,11** | 0 |
+| So với SN4 sạch | **−2,94** | **−2,75** | | | | | |
+| So với app hiện tại | **−3,11** | **−2,83** | | | | | |
+
+- Kết quả giống hệt khi đo riêng quy tắc (b) (§13.2): EM 5 vòng và quy tắc (b) không ảnh hưởng nhau.
+- Mô hình chính của GĐ2 cho lại đúng 22,56 / 22,75 như §13.2, nên lần chạy này nhất quán với GĐ2.
+
+### 14.2 Bản Java khớp bản Python
+
+- **Dữ liệu:** lịch sử khung giờ của DB thật xuất ngày 2026-10-22, ngay sau GĐ3 (19.487 khung có chuyến hoàn thành, 15 chuỗi, 01/01/2023 → 21/10/2026), đóng băng ở `src/test/resources/forecast/`. Đối chiếu với file nhu cầu thật của GĐ3: khớp 19.487/19.487 khung cả số vé lẫn số ghế.
+- **Tham chiếu:** `forecast_research/gd4/reference.py` chạy nguyên `slot_glm` của GĐ2 với cấu hình cuối ở hai ngày gốc, 25/01/2026 (tầm dự báo trùm Tết 2026) và 21/10/2026.
+- **Kết quả** (`SlotDemandModelReferenceTest`):
+  - 1.050/1.050 dự báo khớp, sai lệch tương đối lớn nhất **9,7·10⁻⁹** (ngưỡng đặt ra là 10⁻⁶);
+  - 402/402 hệ số lễ gộp khớp tới 10⁻⁶;
+  - 168/168 giá trị của bước E khớp scipy tới 10⁻⁹, kể cả đuôi rất nhỏ và sức chứa tới 172 ghế.
+- **Tốc độ:** một lần khớp đầy đủ mất 0,22–0,26 giây khi chạy riêng, 0,56 giây khi chạy chung cả bộ test; Python mất 3,5–14 giây. Hệ có 1.431 ẩn; giải theo khối "mũi tên" là lý do chính.
+
+### 14.3 Điều phải nói thật
+
+- Khớp Python chứng minh bản Java **đúng là mô hình đã đo**, không chứng minh mô hình đúng ngoài đời: mọi giới hạn ở §12.7 và §13.6 vẫn còn nguyên.
+- Dữ liệu test là ảnh chụp ngày 2026-10-22. App thật đọc DB ở GĐ5; file test cố ý không đổi để test lặp lại được.
+
 ---
 
 ## Phụ lục A — Số liệu đã đo (DB ngày 2026-10-14, kiểm lại 2026-10-16)
