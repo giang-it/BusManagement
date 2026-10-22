@@ -34,6 +34,7 @@
 | QĐ-11 | Chạy thử và tổng duyệt GĐ3 | Bản sao riêng `busmanagement_gd2`; hai script xoá dữ liệu cũ và trừ km ở cả hai cột odometer |
 | QĐ-12 | Màn danh sách chuyến | Chuyến chưa kết thúc luôn hiện; chuyến đã kết thúc chỉ trong 7/30/90 ngày (mặc định 30) |
 | QĐ-13 | Đo lại bằng Python | Đo lại K, quy tắc "ít nhất 2 lần", λ, EM, cửa sổ lễ, chiều tuyến (kể cả trên dữ liệu Hồng Kông) trên dữ liệu mới |
+| QĐ-14 | Cách làm GĐ3 | Sửa bộ sinh để né xe/người của chuyến có sẵn (lỗi #33); sao lưu và khôi phục thử; tổng duyệt lại trên bản sao; làm ngay; xuất nhu cầu thật; sửa tài liệu; giữ bản sao tới hết GĐ5 |
 
 Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
@@ -170,7 +171,7 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
   - mức nhu cầu trôi và nhảy bậc;
   - nhiễu nhị thức âm, có ngày bão.
   - Bản tham khảo: `forecast_research/step0/synth_generator.py`.
-- **Không lặp lỗi "xu hướng reset sau mỗi lần chạy bổ sung"** của bộ sinh hiện tại:
+- **Không lặp lỗi "xu hướng reset sau mỗi lần chạy bổ sung"** của bộ sinh hiện tại (số dòng dưới đây là của bản trước GĐ2):
   - `HistoricalDataBackfill.java:187` lấy mốc là `today − BACKFILL_DAYS` mỗi lần chạy;
   - `:374` tính xu hướng từ `dayIndex` theo mốc đó;
   - xem `forecast_discussion.md` §2.
@@ -312,6 +313,11 @@ Chủ dự án duyệt toàn bộ đề xuất GĐ2: *"oke. tôi duyệt tất c
     - **21,0% khung bán hết vé**, 5,1% nhu cầu không được phục vụ;
     - **0** vi phạm bất biến;
     - DB và nhu cầu thật mà bộ sinh lên kế hoạch khớp ở **19.475/19.475** khung có chuyến chạy.
+- **Bổ sung ở GĐ3 (2026-10-22, G3-1, lỗi #33).** Chuyến **có sẵn** trong DB — Admin tự tạo, hay chuyến thật về sau — giữ xe, tài xế, phụ xe và tài xế phụ của nó trong mọi ngày lịch mà nó chạm tới; hôm đó bộ sinh không xếp thêm chuyến cho họ.
+  - "Có sẵn" là mọi trạng thái trừ `CANCELLED`, kể cả `COMPLETED`: với lịch sử, chuyến đã chạy là đã dùng xe. Vì vậy không dùng luật "bận" của `isBusBusy` (chỉ cho chuyến tương lai).
+  - Chuyến dạng bộ sinh không bị tính, để lần chạy bổ sung ra đúng như một lần chạy liền.
+  - Cài bằng `TripRepository.findResourceUseBetween` (một truy vấn scalar) và tham số `Occupied` của `planDay()`. Thêm 4 test; `mvnw test` 170/170.
+  - Trước khi sửa, bản sao có 12 cặp chuyến chạy cùng lúc dùng chung xe hoặc người với chuyến của chủ dự án (4 cặp cùng xe). Sau khi sửa: **0**.
 
 ### QĐ-11. Chạy trên bản sao riêng, tổng duyệt GĐ3 (chốt 2026-10-21, G2-7)
 
@@ -361,6 +367,28 @@ Chủ dự án duyệt toàn bộ đề xuất GĐ2: *"oke. tôi duyệt tất c
   - cửa sổ hẹp nhỉnh hơn 0,3 điểm, chỉ trên dữ liệu mô phỏng.
 - Hai đề xuất đổi quyết định (**M-15**), chủ dự án đã chốt cả hai ngày 2026-10-22: EM 5 vòng (vào QĐ-1) và quy tắc (b) (vào QĐ-3). Số đo bổ sung cho quy tắc (b) ở §13.7.
 
+### QĐ-14. Thay dữ liệu trên DB thật — cách làm GĐ3 (chốt 2026-10-22, G3-1…G3-7)
+
+Chủ dự án duyệt cả bảy đề xuất (*"oke. tôi chốt và hãy bắt đầu làm đi từ G3-1 đến G3-7"*).
+
+| # | Quyết định |
+|---|---|
+| G3-1 | Sửa bộ sinh **trước** GĐ3: chuyến có sẵn giữ xe và người của nó (lỗi #33). Chi tiết ở QĐ-10, mục "Bổ sung ở GĐ3" |
+| G3-2 | **Sao lưu** bằng `mysqldump` ra `E:\Y4 S2\PRETHESIS\ProjectBackup\db\`, ngoài git, giữ tới khi bảo vệ xong. **Khôi phục thử** file đó vào một bản sao `busmanagement_gd2` mới và so từng bảng với DB thật (số dòng và `CHECKSUM TABLE`) |
+| G3-3 | **Tổng duyệt lại** trên bản sao mới đó bằng code đã sửa: phần A, phần B, bộ sinh, rồi script kiểm sau khi sinh `forecast_research/gd3_check_new_history.sql`. Khi chạy trên DB thật, so DB thật với bản sao **từng chuyến** — bộ sinh tất định nên phải giống hệt |
+| G3-4 | Làm GĐ3 **ngay**, đúng thứ tự kế hoạch, không dời sau GĐ5 |
+| G3-5 | Khi chạy trên DB thật, xuất **file nhu cầu thật** (`-Dbackfill.truth-csv`) để cạnh file sao lưu, không đưa vào git |
+| G3-6 | Tài liệu: sửa phần GĐ2 để sót (số dòng trong các bài `docs/study` và câu còn nhắc `findAllWithDetails`, "12 tuần"; `project_report.md` Warn #4) rồi build lại HTML; sau khi chạy: đóng #31, #32, #33 và cập nhật roadmap, QĐ-11, `setup_guide.md` |
+| G3-7 | Giữ bản sao `busmanagement_gd2` tới hết GĐ5 làm chỗ thử các thao tác ghi, rồi xoá |
+
+- **Điều kiện trước phần B trên DB thật:** code bản sửa đã commit (dữ liệu sinh ra từ một commit cụ thể); app đang chạy đã tắt; ảnh chụp DB thật vẫn giống lúc sao lưu (nếu khác thì sao lưu lại); **chủ dự án xác nhận lần cuối** ngay trước đó.
+- **Quay lại nếu cần:** tạo lại schema `busmanagement` rỗng rồi nạp file sao lưu (`mysql.exe -uroot -p busmanagement < <file sao lưu>`). File không chứa `CREATE DATABASE` hay `USE`, nên nạp vào schema nào là đúng schema đó.
+- **Đã làm ngày 2026-10-22 (trước phần B trên DB thật):**
+  - G3-1: code, 4 test, 5 lần thử làm hỏng; `mvnw test` 170/170.
+  - G3-2: file `busmanagement_2026-10-22_truoc-GD3.sql` (404 KB). Khôi phục vào bản sao mới: cả 11 bảng giống DB thật cả số dòng lẫn checksum.
+  - G3-3 trên bản sao: phần A đúng số dự kiến (2.206 chuyến cũ, 2.061 `COMPLETED`, 337.860 km, 0 tham chiếu); phần B 2.225 → 19 chuyến, odometer 356.245 → 18.385 km, km kể từ bảo dưỡng giữ 18.355; bộ sinh chạy 74 giây: **21.192 chuyến** (342 tăng cường, 1.363 hủy), 01/01/2023 → 21/10/2026, 20,9% khung bán hết; script kiểm sau khi sinh: **0 vi phạm** ở mọi mục. Chạy cùng script trên dữ liệu cũ của DB thật thì bắt đúng các lỗi đã biết (69 chuyến của #32, 8 xe + 12 người của #33), nên script không đậu suông.
+  - G3-6 phần trước: trong 7 bài học và `Proj_functions_summary.md`, 121 chỗ trích số dòng được ánh xạ lại theo code mới (từng chỗ đã soát với dòng code cũ), 9 chỗ sửa tay; build lại 7 trang HTML.
+
 ---
 
 ## 3. Thứ tự thực hiện
@@ -403,6 +431,7 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | M-13 | ~~Thiếu xe dịp Tết trong bộ sinh~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** giữ "mỗi xe 1 chuyến/ngày"; chuyến thêm chỉ trong số xe rảnh (5/ngày) |
 | M-14 | **Nhiều chuyến tăng cường cho cùng một khung.** Recommendation đánh giá từng thẻ độc lập, nên các thẻ cùng khung sẽ đề xuất cùng một xe. Giữ chỗ xe và tài xế đã chọn giữa các thẻ, hay mỗi khung chỉ một thẻ ghi "cần N chuyến"? | Thuộc GĐ6. Phát hiện ngày 2026-10-21 |
 | M-15 | ~~Hai đề xuất sau lần đo lại GĐ2~~ (`forecast_discussion.md` §13.5): (1) quy tắc (b) thay quy tắc (a) "ít nhất 2 lần"; (2) EM 5 vòng thay vì 15 | **ĐÃ CHỐT CẢ HAI NGÀY 2026-10-22.** Ý 2 vào QĐ-1, ý 1 vào QĐ-3 (viết lại); đóng M-6. Số đo bổ sung cho ý 1: §13.7 |
+| M-16 | **Chạy bổ sung lịch sử về sau:** chuyến Admin tạo tay đúng 06:00/12:00/18:00 (phút 0, 30, 40, 50) trên một tuyến ≤ 8 giờ sẽ bị bộ sinh coi là chuyến của nó, nên ngày đó bị bỏ qua cả ngày và lịch sử ngày đó chỉ còn chuyến tay. Đánh dấu chuyến bộ sinh (cột mới) hay nhận diện chặt hơn? | Phát hiện khi rà GĐ3 (2026-10-22). GĐ3 không bị: 19 chuyến của chủ dự án không có giờ nào như vậy. Chỉ cần khi chạy bổ sung trước buổi demo sau này |
 
 ---
 
@@ -431,3 +460,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-21 (GĐ2 xong) | QĐ-10, QĐ-11, QĐ-12: thêm phần "Đã cài" kèm số đo trên bản sao. QĐ-13: tóm tắt kết quả. M-1: đề xuất giữ cửa sổ hiện tại. Thêm M-15 (quy tắc (b) thay (a); EM 5 vòng), chờ chủ dự án |
 | 2026-10-22 | M-15 ý 2: chủ dự án duyệt EM 5 vòng; sửa QĐ-1. M-15 ý 1 (quy tắc (b)) còn chờ; thêm số đo tách theo tình huống (`forecast_discussion.md` §13.7) |
 | 2026-10-22 (sau) | M-15 ý 1: chủ dự án chọn quy tắc (b). Viết lại QĐ-3 (giữ mô tả quy tắc cũ (a) và lý do thay); sửa bảng mục 1, công thức QĐ-1, ghi chú "sự kiện một lần" ở QĐ-9, tóm tắt QĐ-13. Đóng M-6 và M-15 |
+| 2026-10-22 (GĐ3) | Thảo luận GĐ3, chủ dự án duyệt G3-1…G3-7: thêm QĐ-14 và dòng của nó ở mục 1; QĐ-10 thêm "Bổ sung ở GĐ3" (lỗi #33, chuyến có sẵn giữ xe và người); QĐ-7 ghi rõ số dòng là của bản trước GĐ2. Thêm M-16 (nhận diện chuyến bộ sinh khi chạy bổ sung) |

@@ -3265,3 +3265,45 @@ ghi vào DB thật. Hai script GĐ3 (`forecast_research/gd3_check_old_history.sq
   - `HistoricalDataBackfillPlanTest.driversWithAnExpiredLicence_neverDriveFromTheirExpiryDate` kiểm trên
     đủ 1.389 ngày. Đã thử bỏ bộ lọc này: test đỏ.
   - Trên bản sao sinh lại: **0** chuyến vi phạm.
+
+# Lỗi tìm thấy khi rà GĐ3 của đợt thiết kế lại dự báo (2026-10-22)
+
+## 33. Bộ sinh dữ liệu lịch sử không né xe và người của chuyến có sẵn — một xe chạy hai chuyến cùng lúc
+
+- **Gốc:** `HistoricalDataBackfill.planDay()` chỉ đảm bảo "mỗi xe, mỗi tài xế một chuyến/ngày" giữa các
+  chuyến **do chính nó sinh**: hai tập "đã dùng" bắt đầu rỗng (`HistoricalDataBackfill.java:306-307` ở bản
+  `01560cc`). Nó không nhìn các chuyến có sẵn trong DB, tức 16 chuyến chưa hủy mà chủ dự án tự tạo từ
+  16/07 tới 27/09/2026. Bản Phase 5 có cùng lỗ hổng; bản GĐ2 giữ nguyên nó.
+- **Phân loại (ba hướng):** **lỗi thật.** `setup_guide.md` §4.3, roadmap Phase 5 và QĐ-10 đều hứa luật
+  nghiệp vụ "đúng theo cách dựng", và Phase 5 hứa *"bộ dữ liệu không bịa ra những tình huống mà chính hệ
+  thống coi là sai"*. Lời hứa chỉ đúng khi DB không có chuyến nào khác trong khoảng sinh — mà chuyến của
+  chủ dự án đã có ở đó từ trước khi Phase 5 chạy lần đầu.
+- **Bằng chứng (đo 2026-10-22):**
+  - trên bản sao `busmanagement_gd2` sau buổi tổng duyệt GĐ2, tức đúng dữ liệu GĐ3 sẽ tạo trên DB thật:
+    **12 cặp chuyến chạy cùng lúc** dùng chung xe hoặc người, trong đó **4 cặp cùng một xe**, dính 9
+    chuyến của chủ dự án. Theo đúng luật "một chuyến/ngày" của bộ sinh: 36 cặp, 14 cặp cùng xe;
+  - ví dụ: chuyến #4 (xe 2, 16/07 21:53 → 17/07 03:53) và chuyến sinh #23213 (xe 2, 16/07 18:00 → 24:00) —
+    lúc 22 giờ xe 2 chạy hai chuyến;
+  - dữ liệu cũ của bản Phase 5 trên DB thật: 3 cặp cùng lúc (0 cùng xe); theo ngày, script
+    `gd3_check_new_history.sql` đếm được 8 lần dùng lại xe và 12 lần dùng lại người.
+- **Đã sửa (GĐ3, 2026-10-22, chưa commit):**
+  - chuyến có sẵn ở mọi trạng thái trừ `CANCELLED` giữ xe, tài xế, phụ xe và tài xế phụ của nó trong
+    **mọi ngày lịch** mà nó chạm tới (chuyến qua đêm giữ cả hai ngày). Đọc một lần bằng
+    `TripRepository.findResourceUseBetween` (chỉ scalar), `planDay()` nhận thêm `Occupied`;
+  - chuyến dạng bộ sinh không bị tính là "có sẵn", để lần chạy bổ sung ra đúng như một lần chạy liền;
+  - không dùng lại luật "bận" của `isBusBusy`: luật đó chỉ tính ACTIVE/DEPARTED/PENDING_APPROVAL để xếp
+    chuyến tương lai, còn hai chuyến xung đột của chủ dự án là `COMPLETED`;
+  - test: `HistoricalDataBackfillPlanTest.occupiedBusesAndStaff_areNeverUsedThatDay_notEvenForExtraTrips`,
+    `occupiedByDay_holdsEveryCalendarDayATripTouches`,
+    `HistoricalDataBackfillGenerateTest.existingTrips_holdTheirBusAndStaff_onEveryDayTheyTouch`,
+    `generatorTrips_doNotHoldTheirBusOrDriverForTheNextDay`. Đã thử làm hỏng 5 chỗ (bỏ tham số, bỏ tài xế
+    phụ, tính cả chuyến hủy, chuyến đến 00:00 giữ sang ngày sau, tính cả chuyến dạng bộ sinh): mỗi lần
+    đúng test tương ứng đỏ.
+- **Kiểm lại trên bản sao mới (G3-3):** 16 chuyến của chủ dự án giữ chỗ, **0** lần dùng lại xe, **0** lần
+  dùng lại người. So với bản trước khi sửa, chỉ 11 ngày có chuyến của chủ dự án đổi cách xếp xe (cộng ngày
+  mới 21/10); mọi ngày khác giống hệt, và nhu cầu thật giống hệt ở cả 20.835 khung.
+- **Đóng khi** commit bản sửa và GĐ3 chạy xong trên DB thật.
+
+Ghi thêm, không đánh số vì GĐ3 xoá dữ liệu đó: chạy `gd3_check_new_history.sql` trên dữ liệu cũ còn cho
+thấy ngày **02/08/2026** có 16 chuyến thường thay vì 15 và xe 16 chạy hai chuyến — đúng chỗ giao nhau của
+hai lần chạy bổ sung 04/08 và 11/09 của bộ sinh cũ.

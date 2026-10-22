@@ -16,7 +16,7 @@
 
 ## 1. Trạng thái hiện tại (cập nhật 2026-10-22)
 
-- **Đã chốt** QĐ-1…QĐ-9 (`forecast_decisions.md` mục 1). QĐ-8 và QĐ-9 là thiết kế của GĐ1.
+- **Đã chốt** QĐ-1…QĐ-14 (`forecast_decisions.md` mục 1). QĐ-8, QĐ-9 là thiết kế của GĐ1; QĐ-10…QĐ-13 của GĐ2; QĐ-14 của GĐ3.
 - **Đã chia** bước 1–4 thành 7 giai đoạn (mục 2–3 dưới đây). Mỗi giai đoạn xong thì app vẫn chạy được.
 - **GĐ1 xong và đã commit ngày 2026-10-21, chưa push.**
   - Code: `79ba96c`. Tài liệu: commit `docs:` ngay sau đó.
@@ -29,10 +29,11 @@
   - đo lại bằng Python, kết quả ở `forecast_discussion.md` §13;
   - ghi lỗi #31 và #32;
   - M-15 đã chốt ngày 2026-10-22: quy tắc (b) vào QĐ-3, EM 5 vòng vào QĐ-1.
-- **Việc tiếp theo:** thảo luận GĐ3 (thay dữ liệu trên DB thật).
+- **GĐ3 đang làm** (QĐ-14, G3-1…G3-7, duyệt ngày 2026-10-22; chi tiết ở mục 3). Đã xong phần không đụng DB thật: sửa bộ sinh (lỗi #33), sao lưu và khôi phục thử, tổng duyệt lại trên bản sao, sửa tài liệu GĐ2 để sót. **Chưa commit.**
+- **Việc tiếp theo:** chủ dự án test bản sửa G3-1 và bảo commit; rồi phần A trên DB thật → **chủ dự án xác nhận lần cuối** → phần B → chạy bộ sinh → kiểm → tài liệu.
 
   GĐ4 (lõi toán Java) làm song song được. M-15 đã chốt nên mô hình không còn chỗ treo; GĐ4 vẫn bắt đầu bằng một vòng thảo luận.
-- **Code app:** đã đổi ở GĐ1 và GĐ2. **DB thật:** vẫn là dữ liệu cũ; mọi lần chạy bộ sinh mới đều trên bản sao.
+- **Code app:** đã đổi ở GĐ1, GĐ2, và ở GĐ3 (bản sửa bộ sinh, chưa commit). **DB thật:** vẫn là dữ liệu cũ; mọi lần chạy bộ sinh mới đều trên bản sao.
 - **Commit:** `2eebc25` (tài liệu 14/10 → 21/10) đã push lên `origin/temp`. Chưa push: GĐ1 (`79ba96c`, `fa50ac3`) và GĐ2 (`01560cc`, `6a68937`, cùng commit tài liệu đi kèm). Lúc đầu, toàn bộ tài liệu dự báo từ 14/10 đến 21/10 đã gom thành commit docs `2eebc25` ngày 2026-10-21; dòng cập nhật này được viết sau commit, nên nó sẽ đi vào commit sau. Commit gồm `forecast_*.md`, `forecast_research/` và các thay đổi trong `THESIS_ROADMAP.md`.
   - Không đưa vào commit: transcript `forecast_research/2026-10-20-chưa xong.txt`. Transcript này để ngoài git như mọi transcript khác.
   - Không thuộc đợt này: bài học `docs/study/05` và `06`. Hai bài này đã commit riêng thành `5a5f30f` và `1dc429f`, và đã push, cùng ngày 2026-10-21.
@@ -56,7 +57,7 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
 | KH | Đọc lại project; chia bước 1–4 thành 7 giai đoạn | — | ĐÃ COMMIT `fa50ac3` | 2026-10-21 |
 | GĐ1 | Nền móng: `Route.holidayFlow` và lịch ngày lễ | 1 | ĐÃ COMMIT `79ba96c` (chưa push) | 2026-10-21 |
 | GĐ2 | Bộ sinh mới, chạy trên bản sao DB; chạy lại thí nghiệm Python | 1 | ĐÃ COMMIT `01560cc`, `6a68937` (chưa push) | 2026-10-21 → 22 |
-| GĐ3 | Thay dữ liệu trên DB thật | 1 | CHƯA BẮT ĐẦU | |
+| GĐ3 | Thay dữ liệu trên DB thật | 1 | ĐANG LÀM (xong phần trên bản sao; chờ commit bản sửa và xác nhận trước phần B) | 2026-10-22 |
 | GĐ4 | Lõi toán Java, unit test và đo tốc độ | 2 | CHƯA BẮT ĐẦU | |
 | GĐ5 | `ForecastService` mới, cache và màn Dự báo | 2 | CHƯA BẮT ĐẦU | |
 | GĐ6 | Recommendation và What-if theo nhu cầu | 3 | CHƯA BẮT ĐẦU | |
@@ -164,13 +165,26 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
   - 3 commit: `01560cc` (bộ sinh, kèm 3 lớp test), `6a68937` (màn danh sách chuyến, kèm test), rồi commit tài liệu. `TripRepository` được chia theo từng đoạn thay đổi giữa hai commit code. Commit đầu đứng riêng vẫn biên dịch được (`test-compile` trên worktree tạm).
   - Chưa push.
 
-### GĐ3: thay dữ liệu trên DB thật (thuộc bước 1)
-- Backup bằng `mysqldump`, rồi **chủ dự án xác nhận lần cuối**.
-- Xóa cứng đúng tập ở sự thật 9; trừ km cũ ở cả hai cột odometer (sự thật 4); tự kiểm tham chiếu (sự thật 5). Sau đó chạy bộ sinh mới.
-- Kiểm:
-  - `kmSinceLastMaintenance` không đổi;
-  - các màn admin trả 200 (skill `verify`);
-  - màn dự báo cũ vẫn chạy được. Kết quả của nó sẽ khác; đây là trạng thái tạm, chấp nhận được.
+### GĐ3: thay dữ liệu trên DB thật (thuộc bước 1). Chủ dự án duyệt G3-1…G3-7 ngày 2026-10-22 (QĐ-14)
+- [x] **G3-1. Sửa bộ sinh: chuyến có sẵn giữ xe và người của nó (lỗi #33).**
+  - Rà GĐ3 tìm ra: trên bản sao GĐ2, 12 cặp chuyến chạy cùng lúc dùng chung xe hoặc người với chuyến của chủ dự án (4 cặp cùng xe), ví dụ xe 2 ngày 16/07 lúc 22 giờ.
+  - `HistoricalDataBackfill`: `loadOccupied` + `occupiedByDay`, `planDay(…, Occupied, …)`; `TripRepository.findResourceUseBetween`.
+  - 4 test mới; 5 lần thử làm hỏng, lần nào đúng test tương ứng cũng đỏ. `mvnw test` **170/170**, 24 lớp.
+- [x] **G3-2. Sao lưu và khôi phục thử.** `E:\Y4 S2\PRETHESIS\ProjectBackup\db\busmanagement_2026-10-22_truoc-GD3.sql` (404 KB). Nạp vào bản sao `busmanagement_gd2` tạo mới: cả 11 bảng giống DB thật cả số dòng lẫn `CHECKSUM TABLE`.
+- [x] **G3-3. Tổng duyệt lại trên bản sao mới** (code đã sửa, chưa commit):
+  - phần A đúng số dự kiến; phần B 2.225 → 19 chuyến, odometer 356.245 → 18.385 km, km kể từ bảo dưỡng giữ 18.355;
+  - bộ sinh 74 giây, pool kết nối chỉ trên bản sao: **21.192 chuyến** (342 tăng cường, 1.363 hủy), 01/01/2023 → 21/10/2026, 20,9% khung bán hết, 13 ngày có chuyến có sẵn giữ chỗ;
+  - script mới `forecast_research/gd3_check_new_history.sql` (phần C, chỉ đọc): **0 vi phạm** ở mọi mục, odometer khớp từng km. Chạy trên dữ liệu cũ của DB thật thì bắt đúng 69 chuyến của #32 và 8 xe + 12 người của #33;
+  - so với lần tổng duyệt GĐ2 (trước khi sửa): chỉ 11 ngày có chuyến của chủ dự án đổi cách xếp, cộng ngày mới 21/10; nhu cầu thật giống hệt ở cả 20.835 khung;
+  - 17 trang app trên bản sao trả 200, log sạch. DB thật giống hệt lúc sao lưu.
+- [x] **G3-4.** Làm ngay, không dời sau GĐ5.
+- [ ] **G3-5.** Xuất file nhu cầu thật khi chạy trên DB thật, để cạnh file sao lưu (đã thử trên bản sao).
+- [x] **G3-6 phần trước: sửa tài liệu GĐ2 để sót.** 121 chỗ trích số dòng trong 7 bài `docs/study` và `Proj_functions_summary.md` ánh xạ lại theo code mới (từng chỗ đã soát), 9 chỗ sửa tay (`findAllWithDetails`, "12 tuần"…), `project_report.md` Warn #4; build lại 7 trang HTML (build tái lập được: bài 02 build lại giống từng byte).
+- [ ] **Chủ dự án:** test bản sửa G3-1, rồi bảo commit (dữ liệu trên DB thật phải sinh từ một commit cụ thể).
+- [ ] **Trên DB thật:** tắt app; kiểm ảnh chụp DB vẫn giống lúc sao lưu; phần A → **chủ dự án xác nhận lần cuối** → phần B → bộ sinh (có xuất nhu cầu thật) → phần C → so từng chuyến với bản sao → `verify`.
+- [ ] **G3-6 phần sau:** đóng #31, #32, #33; roadmap (Phase 5, Hidden Cost #4 với số đo mới, §7, §8); QĐ-11; `setup_guide.md`.
+- [ ] **G3-7.** Giữ bản sao tới hết GĐ5 rồi xoá.
+- Kiểm thêm theo kế hoạch cũ: `kmSinceLastMaintenance` không đổi; các màn admin trả 200; màn dự báo cũ vẫn chạy (kết quả khác, sai số khoảng 23% — trạng thái tạm tới GĐ5); trang thống kê, đề xuất tăng cường, gợi ý tài xế chậm còn 2–3 giây (đo trên bản sao).
 
 ### GĐ4: lõi toán Java (thuộc bước 2; không cần DB)
 - Một lớp tính toán thuần, theo tiền lệ `WhatIfCoverageTest`. Gồm:
@@ -238,6 +252,7 @@ Thêm một dòng mới vào cuối bảng sau mỗi phiên; không sửa các d
 | 2026-10-22 | Giải thích lại M-15. Chủ dự án duyệt EM 5 vòng (sửa QĐ-1); ý 1 còn chờ. Đo thêm cho ý 1 bằng cách tách các lần chạy GĐ2 theo việc quy tắc (a) còn tác dụng hay không (§13.7). Sửa ngày thời điểm dự báo cuối ở §13.1 (13/09/2026) và dòng M-10 cũ ở mục 1. Chỉ đổi tài liệu và thêm một script nghiên cứu | Không đổi; không truy vấn DB | Chưa |
 | 2026-10-22 (sau) | Giải thích (b) là "núm vặn tự động" chứ không phải công tắc. Chủ dự án chọn quy tắc (b) (*"oke tôi chọn (b), ghi lại đi"*). Viết lại QĐ-3; sửa QĐ-1, QĐ-9, QĐ-13 và việc của GĐ4, GĐ5; đóng M-6 và M-15 | Không đổi; không truy vấn DB | Chưa |
 | 2026-10-22 (commit GĐ2) | Chủ dự án bảo commit. Chạy `verify` chỉ đọc trên DB thật (màn danh sách chuyến khớp SQL từng mã chuyến; DB giống hệt trước và sau). Chia GĐ2 thành 3 commit; kiểm commit đầu biên dịch được khi đứng riêng. Sửa vài dòng trạng thái cũ (KH, tiêu đề GĐ1). Bắt đầu thảo luận GĐ3 | Không đổi; DB chỉ `SELECT` | `01560cc`, `6a68937` và commit docs; chưa push |
+| 2026-10-22 (GĐ3) | Thảo luận GĐ3: rà ra lỗi #33 (bộ sinh không né chuyến có sẵn) và phần tài liệu GĐ2 để sót; đo tốc độ trang trên 21 nghìn chuyến. Chủ dự án hỏi về quy luật và nhiễu của bộ sinh (đo lại trên dữ liệu đã sinh), rồi duyệt G3-1…G3-7 (QĐ-14). Làm G3-1 (code, 4 test, 5 lần thử làm hỏng, 170/170), G3-2 (sao lưu, khôi phục thử khớp 11/11 bảng), G3-3 (tổng duyệt lại trên bản sao: 0 vi phạm), G3-6 phần trước (121 + 9 chỗ trích trong bài học, build lại HTML). Ghi lỗi #33, M-16 | Code bộ sinh đổi (chưa commit); DB thật chỉ `SELECT` và `mysqldump`, giống hệt lúc sao lưu; bản sao `busmanagement_gd2` tạo lại | Chưa |
 
 ---
 

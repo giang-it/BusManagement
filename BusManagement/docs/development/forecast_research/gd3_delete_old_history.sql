@@ -5,7 +5,8 @@
 --   1. a mysqldump backup of the schema;
 --   2. PART A (gd3_check_old_history.sql) shows the expected numbers;
 --   3. on the real DB: the owner's final confirmation.
--- Then run the new generator: ./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill
+-- Then run the new generator (./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill) and PART C,
+-- gd3_check_new_history.sql (read-only).
 --
 -- Usage (choose the schema on the command line, never edit it in here):
 --   mysql.exe -uroot -p <schema> --default-character-set=utf8mb4 -t < gd3_delete_old_history.sql

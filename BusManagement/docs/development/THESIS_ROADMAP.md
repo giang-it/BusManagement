@@ -299,9 +299,11 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
     - Defects #31/#32 recorded.
     - `mvnw test` 166/166.
     - **The real DB still holds the old dataset.**
+  - **M-15 is settled (2026-10-22):** pooled shrinkage, rule (b), replaces the "≥ 2 occurrences" rule in QĐ-3, and EM runs 5 rounds (QĐ-1).
+  - **GĐ3 in progress (2026-10-22, QĐ-14, G3-1…G3-7 approved):** the review found defect #33 (the generator ignored the bus and crew of trips already in the DB) and fixed it — NOT COMMITTED, `mvnw test` 170/170. Backup taken and proven restorable; the replacement rehearsed again on a fresh clone with the fix: 0 violations.
   - **Next:**
-    - **M-15 is settled (2026-10-22):** pooled shrinkage, rule (b), replaces the "≥ 2 occurrences" rule in QĐ-3, and EM runs 5 rounds (QĐ-1).
-    - The GĐ3 discussion: replace the history on the real DB.
+    - The owner tests the G3-1 fix and says when to commit.
+    - Then on the real DB: PART A → **the owner's final confirmation** → PART B → generator → PART C → per-trip comparison with the clone → `verify` → docs.
     - Every stage starts with its own discussion round.
   - **Multi-session workstream. Read, in order:** `docs/development/forecast_progress.md` (status, step checklist, session log), then `forecast_decisions.md` (the decisions and the open design items M-1…M-15). Read `forecast_discussion.md` §11–12 only for the reasoning and the measured numbers.
 - **Last completed milestone:** **Phase 8 (2026-07-25)** — What-if Simulation. `/admin/analytics/what-if` mô phỏng năng lực đội xe và độ phủ nhu cầu dự báo dưới 4 cần gạt (Δxe, Δtài xế, hệ số nhu cầu %, ghi đè chi phí in-memory), aggregate-only, recompute-per-view, **writes nothing, no new entity/schema/query, `TripService` untouched, engine never re-run**. Throughput derived by cycle-time (`window ÷ (avgDur + prepBuffer)` = 15.0h ÷ 4.0h = 3.75/bus/day), not utilization; bus-vs-driver bottleneck + Forecast Coverage + honesty banner. Verified by driving the real app — baseline's 17 hot slots match Phase 7 exactly, all four levers reconcile field-for-field (incl. a proven negative profit and cost-override that leaves `cost_parameters` untouched), `mvnw test` **21/21**, DB identical before/after. **Committed as `3316796` and pushed to `origin/temp`** (2026-07-31), carrying the defect #7 coverage fix and the defect #8 note correction with it. See Section 5 "As delivered" (Phase 8), the 2026-07-25 Session Log entry, and the 2026-07-31 commit entry.
@@ -1424,6 +1426,25 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
   - `forecast_progress.md` §1 still listed M-10 as open, although it was closed as #31 on 2026-10-21.
 - **Not done:** no app code changed today beyond committing GĐ2, the real DB is untouched (GĐ3), and nothing is pushed.
 
+### 2026-10-22 (GĐ3) — Forecast redesign GĐ3 approved and prepared: generator fix (defect #33), backup proven restorable, replacement rehearsed again — NOT COMMITTED, REAL DB NOT YET CHANGED
+
+- **Discussion first.** Checking GĐ3 against the project found four things:
+  - the generator never looked at trips already in the DB: on the GĐ2 clone, 12 pairs of simultaneous trips shared a bus or a person with the owner's 16 hand-made trips, 4 of them the same bus (defect #33; the Phase 5 generator had the same blind spot, with fewer hits);
+  - GĐ2 had shifted ~120 line references in the study lessons and left mentions of the removed `findAllWithDetails()`;
+  - on ~21,000 trips three pages slow to 2–3 s (analytics 0.47 → 2.80 s, recommendation 0.53 → 1.95 s, driver recommendation 0.30 → 2.06 s);
+  - the old forecast screen reads ~23 % error on the new data until GĐ5.
+- The owner asked how the generator's patterns and noise make the data learnable; that was answered from the generated data itself (weekday profiles, Tết peaks ×2.0–3.7 moving with the official break, negative-binomial variance, a 20.3 % noise floor against 22.6 % for the chosen model). The owner then approved G3-1…G3-7 (*"oke. tôi chốt và hãy bắt đầu làm đi từ G3-1 đến G3-7"*); recorded as QĐ-14.
+- **G3-1, the fix.** `HistoricalDataBackfill.loadOccupied` reads the non-cancelled, non-generator trips once (`TripRepository.findResourceUseBetween`, scalar), `occupiedByDay` spreads each over every calendar day it touches, and `planDay(…, Occupied, …)` starts the day with those buses and people taken. 4 new tests, 5 probes each turned the right test red, `mvnw test` **170/170**.
+- **G3-2, backup.** `mysqldump` to `ProjectBackup/db/busmanagement_2026-10-22_truoc-GD3.sql` (404 KB, outside the repo), restored into a fresh `busmanagement_gd2`: all 11 tables equal to the real DB by row count and `CHECKSUM TABLE`.
+- **G3-3, rehearsal on that clone with the fix.**
+  - PART A matched (2,206 / 2,061 / 337,860 km / 0 references); PART B 2,225 → 19 trips, odometer 356,245 → 18,385, km since maintenance 18,355 kept.
+  - The generator ran in 74 s: 21,192 trips (342 extra, 1,363 cancelled), 01/01/2023 → 21/10/2026, 20.9 % sold out.
+  - New read-only PART C, `forecast_research/gd3_check_new_history.sql`: 0 violations everywhere, 0 reuse of the owner's buses or crew, odometer exact. On the old data of the real DB the same script flags the 69 trips of #32 and the #33 overlaps, so it does not pass vacuously.
+  - Compared with the pre-fix rehearsal, only the 11 days holding owner trips changed (plus the new day); true demand identical on all 20,835 shared slots. 17 pages 200 on the clone. Real DB identical to the backup moment.
+- **G3-6 (the GĐ2 leftovers).** 121 line references in 7 lessons and `Proj_functions_summary.md` remapped from `fa50ac3` to the current code, each reviewed against the old line; 9 rewritten by hand; `project_report.md` Warn #4 corrected; 7 HTML pages rebuilt (the build is reproducible: lesson 02 rebuilds byte-identical).
+- **Docs:** `current_bugs_found.md` #33; `forecast_decisions.md` QĐ-14, QĐ-10 addendum, M-16 (generator-shaped hand-made trips would make a later top-up skip that day); `forecast_progress.md` GĐ3 checklist; `setup_guide.md` §4.3; `Proj_functions_summary.md`; `forecast_research/README.md`; §7 and a §9 note here.
+- **Not done:** the real DB is unchanged. Waiting for the owner to test the fix and say commit, then PART A on the real DB and the owner's final confirmation before PART B.
+
 ---
 
 ## 9. Developer Notes
@@ -1456,6 +1477,11 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
   - **Whole days.** Buses and drivers are assigned per day (one trip each), so the idempotence unit is the **day**, not the `(route, departureTime)` slot. A half-filled day would let a new plan reuse a bus already used that day. `findDepartureTimesByRouteIdsBetween` loads the occupied days in one query instead of ~20,000 `exists` probes.
   - **Refusing old data.** The new data always starts on 01/01/2023. Generator-shaped trips with that day empty can only be the old generator's, so the run stops rather than mixing two datasets. Deleting the old rows is a reviewed SQL script run after a backup (GĐ3), never code.
   - **Fixed start date.** Figures are drawn from a fixed start date, never from the run date — the cause of the old saw-tooth (#31). `HistorySimulationTest` pins it: a run to 30/06/2024 and a run to 20/10/2026 agree on every shared day.
+  - **Trips already in the DB keep their bus and crew (added in GĐ3, 2026-10-22, defect #33).** "One trip per bus and per driver per day" used to hold only among the generator's own trips; the owner's 16 hand-made trips in July–September 2026 were invisible to it, and the GĐ2 clone had a bus on two trips at once.
+    - Every non-`CANCELLED` trip that is not generator-shaped now holds its bus, driver, assistant and co-drivers on **every calendar day** its interval touches; `planDay()` starts each day with those resources already used.
+    - **Why not reuse `TripService.isBusBusy`:** that rule serves *future* assignment and counts only ACTIVE/DEPARTED/PENDING_APPROVAL. For history, a `COMPLETED` trip did occupy the bus — two of the conflicting owner trips were `COMPLETED`.
+    - **Why whole days, not overlapping hours:** it is the generator's existing per-day rule, simple to check, and costs at most 3 of 20 buses on 13 days.
+    - **Why generator-shaped trips are excluded:** so a top-up reproduces exactly what one run writes, even if an 8-hour route's 18:00 trip runs past midnight (`generatorTrips_doNotHoldTheirBusOrDriverForTheNextDay`).
 - **Why the trip list has a finished-trip window and no "show all" (forecast redesign GĐ2, 2026-10-21; QĐ-12):**
   - The regenerated history (~21,000 trips from 2023) would make the old load-everything page ~80 MB. Unfinished trips (`PENDING_APPROVAL`/`ACTIVE`/`DEPARTED`) are always listed whatever their date — they are the ones awaiting action, including `DEPARTED` trips forgotten since July. Finished ones show for 7/30/90 days.
   - "Finished" is derived from `canTransition` (a status with no way out), not re-declared, so a new terminal status would follow automatically.
