@@ -689,7 +689,7 @@ thống tự gợi ý dựa trên quãng đường"* trong khi thân hàm luôn 
 1. **`distanceKm` được đọc lúc chạy, `estimatedDuration` được chụp lúc tạo chuyến.** Đổi km ảnh
    hưởng ngay tới: odometer của chuyến `DEPARTED` khi hoàn thành (`TripService.java:684-688`), kiểm
    tra "sắp tới hạn bảo trì" khi xếp xe (`:1186-1188`, `:324`, `:1496-1497`), chi phí nhiên liệu ở Đề
-   xuất (`RecommendationService.java:300-301`) và What-if (`WhatIfSimulationService.java:270-271`).
+   xuất (`RecommendationService.java:409-410`) và What-if (`WhatIfSimulationService.java:332-333`).
    Còn đổi phút thì **chuyến cũ không đổi** — chuyến lưu `arrivalTimeExpected` của riêng nó — chỉ
    chuyến tạo sau mới dùng số mới (form tạo chuyến, `TripService.java:157-160` cho chuyến tăng cường).
    Cảnh báo chỉ có cho km là đúng với sự bất đối xứng này.
@@ -759,8 +759,8 @@ was blocked"*).
     (roadmap §9, `project_report.md` Warn #4), không đi qua `RouteService`.
   - Chuyến tăng cường (Bài 08): giờ đến = khởi hành + `estimatedDuration` (`TripService.java:157-160`).
   - Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc `findAllWithStations()`
-    (`DashboardService.java:201`, `ForecastService.java:256`, `RecommendationService.java:102`,
-    `WhatIfSimulationService.java:178`); chi phí nhiên liệu = đơn giá × `distanceKm`.
+    (`DashboardService.java:201`, `ForecastService.java:257`, `RecommendationService.java:136`,
+    `WhatIfSimulationService.java:190`); chi phí nhiên liệu = đơn giá × `distanceKm`.
 - **Màn này bị ảnh hưởng bởi:** bến xe (Bài 02 — nguồn của dropdown, và guard xoá bến đọc
   `route_stations`); loại xe (Bài 01 — `BusService.findAllBusTypes()`); chuyến (quyết định tuyến có
   xoá được không, và có cảnh báo khi sửa km không).

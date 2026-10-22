@@ -59,8 +59,8 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 | Entity | `…/domain/Bus.java:42-76`; `…/domain/Driver.java:47-61` | `getKmSinceLastMaintenance()`, `needsMaintenance()`, `isNearMaintenance(km)`; `isLicenseValid(LocalDate)` |
 | Lớp "không-mời" | `TS:1483-1685` (dropdown), `:308-332` + `:472-523` (AI), `TripRestController.java:47-86` (API form Tạo) | Lọc trước những gì validator sẽ từ chối |
 | Người gọi (throw) | `TS:929-930`, `:1007-1008`, `:1051-1052`, `:1076-1077` | `confirmAutoAssignedTrip`, `approveTrip`, `createManualTrip`, `updateManualTrip` |
-| Người gọi (dry-run) | `…/service/RecommendationService.java:236-245` | Cổng xác nhận cuối của thẻ gợi ý |
-| Test | `test/service/TripServiceValidationDryRunTest.java` (12), `TripServiceSeatCapacityTest` (9), `TripServiceDriverShareTest` (9), `TripServiceAssistantAvailabilityTest` (4), `TripServiceAvailabilityContextTest` (3) | §9.4 |
+| Người gọi (dry-run) | `…/service/RecommendationService.java:317-333` | Cổng xác nhận cuối của thẻ gợi ý |
+| Test | `test/service/TripServiceValidationDryRunTest.java` (12), `TripServiceSeatCapacityTest` (9), `TripServiceDriverShareTest` (9), `TripServiceAssistantAvailabilityTest` (4), `TripServiceAvailabilityContextTest` (4) | §9.4 |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
 
@@ -73,7 +73,7 @@ Validator không có endpoint riêng. Đây là mọi lối **dẫn tới** nó.
 | POST | `/admin/trip-management/trips/update` | `ATM.updateTrip()` `:355-460` | nút Lưu ở `trip-edit-form.html` (Bài 07) | `updateManualTrip()` → cả hai, `excludeTripId = id chuyến` (`TS:1076-1077`) | lỗi: redirect form sửa + "Lỗi: …" |
 | POST | `/admin/trips/approve` | `ATC.processManualApproval()` `:166-201` | MANUAL MODE ở `approve-form.html` (Bài 09) | `approveTrip()` → cả hai, `excludeTripId = tripId` (`TS:1007-1008`) | lỗi: `catch (IllegalArgumentException)` → "⛔ Vi phạm ràng buộc: …" → `/admin/trips/approve/{id}` |
 | POST | `/admin/trips/confirm` | `ATC.confirmAutoAssigned()` `:135-156` | nút Xác nhận AUTO MODE (Bài 09) | `confirmAutoAssignedTrip()` → cả hai (`TS:929-930`) | lỗi validator: `catch (Exception)` → "Lỗi xác nhận: …" → `/admin/trips/approve/{id}` |
-| GET | `/admin/analytics/recommendation` | `RecommendationController` `:35-38` | menu Analytics (Bài 17) | `buildRecommendations()` → `buildCard()` → **hai bản dry-run** (`RecommendationService.java:236-237`) | thẻ `RECOMMENDED` hoặc `STALE` kèm lý do (`recommendation.html:171`, `:204`) |
+| GET | `/admin/analytics/recommendation` | `RecommendationController` `:35-38` | menu Analytics (Bài 17) | `buildRecommendations()` → `buildCard()` → **hai bản dry-run** (`RecommendationService.java:320-321`) | thẻ `RECOMMENDED` (màn ghi "Đủ điều kiện") hoặc `STALE` kèm lý do (`recommendation.html:191`, `:228`) |
 | GET (`fetch`) | `/api/admin/trips/available-resources` | `TripRestController.getAvailableResources()` `:47-86` | JS form Tạo (`trip-create-form.html:482-484`) | 3 bộ lọc `…ForTimeRange` — **lớp không-mời**, không gọi validator | JSON `buses`, `drivers`, `assistants` |
 | `@Scheduled` | — | `TS.scanAndSuggestExtraTrips()` `:76-78` | job 10 giây (Bài 08) | AI chọn bằng `findBestAvailableBus/Driver` — **không** gọi validator; validator chạy lại lúc Admin xác nhận | chuyến `PENDING_APPROVAL` |
 
@@ -335,7 +335,7 @@ sequenceDiagram
     A->>RC: GET /admin/analytics/recommendation
     RC->>P: buildRecommendations()
     P->>RS: mở transaction chỉ đọc
-    loop mỗi khung dự báo đông
+    loop mỗi chuyến thêm, theo lãi kỳ vọng giảm dần
         RS->>RS: dựng Trip tạm - route, giờ đi, giờ đến
         RS->>TS: selectBestAvailableBus, selectBestAvailableDriver
         RS->>RS: gắn bus, driver, totalSeats = sức chứa
@@ -349,7 +349,7 @@ sequenceDiagram
         end
         RS->>TS: validateStaffForTripDryRun(candidate, null)
         TS-->>RS: pass hoặc fail
-        RS->>RS: cả hai valid thì RECOMMENDED, không thì STALE kèm lý do
+        RS->>RS: cả hai valid thì RECOMMENDED và giữ chỗ xe, tài xế trong context; không thì STALE kèm lý do
     end
     P-->>RC: RecommendationViewDto
     RC-->>A: recommendation.html - thẻ và lý do
@@ -360,17 +360,17 @@ sequenceDiagram
 | # | Tầng | Vị trí | Method / thành phần | Nhận vào | Làm gì | Trả về / gọi tiếp | Nhãn |
 |---|---|---|---|---|---|---|---|
 | 1 | Controller | `RecommendationController.java:35-38` | GET | — | gọi `buildRecommendations()`, đưa kết quả vào Model key `view` | view `admin/recommendation` | [CODE] |
-| 2 | Proxy | `RecommendationService.java:95` | `@Transactional(readOnly = true)` | — | mở transaction **chỉ đọc** — bắt buộc, vì validator đọc quan hệ LAZY (javadoc `TS:1397-1398`) | — | [SPRING] |
-| 3 | Service | `RecommendationService.java:170-180` | dựng `candidate` | khung dự báo | `new Trip()`: route, giờ đi, giờ đến = giờ đi + `estimatedDuration`. **Không lưu** | Trip tạm, `id = null` | [CODE] |
-| 4 | Service | `:186-211` | chọn tài nguyên | — | `selectBestAvailableBus/Driver` (lớp không-mời, dùng `AvailabilityContext` nạp sẵn). Không có ⇒ thẻ `NO_RESOURCE`, **không** tới cổng | `bus`, `driver` | [CODE] |
-| 5 | Service | `:233-235` | gắn tài nguyên | — | `setBus`, `setDriver`, `setTotalSeats(capacity)` — để luật #22 có số mà so | — | [CODE] |
-| 6 | Service | `:236` → `TS:1407-1413` | `validateBusForTripDryRun(bus, candidate, null)` | — | `try { return ValidationResult.pass(validateBusForTrip(...)); }` — gọi **đúng** validator gốc, **đi đường DB** (không dùng context nạp sẵn) | — | [CODE] |
+| 2 | Proxy | `RecommendationService.java:129` | `@Transactional(readOnly = true)` | — | mở transaction **chỉ đọc** — bắt buộc, vì validator đọc quan hệ LAZY (javadoc `TS:1397-1398`) | — | [SPRING] |
+| 3 | Service | `RecommendationService.java:265-272` | dựng `candidate` | một chuyến thêm của khung dự báo đông | `new Trip()`: route, giờ đi, giờ đến = giờ đi + `estimatedDuration`. **Không lưu** | Trip tạm, `id = null` | [CODE] |
+| 4 | Service | `:278-291`, `:303-314` | chọn tài nguyên | — | `selectBestAvailableBus/Driver` (lớp không-mời, dùng `AvailabilityContext` nạp sẵn, kể cả các chuyến đã giữ chỗ). Không có ⇒ thẻ `NO_RESOURCE`, **không** tới cổng. Giữa hai bước, `:293-301` ước tính khách tràn, doanh thu, lợi nhuận (GĐ6) | `bus`, `driver` | [CODE] |
+| 5 | Service | `:317-319` | gắn tài nguyên | — | `setBus`, `setDriver`, `setTotalSeats(capacity)` — để luật #22 có số mà so | — | [CODE] |
+| 6 | Service | `:320` → `TS:1407-1413` | `validateBusForTripDryRun(bus, candidate, null)` | — | `try { return ValidationResult.pass(validateBusForTrip(...)); }` — gọi **đúng** validator gốc, **đi đường DB** (không dùng context nạp sẵn) | — | [CODE] |
 | 7 | Service | `TS:1410-1411` | `catch (IllegalArgumentException e)` | — | vi phạm luật ⇒ `ValidationResult.fail(e.getMessage())` — **nguyên văn** câu của validator | `busGate` | [CODE] |
 | 8 | — | — | exception loại khác | vd `bus == null` | **không** bắt: `NullPointerException` bay ra ngoài, làm hỏng cả request — có chủ đích (§9.1) | ↑ | [CODE] |
-| 9 | Service | `:237` → `TS:1436-1443` | `validateStaffForTripDryRun(candidate, null)` | — | như trên; validator trả `void` nên hợp lệ là `pass()` rỗng | `staffGate` | [CODE] |
-| 10 | Service | `:239-245` | quyết định thẻ | hai kết quả | cả hai `isValid()` ⇒ `RECOMMENDED`, note "Đủ điều kiện phân công…"; ngược lại `STALE`, note = lý do của **cổng xe** nếu xe hỏng, không thì của cổng người | thẻ | [CODE] |
+| 9 | Service | `:321` → `TS:1436-1443` | `validateStaffForTripDryRun(candidate, null)` | — | như trên; validator trả `void` nên hợp lệ là `pass()` rỗng | `staffGate` | [CODE] |
+| 10 | Service | `:323-333` | quyết định thẻ | hai kết quả | cả hai `isValid()` ⇒ `RECOMMENDED`, note "Đủ điều kiện phân công…", và chuyến tạm được giữ chỗ (`availability.reserve`, trạng thái `PENDING_APPROVAL`) — cổng chạy SQL nên không thấy chỗ giữ này, việc tránh trùng là của bước 4; ngược lại `STALE`, note = lý do của **cổng xe** nếu xe hỏng, không thì của cổng người | thẻ | [CODE] |
 | 11 | Proxy | — | kết thúc transaction chỉ đọc | — | không có gì để ghi | — | [SPRING] |
-| 12 | View | `recommendation.html:171`, `:204` | nhãn + ghi chú | `view` | `STALE` hiện badge vàng; cột ghi chú in `c.note` — chính câu tiếng Việt của validator | HTML | [CODE] |
+| 12 | View | `recommendation.html:191`, `:228` | nhãn + ghi chú | `view` | `STALE` hiện badge vàng; cột ghi chú in `c.note` — chính câu tiếng Việt của validator | HTML | [CODE] |
 
 **Vì sao cổng này cần thiết dù bộ chọn đã lọc?** Roadmap §9 (*"Why the Recommendation Engine's final
 Business Rule Validation gate reuses validateBusForTrip/validateStaffForTrip…"*): cùng khuôn đã có ở
@@ -519,7 +519,7 @@ mời rồi bị từ chối lúc lưu.
 | So sánh chặt `<` / `>` trong JPQL | "Chạm mép không phải trùng" | `TR:136`, `:154`, `:172` | Dùng `<=` thì một chuyến khởi hành đúng lúc đệm kết thúc bị coi là trùng |
 | `:excludeTripId IS NULL OR t.id <> :excludeTripId` | "Bỏ qua chính chuyến đang sửa" | `TR:135`, `:153`, `:173`, `:190` | Sửa một chuyến sẽ luôn báo "đang bận" — vì nó trùng với chính nó |
 | `LEFT JOIN t.coDrivers cd` | "Ghép thêm bảng tài xế phụ, giữ cả chuyến không có ai" | `TR:132`, `:187` | `JOIN` thường làm mất các chuyến không có tài xế phụ — tài xế chính của chúng thành "không bận" |
-| `@Transactional(readOnly = true)` bao quanh dry-run | "Mở phiên đọc để chạm được quan hệ LAZY" | `RecommendationService.java:95` | Validator đọc `trip.getRoute()`, `bus.getBusType()`… ngoài phiên ⇒ `LazyInitializationException` — bản dry-run **không** bắt lỗi này (đúng ý) |
+| `@Transactional(readOnly = true)` bao quanh dry-run | "Mở phiên đọc để chạm được quan hệ LAZY" | `RecommendationService.java:129` | Validator đọc `trip.getRoute()`, `bus.getBusType()`… ngoài phiên ⇒ `LazyInitializationException` — bản dry-run **không** bắt lỗi này (đúng ý) |
 | `Math.ceil` + ép `(int)` | "Làm tròn lên rồi bỏ phần thập phân" | `TS:1233`, `:1719` | `(int)(10/8)` = 1 — chuyến 10h chỉ đòi 1 tài xế |
 | `Boolean.TRUE.equals(x)` | "So an toàn với null" (Bài 04) | `TS:1302`, `:1326`, `:1350` | `isActive` null ⇒ `NullPointerException` |
 
@@ -709,7 +709,7 @@ màn Duyệt đánh ★ cho xe mà #22 chắc chắn từ chối, vì số ghế
 | `TripServiceSeatCapacityTest` (`:108`–`:214`, 9 test) | 30 > 22 bị từ chối kèm số trong câu báo; = 22 và < 22 qua; xe không loại ⇒ bỏ qua; đường throw cùng luật; AI và màn Duyệt đặt số ghế theo xe; không nhận xe nhỏ hơn số vé đã bán |
 | `TripServiceDriverShareTest` (9 test, JUnit thuần) | Bảng phần chia §8.1; biên 8h vẫn 1 người; tuyến 9h lệch 3,5h (21 → 25 người); bất biến một chiều; phần chia ≤ 8h |
 | `TripServiceAssistantAvailabilityTest` (4 test) | Người trượt luật 8h vắng ở danh sách tài xế nhưng có ở danh sách phụ xe; phụ xe vẫn bị loại khi khoá / hết bằng / trùng lịch; validator nhận đúng người đó |
-| `TripServiceAvailabilityContextTest` (3 test) | Nhánh nạp sẵn (Phase 7) cho **cùng** kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày |
+| `TripServiceAvailabilityContextTest` (4 test) | Nhánh nạp sẵn (Phase 7) cho **cùng** kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày; và (GĐ6) một chuyến giữ chỗ được chính các luật đó nhìn thấy, chỉ trong bộ nhớ |
 
 **Chưa có test tự động** cho: luật đủ `ceil(h/8)` tài xế và luật trùng vai (grep `src/test` không thấy
 "yêu cầu ít nhất" hay "Nhân sự trùng lặp"), luật 8h **qua validator** cho tài xế chính và tài xế phụ

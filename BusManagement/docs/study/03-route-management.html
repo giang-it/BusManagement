@@ -1648,7 +1648,7 @@ thống tự gợi ý dựa trên quãng đường&quot;</em> trong khi thân h�
 <li><strong><code>distanceKm</code> được đọc lúc chạy, <code>estimatedDuration</code> được chụp lúc tạo chuyến.</strong> Đổi km ảnh
 hưởng ngay tới: odometer của chuyến <code>DEPARTED</code> khi hoàn thành (<code>TripService.java:684-688</code>), kiểm
 tra &quot;sắp tới hạn bảo trì&quot; khi xếp xe (<code>:1186-1188</code>, <code>:324</code>, <code>:1496-1497</code>), chi phí nhiên liệu ở Đề
-xuất (<code>RecommendationService.java:300-301</code>) và What-if (<code>WhatIfSimulationService.java:270-271</code>).
+xuất (<code>RecommendationService.java:409-410</code>) và What-if (<code>WhatIfSimulationService.java:332-333</code>).
 Còn đổi phút thì <strong>chuyến cũ không đổi</strong> — chuyến lưu <code>arrivalTimeExpected</code> của riêng nó — chỉ
 chuyến tạo sau mới dùng số mới (form tạo chuyến, <code>TripService.java:157-160</code> cho chuyến tăng cường).
 Cảnh báo chỉ có cho km là đúng với sự bất đối xứng này.</li>
@@ -1736,8 +1736,8 @@ từ controller</strong> (<code>AdminTripManagementController.java:127</code>, <
 (roadmap §9, <code>project_report.md</code> Warn #4), không đi qua <code>RouteService</code>.</li>
 <li>Chuyến tăng cường (Bài 08): giờ đến = khởi hành + <code>estimatedDuration</code> (<code>TripService.java:157-160</code>).</li>
 <li>Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc <code>findAllWithStations()</code>
-(<code>DashboardService.java:201</code>, <code>ForecastService.java:256</code>, <code>RecommendationService.java:102</code>,
-<code>WhatIfSimulationService.java:178</code>); chi phí nhiên liệu = đơn giá × <code>distanceKm</code>.</li>
+(<code>DashboardService.java:201</code>, <code>ForecastService.java:257</code>, <code>RecommendationService.java:136</code>,
+<code>WhatIfSimulationService.java:190</code>); chi phí nhiên liệu = đơn giá × <code>distanceKm</code>.</li>
 </ul>
 </li>
 <li><strong>Màn này bị ảnh hưởng bởi:</strong> bến xe (Bài 02 — nguồn của dropdown, và guard xoá bến đọc

@@ -448,8 +448,9 @@ Map&lt;String, Long&gt; busTypeCounts = allBuses.stream()
             .thenComparingDouble(Bus::getKmSinceLastMaintenance);          // tiêu chí 2: ít km kể từ bảo trì lên trước
 }</code></pre></div>
 <p>Mẹo: <code>!isOfType(...)</code> cho <code>false</code> với xe đúng loại, mà <code>false</code> xếp trước <code>true</code>, nên xe đúng loại
-đứng đầu. <code>.reversed()</code> (gặp ở <code>RecommendationService</code>, <code>VehicleReplacementService</code>) đảo thứ tự,
-dùng để xếp &quot;lớn nhất lên đầu&quot;.</p>
+đứng đầu. <code>.reversed()</code> (gặp ở <code>VehicleReplacementService</code>) đảo thứ tự,
+dùng để xếp &quot;lớn nhất lên đầu&quot;. <code>Comparator.reverseOrder()</code> làm cùng việc khi so một khóa vốn có
+thứ tự, như lợi nhuận <code>BigDecimal</code> của thẻ Đề xuất (<code>RecommendationService</code>).</p>
 <h3 id="2-4-optional-va-orelsethrow-hop-co-the-rong">2.4. <code>Optional</code> và <code>orElseThrow</code> — &quot;hộp có thể rỗng&quot;</h3>
 <p><code>Optional&lt;T&gt;</code> = một cái hộp có thể chứa một object, hoặc rỗng. Nó thay cho việc trả <code>null</code>, buộc
 người gọi phải xử lý trường hợp &quot;không tìm thấy&quot;.</p>
@@ -464,15 +465,16 @@ if (bus == null) throw new RuntimeException("Không tìm thấy xe với ID: " +
 <code>.orElse(null)</code> (rỗng thì trả null), <code>.orElseGet(() -&gt; ...)</code> (rỗng thì tạo mới — xem
 <code>CostParameterService.getOrDefault()</code>).</p>
 <h3 id="2-5-record-class-chi-de-cho-du-lieu-viet-mot-dong">2.5. <code>record</code> — &quot;class chỉ để chở dữ liệu, viết một dòng&quot;</h3>
-<p><span class="tag tag-code">CODE</span> <code>…/service/ForecastService.java:185</code>:</p>
+<p><span class="tag tag-code">CODE</span> <code>…/service/ForecastService.java:186</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">record Scored(int series, double model, double baseline, double ticketsSold, double seatsRun) {
 }</code></pre></div>
 <p>Khai báo này tương đương một class có 5 field <code>final</code>, constructor 5 tham số, 5 method đọc
 (<code>series()</code>, <code>model()</code>, <code>baseline()</code>, <code>ticketsSold()</code>, <code>seatsRun()</code> — <strong>không có chữ <code>get</code></strong>), cùng
 <code>equals</code>, <code>hashCode</code>, <code>toString</code>. Dự án dùng <code>record</code> cho dữ liệu trung gian trong tính toán:
-<code>ForecastService.SlotKey</code> (:176), <code>WhatIfSimulationService.HotSlot</code> (:134), <code>Derivation</code> (:138).</p>
+<code>ForecastService.SlotKey</code> (:177), <code>RecommendationService.ExtraTrip</code> (:125),
+<code>WhatIfSimulationService.ExtraTrip</code> (:143), <code>Derivation</code> (:150).</p>
 <p>Vì <code>record</code> có sẵn <code>equals/hashCode</code> theo các field, nó dùng được làm <strong>khóa của Map</strong> — đúng như
-<code>ForecastService.java:400</code> gom các chuyến theo <code>new SlotKey(routeId, giờ)</code>. <code>SlotKey</code> còn
+<code>ForecastService.java:401</code> gom các chuyến theo <code>new SlotKey(routeId, giờ)</code>. <code>SlotKey</code> còn
 <code>implements Comparable</code> để làm khóa của <code>TreeMap</code>, giữ các chuỗi theo thứ tự tuyến rồi giờ.</p>
 <h3 id="2-6-switch-expression-va-vi-sao-co-y-khong-co-default">2.6. Switch expression — và vì sao cố ý <strong>không có <code>default</code></strong></h3>
 <p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1874-1895</code> (rút gọn):</p>
@@ -1259,7 +1261,7 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>record</code></td>
 <td>Class chở dữ liệu viết một dòng</td>
-<td><code>ForecastService.java:185</code></td>
+<td><code>ForecastService.java:186</code></td>
 </tr>
 <tr>
 <td>Switch expression</td>

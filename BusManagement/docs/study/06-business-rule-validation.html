@@ -232,12 +232,12 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 </tr>
 <tr>
 <td>Người gọi (dry-run)</td>
-<td><code>…/service/RecommendationService.java:236-245</code></td>
+<td><code>…/service/RecommendationService.java:317-333</code></td>
 <td>Cổng xác nhận cuối của thẻ gợi ý</td>
 </tr>
 <tr>
 <td>Test</td>
-<td><code>test/service/TripServiceValidationDryRunTest.java</code> (12), <code>TripServiceSeatCapacityTest</code> (9), <code>TripServiceDriverShareTest</code> (9), <code>TripServiceAssistantAvailabilityTest</code> (4), <code>TripServiceAvailabilityContextTest</code> (3)</td>
+<td><code>test/service/TripServiceValidationDryRunTest.java</code> (12), <code>TripServiceSeatCapacityTest</code> (9), <code>TripServiceDriverShareTest</code> (9), <code>TripServiceAssistantAvailabilityTest</code> (4), <code>TripServiceAvailabilityContextTest</code> (4)</td>
 <td>§9.4</td>
 </tr>
 </tbody></table></div>
@@ -289,8 +289,8 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 <td><code>/admin/analytics/recommendation</code></td>
 <td><code>RecommendationController</code> <code>:35-38</code></td>
 <td>menu Analytics (Bài 17)</td>
-<td><code>buildRecommendations()</code> → <code>buildCard()</code> → <strong>hai bản dry-run</strong> (<code>RecommendationService.java:236-237</code>)</td>
-<td>thẻ <code>RECOMMENDED</code> hoặc <code>STALE</code> kèm lý do (<code>recommendation.html:171</code>, <code>:204</code>)</td>
+<td><code>buildRecommendations()</code> → <code>buildCard()</code> → <strong>hai bản dry-run</strong> (<code>RecommendationService.java:320-321</code>)</td>
+<td>thẻ <code>RECOMMENDED</code> (màn ghi &quot;Đủ điều kiện&quot;) hoặc <code>STALE</code> kèm lý do (<code>recommendation.html:191</code>, <code>:228</code>)</td>
 </tr>
 <tr>
 <td>GET (<code>fetch</code>)</td>
@@ -781,7 +781,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
     A-&gt;&gt;RC: GET /admin/analytics/recommendation
     RC-&gt;&gt;P: buildRecommendations()
     P-&gt;&gt;RS: mở transaction chỉ đọc
-    loop mỗi khung dự báo đông
+    loop mỗi chuyến thêm, theo lãi kỳ vọng giảm dần
         RS-&gt;&gt;RS: dựng Trip tạm - route, giờ đi, giờ đến
         RS-&gt;&gt;TS: selectBestAvailableBus, selectBestAvailableDriver
         RS-&gt;&gt;RS: gắn bus, driver, totalSeats = sức chứa
@@ -795,7 +795,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
         end
         RS-&gt;&gt;TS: validateStaffForTripDryRun(candidate, null)
         TS--&gt;&gt;RS: pass hoặc fail
-        RS-&gt;&gt;RS: cả hai valid thì RECOMMENDED, không thì STALE kèm lý do
+        RS-&gt;&gt;RS: cả hai valid thì RECOMMENDED và giữ chỗ xe, tài xế trong context; không thì STALE kèm lý do
     end
     P--&gt;&gt;RC: RecommendationViewDto
     RC--&gt;&gt;A: recommendation.html - thẻ và lý do</pre></figure>
@@ -823,7 +823,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>2</td>
 <td>Proxy</td>
-<td><code>RecommendationService.java:95</code></td>
+<td><code>RecommendationService.java:129</code></td>
 <td><code>@Transactional(readOnly = true)</code></td>
 <td>—</td>
 <td>mở transaction <strong>chỉ đọc</strong> — bắt buộc, vì validator đọc quan hệ LAZY (javadoc <code>TS:1397-1398</code>)</td>
@@ -833,9 +833,9 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>3</td>
 <td>Service</td>
-<td><code>RecommendationService.java:170-180</code></td>
+<td><code>RecommendationService.java:265-272</code></td>
 <td>dựng <code>candidate</code></td>
-<td>khung dự báo</td>
+<td>một chuyến thêm của khung dự báo đông</td>
 <td><code>new Trip()</code>: route, giờ đi, giờ đến = giờ đi + <code>estimatedDuration</code>. <strong>Không lưu</strong></td>
 <td>Trip tạm, <code>id = null</code></td>
 <td><span class="tag tag-code">CODE</span></td>
@@ -843,17 +843,17 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>4</td>
 <td>Service</td>
-<td><code>:186-211</code></td>
+<td><code>:278-291</code>, <code>:303-314</code></td>
 <td>chọn tài nguyên</td>
 <td>—</td>
-<td><code>selectBestAvailableBus/Driver</code> (lớp không-mời, dùng <code>AvailabilityContext</code> nạp sẵn). Không có ⇒ thẻ <code>NO_RESOURCE</code>, <strong>không</strong> tới cổng</td>
+<td><code>selectBestAvailableBus/Driver</code> (lớp không-mời, dùng <code>AvailabilityContext</code> nạp sẵn, kể cả các chuyến đã giữ chỗ). Không có ⇒ thẻ <code>NO_RESOURCE</code>, <strong>không</strong> tới cổng. Giữa hai bước, <code>:293-301</code> ước tính khách tràn, doanh thu, lợi nhuận (GĐ6)</td>
 <td><code>bus</code>, <code>driver</code></td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
 <tr>
 <td>5</td>
 <td>Service</td>
-<td><code>:233-235</code></td>
+<td><code>:317-319</code></td>
 <td>gắn tài nguyên</td>
 <td>—</td>
 <td><code>setBus</code>, <code>setDriver</code>, <code>setTotalSeats(capacity)</code> — để luật #22 có số mà so</td>
@@ -863,7 +863,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>6</td>
 <td>Service</td>
-<td><code>:236</code> → <code>TS:1407-1413</code></td>
+<td><code>:320</code> → <code>TS:1407-1413</code></td>
 <td><code>validateBusForTripDryRun(bus, candidate, null)</code></td>
 <td>—</td>
 <td><code>try { return ValidationResult.pass(validateBusForTrip(...)); }</code> — gọi <strong>đúng</strong> validator gốc, <strong>đi đường DB</strong> (không dùng context nạp sẵn)</td>
@@ -893,7 +893,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>9</td>
 <td>Service</td>
-<td><code>:237</code> → <code>TS:1436-1443</code></td>
+<td><code>:321</code> → <code>TS:1436-1443</code></td>
 <td><code>validateStaffForTripDryRun(candidate, null)</code></td>
 <td>—</td>
 <td>như trên; validator trả <code>void</code> nên hợp lệ là <code>pass()</code> rỗng</td>
@@ -903,10 +903,10 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>10</td>
 <td>Service</td>
-<td><code>:239-245</code></td>
+<td><code>:323-333</code></td>
 <td>quyết định thẻ</td>
 <td>hai kết quả</td>
-<td>cả hai <code>isValid()</code> ⇒ <code>RECOMMENDED</code>, note &quot;Đủ điều kiện phân công…&quot;; ngược lại <code>STALE</code>, note = lý do của <strong>cổng xe</strong> nếu xe hỏng, không thì của cổng người</td>
+<td>cả hai <code>isValid()</code> ⇒ <code>RECOMMENDED</code>, note &quot;Đủ điều kiện phân công…&quot;, và chuyến tạm được giữ chỗ (<code>availability.reserve</code>, trạng thái <code>PENDING_APPROVAL</code>) — cổng chạy SQL nên không thấy chỗ giữ này, việc tránh trùng là của bước 4; ngược lại <code>STALE</code>, note = lý do của <strong>cổng xe</strong> nếu xe hỏng, không thì của cổng người</td>
 <td>thẻ</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -923,7 +923,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>12</td>
 <td>View</td>
-<td><code>recommendation.html:171</code>, <code>:204</code></td>
+<td><code>recommendation.html:191</code>, <code>:228</code></td>
 <td>nhãn + ghi chú</td>
 <td><code>view</code></td>
 <td><code>STALE</code> hiện badge vàng; cột ghi chú in <code>c.note</code> — chính câu tiếng Việt của validator</td>
@@ -1288,7 +1288,7 @@ mời rồi bị từ chối lúc lưu.</p>
 <tr>
 <td><code>@Transactional(readOnly = true)</code> bao quanh dry-run</td>
 <td>&quot;Mở phiên đọc để chạm được quan hệ LAZY&quot;</td>
-<td><code>RecommendationService.java:95</code></td>
+<td><code>RecommendationService.java:129</code></td>
 <td>Validator đọc <code>trip.getRoute()</code>, <code>bus.getBusType()</code>… ngoài phiên ⇒ <code>LazyInitializationException</code> — bản dry-run <strong>không</strong> bắt lỗi này (đúng ý)</td>
 </tr>
 <tr>
@@ -1718,8 +1718,8 @@ hành (đã nêu ở Bài 05).</li>
 <td>Người trượt luật 8h vắng ở danh sách tài xế nhưng có ở danh sách phụ xe; phụ xe vẫn bị loại khi khoá / hết bằng / trùng lịch; validator nhận đúng người đó</td>
 </tr>
 <tr>
-<td><code>TripServiceAvailabilityContextTest</code> (3 test)</td>
-<td>Nhánh nạp sẵn (Phase 7) cho <strong>cùng</strong> kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày</td>
+<td><code>TripServiceAvailabilityContextTest</code> (4 test)</td>
+<td>Nhánh nạp sẵn (Phase 7) cho <strong>cùng</strong> kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày; và (GĐ6) một chuyến giữ chỗ được chính các luật đó nhìn thấy, chỉ trong bộ nhớ</td>
 </tr>
 </tbody></table></div>
 <p><strong>Chưa có test tự động</strong> cho: luật đủ <code>ceil(h/8)</code> tài xế và luật trùng vai (grep <code>src/test</code> không thấy
