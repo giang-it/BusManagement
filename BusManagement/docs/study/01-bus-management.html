@@ -924,7 +924,7 @@ lọc bảo trì.</p>
 <tr>
 <td>7</td>
 <td>Service → DB</td>
-<td><code>:242</code>, <code>TripRepository.java:233</code></td>
+<td><code>:242</code>, <code>TripRepository.java:246</code></td>
 <td><code>existsByBusId(28)</code></td>
 <td>—</td>
 <td>derived query. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT 1 FROM trips WHERE bus_id = 28 AND is_deleted = false LIMIT 1</code> — vế <code>is_deleted = false</code> do <code>@SQLRestriction</code> của <code>Trip</code> tự thêm (Bài 00b §1.5)</td>
@@ -1024,7 +1024,7 @@ tay đổi luôn hãng xe</strong>, bấm Lưu.</p>
 <tr>
 <td>3</td>
 <td><code>existsByBusIdAndStatusIn(6, [PENDING_APPROVAL, ACTIVE, DEPARTED])</code> ⇒ <code>true</code> vì chuyến 13 đang <code>DEPARTED</code>. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT 1 FROM trips WHERE bus_id = 6 AND status IN (&#39;PENDING_APPROVAL&#39;,&#39;ACTIVE&#39;,&#39;DEPARTED&#39;) AND is_deleted = false LIMIT 1</code></td>
-<td><code>:136-137</code>, <code>TripRepository.java:350</code></td>
+<td><code>:136-137</code>, <code>TripRepository.java:393</code></td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
 <tr>
@@ -1303,7 +1303,7 @@ có cho luật quan trọng; lớp không-mời có thì tốt. Ở màn này, c
 <tr>
 <td><code>@Query</code> trả số vô hướng</td>
 <td>Chỉ lấy một con số, không nạp entity (Hidden Cost #4)</td>
-<td><code>findMaxTotalSeatsForBus</code> <code>TripRepository.java:367-369</code></td>
+<td><code>findMaxTotalSeatsForBus</code> <code>TripRepository.java:410-412</code></td>
 <td>Nạp cả danh sách <code>Trip</code> chỉ để lấy max</td>
 </tr>
 <tr>

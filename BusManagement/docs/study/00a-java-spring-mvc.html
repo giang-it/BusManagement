@@ -139,9 +139,8 @@ strong { font-weight: 600; }
   <main>
     <header class="lesson">
       <span class="chip">BÀI 00a · NỀN TẢNG</span>
-      <h1></h1>
+      <h1>BÀI 00a — JAVA HIỆN ĐẠI + SPRING CORE + SPRING MVC + THYMELEAF/JAVASCRIPT</h1>
     </header>
-<h1 id="bai-00a-java-hien-dai-spring-core-spring-mvc-thymeleaf-javascript">BÀI 00a — JAVA HIỆN ĐẠI + SPRING CORE + SPRING MVC + THYMELEAF/JAVASCRIPT</h1>
 <aside class="callout"><p>Bài nền thứ nhất, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN A1), ngày 2026-09-26.
 Mọi ví dụ lấy từ code thật của BusManagement. Số dòng là ảnh chụp ngày viết — nếu lệch, grep lại.</p>
 <p><strong>Nhãn dùng trong bài:</strong></p>
@@ -474,7 +473,7 @@ if (bus == null) throw new RuntimeException("Không tìm thấy xe với ID: " +
 <p>Vì <code>record</code> có sẵn <code>equals/hashCode</code> theo các field, nó dùng được làm <strong>khóa của Map</strong> — đúng như
 <code>ForecastService.java:164</code> nhóm quan sát theo <code>new SeriesKey(o.routeId(), o.hour())</code>.</p>
 <h3 id="2-6-switch-expression-va-vi-sao-co-y-khong-co-default">2.6. Switch expression — và vì sao cố ý <strong>không có <code>default</code></strong></h3>
-<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1855-1876</code> (rút gọn):</p>
+<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1874-1895</code> (rút gọn):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">public String deleteRefusalReason(Trip trip) {
     return switch (trip.getStatus()) {                 // switch TRẢ VỀ một giá trị
         case DEPARTED  -&gt; "Chuyến ... đang trên đường ...";
@@ -488,9 +487,9 @@ if (bus == null) throw new RuntimeException("Không tìm thấy xe với ID: " +
 không cần <code>default</code>. Nếu sau này ai thêm một <code>TripStatus</code> mới, switch không còn phủ đủ nữa → <strong>lỗi
 biên dịch</strong> → người thêm bắt buộc phải quyết định chính sách cho trạng thái mới. Javadoc nói rõ ý
 đồ này <span class="tag tag-code">CODE</span> (<code>TripService.java</code> javadoc của <code>deleteRefusalReason</code>; cùng kiểu ở
-<code>AdminTripManagementController.editRefusalReason()</code> <code>:232-245</code>).</p>
+<code>AdminTripManagementController.editRefusalReason()</code> <code>:248-261</code>).</p>
 <h3 id="2-7-text-block-chuoi-nhieu-dong">2.7. Text block <code>&quot;&quot;&quot;</code> — chuỗi nhiều dòng</h3>
-<p><span class="tag tag-code">CODE</span> <code>…/repository/TripRepository.java:46-56</code>: câu truy vấn dài được viết giữa hai dấu <code>&quot;&quot;&quot;</code>
+<p><span class="tag tag-code">CODE</span> <code>…/repository/TripRepository.java:54-67</code>: câu truy vấn dài được viết giữa hai dấu <code>&quot;&quot;&quot;</code>
 thay vì nối nhiều chuỗi bằng <code>+</code>. Chỉ là cách viết chuỗi cho dễ đọc, không có ý nghĩa gì khác.</p>
 <h3 id="2-8-cac-kieu-du-lieu-hay-gap">2.8. Các kiểu dữ liệu hay gặp</h3>
 <ul>
@@ -720,12 +719,12 @@ không nạp sẵn loại xe, mỗi dòng bảng sẽ phát sinh thêm một tru
 <tr>
 <td><code>@RequestParam Long routeId</code></td>
 <td>Lấy tham số <code>?routeId=...</code> hoặc ô form tên <code>routeId</code></td>
-<td><code>AdminTripManagementController.java:122</code></td>
+<td><code>AdminTripManagementController.java:138</code></td>
 </tr>
 <tr>
 <td><code>@RequestParam(required = false) List&lt;Long&gt; coDriverIds</code></td>
 <td>Tùy chọn; nhiều ô cùng tên gom thành List</td>
-<td><code>AdminTripManagementController.java:126</code></td>
+<td><code>AdminTripManagementController.java:142</code></td>
 </tr>
 <tr>
 <td><code>@ModelAttribute Bus bus</code></td>
@@ -1079,8 +1078,8 @@ ghi đè <code>ddl-auto=create-drop</code> (<code>:19</code>) — <strong>xóa v
 <li><strong><code>@Profile(&quot;demo&quot;)</code></strong> trên một bean = bean đó chỉ tồn tại khi profile <code>demo</code> được bật.
 <span class="tag tag-code">CODE</span> <code>…/config/DataInitializer.java:26-29</code>: <code>@Component @Profile(&quot;demo&quot;) ... implements CommandLineRunner</code>. <strong><code>CommandLineRunner</code></strong> = &quot;chạy method <code>run()</code> một lần ngay sau khi ứng dụng
 khởi động xong&quot; <span class="tag tag-spring">SPRING</span>. <code>DataInitializer.run()</code> gọi <code>deleteAll()</code> mọi bảng rồi nạp dữ liệu mẫu.
-Tương tự <code>HistoricalDataBackfill</code> (<code>:110-114</code>) với <code>@Profile(&quot;backfill&quot;)</code> sinh 12 tuần dữ liệu
-lịch sử mô phỏng.</li>
+Tương tự <code>HistoricalDataBackfill</code> (<code>:114-118</code>) với <code>@Profile(&quot;backfill&quot;)</code> sinh dữ liệu lịch sử
+mô phỏng từ 01/01/2023 tới hôm qua.</li>
 </ul>
 <div class="table-wrap"><table><thead><tr>
 <th>Cách chạy</th>
@@ -1263,12 +1262,12 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td>Switch expression</td>
 <td>switch trả về giá trị, dùng <code>-&gt;</code></td>
-<td><code>TripService.java:1855-1876</code></td>
+<td><code>TripService.java:1874-1895</code></td>
 </tr>
 <tr>
 <td>Text block <code>&quot;&quot;&quot;</code></td>
 <td>Chuỗi nhiều dòng</td>
-<td><code>TripRepository.java:46-56</code></td>
+<td><code>TripRepository.java:54-67</code></td>
 </tr>
 <tr>
 <td><code>BigDecimal</code></td>
@@ -1353,7 +1352,7 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>@RequestParam</code></td>
 <td>Lấy tham số URL / ô form</td>
-<td><code>AdminTripManagementController.java:122</code></td>
+<td><code>AdminTripManagementController.java:138</code></td>
 </tr>
 <tr>
 <td><code>@ModelAttribute</code></td>

@@ -234,7 +234,7 @@ vì anh A đã từng lái chuyến: <em>&quot;…Hãy khóa hồ sơ (bỏ tick
 </tr>
 <tr>
 <td>Repository (mượn)</td>
-<td><code>TripRepository.java:257-276</code>, <code>IncidentRepository.java:62</code></td>
+<td><code>TripRepository.java:270-289</code>, <code>IncidentRepository.java:62</code></td>
 <td>Guard: tài xế từng/đang có chuyến; tài xế có bản ghi sự cố</td>
 </tr>
 <tr>
@@ -903,7 +903,7 @@ chép sang (Bài 00b §1.3).</p>
 <tr>
 <td>14</td>
 <td>Service → DB</td>
-<td><code>:106</code>, <code>TripRepository.java:269-276</code></td>
+<td><code>:106</code>, <code>TripRepository.java:282-289</code></td>
 <td><code>existsTripForDriverWithStatusIn(42, BUSY_STATUSES)</code></td>
 <td><code>BUSY_STATUSES</code> = <code>PENDING_APPROVAL</code>, <code>ACTIVE</code>, <code>DEPARTED</code> (<code>DriverService.java:42-43</code>)</td>
 <td>JPQL xét <strong>cả ba vai trò</strong>: tài xế chính, phụ xe, tài xế phụ (<code>LEFT JOIN t.coDrivers</code>). <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) &gt; 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = 42 OR t.assistant_id = 42 OR cd.driver_id = 42) AND t.status IN (&#39;PENDING_APPROVAL&#39;,&#39;ACTIVE&#39;,&#39;DEPARTED&#39;) AND t.is_deleted = false</code></td>
@@ -1051,7 +1051,7 @@ existing.setIsActive(Boolean.TRUE.equals(formDriver.getIsActive())); // null cũ
 <tr>
 <td>4</td>
 <td><strong>Guard 1</strong> <code>existsAnyTripForDriver(42)</code> — mọi vai trò, <strong>mọi trạng thái</strong>. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> như bước 14 luồng B nhưng không có điều kiện <code>status</code></td>
-<td><code>:147</code>, <code>TripRepository.java:257-262</code></td>
+<td><code>:147</code>, <code>TripRepository.java:270-275</code></td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
 <tr>
@@ -1607,7 +1607,7 @@ tài xế chính / phụ / phụ xe), <code>:1531-1532</code>, <code>:1560-1561<
 <li>Giờ lái trong ngày: <code>totalDrivingHours24h</code> cộng vào khi xét <strong>hôm nay</strong> (<code>TripService.java:827-831</code>).</li>
 <li>Gợi ý tài xế (Bài 15): <code>DriverRecommendationService.java:85-93</code>.</li>
 <li>Dashboard (Bài 12): <code>DashboardService.java:239</code>, <code>DriverRepository.java:20-34</code>.</li>
-<li>Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (<code>HistoricalDataBackfill.java:167</code>).</li>
+<li>Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (<code>HistoricalDataBackfill.java:217</code>).</li>
 </ul>
 </li>
 <li><strong>Màn này bị ảnh hưởng bởi:</strong> chuyến (quyết định có khoá / xoá được không); sự cố (Bài 11 — chặn xoá).</li>

@@ -61,7 +61,7 @@ sử vận hành và doanh thu phải được giữ nguyên)!"*.
 | Service | `…/service/RouteService.java` | Tạo (tripwire id), sửa (chép field + cảnh báo km + dựng lại lộ trình), xoá (guard có chuyến), `validateRoute()` 4 luật |
 | Repository | `…/repository/RouteRepository.java` | Hai JPQL `JOIN FETCH` nạp tuyến kèm bến và loại xe |
 | Repository | `…/repository/RouteStationRepository.java` | Đọc lộ trình của một tuyến theo `stopOrder` |
-| Repository (mượn) | `…/repository/TripRepository.java:240`, `:249` | `existsByRouteId` (guard xoá), `countByRouteIdAndStatus` (cảnh báo km) |
+| Repository (mượn) | `…/repository/TripRepository.java:253`, `:262` | `existsByRouteId` (guard xoá), `countByRouteIdAndStatus` (cảnh báo km) |
 | Entity | `…/domain/Route.java` | Bảng `routes`: `distanceKm`, `estimatedDuration`, `suitableBusType`, collection `routeStations` + các hàm suy ra điểm đi/đến |
 | Entity | `…/domain/RouteStation.java`, `RouteStationId.java` | Bảng nối `route_stations`, khoá kép `(route_id, station_id)`, cột `stop_order` |
 | Test | `test/service/RouteServiceDistanceWarningTest.java` | 4 test cho cảnh báo km |
@@ -253,7 +253,7 @@ sequenceDiagram
 | 20 | Service → DB | `:117-118` | `routeRepository.findById(1)` | 1 | [SUY LUẬN — SQL tương đương] `SELECT id, distance_km, estimated_duration, suitable_bus_type_id FROM routes WHERE id = 1`; không thấy ⇒ `RuntimeException` | `existing` (managed) | [CODE]+[SPRING] |
 | 21 | Service | `:120`, `:197-218` | `validateRoute(form, stationIds)` | form, `[1,3,2]` | (1) `null` hoặc `< 2` phần tử ⇒ lỗi; (2) `HashSet` nhỏ hơn danh sách ⇒ trùng bến ⇒ lỗi; (3) km `null` hoặc `<= 0`; (4) phút `null` hoặc `<= 0`. Tất cả là `IllegalArgumentException`. Ở đây qua hết | — | [CODE] |
 | 22 | Service | `:124` | `Objects.equals(existing.getDistanceKm(), form.getDistanceKm())` | 120.0 vs 500.0 | **đọc km cũ trước khi chép** (comment `:122`); khác nhau ⇒ đi tiếp kiểm chuyến đang chạy | — | [CODE] |
-| 23 | Service → DB | `:125`, `TripRepository.java:249` | `countByRouteIdAndStatus(1, DEPARTED)` | — | derived query; `Trip` có `@SQLRestriction("is_deleted = false")` (`Trip.java:21`) nên Hibernate tự thêm điều kiện. [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) FROM trips t WHERE t.route_id = 1 AND t.status = 'DEPARTED' AND t.is_deleted = false` | `2` | [CODE]+[SPRING] |
+| 23 | Service → DB | `:125`, `TripRepository.java:262` | `countByRouteIdAndStatus(1, DEPARTED)` | — | derived query; `Trip` có `@SQLRestriction("is_deleted = false")` (`Trip.java:21`) nên Hibernate tự thêm điều kiện. [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) FROM trips t WHERE t.route_id = 1 AND t.status = 'DEPARTED' AND t.is_deleted = false` | `2` | [CODE]+[SPRING] |
 | 24 | Service | `:126-132`, `:152-157` | `String.format(...)` + `formatKm()` | 2, 500.0, 120.0 | tạo câu cảnh báo; `formatKm` bỏ đuôi `.0` (500.0 ⇒ "500") | `warning` | [CODE] |
 | 25 | Service | `:135-137` | chép field | form | `setDistanceKm`, `setEstimatedDuration`, `setSuitableBusType` — chép **nguyên**, kể cả `null` của loại xe ("Không giới hạn" là ý định hợp lệ, javadoc `:94-97`) | `existing` bị "bẩn" | [CODE] |
 | 26 | Service | `:142` | `existing.setRouteStations(null)` | — | buông tham chiếu tới collection cũ (comment `:139-141`) | — | [CODE] |
@@ -488,7 +488,7 @@ Tình huống: Admin xoá tuyến 1, tuyến có hàng trăm chuyến lịch s�
 | 2 | `deleteRoute(1)` gọi service trong `try` | `AdminRouteController.java:98-100` | [CODE] |
 | 3 | Proxy mở transaction | `RouteService.java:183` | [SPRING] |
 | 4 | `findByIdWithStations(1)` — nạp tuyến **kèm** điểm dừng (`JOIN FETCH`); không thấy ⇒ `RuntimeException("Không tìm thấy tuyến cần xóa với ID: 1")` | `:185-186` | [CODE] |
-| 5 | `tripRepository.existsByRouteId(1)` — [SUY LUẬN — SQL tương đương] `SELECT 1 FROM trips WHERE route_id = 1 AND is_deleted = false LIMIT 1` | `:188`, `TripRepository.java:240` | [CODE]+[SPRING] |
+| 5 | `tripRepository.existsByRouteId(1)` — [SUY LUẬN — SQL tương đương] `SELECT 1 FROM trips WHERE route_id = 1 AND is_deleted = false LIMIT 1` | `:188`, `TripRepository.java:253` | [CODE]+[SPRING] |
 | 6 | Có ⇒ **ném `RuntimeException`** "Không thể xóa tuyến này vì đã có chuyến xe sử dụng (dữ liệu lịch sử vận hành và doanh thu phải được giữ nguyên)!" | `:189-191` | [CODE] |
 | 7 | `routeRepository.delete(route)` ở `:194` **không chạy** | — | [CODE] |
 | 8 | Unchecked exception ⇒ proxy **rollback**; chưa ghi gì nên không có gì để hoàn tác | — | [SPRING] |
@@ -703,7 +703,7 @@ thống tự gợi ý dựa trên quãng đường"* trong khi thân hàm luôn 
 6. **Không giới hạn trên cho phút**, mà phút quyết định số tài xế bắt buộc (§8.3). `current_bugs_found.md`
    (mục #12) ghi *"ngòi nổ nằm trong tay Admin"*: thêm một tuyến 9 giờ là đủ làm lệch
    dropdown tài xế với validator. Lịch sử mô phỏng chỉ dùng tuyến ≤ 8 giờ
-   (`HistoricalDataBackfill.java:141`, `:284-285`).
+   (`HistoricalDataBackfill.java:137`, `:498-499`).
 7. **Chuyến đã xoá mềm không chặn được việc xoá tuyến.** `existsByRouteId` đi qua `@SQLRestriction`
    nên không thấy chuyến `is_deleted = true`. Sổ lỗi đã xét và **RÚT** mục này (bán kính đo được = 0,
    cùng loại ghi chú soft-delete mà roadmap §9 chấp nhận) — nói được khi bị hỏi, không trình bày như
@@ -755,7 +755,7 @@ was blocked"*).
   - Xếp xe và kiểm tài xế (Bài 06): `distanceKm` trong kiểm tra bảo trì; giờ đến (từ
     `estimatedDuration`) quyết định số tài xế; `suitableBusType` xếp thứ tự xe.
   - Tạo chuyến thủ công (Bài 07): dropdown tuyến đọc `routeRepository.findAllWithStations()` **thẳng
-    từ controller** (`AdminTripManagementController.java:111`, `:274`) — anti-pattern đã biết
+    từ controller** (`AdminTripManagementController.java:127`, `:290`) — anti-pattern đã biết
     (roadmap §9, `project_report.md` Warn #4), không đi qua `RouteService`.
   - Chuyến tăng cường (Bài 08): giờ đến = khởi hành + `estimatedDuration` (`TripService.java:157-160`).
   - Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc `findAllWithStations()`

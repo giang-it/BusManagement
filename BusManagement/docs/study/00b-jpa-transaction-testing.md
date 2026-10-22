@@ -211,7 +211,7 @@ List<Trip> findByDepartureTimeBetweenAndStatus(LocalDateTime start, LocalDateTim
 
 **Kiểu 2 — JPQL với `@Query` và `@Param`.** Khi điều kiện quá phức tạp để đặt tên.
 
-[CODE] `TripRepository.java:117-129` (`existsOverlappingTripForDriver`):
+[CODE] `TripRepository.java:130-142` (`existsOverlappingTripForDriver`):
 
 ```java
 @Query("SELECT COUNT(t) > 0 FROM Trip t " +
@@ -232,7 +232,7 @@ boolean existsOverlappingTripForDriver(
 thức chuẩn để kiểm **hai khoảng thời gian có giao nhau không**; chạm đúng biên thì **không** tính
 là trùng.
 
-**Kiểu 3 — Projection: chỉ lấy vài cột, trả `Object[]`.** [CODE] `TripRepository.java:440-442`:
+**Kiểu 3 — Projection: chỉ lấy vài cột, trả `Object[]`.** [CODE] `TripRepository.java:483-485`:
 
 ```java
 @Query("SELECT t.route.id, t.departureTime, t.ticketsSold, t.totalSeats FROM Trip t " +
@@ -283,15 +283,15 @@ sequenceDiagram
     end
     rect rgba(40, 140, 100, 0.12)
     Note over T,DB: Có JOIN FETCH → 1 truy vấn
-    T->>H: findAllWithDetails()
+    T->>H: findForTripList(...)
     H->>DB: SELECT ... FROM trips LEFT JOIN routes LEFT JOIN buses ... (1 truy vấn)
     end
 ```
 
 Cách dự án tránh [CODE]:
 
-- **`JOIN FETCH`** — ép nạp quan hệ ngay trong câu truy vấn. `TripRepository.findAllWithDetails()`
-  (`:46-57`) nạp một lần route, bus, busType, driver + user, assistant + user, coDrivers. Có
+- **`JOIN FETCH`** — ép nạp quan hệ ngay trong câu truy vấn. `TripRepository.findForTripList()`
+  (`:54-70`) nạp một lần route, bus, busType, driver + user, assistant + user, coDrivers. Có
   `DISTINCT` để khử dòng trùng khi join với danh sách `coDrivers`.
 - **`@BatchSize(size = 20)`** trên `Route.routeStations` (`Route.java:44-45`) — khi cần nạp điểm
   dừng của nhiều tuyến, Hibernate gom **20 tuyến một lần** thay vì từng tuyến.
@@ -302,7 +302,7 @@ câu (lỗi `MultipleBagFetchException`), mà `Trip.coDrivers` đã là một `L
 
 ### 2.5. Cái bẫy của projection nhiều cột không `GROUP BY`
 
-[CODE] `TripRepository.java:402-403` và `DashboardService.java:184-185`:
+[CODE] `TripRepository.java:445-446` và `DashboardService.java:184-185`:
 
 ```java
 @Query("SELECT SUM(t.ticketsSold), SUM(t.price * t.ticketsSold) FROM Trip t WHERE t.status IN :statuses")
@@ -490,7 +490,7 @@ public String approveTrip(Long tripId, Long busId, ...) {        // :955-956
 
 ### 4.4. Controller **không** có `@Transactional` ⇒ gọi hai service là hai transaction
 
-[CODE] `AdminTripManagementController.updateTrip()` (`:340-452`) gọi **hai** method service:
+[CODE] `AdminTripManagementController.updateTrip()` (`:356-468`) gọi **hai** method service:
 
 ```mermaid
 sequenceDiagram
@@ -609,7 +609,7 @@ flowchart LR
 
 | Luật | Lớp không-mời | Lớp chặn thật |
 |---|---|---|
-| Chỉ xóa chuyến theo chính sách trạng thái | nút Xóa chỉ hiện khi `deletableIds.contains(trip.id)` (`trip-list.html:472`; tập tính ở `populateTripList()` `AdminTripManagementController.java:80-93`) | `TripService.deleteTrip()` → `deleteRefusalReason()` (`:1823-1830`) |
+| Chỉ xóa chuyến theo chính sách trạng thái | nút Xóa chỉ hiện khi `deletableIds.contains(trip.id)` (`trip-list.html:484`; tập tính ở `populateTripList()` `AdminTripManagementController.java:96-109`) | `TripService.deleteTrip()` → `deleteRefusalReason()` (`:1842-1849`) |
 | Chỉ đổi trạng thái theo FSM | select trạng thái ở form Sửa chỉ liệt kê `allowedTransitionsFrom()` | pre-check `:373` + `canTransition()` trong `updateTripStatus()` (`:642`) |
 | Bảng điều phối không được kích hoạt chuyến | chỉ có 3 nút Xuất phát / Hủy / Hoàn thành | `BOARD_ACTIONS` (`DispatchController.java:59`, kiểm ở `:108`) |
 | Chỉ duyệt chuyến đang chờ duyệt | `showApproveForm()` không mở form cho chuyến khác `PENDING_APPROVAL` (`AdminTripController.java:75`) | `requirePendingApproval()` (`TripService.java:892`) |
@@ -773,7 +773,7 @@ trang qua HTTP và đối chiếu DB trước/sau. Vì sao cần cả hai [CODE 
 | LAZY / EAGER | Nạp khi cần / nạp ngay | `Trip.java:39` |
 | Proxy (Hibernate) | Object giữ chỗ cho quan hệ LAZY | [SPRING] |
 | N+1 | 1 truy vấn danh sách + N truy vấn phụ | §2.4 |
-| `JOIN FETCH` | Ép nạp quan hệ trong cùng truy vấn | `findAllWithDetails` (`:46-57`) |
+| `JOIN FETCH` | Ép nạp quan hệ trong cùng truy vấn | `findForTripList` (`TripRepository.java:54-70`) |
 | `@BatchSize` | Gom nạp LAZY theo lô | `Route.java:45` |
 | `MultipleBagFetchException` | Lỗi JOIN FETCH hai `List` cùng lúc | comment `Route.java:74-78` |
 | persist / merge | INSERT dòng mới / ghi đè dòng có sẵn | §3.1 |
@@ -809,7 +809,7 @@ ngoài cùng như `scanAndSuggestExtraTrips()`.
 
 **Q2. N+1 là gì, em xử lý ra sao?**
 Lấy danh sách N bản ghi bằng một truy vấn rồi truy cập quan hệ LAZY của từng bản ghi thì phát sinh N
-truy vấn phụ. Em dùng `JOIN FETCH` trong các truy vấn như `TripRepository.findAllWithDetails()` để nạp
+truy vấn phụ. Em dùng `JOIN FETCH` trong các truy vấn như `TripRepository.findForTripList()` để nạp
 route, xe, tài xế trong một truy vấn, và `@BatchSize(20)` cho `Route.routeStations` vì Hibernate không
 cho JOIN FETCH hai danh sách cùng lúc. Các màn phân tích thì đọc bằng projection vài cột.
 
@@ -912,7 +912,7 @@ trip.setDriver(driver);
 8. Nó chỉ kiểm hàm tính toán thuần `WhatIfSimulationService.coverableSlots()` — một method `static`
    package-private, không cần bean, không cần DB.
 9. `updateTrip()` nạp chuyến, `editRefusalReason()` cho qua (`ACTIVE` sửa được). Pre-check ở
-   `AdminTripManagementController.java:373`: `allowedTransitionsFrom(ACTIVE)` = `[ACTIVE, DEPARTED,
+   `AdminTripManagementController.java:389`: `allowedTransitionsFrom(ACTIVE)` = `[ACTIVE, DEPARTED,
    CANCELLED]`, không chứa `COMPLETED` ⇒ flash `error` "Không thể đổi trạng thái chuyến #50 từ
    [ACTIVE] sang [COMPLETED] — chưa có thay đổi nào được lưu. Các đích hợp lệ: [...]" và redirect về
    form sửa. **Chưa transaction nào được mở** (chưa gọi service). Giá vé mới **không** được lưu.

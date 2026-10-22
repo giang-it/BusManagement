@@ -295,7 +295,7 @@ Vì `record` có sẵn `equals/hashCode` theo các field, nó dùng được là
 
 ### 2.6. Switch expression — và vì sao cố ý **không có `default`**
 
-[CODE] `…/service/TripService.java:1855-1876` (rút gọn):
+[CODE] `…/service/TripService.java:1874-1895` (rút gọn):
 
 ```java
 public String deleteRefusalReason(Trip trip) {
@@ -314,11 +314,11 @@ Vì sao không có `default`: khi switch trên enum phủ **đủ mọi giá tr�
 không cần `default`. Nếu sau này ai thêm một `TripStatus` mới, switch không còn phủ đủ nữa → **lỗi
 biên dịch** → người thêm bắt buộc phải quyết định chính sách cho trạng thái mới. Javadoc nói rõ ý
 đồ này [CODE] (`TripService.java` javadoc của `deleteRefusalReason`; cùng kiểu ở
-`AdminTripManagementController.editRefusalReason()` `:232-245`).
+`AdminTripManagementController.editRefusalReason()` `:248-261`).
 
 ### 2.7. Text block `"""` — chuỗi nhiều dòng
 
-[CODE] `…/repository/TripRepository.java:46-56`: câu truy vấn dài được viết giữa hai dấu `"""`
+[CODE] `…/repository/TripRepository.java:54-67`: câu truy vấn dài được viết giữa hai dấu `"""`
 thay vì nối nhiều chuỗi bằng `+`. Chỉ là cách viết chuỗi cho dễ đọc, không có ý nghĩa gì khác.
 
 ### 2.8. Các kiểu dữ liệu hay gặp
@@ -465,8 +465,8 @@ không nạp sẵn loại xe, mỗi dòng bảng sẽ phát sinh thêm một tru
 | Cách | Nghĩa | Ví dụ thật |
 |---|---|---|
 | `@PathVariable Long id` | Lấy giá trị nằm **trong đường dẫn** `/edit/{id}` | `AdminBusController.java:45` |
-| `@RequestParam Long routeId` | Lấy tham số `?routeId=...` hoặc ô form tên `routeId` | `AdminTripManagementController.java:122` |
-| `@RequestParam(required = false) List<Long> coDriverIds` | Tùy chọn; nhiều ô cùng tên gom thành List | `AdminTripManagementController.java:126` |
+| `@RequestParam Long routeId` | Lấy tham số `?routeId=...` hoặc ô form tên `routeId` | `AdminTripManagementController.java:138` |
+| `@RequestParam(required = false) List<Long> coDriverIds` | Tùy chọn; nhiều ô cùng tên gom thành List | `AdminTripManagementController.java:142` |
 | `@ModelAttribute Bus bus` | Gom **mọi ô form** thành một object, khớp theo tên | `AdminBusController.java:34` |
 | `@DateTimeFormat(iso = ...)` | Chỉ rõ định dạng ngày giờ khi đổi chuỗi thành `LocalDateTime` | `TripRestController.java:49-50` |
 | `Model model` | "Cái khay" để đặt dữ liệu cho template | `AdminBusController.java:20` |
@@ -769,8 +769,8 @@ viết số có dấu gạch dưới cho dễ đọc (Java 7+), bằng `10000`. 
   [CODE] `…/config/DataInitializer.java:26-29`: `@Component @Profile("demo") ... implements
   CommandLineRunner`. **`CommandLineRunner`** = "chạy method `run()` một lần ngay sau khi ứng dụng
   khởi động xong" [SPRING]. `DataInitializer.run()` gọi `deleteAll()` mọi bảng rồi nạp dữ liệu mẫu.
-  Tương tự `HistoricalDataBackfill` (`:110-114`) với `@Profile("backfill")` sinh 12 tuần dữ liệu
-  lịch sử mô phỏng.
+  Tương tự `HistoricalDataBackfill` (`:114-118`) với `@Profile("backfill")` sinh dữ liệu lịch sử
+  mô phỏng từ 01/01/2023 tới hôm qua.
 
 | Cách chạy | Profile | Hệ quả |
 |---|---|---|
@@ -865,8 +865,8 @@ Test canh quy ước này: `src/test/.../domain/EntityEqualsHashCodeCycleTest.ja
 | `Optional` | Hộp có thể rỗng | `AdminBusController.java:47-48` |
 | `orElseThrow` | Hộp rỗng thì ném lỗi | như trên |
 | `record` | Class chở dữ liệu viết một dòng | `ForecastService.java:140` |
-| Switch expression | switch trả về giá trị, dùng `->` | `TripService.java:1855-1876` |
-| Text block `"""` | Chuỗi nhiều dòng | `TripRepository.java:46-56` |
+| Switch expression | switch trả về giá trị, dùng `->` | `TripService.java:1874-1895` |
+| Text block `"""` | Chuỗi nhiều dòng | `TripRepository.java:54-67` |
 | `BigDecimal` | Số thập phân chính xác, dùng cho tiền | `Trip.price` |
 | `LocalDateTime` / `Duration` | Ngày giờ / khoảng thời gian | `Trip.getTripDurationHours()` |
 | `EnumSet` | Tập giá trị enum | `DispatchController.BOARD_ACTIONS` |
@@ -883,7 +883,7 @@ Test canh quy ước này: `src/test/.../domain/EntityEqualsHashCodeCycleTest.ja
 | DispatcherServlet | Tổng đài nhận mọi request | [SPRING] |
 | `@RequestMapping` / `@GetMapping` / `@PostMapping` | Gắn URL (+ phương thức HTTP) với method | `AdminBusController.java:13`, `:19`, `:33` |
 | `@PathVariable` | Lấy giá trị trong đường dẫn | `AdminBusController.java:45` |
-| `@RequestParam` | Lấy tham số URL / ô form | `AdminTripManagementController.java:122` |
+| `@RequestParam` | Lấy tham số URL / ô form | `AdminTripManagementController.java:138` |
 | `@ModelAttribute` | Gom ô form thành object | `AdminBusController.java:34` |
 | `DomainClassConverter` | Tự đổi id gửi lên thành entity | javadoc `AdminIncidentController.java:58-63` |
 | `@DateTimeFormat` | Định dạng khi đổi chuỗi → ngày giờ | `TripRestController.java:49` |

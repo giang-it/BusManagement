@@ -382,7 +382,7 @@ từng phần, dựng câu truy vấn <span class="tag tag-spring">SPRING</span>
 List&lt;Trip&gt; findByDepartureTimeBetweenAndStatus(LocalDateTime start, LocalDateTime end, TripStatus status); // :194</code></pre></div>
 <p>Để ý <code>is_deleted = false</code> tự xuất hiện — đó là <code>@SQLRestriction</code> (§1.5).</p>
 <p><strong>Kiểu 2 — JPQL với <code>@Query</code> và <code>@Param</code>.</strong> Khi điều kiện quá phức tạp để đặt tên.</p>
-<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:117-129</code> (<code>existsOverlappingTripForDriver</code>):</p>
+<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:130-142</code> (<code>existsOverlappingTripForDriver</code>):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT COUNT(t) &gt; 0 FROM Trip t " +
        "LEFT JOIN t.coDrivers cd " +
        "WHERE (t.driver = :driver OR cd = :driver) " +                 // tài xế chính HOẶC tài xế phụ
@@ -398,7 +398,7 @@ boolean existsOverlappingTripForDriver(
 <p>Điều kiện &quot;trùng lịch&quot; <code>departureTime &lt; windowEnd AND arrivalTimeExpected &gt; windowStart</code> là công
 thức chuẩn để kiểm <strong>hai khoảng thời gian có giao nhau không</strong>; chạm đúng biên thì <strong>không</strong> tính
 là trùng.</p>
-<p><strong>Kiểu 3 — Projection: chỉ lấy vài cột, trả <code>Object[]</code>.</strong> <span class="tag tag-code">CODE</span> <code>TripRepository.java:440-442</code>:</p>
+<p><strong>Kiểu 3 — Projection: chỉ lấy vài cột, trả <code>Object[]</code>.</strong> <span class="tag tag-code">CODE</span> <code>TripRepository.java:483-485</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT t.route.id, t.departureTime, t.ticketsSold, t.totalSeats FROM Trip t " +
        "WHERE t.status = :status AND t.totalSeats &gt; 0 ORDER BY t.departureTime")
 List&lt;Object[]&gt; findDemandHistoryByStatus(@Param("status") TripStatus status);
@@ -454,13 +454,13 @@ mỗi chuyến phát sinh thêm 1 truy vấn nạp tuyến ⇒ tổng <strong>1 
     end
     rect rgba(40, 140, 100, 0.12)
     Note over T,DB: Có JOIN FETCH → 1 truy vấn
-    T-&gt;&gt;H: findAllWithDetails()
+    T-&gt;&gt;H: findForTripList(...)
     H-&gt;&gt;DB: SELECT ... FROM trips LEFT JOIN routes LEFT JOIN buses ... (1 truy vấn)
     end</pre></figure>
 <p>Cách dự án tránh <span class="tag tag-code">CODE</span>:</p>
 <ul>
-<li><strong><code>JOIN FETCH</code></strong> — ép nạp quan hệ ngay trong câu truy vấn. <code>TripRepository.findAllWithDetails()</code>
-(<code>:46-57</code>) nạp một lần route, bus, busType, driver + user, assistant + user, coDrivers. Có
+<li><strong><code>JOIN FETCH</code></strong> — ép nạp quan hệ ngay trong câu truy vấn. <code>TripRepository.findForTripList()</code>
+(<code>:54-70</code>) nạp một lần route, bus, busType, driver + user, assistant + user, coDrivers. Có
 <code>DISTINCT</code> để khử dòng trùng khi join với danh sách <code>coDrivers</code>.</li>
 <li><strong><code>@BatchSize(size = 20)</code></strong> trên <code>Route.routeStations</code> (<code>Route.java:44-45</code>) — khi cần nạp điểm
 dừng của nhiều tuyến, Hibernate gom <strong>20 tuyến một lần</strong> thay vì từng tuyến.</li>
@@ -469,7 +469,7 @@ dừng của nhiều tuyến, Hibernate gom <strong>20 tuyến một lần</stro
 <code>Route.java:74-78</code>: Hibernate <strong>không cho JOIN FETCH hai collection kiểu <code>List</code></strong> trong cùng một
 câu (lỗi <code>MultipleBagFetchException</code>), mà <code>Trip.coDrivers</code> đã là một <code>List</code> được fetch rồi.</p>
 <h3 id="2-5-cai-bay-cua-projection-nhieu-cot-khong-group-by">2.5. Cái bẫy của projection nhiều cột không <code>GROUP BY</code></h3>
-<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:402-403</code> và <code>DashboardService.java:184-185</code>:</p>
+<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:445-446</code> và <code>DashboardService.java:184-185</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT SUM(t.ticketsSold), SUM(t.price * t.ticketsSold) FROM Trip t WHERE t.status IN :statuses")
 List&lt;Object[]&gt; sumTicketsSoldAndRevenueByStatuses(...);        // trả List, dù chỉ có 1 dòng
 
@@ -628,7 +628,7 @@ lý do <span class="tag tag-code">CODE</span>: để một chuyến sai trạng 
 và báo đúng lý do &quot;sai trạng thái&quot; thay vì một lỗi validate khác (lỗi #20).</li>
 </ul>
 <h3 id="4-4-controller-khong-co-transactional-goi-hai-service-la-hai-transaction">4.4. Controller <strong>không</strong> có <code>@Transactional</code> ⇒ gọi hai service là hai transaction</h3>
-<p><span class="tag tag-code">CODE</span> <code>AdminTripManagementController.updateTrip()</code> (<code>:340-452</code>) gọi <strong>hai</strong> method service:</p>
+<p><span class="tag tag-code">CODE</span> <code>AdminTripManagementController.updateTrip()</code> (<code>:356-468</code>) gọi <strong>hai</strong> method service:</p>
 <figure class="diagram"><pre class="mermaid">sequenceDiagram
     autonumber
     participant C as AdminTripManagementController.updateTrip()
@@ -749,8 +749,8 @@ lựa chọn hợp lệ, JS kiểm trước.</li>
 </tr>
 </thead><tbody><tr>
 <td>Chỉ xóa chuyến theo chính sách trạng thái</td>
-<td>nút Xóa chỉ hiện khi <code>deletableIds.contains(trip.id)</code> (<code>trip-list.html:472</code>; tập tính ở <code>populateTripList()</code> <code>AdminTripManagementController.java:80-93</code>)</td>
-<td><code>TripService.deleteTrip()</code> → <code>deleteRefusalReason()</code> (<code>:1823-1830</code>)</td>
+<td>nút Xóa chỉ hiện khi <code>deletableIds.contains(trip.id)</code> (<code>trip-list.html:484</code>; tập tính ở <code>populateTripList()</code> <code>AdminTripManagementController.java:96-109</code>)</td>
+<td><code>TripService.deleteTrip()</code> → <code>deleteRefusalReason()</code> (<code>:1842-1849</code>)</td>
 </tr>
 <tr>
 <td>Chỉ đổi trạng thái theo FSM</td>
@@ -1053,7 +1053,7 @@ tầng controller bằng MockMvc và chưa có test giao diện tự động.</p
 <tr>
 <td><code>JOIN FETCH</code></td>
 <td>Ép nạp quan hệ trong cùng truy vấn</td>
-<td><code>findAllWithDetails</code> (<code>:46-57</code>)</td>
+<td><code>findForTripList</code> (<code>TripRepository.java:54-70</code>)</td>
 </tr>
 <tr>
 <td><code>@BatchSize</code></td>
@@ -1180,7 +1180,7 @@ tác. Cần nhớ: gọi nội bộ trong cùng class không qua proxy, nên d�
 ngoài cùng như <code>scanAndSuggestExtraTrips()</code>.</p>
 <p><strong>Q2. N+1 là gì, em xử lý ra sao?</strong>
 Lấy danh sách N bản ghi bằng một truy vấn rồi truy cập quan hệ LAZY của từng bản ghi thì phát sinh N
-truy vấn phụ. Em dùng <code>JOIN FETCH</code> trong các truy vấn như <code>TripRepository.findAllWithDetails()</code> để nạp
+truy vấn phụ. Em dùng <code>JOIN FETCH</code> trong các truy vấn như <code>TripRepository.findForTripList()</code> để nạp
 route, xe, tài xế trong một truy vấn, và <code>@BatchSize(20)</code> cho <code>Route.routeStations</code> vì Hibernate không
 cho JOIN FETCH hai danh sách cùng lúc. Các màn phân tích thì đọc bằng projection vài cột.</p>
 <p><strong>Q3. Soft delete em làm thế nào? Sao không xóa hẳn?</strong>
@@ -1271,7 +1271,7 @@ proxy) mới mở được transaction, và transaction đó còn giữ phiên m
 <li>Nó chỉ kiểm hàm tính toán thuần <code>WhatIfSimulationService.coverableSlots()</code> — một method <code>static</code>
 package-private, không cần bean, không cần DB.</li>
 <li><code>updateTrip()</code> nạp chuyến, <code>editRefusalReason()</code> cho qua (<code>ACTIVE</code> sửa được). Pre-check ở
-<code>AdminTripManagementController.java:373</code>: <code>allowedTransitionsFrom(ACTIVE)</code> = <code>[ACTIVE, DEPARTED, CANCELLED]</code>, không chứa <code>COMPLETED</code> ⇒ flash <code>error</code> &quot;Không thể đổi trạng thái chuyến #50 từ
+<code>AdminTripManagementController.java:389</code>: <code>allowedTransitionsFrom(ACTIVE)</code> = <code>[ACTIVE, DEPARTED, CANCELLED]</code>, không chứa <code>COMPLETED</code> ⇒ flash <code>error</code> &quot;Không thể đổi trạng thái chuyến #50 từ
 [ACTIVE] sang [COMPLETED] — chưa có thay đổi nào được lưu. Các đích hợp lệ: [...]&quot; và redirect về
 form sửa. <strong>Chưa transaction nào được mở</strong> (chưa gọi service). Giá vé mới <strong>không</strong> được lưu.
 (Bình thường select trạng thái đã không liệt kê <code>COMPLETED</code> — đây là lớp không-mời; pre-check là

@@ -62,7 +62,7 @@ vì anh A đã từng lái chuyến: *"…Hãy khóa hồ sơ (bỏ tick 'Đang 
 | Service | `…/service/AdminService.java` | Tạo tài khoản không phải tài xế; luật "username duy nhất" dùng chung |
 | Repository | `…/repository/DriverRepository.java:17-18` | `findAllWithUser()` (`JOIN FETCH d.user`) |
 | Repository | `…/repository/UserRepository.java:12` | `findByUsername()` |
-| Repository (mượn) | `TripRepository.java:257-276`, `IncidentRepository.java:62` | Guard: tài xế từng/đang có chuyến; tài xế có bản ghi sự cố |
+| Repository (mượn) | `TripRepository.java:270-289`, `IncidentRepository.java:62` | Guard: tài xế từng/đang có chuyến; tài xế có bản ghi sự cố |
 | Entity | `…/domain/User.java` | Bảng `users`: username (unique), password, fullName, email (unique), phone, role, status + quan hệ ngược `driver` |
 | Entity | `…/domain/Driver.java` | Bảng `drivers`: khoá chính **là** `user_id`; số bằng, hạn bằng, kinh nghiệm, `isActive`, hai cột ẩn |
 | Enum | `…/domain/Role.java` | `ROLE_ADMIN`, `ROLE_DRIVER`, `ROLE_USER` |
@@ -349,7 +349,7 @@ sequenceDiagram
 | 11 | Service → DB | `:95-96` | `driverRepository.findById(42)` | — | bản ghi thật (kèm `User` — EAGER) | `existing` managed | [CODE] |
 | 12 | Service | `:98-99` | `normalizeUser` + `requireUsernameAvailable(username, 42)` | — | truyền `42` để **không tự báo trùng với chính mình** (javadoc `AdminService.java:61-62`) | — | [CODE] |
 | 13 | Service | `:104-105` | `isBeingDeactivated` | `existing.isActive = true`, `formDriver.isActive = false` | `TRUE.equals(cũ) && !TRUE.equals(mới)` ⇒ `true`. Chỉ xét khi **chuyển** từ hoạt động sang khoá | — | [CODE] |
-| 14 | Service → DB | `:106`, `TripRepository.java:269-276` | `existsTripForDriverWithStatusIn(42, BUSY_STATUSES)` | `BUSY_STATUSES` = `PENDING_APPROVAL`, `ACTIVE`, `DEPARTED` (`DriverService.java:42-43`) | JPQL xét **cả ba vai trò**: tài xế chính, phụ xe, tài xế phụ (`LEFT JOIN t.coDrivers`). [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) > 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = 42 OR t.assistant_id = 42 OR cd.driver_id = 42) AND t.status IN ('PENDING_APPROVAL','ACTIVE','DEPARTED') AND t.is_deleted = false` | `true` | [CODE]+[SPRING] |
+| 14 | Service → DB | `:106`, `TripRepository.java:282-289` | `existsTripForDriverWithStatusIn(42, BUSY_STATUSES)` | `BUSY_STATUSES` = `PENDING_APPROVAL`, `ACTIVE`, `DEPARTED` (`DriverService.java:42-43`) | JPQL xét **cả ba vai trò**: tài xế chính, phụ xe, tài xế phụ (`LEFT JOIN t.coDrivers`). [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) > 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = 42 OR t.assistant_id = 42 OR cd.driver_id = 42) AND t.status IN ('PENDING_APPROVAL','ACTIVE','DEPARTED') AND t.is_deleted = false` | `true` | [CODE]+[SPRING] |
 | 15 | Service | `:107-109` | ném lỗi | — | `RuntimeException("Không thể khóa tài xế này vì đang được phân công cho chuyến xe chưa kết thúc …")` | ↑ | [CODE] |
 | 16 | Proxy | — | rollback | — | chưa chép field nào ⇒ không có gì để hoàn tác | ↑ | [SPRING] |
 | 17 | Controller | `AdminDriverController.java:76-78` | `catch (Exception e)` | — | flash `error` = "Lỗi: " + câu trên; `redirect:/admin/drivers/edit/42` | 302 | [CODE] |
@@ -408,7 +408,7 @@ existing.setIsActive(Boolean.TRUE.equals(formDriver.getIsActive())); // null cũ
 | 1 | Nút "Xóa" có `confirm('Bạn có chắc chắn muốn xóa tài xế này?')` — câu chung chung; luật được báo trước bằng dòng chữ nhỏ cuối trang | `driver-list.html:84-87`, `:95-99` | [CODE] |
 | 2 | `GET /admin/drivers/delete/42` → `deleteDriver(42)` trong `try` | `AdminDriverController.java:84-86` | [CODE] |
 | 3 | Proxy mở transaction; `driverRepository.findById(42)`; không thấy ⇒ `RuntimeException("Không tìm thấy tài xế cần xóa với ID: 42")` | `DriverService.java:142-145` | [CODE] |
-| 4 | **Guard 1** `existsAnyTripForDriver(42)` — mọi vai trò, **mọi trạng thái**. [SUY LUẬN — SQL tương đương] như bước 14 luồng B nhưng không có điều kiện `status` | `:147`, `TripRepository.java:257-262` | [CODE] |
+| 4 | **Guard 1** `existsAnyTripForDriver(42)` — mọi vai trò, **mọi trạng thái**. [SUY LUẬN — SQL tương đương] như bước 14 luồng B nhưng không có điều kiện `status` | `:147`, `TripRepository.java:270-275` | [CODE] |
 | 5 | Có ⇒ ném `RuntimeException("Không thể xóa tài xế này vì đã có dữ liệu lịch sử vận hành … Hãy khóa hồ sơ (bỏ tick 'Đang hoạt động') thay vì xóa cứng!")` | `:148-150` | [CODE] |
 | 6 | Proxy rollback (chưa ghi gì) → `catch` → flash `error` "Lỗi: …" → `redirect:/admin/drivers` → khung đỏ `driver-list.html:29-32` | `AdminDriverController.java:88-91` | [SPRING]+[CODE] |
 
@@ -667,7 +667,7 @@ hết hạn là sự kiện thật phải ghi được. Nếu làm, hình dạng
   - Giờ lái trong ngày: `totalDrivingHours24h` cộng vào khi xét **hôm nay** (`TripService.java:827-831`).
   - Gợi ý tài xế (Bài 15): `DriverRecommendationService.java:85-93`.
   - Dashboard (Bài 12): `DashboardService.java:239`, `DriverRepository.java:20-34`.
-  - Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (`HistoricalDataBackfill.java:167`).
+  - Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (`HistoricalDataBackfill.java:217`).
 - **Màn này bị ảnh hưởng bởi:** chuyến (quyết định có khoá / xoá được không); sự cố (Bài 11 — chặn xoá).
 
 ---

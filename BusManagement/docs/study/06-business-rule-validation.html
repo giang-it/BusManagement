@@ -212,7 +212,7 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 </tr>
 <tr>
 <td>Repository</td>
-<td><code>TR:118-129</code>, <code>:137-147</code>, <code>:158-166</code>, <code>:173-184</code>; <code>:350</code></td>
+<td><code>TR:131-142</code>, <code>:150-160</code>, <code>:171-179</code>, <code>:186-197</code>; <code>:393</code></td>
 <td>3 câu &quot;có trùng lịch không&quot;, 1 câu &quot;chuyến của tài xế trong ngày&quot;, 1 câu &quot;xe có chuyến DEPARTED không&quot;</td>
 </tr>
 <tr>
@@ -255,7 +255,7 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 </thead><tbody><tr>
 <td>POST</td>
 <td><code>/admin/trip-management/trips/create</code></td>
-<td><code>ATM.createTrip()</code> <code>:120-177</code></td>
+<td><code>ATM.createTrip()</code> <code>:136-193</code></td>
 <td>nút Lưu ở <code>trip-create-form.html</code> (Bài 07)</td>
 <td><code>createManualTrip()</code> → cả hai validator, <code>excludeTripId = null</code> (<code>TS:1051-1052</code>)</td>
 <td>thành công: redirect danh sách + <code>success</code>; lỗi: redirect <code>/trips/create</code> + <code>error</code> &quot;Lỗi: …&quot;</td>
@@ -263,7 +263,7 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 <tr>
 <td>POST</td>
 <td><code>/admin/trip-management/trips/update</code></td>
-<td><code>ATM.updateTrip()</code> <code>:339-444</code></td>
+<td><code>ATM.updateTrip()</code> <code>:355-460</code></td>
 <td>nút Lưu ở <code>trip-edit-form.html</code> (Bài 07)</td>
 <td><code>updateManualTrip()</code> → cả hai, <code>excludeTripId = id chuyến</code> (<code>TS:1076-1077</code>)</td>
 <td>lỗi: redirect form sửa + &quot;Lỗi: …&quot;</td>
@@ -431,7 +431,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 </thead><tbody><tr>
 <td>1</td>
 <td>Controller</td>
-<td><code>ATM:120-158</code></td>
+<td><code>ATM:136-174</code></td>
 <td><code>createTrip()</code></td>
 <td><code>@ModelAttribute Trip</code> + <code>routeId</code>, <code>busId</code>, <code>driverId</code>, <code>assistantId</code>, <code>coDriverIds</code></td>
 <td>nạp từng entity bằng <code>findById</code> của <strong>repository</strong> (controller inject thẳng repository — anti-pattern đã biết, roadmap §3); gắn vào <code>trip</code>; <code>coDrivers = [Bình]</code></td>
@@ -441,7 +441,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 <tr>
 <td>2</td>
 <td>Controller</td>
-<td><code>ATM:161-165</code></td>
+<td><code>ATM:177-181</code></td>
 <td>đặt trạng thái + gọi service</td>
 <td>—</td>
 <td><code>setStatus(ACTIVE)</code>, <code>setExtraTrip(false)</code>, rồi <code>tripService.createManualTrip(trip)</code> trong <code>try</code></td>
@@ -501,7 +501,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 <tr>
 <td>8</td>
 <td>Service → DB</td>
-<td><code>TS:1165</code> → <code>:352-371</code> → <code>TR:158-166</code></td>
+<td><code>TS:1165</code> → <code>:352-371</code> → <code>TR:171-179</code></td>
 <td>luật 3 — <code>isBusBusy</code> → <code>existsOverlappingTripForBus</code></td>
 <td>xe #5, trạng thái bận <code>ACTIVE, DEPARTED, PENDING_APPROVAL</code></td>
 <td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) &gt; 0 FROM trips t WHERE t.bus_id = 5 AND t.status IN (&#39;ACTIVE&#39;,&#39;DEPARTED&#39;,&#39;PENDING_APPROVAL&#39;) AND t.departure_time &lt; &#39;…17:00&#39; AND t.arrival_time_expected &gt; &#39;…05:00&#39; AND t.is_deleted = false</code> (vế <code>excludeTripId</code> luôn đúng vì tham số <code>null</code>)</td>
@@ -601,7 +601,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 <tr>
 <td>18</td>
 <td>Service → DB</td>
-<td><code>TS:1311</code> → <code>:714-728</code> → <code>TR:118-129</code>, <code>:137-147</code></td>
+<td><code>TS:1311</code> → <code>:714-728</code> → <code>TR:131-142</code>, <code>:150-160</code></td>
 <td>An bận?</td>
 <td>trạng thái bận <code>PENDING_APPROVAL, ACTIVE, DEPARTED</code></td>
 <td>hai câu: <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) &gt; 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = An OR cd.user_id = An) AND t.status IN (…) AND t.departure_time &lt; &#39;…16:30&#39; AND t.arrival_time_expected &gt; &#39;…05:30&#39; AND t.is_deleted = false</code>, rồi câu tương tự với <code>t.assistant_id = An</code></td>
@@ -611,7 +611,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 <tr>
 <td>19</td>
 <td>Service → DB</td>
-<td><code>TS:1315</code> → <code>:752-772</code> → <code>TR:173-184</code></td>
+<td><code>TS:1315</code> → <code>:752-772</code> → <code>TR:186-197</code></td>
 <td>giờ lái của An ngày mai</td>
 <td>thêm <code>COMPLETED</code> vào tập trạng thái (<code>TS:756-757</code>)</td>
 <td><span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT DISTINCT t.*, cd.* FROM trips t LEFT JOIN trip_co_drivers cd … WHERE (t.driver_id = An OR cd.user_id = An OR t.assistant_id = An) AND t.status IN (4 trạng thái) AND t.departure_time &gt;= &#39;mai 00:00&#39; AND t.departure_time &lt; &#39;mốt 00:00&#39; AND t.is_deleted = false</code></td>
@@ -661,7 +661,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 <tr>
 <td>24</td>
 <td>Service</td>
-<td><code>TS:1054</code> → <code>:1910-1915</code></td>
+<td><code>TS:1054</code> → <code>:1929-1934</code></td>
 <td><code>changeStatusToActive()</code></td>
 <td>—</td>
 <td><code>ACTIVE</code> + <code>saleOpenedAt = now()</code> (Bài 05)</td>
@@ -691,7 +691,7 @@ chuyến 18:00–21:00 một mình lái. Phụ xe Chi: rảnh. Cả ba đang ho�
 <tr>
 <td>27</td>
 <td>Controller</td>
-<td><code>ATM:167-171</code></td>
+<td><code>ATM:183-187</code></td>
 <td>flash + redirect</td>
 <td>—</td>
 <td><code>success</code> = &quot;Tạo chuyến xe thành công!&quot;; <code>warning</code> chỉ thêm khi khác <code>null</code> (không bao giờ, §9.3) → <code>redirect:/admin/trip-management/trips</code></td>
@@ -705,7 +705,7 @@ wrappers are genuinely side-effect free&quot;, đã kiểm). Số truy vấn c�
 3 × 2 (An, Bình) + 2 (Chi) = <strong>9 SELECT</strong> trước câu <code>INSERT</code>.</p>
 <p><strong>Nếu chuyến tối của Bình là 17:00–21:00</strong> (4h): bước 22 thành 4.0 + 5.0 = 9.0 &gt; 8.0 ⇒ ném
 <em>&quot;Tài xế phụ Bình đã được phân công lái 4.0h trong ngày …, thêm chuyến này (5.0h) sẽ vượt 8h/ngày!&quot;</em>
-(<code>TS:1340-1345</code>) → rollback (chưa ghi gì) → <code>catch (Exception)</code> <code>ATM:173-175</code> → flash &quot;Lỗi: …&quot; →
+(<code>TS:1340-1345</code>) → rollback (chưa ghi gì) → <code>catch (Exception)</code> <code>ATM:189-191</code> → flash &quot;Lỗi: …&quot; →
 <code>redirect:/admin/trip-management/trips/create</code> → khung đỏ <code>trip-create-form.html:93-94</code>. Form trở về
 <strong>trống</strong> — dữ liệu vừa gõ mất (cùng hạn chế Bài 03, 04). Để ý: 17:00 vẫn <strong>không</strong> đụng cửa sổ bận
 (<code>17:00 &lt; 16:30</code> sai) — Bình không bận, chỉ quá giờ.</p>
@@ -1030,13 +1030,13 @@ kmSince = 4000, ngưỡng 5000.</p>
 <td>Bất kỳ luật nào khi <strong>tạo</strong></td>
 <td><code>TS:1106-1366</code></td>
 <td><code>IllegalArgumentException</code></td>
-<td><code>ATM:173-175</code> &quot;Lỗi: …&quot; → form Tạo trống</td>
+<td><code>ATM:189-191</code> &quot;Lỗi: …&quot; → form Tạo trống</td>
 </tr>
 <tr>
 <td>Bất kỳ luật nào khi <strong>sửa</strong></td>
 <td>như trên</td>
 <td>như trên</td>
-<td><code>ATM:440-442</code> &quot;Lỗi: …&quot; → form Sửa nạp lại từ DB. Bước sửa là transaction 1; chưa chạm bước đổi trạng thái (Bài 05 §5)</td>
+<td><code>ATM:456-458</code> &quot;Lỗi: …&quot; → form Sửa nạp lại từ DB. Bước sửa là transaction 1; chưa chạm bước đổi trạng thái (Bài 05 §5)</td>
 </tr>
 <tr>
 <td>Bất kỳ luật nào khi <strong>xác nhận AUTO</strong></td>
@@ -1089,7 +1089,7 @@ trả JSON <code>buses</code>/<code>drivers</code>/<code>assistants</code> → J
 <code>isBusBusy</code>, <code>isDriverBusyInWindow</code>, <code>getDrivingHoursForDate</code>, <code>driverShareHours</code> (Bài 07).</li>
 <li><strong>Dropdown màn Duyệt / Sửa</strong> — <code>getAvailableBusesForTrip</code>, <code>…DriversForTrip</code>, <code>…AssistantsForTrip</code>
 (<code>TS:1483-1565</code>), có <code>excludeTripId = tripId</code>. Màn Sửa <strong>cưỡng bức thêm</strong> xe đang gán vào danh sách
-dù nó không còn hợp lệ (<code>ATM:266-270</code>) — để Admin thấy mình đang dùng xe nào.</li>
+dù nó không còn hợp lệ (<code>ATM:282-286</code>) — để Admin thấy mình đang dùng xe nào.</li>
 <li><strong>AI tự phân công</strong> — <code>@Scheduled</code> → <code>createExtraTrip()</code> → <code>autoAssignResources()</code> →
 <code>findBestAvailableBus()</code> <code>TS:308-332</code> (xe <code>READY</code>, không bận, không chạm ngưỡng bảo dưỡng; đúng loại
 tuyến xếp trước, rồi ít km nhất) và <code>findBestAvailableDriver()</code> <code>:472-523</code> (ưu tiên bằng còn hạn<aside class="callout"><p>7 ngày, ít giờ lái nhất). AI <strong>không</strong> gọi validator; validator chạy khi Admin xác nhận (Bài 08).</p>
@@ -1270,19 +1270,19 @@ mời rồi bị từ chối lúc lưu.</p>
 <tr>
 <td>So sánh chặt <code>&lt;</code> / <code>&gt;</code> trong JPQL</td>
 <td>&quot;Chạm mép không phải trùng&quot;</td>
-<td><code>TR:123</code>, <code>:141</code>, <code>:159</code></td>
+<td><code>TR:136</code>, <code>:154</code>, <code>:172</code></td>
 <td>Dùng <code>&lt;=</code> thì một chuyến khởi hành đúng lúc đệm kết thúc bị coi là trùng</td>
 </tr>
 <tr>
 <td><code>:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId</code></td>
 <td>&quot;Bỏ qua chính chuyến đang sửa&quot;</td>
-<td><code>TR:122</code>, <code>:140</code>, <code>:160</code>, <code>:177</code></td>
+<td><code>TR:135</code>, <code>:153</code>, <code>:173</code>, <code>:190</code></td>
 <td>Sửa một chuyến sẽ luôn báo &quot;đang bận&quot; — vì nó trùng với chính nó</td>
 </tr>
 <tr>
 <td><code>LEFT JOIN t.coDrivers cd</code></td>
 <td>&quot;Ghép thêm bảng tài xế phụ, giữ cả chuyến không có ai&quot;</td>
-<td><code>TR:119</code>, <code>:174</code></td>
+<td><code>TR:132</code>, <code>:187</code></td>
 <td><code>JOIN</code> thường làm mất các chuyến không có tài xế phụ — tài xế chính của chúng thành &quot;không bận&quot;</td>
 </tr>
 <tr>
@@ -1393,7 +1393,7 @@ biến một chiều).</p>
 </tr>
 <tr>
 <td>Chuyến C <strong>hôm qua</strong> 22:00 → hôm nay 04:00 (6h), Dũng lái</td>
-<td>khởi hành <strong>hôm qua</strong> ⇒ không nằm trong ngày (<code>TR:178</code>)</td>
+<td>khởi hành <strong>hôm qua</strong> ⇒ không nằm trong ngày (<code>TR:191</code>)</td>
 <td>không tính</td>
 <td>0</td>
 </tr>
@@ -1431,7 +1431,7 @@ khi xét hôm nay) ⇒ 2 + 3 = 5. Đây là lý do giờ nền được gọi l�
 là <code>{0 × 21, 1, 2 × 2, 3, 5, 6, 7, 7.9, 8, 9, 10, 11}</code>. Ba người có giờ nền 9, 10, 11 <strong>&gt; 8</strong> — hôm
 nay họ không nhận được <strong>bất kỳ</strong> chuyến lái nào (mọi chuyến cộng thêm &gt; 0).</p>
 <h3 id="8-3-xe-cua-so-ban-va-nguong-bao-duong">8.3. Xe: cửa sổ bận và ngưỡng bảo dưỡng</h3>
-<p>Chuyến mới 06:00–16:00 ⇒ cửa sổ xe <code>[05:00, 17:00]</code>. Điều kiện bận (<code>TR:159</code>): <code>dep &lt; 17:00</code> <strong>và</strong>
+<p>Chuyến mới 06:00–16:00 ⇒ cửa sổ xe <code>[05:00, 17:00]</code>. Điều kiện bận (<code>TR:172</code>): <code>dep &lt; 17:00</code> <strong>và</strong>
 <code>arr &gt; 05:00</code>.</p>
 <div class="table-wrap"><table><thead><tr>
 <th>Chuyến khác của cùng xe</th>
@@ -1637,7 +1637,7 @@ biến mất ở màn Duyệt.</li>
 và 0h vào hôm sau (§8.2). Đúng như đặc tả nói &quot;single calendar day&quot;
 (<code>current_functional_spec.md:174</code>), nhưng nên biết khi bị hỏi về chuyến đêm.</li>
 <li><strong><span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span> Câu tính giờ lái có thể đếm thiếu tài xế phụ.</strong>
-<code>findTripsForDriverOnDate</code> (<code>TR:173-178</code>) vừa <code>LEFT JOIN FETCH t.coDrivers cd</code> vừa lọc
+<code>findTripsForDriverOnDate</code> (<code>TR:186-191</code>) vừa <code>LEFT JOIN FETCH t.coDrivers cd</code> vừa lọc
 <code>cd = :driver</code>. Với một chuyến mà người được xét là <strong>tài xế phụ</strong> và chuyến có <strong>từ hai</strong> tài xế phụ,
 Hibernate có thể nạp collection <code>coDrivers</code> chỉ gồm các dòng thoả điều kiện ⇒ <code>totalDrivers</code> nhỏ hơn
 thật ⇒ phần chia <strong>lớn</strong> hơn thật ⇒ validator khắt khe hơn (chặn nhầm, không cho lọt). Chỉ xảy ra với
@@ -1779,8 +1779,8 @@ Dropdown là lớp &quot;không-mời&quot;, chạy trên trình duyệt có th�
 mở form và lúc bấm lưu, người khác có thể đã xếp tài xế đó. Validator là lớp chặn thật duy nhất. Nguyên
 tắc một chiều: dropdown chỉ được hẹp hơn validator — lỗi #12, #13 là hai lần nó bị lệch và đã sửa.</p>
 <p><strong>8. (Thế nào) Sửa một chuyến thì sao nó không tự &quot;trùng&quot; với chính nó?</strong>
-Mọi câu kiểm có vế <code>(:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId)</code> (<code>TR:122</code>, <code>:140</code>, <code>:160</code>,
-<code>:177</code>). Khi sửa, <code>updateManualTrip</code> truyền id chính chuyến (<code>TS:1076-1077</code>); khi tạo mới truyền <code>null</code>.</p>
+Mọi câu kiểm có vế <code>(:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId)</code> (<code>TR:135</code>, <code>:153</code>, <code>:173</code>,
+<code>:190</code>). Khi sửa, <code>updateManualTrip</code> truyền id chính chuyến (<code>TS:1076-1077</code>); khi tạo mới truyền <code>null</code>.</p>
 <p><strong>9. (Vì sao) Sao bằng lái xét theo ngày khởi hành chứ không phải hôm nay?</strong>
 Vì tài xế phải có bằng hợp lệ <strong>lúc lái</strong>. Trước 2026-07-20 hệ thống so với hôm nay, nên duyệt được chuyến
 tháng sau cho người hết bằng tuần sau (lỗi #1). Nay mọi chỗ gọi <code>isLicenseValid(departure.toLocalDate())</code>.</p>
@@ -1856,7 +1856,7 @@ sửa được), pre-check trạng thái (không đổi) → chép giờ mới v
 (transaction): giờ đến sau giờ đi, ghế ≥ vé → <code>validateBusForTrip(bus, trip, 70)</code> (giả sử xe qua) →
 <code>validateStaffForTrip(trip, 70)</code>: cửa sổ người = <code>[đi − 30&#39;, đến mới + 30&#39;]</code>. Chuyến #71 khởi hành <strong>20
 phút</strong> sau giờ đến mới ⇒ nằm trong 30 phút đệm ⇒ <code>existsOverlappingTripForDriver(Em, …, excludeTripId = 70)</code> trả <code>true</code> (chuyến #71 khác 70 nên không bị loại) ⇒ ném <em>&quot;Tài xế chính Em đang bận ở chuyến khác!&quot;</em>
-→ rollback → <code>catch (Exception)</code> <code>ATM:440-442</code> → flash &quot;Lỗi: Tài xế chính Em đang bận ở chuyến khác!&quot; →
+→ rollback → <code>catch (Exception)</code> <code>ATM:456-458</code> → flash &quot;Lỗi: Tài xế chính Em đang bận ở chuyến khác!&quot; →
 <code>redirect:/admin/trip-management/trips/edit/70</code> → form sửa nạp lại <strong>từ DB</strong> với giờ đến cũ.</p>
 <p><strong>Câu đọc code</strong></p>
 <p><code>if</code> có tác dụng khi <code>durationHours ≤ 0</code> (giờ đến trùng hoặc trước giờ đi — <code>ceil(0) = 0</code>), bảo đảm tối

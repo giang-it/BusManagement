@@ -39,7 +39,7 @@ Chưa xử lý. Vẫn cần quyết định rõ: trip thủ công có nên qua `
 Vì Bug #1 đã fix (bus tự chuyển `TRAVELING` khi `DEPARTED`), rủi ro "xe TRAVELING vẫn mang status READY" không còn xảy ra.
 
 ### Warn #4: `AdminTripManagementController` inject Repository trực tiếp — ⚠️ **CÒN MỞ**
-Đã verify lại: controller vẫn `@RequiredArgsConstructor` với `TripRepository`, `RouteRepository`, `BusRepository`, `DriverRepository` **song song** với `TripService`, và gọi thẳng `tripRepository.findAllWithDetails()` trong `listAllTrips()`. Vi phạm layered architecture vẫn còn nguyên.
+Đã verify lại: controller vẫn `@RequiredArgsConstructor` với `TripRepository`, `RouteRepository`, `BusRepository`, `DriverRepository` **song song** với `TripService`, và gọi thẳng repository ở form tạo/sửa chuyến (`routeRepository.findAllWithStations()`, `busRepository.findAll()`, `tripRepository.findByIdWithDetails()`…). Vi phạm layered architecture vẫn còn nguyên. *(Cập nhật 2026-10-22: riêng trang danh sách đã đi qua `TripService.getTripsForList()` từ GĐ2 của đợt thiết kế lại dự báo; trước đó `listAllTrips()` gọi thẳng `tripRepository.findAllWithDetails()`, và hàm này đã bị xoá.)*
 
 ### Warn #5: `ddl-auto` xóa dữ liệu mỗi lần restart — ✅ **ĐÃ FIX (Phase 0, 2026-07-16)**
 Đã tách profile: mặc định `ddl-auto=update` (giữ dữ liệu, `DataInitializer` không chạy), profile `demo` mới dùng `create-drop` + seed lại. `DataInitializer` được gate bằng `@Profile("demo")` — đây mới là mấu chốt, vì chỉ đổi `ddl-auto` là chưa đủ (bean này gọi `deleteAll()` toàn bộ bảng).

@@ -138,9 +138,8 @@ strong { font-weight: 600; }
   <main>
     <header class="lesson">
       <span class="chip">BÀI 03 · CHỨC NĂNG</span>
-      <h1></h1>
+      <h1>Bài 03 — Route Management (Quản lý tuyến đường)</h1>
     </header>
-<h1 id="bai-03-route-management-quan-ly-tuyen-duong">Bài 03 — Route Management (Quản lý tuyến đường)</h1>
 <aside class="callout"><p>Bài chức năng thứ ba, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN B), ngày 2026-10-01.
 Học sau Bài 00a, 00b, 01 và 02. Số dòng là ảnh chụp ngày viết — lệch thì grep lại.</p>
 <p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết
@@ -223,7 +222,7 @@ sử vận hành và doanh thu phải được giữ nguyên)!&quot;</em>.</p>
 </tr>
 <tr>
 <td>Repository (mượn)</td>
-<td><code>…/repository/TripRepository.java:240</code>, <code>:249</code></td>
+<td><code>…/repository/TripRepository.java:253</code>, <code>:262</code></td>
 <td><code>existsByRouteId</code> (guard xoá), <code>countByRouteIdAndStatus</code> (cảnh báo km)</td>
 </tr>
 <tr>
@@ -674,7 +673,7 @@ khối &quot;Group C(a) và C(c) ĐÃ SỬA&quot;.)</p>
 <tr>
 <td>23</td>
 <td>Service → DB</td>
-<td><code>:125</code>, <code>TripRepository.java:249</code></td>
+<td><code>:125</code>, <code>TripRepository.java:262</code></td>
 <td><code>countByRouteIdAndStatus(1, DEPARTED)</code></td>
 <td>—</td>
 <td>derived query; <code>Trip</code> có <code>@SQLRestriction(&quot;is_deleted = false&quot;)</code> (<code>Trip.java:21</code>) nên Hibernate tự thêm điều kiện. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT COUNT(t.id) FROM trips t WHERE t.route_id = 1 AND t.status = &#39;DEPARTED&#39; AND t.is_deleted = false</code></td>
@@ -1194,7 +1193,7 @@ return (first != null) ? first.getStation() : null;</code></pre></div>
 <tr>
 <td>5</td>
 <td><code>tripRepository.existsByRouteId(1)</code> — <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT 1 FROM trips WHERE route_id = 1 AND is_deleted = false LIMIT 1</code></td>
-<td><code>:188</code>, <code>TripRepository.java:240</code></td>
+<td><code>:188</code>, <code>TripRepository.java:253</code></td>
 <td><span class="tag tag-code">CODE</span>+<span class="tag tag-spring">SPRING</span></td>
 </tr>
 <tr>
@@ -1663,7 +1662,7 @@ tức là sau điểm đến. Muốn chèn một bến vào giữa phải chọn
 <li><strong>Không giới hạn trên cho phút</strong>, mà phút quyết định số tài xế bắt buộc (§8.3). <code>current_bugs_found.md</code>
 (mục #12) ghi <em>&quot;ngòi nổ nằm trong tay Admin&quot;</em>: thêm một tuyến 9 giờ là đủ làm lệch
 dropdown tài xế với validator. Lịch sử mô phỏng chỉ dùng tuyến ≤ 8 giờ
-(<code>HistoricalDataBackfill.java:141</code>, <code>:284-285</code>).</li>
+(<code>HistoricalDataBackfill.java:137</code>, <code>:498-499</code>).</li>
 <li><strong>Chuyến đã xoá mềm không chặn được việc xoá tuyến.</strong> <code>existsByRouteId</code> đi qua <code>@SQLRestriction</code>
 nên không thấy chuyến <code>is_deleted = true</code>. Sổ lỗi đã xét và <strong>RÚT</strong> mục này (bán kính đo được = 0,
 cùng loại ghi chú soft-delete mà roadmap §9 chấp nhận) — nói được khi bị hỏi, không trình bày như
@@ -1733,7 +1732,7 @@ was blocked&quot;</em>).</p>
 <li>Xếp xe và kiểm tài xế (Bài 06): <code>distanceKm</code> trong kiểm tra bảo trì; giờ đến (từ
 <code>estimatedDuration</code>) quyết định số tài xế; <code>suitableBusType</code> xếp thứ tự xe.</li>
 <li>Tạo chuyến thủ công (Bài 07): dropdown tuyến đọc <code>routeRepository.findAllWithStations()</code> <strong>thẳng
-từ controller</strong> (<code>AdminTripManagementController.java:111</code>, <code>:274</code>) — anti-pattern đã biết
+từ controller</strong> (<code>AdminTripManagementController.java:127</code>, <code>:290</code>) — anti-pattern đã biết
 (roadmap §9, <code>project_report.md</code> Warn #4), không đi qua <code>RouteService</code>.</li>
 <li>Chuyến tăng cường (Bài 08): giờ đến = khởi hành + <code>estimatedDuration</code> (<code>TripService.java:157-160</code>).</li>
 <li>Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc <code>findAllWithStations()</code>

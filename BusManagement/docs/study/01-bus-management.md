@@ -383,7 +383,7 @@ sequenceDiagram
 | 4 | Controller | `AdminBusController.java:75` | `deleteBus()` | 28 | gọi service trong `try` | → proxy | [CODE] |
 | 5 | Proxy | `BusService.java:235` | `@Transactional` | — | mở transaction | — | [SPRING] |
 | 6 | Service | `:237-238` | `findById` | 28 | không thấy ⇒ `RuntimeException("Không tìm thấy xe cần xóa với ID: 28")` | `bus` | [CODE] |
-| 7 | Service → DB | `:242`, `TripRepository.java:233` | `existsByBusId(28)` | — | derived query. [SUY LUẬN — SQL tương đương] `SELECT 1 FROM trips WHERE bus_id = 28 AND is_deleted = false LIMIT 1` — vế `is_deleted = false` do `@SQLRestriction` của `Trip` tự thêm (Bài 00b §1.5) | `false` | [CODE]+[SPRING] |
+| 7 | Service → DB | `:242`, `TripRepository.java:246` | `existsByBusId(28)` | — | derived query. [SUY LUẬN — SQL tương đương] `SELECT 1 FROM trips WHERE bus_id = 28 AND is_deleted = false LIMIT 1` — vế `is_deleted = false` do `@SQLRestriction` của `Trip` tự thêm (Bài 00b §1.5) | `false` | [CODE]+[SPRING] |
 | 8 | Service → DB | `:256`, `IncidentRepository.java:56` | `existsByBusId(28)` | — | [SUY LUẬN — SQL tương đương] `SELECT 1 FROM incidents WHERE bus_id = 28 LIMIT 1` — **không lọc** theo trạng thái sự cố | `false` | [CODE] |
 | 9 | Service | `:261` | `busRepository.delete(bus)` | entity | đánh dấu xóa. `Bus` **không** có `@SQLDelete` ⇒ xóa cứng | — | [CODE] |
 | 10 | Proxy | — | commit | — | [SUY LUẬN — SQL tương đương] `DELETE FROM buses WHERE id = 28` | — | [SPRING] |
@@ -423,7 +423,7 @@ tay đổi luôn hãng xe**, bấm Lưu.
 |---|---|---|---|
 | 1 | Bước 1–18 như luồng A; `existing` = xe 6 (managed) | — | [CODE] |
 | 2 | `form.getStatus() == REPAIRING` ⇒ vào guard | `BusService.java:135` | [CODE] |
-| 3 | `existsByBusIdAndStatusIn(6, [PENDING_APPROVAL, ACTIVE, DEPARTED])` ⇒ `true` vì chuyến 13 đang `DEPARTED`. [SUY LUẬN — SQL tương đương] `SELECT 1 FROM trips WHERE bus_id = 6 AND status IN ('PENDING_APPROVAL','ACTIVE','DEPARTED') AND is_deleted = false LIMIT 1` | `:136-137`, `TripRepository.java:350` | [CODE] |
+| 3 | `existsByBusIdAndStatusIn(6, [PENDING_APPROVAL, ACTIVE, DEPARTED])` ⇒ `true` vì chuyến 13 đang `DEPARTED`. [SUY LUẬN — SQL tương đương] `SELECT 1 FROM trips WHERE bus_id = 6 AND status IN ('PENDING_APPROVAL','ACTIVE','DEPARTED') AND is_deleted = false LIMIT 1` | `:136-137`, `TripRepository.java:393` | [CODE] |
 | 4 | **Ném `RuntimeException`** "Không thể chuyển trạng thái xe sang bảo trì vì xe đang được phân công cho chuyến xe chưa kết thúc (chờ duyệt / đang bán vé / đang trên đường). Hãy hoàn thành hoặc hủy các chuyến đó trước!" | `:139-140` | [CODE] |
 | 5 | Chưa setter nào chạy (setter bắt đầu ở `:182`) ⇒ hãng xe mới **chưa hề chạm** vào `existing` | — | [CODE] |
 | 6 | Exception là unchecked ⇒ proxy **rollback** (Bài 00b §4.1). Với `EntityManager` do OSIV giữ, Spring còn xóa sạch các thay đổi chưa ghi trong phiên khi rollback — sổ lỗi ghi đây là điểm "ĐÃ KIỂM, không phải lỗi" (`current_bugs_found.md` mục 2026-09-19) | — | [SPRING] |
@@ -521,7 +521,7 @@ Hai dòng cuối nhắc để thấy: `buses` có **hai người ghi**. Màn nà
 | Dirty checking | Hibernate tự `UPDATE` field đã đổi của entity managed lúc commit (00b §4.3) | `updateBus` `:182-198` | — (`save()` ở `:198` về lý thuyết là thừa) |
 | `@Query` + `LEFT JOIN FETCH` | Nạp xe kèm loại xe trong một câu (00b §2.4) | `BusRepository.java:16-17` | N+1: mỗi dòng bảng thêm một câu `SELECT bus_types` |
 | Derived query `existsBy...` | Spring Data đọc tên method để sinh câu truy vấn (00b §2.2) | `TripRepository.java:233, :350`; `IncidentRepository.java:56` | Phải viết JPQL tay |
-| `@Query` trả số vô hướng | Chỉ lấy một con số, không nạp entity (Hidden Cost #4) | `findMaxTotalSeatsForBus` `TripRepository.java:367-369` | Nạp cả danh sách `Trip` chỉ để lấy max |
+| `@Query` trả số vô hướng | Chỉ lấy một con số, không nạp entity (Hidden Cost #4) | `findMaxTotalSeatsForBus` `TripRepository.java:410-412` | Nạp cả danh sách `Trip` chỉ để lấy max |
 | `@SQLRestriction` trên `Trip` | Tự thêm `is_deleted = false` vào mọi truy vấn chuyến (00b §1.5) | ảnh hưởng `existsByBusId` | Chuyến đã xóa mềm cũng được đếm |
 | `@EqualsAndHashCode(onlyExplicitlyIncluded = true)` + `@ToString.Exclude` | So sánh xe chỉ theo id; `toString` không đi vào loại xe (00a §9, 00b §1.7) | `Bus.java:20, :24, :29` | Nguy cơ đệ quy / LAZY load bất ngờ (Hidden Cost #9) |
 | `@ManyToOne(fetch = LAZY)` | Loại xe chỉ nạp khi cần | `Bus.java:30-32` | EAGER: luôn nạp loại xe kể cả khi không dùng |
