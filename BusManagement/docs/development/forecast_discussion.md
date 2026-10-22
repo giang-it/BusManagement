@@ -59,6 +59,8 @@ Năm kết luận chính:
 
 ## 1. Hiện trạng `ForecastService` (đã đọc code, số dòng kiểm lại ngày 2026-10-16)
 
+> Mục này tả mô hình **cũ** (tỉ lệ lấp đầy, hồi quy tuyến tính) như nó có ngày 2026-10-16, kèm số dòng của lúc đó. GĐ5 (2026-10-22, QĐ-16) đã viết lại `ForecastService`; code hiện tại được tả ở `Proj_functions_summary.md` §16.
+
 **Màn hình:** `/admin/analytics/forecast` (một tab trong `dashboard-analytics.html`).
 
 **Dữ liệu đầu vào:**
@@ -906,6 +908,67 @@ Sau M-15, mô hình là "EM 5 vòng + quy tắc (b)". Ở GĐ2 hai thay đổi n
 
 - Khớp Python chứng minh bản Java **đúng là mô hình đã đo**, không chứng minh mô hình đúng ngoài đời: mọi giới hạn ở §12.7 và §13.6 vẫn còn nguyên.
 - Dữ liệu test là ảnh chụp ngày 2026-10-22. App thật đọc DB ở GĐ5; file test cố ý không đổi để test lặp lại được.
+
+---
+
+## 15. GĐ5: số liệu của vòng thảo luận và cách app tự chấm điểm (2026-10-22)
+
+> **Chỉ nghiên cứu.** Dữ liệu là file test đóng băng của GĐ4, tức DB thật ngày 2026-10-22. Mọi số dưới đây tái lập được bằng `forecast_research/gd5/backtest_reference.py`; script đó cũng ghi `src/test/resources/forecast/reference_backtest.csv`, file mà `ForecastServiceReferenceTest` dùng để kiểm bản Java. Quyết định rút ra là QĐ-16.
+
+### 15.1 Mô hình mới báo "cần tăng cường" nhiều hơn hẳn, và thực tế đúng là vậy
+
+- **Màn cũ** (mở ngày 22/10): **14/105** ô của 7 ngày tới (23–29/10) vượt 90%.
+- **Mô hình mới**, cùng 7 ngày, chuẩn "nhu cầu > 90% số ghế xe chuẩn": **41/105** ô.
+- **Thực tế 12 tuần cuối:** **43,8%** khung có số vé > 90% ghế xe chuẩn, và 30,5% khung bán hết vé. Đây mới là cận dưới, vì khung bán hết chỉ cho biết "nhu cầu ≥ số ghế".
+- **Ví dụ:** tuyến 4 (chiều về TP), 18:00, Chủ nhật 25/10/2026: dự báo 57,6 khách. Xe chuẩn 40 chỗ, tức 144%, cần 2 chuyến. Mô hình cũ chỉ nói được tối đa "100%".
+
+### 15.2 App chấm điểm thế nào: ba cách, chỉ một cách công bằng
+
+App không biết nhu cầu thật, chỉ biết số vé đã bán. Khung bán hết vé chỉ cho biết "nhu cầu ≥ số ghế". Ba cách chấm, cùng các ngày-khung, so với SN4 sạch (WAPE %, thấp hơn là tốt hơn):
+
+| Cách chấm | 8 tuần cuối: mô hình | SN4 | Tết 2026: mô hình | SN4 |
+|---|---|---|---|---|
+| So thẳng nhu cầu dự báo với số vé | 20,11 | 18,28 | 24,99 | 36,00 |
+| Chỉ chấm khung chưa bán hết | 23,77 | 21,29 | 26,53 | 41,93 |
+| **min(dự báo; số ghế đã chạy) so với số vé (chọn)** | **16,06** | 17,54 | **19,83** | 35,92 |
+| Khung bán hết được báo trước (dự báo ≥ số ghế) | **43,7%** | 12,6% | **48,0%** | 5,0% |
+| Cờ tăng cường bắt được khung đông thật | **61,7%** | 46,3% | **67,4%** | 31,4% |
+| Cờ tăng cường báo đúng | 67,3% | 66,4% | 75,2% | 58,5% |
+
+- **Cách 1 phạt mô hình đúng lúc nó đúng.** Tuyến 1, 06:00, ngày 13/02/2026: mô hình dự báo 53,8 khách. Xe 22 chỗ bán hết 22 vé; nhu cầu thật (file của bộ sinh, ngoài app) là 64. Cách 1 ghi mô hình sai 31,8 khách, trong khi mô hình gần đúng hơn số vé.
+- **Cách 2 chọn mẫu theo kết quả.** Khung không bán hết là khung hôm đó ít khách hơn mức thường, nên cách 2 nghiêng về phía phương pháp dự báo thấp. SN4 học trên số vé đã bị chặn trần, tức luôn dự báo thấp, nên được lợi.
+- **Cách 3 so cái app thấy được với cái app thấy được.** Với một khung, "số vé sẽ bán" là min(nhu cầu; số ghế). Phép min không làm đổi thứ tự, nên min(trung vị nhu cầu; ghế) là trung vị của số vé. Với độ phân tán của dữ liệu này, trung bình gần với trung vị, nên dùng thẳng min(dự báo; ghế) để chấm sai số tuyệt đối là hợp lý. SN4 được chấm y hệt.
+- **Hai thước đo quyết định** đo đúng việc Recommendation cần: báo trước được khung sẽ cháy vé, và cờ tăng cường rơi đúng chỗ. "Khung đông thật" là số vé > 90% ghế xe chuẩn, một cận dưới quan sát được.
+
+### 15.3 Theo từng ngày gốc (tầm 1–7 ngày, cách 3)
+
+| Ngày gốc | 26/08 | 02/09 | 09/09 | 16/09 | 23/09 | 30/09 | 07/10 | 14/10 |
+|---|---|---|---|---|---|---|---|---|
+| Mô hình | 17,13 | 19,85 | 15,85 | 15,83 | 15,95 | 16,33 | 13,79 | 13,40 |
+| SN4 sạch | 19,33 | 22,54 | 15,67 | 17,64 | 17,48 | 18,22 | 14,15 | 14,98 |
+
+Mô hình thắng 7/8 mốc; mốc 09/09 gần như hòa. Chỉ dùng 4 mốc cuối thì kết luận vẫn vậy, nhưng 8 mốc cho số ổn định hơn mà vẫn rẻ (≈ 2 giây trong Java).
+
+### 15.4 Tết vừa qua
+
+Mô hình học tới **Chủ nhật 25/01/2026**, Chủ nhật gần nhất cách Tết (17/02) ít nhất 3 tuần, rồi dự báo 35 ngày (26/01–01/03, gồm 493 ngày-khung).
+- Kết quả: sai số số vé **19,83%**, so với 35,92% của SN4; báo trước **48%** số khung bán hết, SN4 báo trước 5%.
+- Vòng thảo luận đã dẫn số 21,0% / 42,7%. Số đó chỉ tính cửa sổ D−14…D+10. Khối được duyệt chấm trọn 35 ngày, cho dễ nói ("học tới ngày X, dự báo 35 ngày").
+
+Tuyến 1 (chiều rời TP), 06:00:
+
+| Ngày | 11/02 (D−6) | 13/02 (D−4) | 14/02 (D−3) | 17/02 (Tết) | 21/02 (D+4) |
+|---|---|---|---|---|---|
+| Mô hình | 43,2 | 53,8 | 41,8 | 7,0 | 18,9 |
+| SN4 sạch | 18,7 | 17,8 | 20,5 | 14,5 | 20,5 |
+| Số vé / số ghế đã chạy | 42 / 72 | 22 / 22 (hết vé) | 67 / 72 | 2 / 50 | 18 / 22 |
+| Nhu cầu thật (ngoài app) | 42 | 64 | 67 | 2 | 18 |
+
+### 15.5 Điều phải nói thật
+
+- Mọi số ở đây đo trên dữ liệu **mô phỏng**; giới hạn ở §12.7 và §13.6 vẫn còn nguyên.
+- Cách 3 dùng số ghế **đã chạy**, một con số chỉ biết sau sự việc. Như vậy vẫn hợp lệ để *chấm điểm*, vì số ghế là quyết định của nhà xe chứ không phải nhu cầu. Nhưng đó không phải dự báo số ghế.
+- 41 ô "cần tăng cường" là chuẩn của GĐ5. Recommendation và What-if đọc chúng qua cầu nối `predictedOccupancy` tới GĐ6 (QĐ-16, G5-1), nên doanh thu thẻ vẫn tính "đầy xe × giá vé".
 
 ---
 

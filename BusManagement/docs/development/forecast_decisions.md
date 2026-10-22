@@ -36,6 +36,7 @@
 | QĐ-13 | Đo lại bằng Python | Đo lại K, quy tắc "ít nhất 2 lần", λ, EM, cửa sổ lễ, chiều tuyến (kể cả trên dữ liệu Hồng Kông) trên dữ liệu mới |
 | QĐ-14 | Cách làm GĐ3 | Sửa bộ sinh để né xe/người của chuyến có sẵn (lỗi #33); sao lưu và khôi phục thử; tổng duyệt lại trên bản sao; làm ngay; xuất nhu cầu thật; sửa tài liệu; giữ bản sao tới hết GĐ5 |
 | QĐ-15 | Lõi toán Java (GĐ4) | `SlotDemandModel` và `ArrowSolver`, package-private trong `service`, chưa nối vào app; giải hệ theo khối "mũi tên"; bước E cộng phần đuôi nhị thức âm; phải khớp bản Python đã đo trên dữ liệu thật đóng băng (tới một phần triệu); mục tiêu ≤ 2 giây mỗi lần khớp |
+| QĐ-16 | `ForecastService` mới (GĐ5) | Nhu cầu khung từ chuyến `COMPLETED`; khớp lõi GĐ4 và nhớ kết quả trong bộ nhớ; dự báo số khách 7 ngày (thẻ) và 35 ngày (xem trước); cầu nối `predictedOccupancy` cho Recommendation, What-if tới GĐ6; số chuyến cần = max(1; ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉); tự chấm điểm trên số vé thật bằng min(dự báo; số ghế), so với SN4 sạch |
 
 Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
@@ -81,8 +82,8 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
 **Hệ quả đã biết.**
 - Tính toán nặng: bản Python mất 10–25 giây cho mỗi lần khớp. Bản Java (GĐ4) chỉ mất khoảng 0,2–0,6 giây nhờ giải theo khối.
-- `buildForecast()` hiện được gọi từ 3 nơi: `ForecastController.java:44`, `RecommendationService.java:100` và `WhatIfSimulationService.java:147`.
-- Vì vậy nhiều khả năng phải tính một lần mỗi ngày rồi cache. Cách làm chưa chốt (M-5).
+- Dự báo được 3 màn gọi: màn Dự báo gọi `buildForecastPage()` (`ForecastController.java:47`); `RecommendationService.java:100` và `WhatIfSimulationService.java:147` gọi `buildForecast()`.
+- Vì vậy phải nhớ kết quả. Cách làm đã chốt ở QĐ-16 (G5-4): nhớ trong bộ nhớ, khớp lại khi lịch sử đổi; phần tự chấm điểm chỉ màn Dự báo trả.
 
 ### QĐ-2. Đơn vị: nhu cầu của khung giờ (B1)
 
@@ -424,6 +425,41 @@ Chủ dự án duyệt cả tám đề xuất (*"oke, bạn hãy thực hiện �
   - **Tốc độ:** một lần khớp đầy đủ (19.487 quan sát, 4.078 khung bán hết, 18 vòng IRLS cho cả 6 lần khớp) mất 0,22–0,26 giây khi chạy riêng, 0,56 giây khi chạy chung cả bộ test. Python mất 3,5–14 giây.
   - Test: `ArrowSolverTest` (2), `SlotDemandModelTest` (8), `SlotDemandModelReferenceTest` (4). Năm lần thử làm hỏng (tắt ridge phần lễ gộp, 15 vòng EM, xu hướng không đóng băng, bỏ bước bù Schur, cửa sổ chỉnh mức 21 ngày) đều làm đỏ đúng test. `mvnw test` **184/184**, 27 lớp.
 
+### QĐ-16. `ForecastService` mới, cache và màn Dự báo — cách làm GĐ5 (chốt 2026-10-22, G5-1…G5-8; đóng M-3, M-4, M-5, M-9)
+
+Chủ dự án duyệt cả tám đề xuất (*"oke, bạn hãy thực hiện đi, tôi đồng ý hết"*). Số liệu dẫn chứng của vòng thảo luận ở `forecast_discussion.md` §15.
+
+| # | Quyết định |
+|---|---|
+| G5-1 | **Cầu nối tạm tới GĐ6:** Recommendation và What-if không sửa code. `ForecastPointDto` giữ `predictedOccupancy` = min(1; nhu cầu ÷ số ghế xe chuẩn) và `needsReinforcement` = nhu cầu ÷ số ghế xe chuẩn > 0,90. Ba hệ quả tạm, biết trước: số thẻ Đề xuất đổi theo dự báo mới; doanh thu thẻ vẫn tính "đầy xe × giá vé"; What-if dưới 100% nhu cầu đếm thiếu khung nóng vì tỉ lệ đã bị kẹp 100% trước khi nhân. GĐ6 sửa cả ba |
+| G5-2 | **Nhu cầu khung (đóng M-3):** cộng các chuyến `COMPLETED` cùng (tuyến, ngày, giờ khởi hành), kể cả chuyến tăng cường; bán hết khi tổng vé ≥ tổng ghế; khung không có chuyến hoàn thành là *không quan sát được*, không phải 0; trạng thái khác bỏ qua. Dùng lại `TripRepository.findDemandHistoryByStatus`, gom trong Java. Một chuỗi (tuyến, giờ) cần ≥ 28 ngày quan sát. Bỏ dòng ngoài phạm vi lịch lễ hoặc sau hôm nay. Nhóm chiều lấy từ `Route.holidayFlow` |
+| G5-3 | **Ngày gốc và tầm:** ngày gốc là ngày cuối có dữ liệu (không quá hôm nay). Dự báo từ ngày mai: 7 ngày cho thẻ (QĐ-5), 35 ngày xem trước. Dữ liệu cũ thì cảnh báo; ngày sau 2032 (hết lịch lễ) thì cắt và cảnh báo |
+| G5-4 | **Tính và nhớ (đóng M-5):** mỗi lần gọi vẫn đọc lại lịch sử; đầu vào y hệt lần trước thì dùng lại kết quả đã khớp, khác dù một vé thì khớp lại. Không cron, không bảng mới, không đụng `TripService`. Phần tự chấm điểm tách khỏi `buildForecast()`, nên chỉ màn Dự báo trả chi phí đó |
+| G5-5 | **Màn Dự báo (M-9):** thẻ tóm tắt; bảng 7 ngày bằng số khách, kèm xe chuẩn, tô đỏ khi cần tăng cường và ghi số chuyến cần; biểu đồ 35 ngày theo từng chuỗi; bảng hệ số lễ gộp theo chiều; khối tự chấm điểm; cảnh báo dữ liệu mô phỏng / dữ liệu cũ / hết lịch lễ |
+| G5-6 | **Số chuyến cần (đóng M-4):** max(1; ⌈nhu cầu ÷ (0,9 × số ghế xe chuẩn)⌉). Số này ≥ 2 đúng khi `needsReinforcement`, nên vẫn chỉ một định nghĩa "chuyến nóng" (sự thật 1 của `forecast_progress.md`). Xe chuẩn = `Route.suitableBusType`; tuyến chưa có loại xe thì lấy sức chứa trung bình của đội xe, như What-if |
+| G5-7 | **Tự chấm điểm (M-9):** 8 mốc cách nhau 7 ngày trong 8 tuần cuối, tầm 1–7 ngày, so với SN4 sạch. Thước đo chính: WAPE của min(dự báo; số ghế đã chạy) so với số vé thật, trên mọi khung. Kèm hai thước đo quyết định: khung bán hết được báo trước, và cờ tăng cường (bắt được / báo đúng). **Không** so nhu cầu dự báo với số vé (phạt mô hình đúng lúc nó đúng), **không** chỉ chấm khung chưa bán hết (chọn mẫu theo kết quả). Thêm khối "Tết vừa qua": học tới Chủ nhật gần nhất cách Tết ít nhất 3 tuần, dự báo 35 ngày |
+| G5-8 | **Kiểm chứng và tài liệu:** test mới; đối chiếu số trên màn với `reference_forecast.csv`; chạy app chỉ đọc trên DB thật; cập nhật tài liệu mô tả code ngay ở GĐ5 (phần viết lại lớn vẫn ở GĐ7) |
+
+- **Đã cài ngày 2026-10-22 (commit `b6dced9`):**
+  - `service/ForecastService.java` viết lại:
+    - gom khung từ `findDemandHistoryByStatus(COMPLETED)`, chọn chuỗi ≥ 28 ngày, khớp `SlotDemandModel` và nhớ kết quả;
+    - dự báo 7 và 35 ngày từ ngày mai; cầu nối `predictedOccupancy` / `needsReinforcement`; số chuyến cần; hệ số lễ;
+    - tự chấm điểm trong `buildForecastPage()`;
+    - inject thêm `BusRepository`, để lấy sức chứa trung bình đội xe cho tuyến chưa có loại xe.
+  - Đổi trường của 4 DTO; `ForecastController` gọi `buildForecastPage()`; làm lại `admin/demand-forecast.html` (Chart.js 4.4.1).
+  - Không đổi: `RecommendationService`, `WhatIfSimulationService`, `TripRepository`, `SlotDemandModel`.
+  - **Test:**
+    - `ForecastServiceRulesTest` (8), `ForecastServiceReferenceTest` (4), `ForecastServiceTest` (8, đi qua DB test).
+    - File đối chiếu mới `src/test/resources/forecast/reference_backtest.csv`, tạo bằng `forecast_research/gd5/backtest_reference.py`.
+    - 11 lần thử làm hỏng đều làm đỏ đúng test. Lần đầu, "tính số chuyến tách khỏi cờ" không làm đỏ test nào, nên đã thêm các giá trị sát ngưỡng (xe 13, 21, 26, 37, 42… chỗ): ở đó hai phép chia làm tròn khác nhau.
+    - `mvnw test` **204/204**, 30 lớp.
+  - **Chạy app trên DB thật (chỉ đọc):**
+    - màn Dự báo 200: lần đầu 3,6–7,3 giây tùy lần đo (gồm 9 lần khớp để tự chấm điểm), lần sau 0,16–0,6 giây (màn ghi "dùng lại kết quả");
+    - 510 số của biểu đồ khớp Python (ngày gốc 21/10/2026) tới 9,7·10⁻⁹; khối Tết khớp tới 2,4·10⁻¹³; cả 12 con số tự chấm hiển thị đúng;
+    - 41 ô cần tăng cường trên màn Dự báo = 41 thẻ Đề xuất = 41 khung đông của What-if;
+    - Đề xuất mất 5,0–6,7 giây với 41 thẻ (trước GĐ5: 14 thẻ, 2,45 giây). What-if ở 70% nhu cầu báo 0 khung đông, trong khi tính theo đơn vị nhu cầu là 2 — hạn chế tạm của cầu nối, GĐ6 sửa;
+    - 18 trang trả 200, log sạch; DB thật giữ nguyên (11 bảng, số dòng và `CHECKSUM TABLE`).
+
 ---
 
 ## 3. Thứ tự thực hiện
@@ -453,13 +489,13 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 |---|---|---|
 | M-1 | ~~Lịch lễ trong app~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-9.** Cửa sổ trước/sau mỗi dịp đã đo ở QĐ-13: cửa sổ hẹp nhỉnh hơn 0,3 điểm, nhưng chỉ trên bộ sinh của chính ta. Đề xuất **giữ cửa sổ hiện tại** (`forecast_discussion.md` §13.5) |
 | M-2 | ~~Chiều tuyến: chi tiết của QĐ-4~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-8** |
-| M-3 | **"Nhu cầu khung giờ" và "bán hết vé" đo thế nào trên DB:** gộp các chuyến cùng (tuyến, giờ, ngày), kể cả chuyến tăng cường; tính những trạng thái nào; xử lý chuyến `CANCELLED` ra sao | Hiện Phase 6 chỉ tính `COMPLETED` (roadmap §9). **Dữ liệu GĐ2 đã sinh theo cách hiểu này**, và lần đo lại QĐ-13 dùng đúng nó: cộng các chuyến `COMPLETED` cùng (tuyến, ngày, HOUR); chuyến thêm ở phút 30/40/50 nên tự rơi vào đúng khung; bán hết khi vé ≥ tổng số ghế; khung bị hủy là không quan sát được. Định nghĩa chính thức cho `ForecastService` chốt ở GĐ5 |
-| M-4 | **Ngưỡng 0,90 và số chuyến cần:** giữ một định nghĩa "chuyến nóng" duy nhất như thế nào | Bước 0 đo bằng: số chuyến cần = max(1, ⌈nhu cầu / (0,9 × số ghế xe chuẩn)⌉) (§12.2) |
-| M-5 | **Tính toán và cache:** tính một lần mỗi ngày? Lưu ở đâu? Ai kích hoạt? | QĐ-1, hệ quả. GĐ4 đo được 0,2–0,6 giây một lần khớp đầy đủ, nhẹ hơn dự kiến nhiều; vẫn chốt ở GĐ5 |
+| M-3 | ~~"Nhu cầu khung giờ" và "bán hết vé" đo thế nào trên DB~~ **ĐÃ CHỐT 2026-10-22, thành QĐ-16 (G5-2).** Câu hỏi cũ: gộp các chuyến cùng (tuyến, giờ, ngày), kể cả chuyến tăng cường; tính những trạng thái nào; xử lý chuyến `CANCELLED` ra sao | Hiện Phase 6 chỉ tính `COMPLETED` (roadmap §9). **Dữ liệu GĐ2 đã sinh theo cách hiểu này**, và lần đo lại QĐ-13 dùng đúng nó: cộng các chuyến `COMPLETED` cùng (tuyến, ngày, HOUR); chuyến thêm ở phút 30/40/50 nên tự rơi vào đúng khung; bán hết khi vé ≥ tổng số ghế; khung bị hủy là không quan sát được. Định nghĩa chính thức cho `ForecastService` chốt ở GĐ5 |
+| M-4 | ~~Ngưỡng 0,90 và số chuyến cần~~ **ĐÃ CHỐT 2026-10-22, thành QĐ-16 (G5-6),** sớm hơn kế hoạch (GĐ6) vì cờ cầu nối của GĐ5 chính là quy tắc này. Câu hỏi cũ: giữ một định nghĩa "chuyến nóng" duy nhất như thế nào | Bước 0 đo bằng: số chuyến cần = max(1, ⌈nhu cầu / (0,9 × số ghế xe chuẩn)⌉) (§12.2) |
+| M-5 | ~~Tính toán và cache~~ **ĐÃ CHỐT 2026-10-22, thành QĐ-16 (G5-4).** Câu hỏi cũ: tính một lần mỗi ngày? Lưu ở đâu? Ai kích hoạt? | QĐ-1, hệ quả. GĐ4 đo được 0,2–0,6 giây một lần khớp đầy đủ, nhẹ hơn dự kiến nhiều; vẫn chốt ở GĐ5 |
 | M-6 | ~~Đếm "ít nhất 2 lần" theo toàn hệ thống hay theo từng tuyến~~ | **ĐÃ ĐÓNG 2026-10-22:** không còn đếm số lần, vì QĐ-3 đổi sang quy tắc (b) |
 | M-7 | ~~Ngày bão, lũ~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** bão là đóng tuyến, mọi chuyến hôm đó `CANCELLED`; không dùng Incident |
 | M-8 | ~~Bộ sinh: độ lớn, số năm, phạm vi xóa~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10 và QĐ-11** |
-| M-9 | **Màn hình dự báo:** hiển thị gì (bảng hệ số lễ, xem trước 35 ngày), backtest so với mốc nào, đo bằng WAPE hay MAPE | |
+| M-9 | ~~Màn hình dự báo~~ **ĐÃ CHỐT 2026-10-22, thành QĐ-16 (G5-5, G5-7).** Câu hỏi cũ: hiển thị gì (bảng hệ số lễ, xem trước 35 ngày), backtest so với mốc nào, đo bằng WAPE hay MAPE | |
 | M-10 | ~~Ghi lỗi "xu hướng reset"~~ | **ĐÃ CHỐT 2026-10-21:** ghi thành #31 trong `current_bugs_found.md`, cùng lỗi #32 (69 chuyến tài xế hết hạn bằng). Gốc ở code đã bỏ ở GĐ2; đóng khi GĐ3 xoá dữ liệu cũ |
 | M-11 | **Vé đặt trước (câu F)** | Đề xuất ngày 20/10: không làm trong đợt này; khi thiết kế Booking ở Phase 9 thì lưu thời điểm đặt vé. Chưa duyệt riêng |
 | M-12 | **Thứ tự so với Phase 9** (Customer Portal) | Chưa quyết |
@@ -498,3 +534,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-22 (GĐ3) | Thảo luận GĐ3, chủ dự án duyệt G3-1…G3-7: thêm QĐ-14 và dòng của nó ở mục 1; QĐ-10 thêm "Bổ sung ở GĐ3" (lỗi #33, chuyến có sẵn giữ xe và người); QĐ-7 ghi rõ số dòng là của bản trước GĐ2. Thêm M-16 (nhận diện chuyến bộ sinh khi chạy bổ sung) |
 | 2026-10-22 (GĐ3 trên DB thật) | QĐ-11, QĐ-14: ghi kết quả chạy trên DB thật (giống hệt bản sao tổng duyệt tới từng chuyến) |
 | 2026-10-22 (GĐ4) | Thảo luận GĐ4, chủ dự án duyệt G4-1…G4-8: thêm QĐ-15 và dòng của nó ở mục 1. QĐ-1: ghi bản Java và tốc độ đo được. M-5: ghi tốc độ GĐ4 đo được |
+| 2026-10-22 (GĐ5) | Thảo luận GĐ5, chủ dự án duyệt G5-1…G5-8: thêm QĐ-16 và dòng của nó ở mục 1; đóng M-3, M-4 (sớm hơn kế hoạch), M-5, M-9. QĐ-16: thêm "Đã cài" kèm số đo. QĐ-1: ghi nơi gọi dự báo sau GĐ5 |

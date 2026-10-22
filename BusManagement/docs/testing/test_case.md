@@ -2116,56 +2116,118 @@
 
 ---
 
-## MODULE 8 — DỰ BÁO NHU CẦU (Phase 6)
+## MODULE 8 — DỰ BÁO NHU CẦU (Phase 6; viết lại ở GĐ5 của đợt thiết kế lại dự báo, 2026-10-22, QĐ-16)
 
 Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
-`GET /admin/analytics/forecast`.
+`GET /admin/analytics/forecast`. Đơn vị là **khung** (tuyến × giờ khởi hành × ngày) và con số dự báo là
+**số khách**, không còn là tỉ lệ lấp đầy. Các luật dưới đây còn được khoá bằng test tự động:
+`ForecastServiceTest` (đi qua DB test), `ForecastServiceRulesTest` (luật thuần),
+`ForecastServiceReferenceTest` (khớp bản Python trên dữ liệu đóng băng).
 
-### TC_FC_001 — Trang dự báo dựng đúng chuỗi và số liệu lịch sử
+### TC_FC_001 — Trang dự báo dựng đúng chuỗi, bằng số khách, từ ngày mai
 
 - **Mã TC:** TC_FC_001
-- **Tên Kịch Bản:** Happy path — số trên trang phải khớp với DB
-- **Điều kiện tiên quyết:** Đã chạy profile `backfill`; mỗi nhóm (tuyến × giờ khởi hành) có ≥ 28 chuyến `COMPLETED`
+- **Tên Kịch Bản:** Happy path — số trên trang phải khớp với DB và với bản Python đã đo
+- **Điều kiện tiên quyết:** Đã chạy profile `backfill`; mỗi chuỗi (tuyến × giờ khởi hành) có ≥ 28 ngày có chuyến `COMPLETED`
 - **Các bước thực hiện:**
   1. Mở `/admin/analytics/forecast`
-  2. Với từng dòng, đối chiếu 4 cột lịch sử (số chuyến, TB, mức nền, xu hướng) bằng truy vấn SQL độc lập
+  2. Với từng dòng, đối chiếu cột "Lịch sử" (số ngày, số ngày bán hết) bằng truy vấn SQL độc lập gom `COMPLETED` theo (tuyến, ngày, giờ)
+  3. Nếu DB vẫn đúng như lúc xuất `src/test/resources/forecast/slot_history.csv` (ngày cuối 21/10/2026), đối chiếu số khách dự báo với `reference_forecast.csv` (ngày gốc 2026-10-21)
 - **Kết quả mong đợi:**
-  - HTTP 200, mỗi nhóm đủ điều kiện là **một dòng**, xếp theo mức đỉnh giảm dần
-  - Số chuyến và TB khớp `COUNT(*)` / `AVG(tickets_sold/total_seats)` trên `status='COMPLETED'`
-  - "Mức nền" khớp trung bình 7 **ngày lịch** cuối của chính chuỗi đó (không phải 7 quan sát cuối)
-  - Xu hướng khớp hệ số góc bình phương tối thiểu tính trên chuỗi đã khử mùa vụ
+  - HTTP 200; tiêu đề ghi "7 ngày kể từ" ngày mai và "xem trước 35 ngày"
+  - Mỗi chuỗi đủ điều kiện là **một dòng**, xếp theo mức đỉnh (nhu cầu ÷ ghế xe chuẩn) giảm dần
+  - Số ngày quan sát = số ngày có ít nhất một chuyến `COMPLETED` của khung; số ngày bán hết = số ngày có tổng vé ≥ tổng ghế
+  - Số khách khớp `reference_forecast.csv` tới đơn vị hiển thị (dữ liệu biểu đồ trong trang khớp tới 10⁻⁶)
 
-### TC_FC_002 — Nhóm không đủ số quan sát bị loại và được đếm
+### TC_FC_002 — Nhóm không đủ 28 ngày bị loại và được đếm
 
 - **Mã TC:** TC_FC_002
 - **Tên Kịch Bản:** Edge case — chuyến giờ lẻ do Admin tự tạo không được dựng thành chuỗi
 - **Điều kiện tiên quyết:** Tồn tại vài chuyến `COMPLETED` ở khung giờ ngoài 06/12/18 (ví dụ 13:00, 21:00)
 - **Các bước thực hiện:** Mở `/admin/analytics/forecast`
 - **Kết quả mong đợi:**
-  - Các nhóm dưới 28 quan sát **không** xuất hiện thành dòng dự báo
+  - Các nhóm dưới 28 ngày quan sát **không** xuất hiện thành dòng dự báo; nhóm có đúng 28 ngày thì có
   - Thẻ tóm tắt hiển thị đúng số nhóm bị bỏ qua kèm lý do "thiếu dữ liệu"
   - ⚠️ Không được xóa các chuyến giờ lẻ để bảng gọn hơn — đó là dữ liệu thật của Admin
 
-### TC_FC_003 — Chu kỳ cuối tuần được áp vào dự báo
+### TC_FC_003 — Khung gộp chuyến tăng cường; chỉ chuyến `COMPLETED` làm nên lịch sử
 
 - **Mã TC:** TC_FC_003
-- **Tên Kịch Bản:** Kiểm chứng thành phần mùa vụ thực sự có tác dụng
-- **Các bước thực hiện:** Mở trang, so cột T7/CN với cột ngày thường trên **cùng một dòng**
+- **Tên Kịch Bản:** Kiểm chứng luật gom khung (M-3)
+- **Điều kiện tiên quyết:** Có ngày một khung có cả chuyến gốc (06:00) và chuyến tăng cường (06:30) đã hoàn thành; có ngày khung chỉ có chuyến `CANCELLED`
+- **Các bước thực hiện:** So cột "Lịch sử" của chuỗi với truy vấn SQL gom theo (tuyến, ngày, `HOUR(departure_time)`) chỉ trên `COMPLETED`
 - **Kết quả mong đợi:**
-  - Ô cuối tuần cao hơn ô ngày thường trong mọi dòng, theo đúng tỉ lệ hệ số ở bảng "Chu kỳ theo thứ trong tuần"
-  - Bảng hệ số cho tổng số chuyến của 7 thứ đúng bằng tổng số quan sát đã dùng
-  - Ô vượt 90% được tô đỏ — cùng ngưỡng `Trip.needsReinforcement()`, không phải ngưỡng mới
+  - Chuyến 06:30 cộng vào khung 06:00 (cả vé lẫn ghế) — không thành chuỗi riêng
+  - Ngày chỉ có chuyến `CANCELLED` (hoặc chưa kết thúc) **không** được tính là một ngày quan sát — không phải "0 khách"
+  - Khung có chuyến gốc đầy 40/40 và chuyến tăng cường 10/22 là **không bán hết** (50/62)
 
-### TC_FC_004 — Không đủ dữ liệu lịch sử: trang vẫn sống
+### TC_FC_004 — Cần tăng cường và số chuyến cần là một định nghĩa
 
 - **Mã TC:** TC_FC_004
+- **Tên Kịch Bản:** Kiểm chứng ngưỡng 90% trên nhu cầu dự báo (M-4)
+- **Các bước thực hiện:** Trên bảng 7 ngày, xem các ô tô đỏ và các ô ngay dưới ngưỡng
+- **Kết quả mong đợi:**
+  - Ô đỏ khi và chỉ khi nhu cầu ÷ ghế xe chuẩn **> 90%** — cùng ngưỡng `Trip.needsReinforcement()`; đúng 90% thì chưa đỏ
+  - Ô đỏ ghi "cần N chuyến" với N = ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉ ≥ 2; ô không đỏ không ghi
+  - Ví dụ: 57,6 khách / xe 40 chỗ → 144%, cần 2 chuyến; 53,8 khách / xe 22 chỗ → cần 3 chuyến
+  - Cột "Xe chuẩn" là sức chứa loại xe phù hợp của tuyến; tuyến chưa có loại xe thì là sức chứa trung bình đội xe, có dấu `*`
+
+### TC_FC_005 — Tự chấm điểm trên số vé, không so nhu cầu với số vé
+
+- **Mã TC:** TC_FC_005
+- **Tên Kịch Bản:** Kiểm chứng khối "Mô hình có thực sự tốt hơn không?" (G5-7)
+- **Các bước thực hiện:** Mở trang, đọc khối tự chấm điểm
+- **Kết quả mong đợi:**
+  - 8 ngày gốc, mỗi tuần một ngày, ngày gốc cuối = 7 ngày trước ngày cuối của lịch sử
+  - Mô hình và SN4 sạch được chấm trên **cùng** các ngày-khung, bằng min(dự báo; số ghế đã chạy) so với số vé
+  - Trên DB thật ngày 2026-10-22: 787 ngày-khung; sai số số vé 16,1% (SN4 17,5%); khung bán hết được báo trước 43,7% (SN4 12,6%); cờ bắt được 61,7% (SN4 46,3%), báo đúng 67,3% (SN4 66,4%) — khớp `reference_backtest.csv`
+  - Mô hình thua thì khối phải nói thẳng (cảnh báo vàng), không che
+
+### TC_FC_006 — Khối "Tết vừa qua"
+
+- **Mã TC:** TC_FC_006
+- **Tên Kịch Bản:** Kiểm chứng mô hình học được Tết
+- **Điều kiện tiên quyết:** Lịch sử chứa một Tết trọn 35 ngày sau ngày gốc và một Tết trước đó
+- **Các bước thực hiện:** Đọc khối "Tết vừa qua"; chọn chuỗi tuyến 1 — 06:00 trên biểu đồ
+- **Kết quả mong đợi:**
+  - Ngày gốc là Chủ nhật gần nhất cách Tết ít nhất 3 tuần (Tết 17/02/2026 → 25/01/2026), cửa sổ 26/01–01/03
+  - Trên DB thật ngày 2026-10-22: 493 ngày-khung; sai số số vé 19,8% (SN4 35,9%); báo trước 48% khung bán hết (SN4 5%)
+  - Biểu đồ ngày 13/02: mô hình ~54 khách, cột số vé chạm đường số ghế 22 (bán hết)
+  - Lịch sử chưa có Tết nào đủ điều kiện thì khối **ẩn**, không hiện số 0
+
+### TC_FC_007 — Nhớ kết quả tới khi dữ liệu đổi
+
+- **Mã TC:** TC_FC_007
+- **Tên Kịch Bản:** Kiểm chứng cache trong bộ nhớ (M-5)
+- **Các bước thực hiện:**
+  1. Mở trang hai lần liên tiếp
+  2. Đổi số vé của một chuyến `COMPLETED` (trên bản sao DB), mở lại
+- **Kết quả mong đợi:**
+  - Lần 2: dòng thông tin mô hình ghi "dùng lại kết quả đó vì lịch sử không đổi", cùng giờ tính
+  - Sau khi đổi một vé: "vừa tính lại", giờ tính mới
+  - Không có bảng mới, không có tác vụ chạy định kỳ
+
+### TC_FC_008 — Không đủ dữ liệu lịch sử: trang vẫn sống
+
+- **Mã TC:** TC_FC_008
 - **Tên Kịch Bản:** Edge case — bản cài mới chưa chạy backfill
-- **Điều kiện tiên quyết:** Không nhóm nào đạt ngưỡng quan sát tối thiểu
+- **Điều kiện tiên quyết:** Không chuỗi nào đạt ngưỡng 28 ngày
 - **Các bước thực hiện:** Mở `/admin/analytics/forecast`
 - **Kết quả mong đợi:**
-  - **HTTP 200**, không ném `TemplateProcessingException` (phần đầu bảng tham chiếu `series[0]` phải được `th:if` chặn, không bao giờ được tính tới)
+  - **HTTP 200**, không ném `TemplateProcessingException` (phần đầu bảng tham chiếu `series[0]` phải được `th:if` chặn)
   - Hiện thông báo "Chưa đủ dữ liệu lịch sử để dự báo" kèm ngưỡng và đúng lệnh chạy profile `backfill`
-  - Khối "Mô hình có thực sự tốt hơn không?" **tự ẩn** thay vì hiện 0%
+  - Khối tự chấm điểm, biểu đồ và bảng hệ số lễ **tự ẩn** thay vì hiện 0
+
+### TC_FC_009 — Cầu nối: Đề xuất và What-if vẫn chạy trên dự báo mới
+
+- **Mã TC:** TC_FC_009
+- **Tên Kịch Bản:** Regression — hai màn đọc dự báo không phải sửa (G5-1, tạm tới GĐ6)
+- **Các bước thực hiện:** Mở `/admin/analytics/recommendation` và `/admin/analytics/what-if` cùng lúc với trang Dự báo
+- **Kết quả mong đợi:**
+  - HTTP 200 cả hai
+  - Số thẻ Đề xuất **đúng bằng** số ô đỏ của bảng 7 ngày (TC_RC_002 vẫn đúng)
+  - Số khung đông của What-if ở hệ số nhu cầu 100% bằng số ô đỏ
+  - Biết trước, tới GĐ6: doanh thu thẻ vẫn "đầy xe × giá vé"; What-if dưới 100% nhu cầu đếm thiếu khung nóng vì tỉ lệ bị kẹp 100% trước khi nhân
 
 ---
 
@@ -2352,6 +2414,11 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
 > TC_INC_012/TC_INC_013. Phase 4 (Đề xuất tài xế khả dụng) cũng chưa có case nào. Đây là nợ
 > tài liệu, không phải nợ tính năng.
+
+> **Viết lại 2026-10-22 (đợt thiết kế lại dự báo, GĐ5, QĐ-16):** Module 8 viết lại theo dự báo nhu cầu
+> của khung: 9 case `TC_FC_001`–`TC_FC_009` (TC_FC_003 cũ "chu kỳ cuối tuần" bỏ cùng mô hình cũ; TC_FC_004 cũ
+> thành TC_FC_008). Các luật mới còn được khoá bằng `ForecastServiceTest`, `ForecastServiceRulesTest`,
+> `ForecastServiceReferenceTest`. Bảng thống kê phía trên vẫn **cố ý chưa cộng thêm**, cùng lý do ghi ở dưới.
 
 > **Bổ sung 2026-07-23 (Phase 7 bước 2):** thêm Module 10 — Đề Xuất Tăng Cường, 5 case
 > `TC_RC_001`–`TC_RC_005` (1 happy path, 4 edge/regression/tương-đương), tất cả chỉ đọc. `TC_RC_002`

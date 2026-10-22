@@ -18,11 +18,11 @@
 
 - **Đã chốt** QĐ-1…QĐ-15 (`forecast_decisions.md` mục 1). QĐ-8, QĐ-9 là thiết kế của GĐ1; QĐ-10…QĐ-13 của GĐ2; QĐ-14 của GĐ3; QĐ-15 của GĐ4.
 - **Đã chia** bước 1–4 thành 7 giai đoạn (mục 2–3 dưới đây). Mỗi giai đoạn xong thì app vẫn chạy được.
-- **GĐ1 xong và đã commit ngày 2026-10-21, chưa push.**
+- **GĐ1 xong và đã commit ngày 2026-10-21, đã push ngày 2026-10-22.**
   - Code: `79ba96c`. Tài liệu: commit `docs:` ngay sau đó.
   - Chủ dự án đã chạy app trên DB thật, gán nhãn 8 tuyến và tự test (*"test xong rồi, commit đi"*).
   - Chi tiết và bằng chứng ở mục 3.
-- **GĐ2 xong ngày 2026-10-21, đã commit ngày 2026-10-22, chưa push** (QĐ-10…QĐ-13; chi tiết ở mục 3):
+- **GĐ2 xong ngày 2026-10-21, đã commit và push ngày 2026-10-22** (QĐ-10…QĐ-13; chi tiết ở mục 3):
   - Code: `01560cc` (bộ sinh mới) và `6a68937` (màn danh sách chuyến). Tài liệu: commit `docs:` ngay sau đó.
   - bộ sinh mới, màn danh sách chuyến có cửa sổ ngày, 23 test mới;
   - tổng duyệt GĐ3 trên bản sao `busmanagement_gd2`;
@@ -30,17 +30,25 @@
   - ghi lỗi #31 và #32;
   - M-15 đã chốt ngày 2026-10-22: quy tắc (b) vào QĐ-3, EM 5 vòng vào QĐ-1.
 - **GĐ3 xong ngày 2026-10-22** (QĐ-14, G3-1…G3-7; chi tiết ở mục 3):
-  - Code và tài liệu chuẩn bị: commit `09f4a4c` (sửa bộ sinh, lỗi #33), `71e3486` (bài học), `db111c9` (ghi chép GĐ3); chưa push.
+  - Code và tài liệu chuẩn bị: commit `09f4a4c` (sửa bộ sinh, lỗi #33), `71e3486` (bài học), `db111c9` (ghi chép GĐ3); đã push ngày 2026-10-22.
   - **DB thật đã thay lịch sử:** 21.192 chuyến mô phỏng từ 01/01/2023 tới 21/10/2026, cộng 19 chuyến của chủ dự án. Giống hệt bản sao tổng duyệt tới từng chuyến.
-  - Tài liệu ghi sau khi chạy: commit `docs:` ngay sau đó (2026-10-22), chưa push.
-- **GĐ4 xong và đã commit ngày 2026-10-22, chưa push** (QĐ-15; chi tiết ở mục 3):
+  - Tài liệu ghi sau khi chạy: commit `4dea67b` (2026-10-22), đã push.
+- **GĐ4 xong và đã commit ngày 2026-10-22, đã push cùng ngày** (QĐ-15; chi tiết ở mục 3):
   - Code: `c5a830c`. Tài liệu: commit `docs:` ngay sau đó.
   - lõi toán Java `SlotDemandModel` + `ArrowSolver`, chưa nối vào app;
   - khớp bản Python đã đo: 1.050/1.050 dự báo, sai lệch lớn nhất 9,7·10⁻⁹;
   - 0,2–0,6 giây cho một lần khớp đầy đủ; `mvnw test` 184/184.
-- **Việc tiếp theo:** thảo luận GĐ5 (`ForecastService` mới, cache, màn Dự báo — cần chốt M-3, M-5, M-9), mở ngày 2026-10-22.
-- **Code app:** đã đổi ở GĐ1, GĐ2 và GĐ3, đều đã commit; GĐ4 thêm hai lớp mới (commit `c5a830c`), chưa nơi nào gọi tới. **DB thật:** đã mang dữ liệu của bộ sinh mới từ ngày 2026-10-22. Bản sao `busmanagement_gd2` giống DB thật, giữ tới hết GĐ5 để thử thao tác ghi.
-- **Commit:** `2eebc25` (tài liệu 14/10 → 21/10) đã push lên `origin/temp`. Chưa push: GĐ1 (`79ba96c`, `fa50ac3`), GĐ2 (`01560cc`, `6a68937`, `d04352a`), GĐ3 (`09f4a4c`, `71e3486`, `db111c9`, `4dea67b`) và GĐ4 (`c5a830c` + commit `docs:` ngay sau đó). Lúc đầu, toàn bộ tài liệu dự báo từ 14/10 đến 21/10 đã gom thành commit docs `2eebc25` ngày 2026-10-21; dòng cập nhật này được viết sau commit, nên nó sẽ đi vào commit sau. Commit gồm `forecast_*.md`, `forecast_research/` và các thay đổi trong `THESIS_ROADMAP.md`.
+- **GĐ5 xong, đã commit và push ngày 2026-10-22** (QĐ-16; đóng M-3, M-4, M-5, M-9; chi tiết ở mục 3):
+  - Code: `b6dced9`; bài học: `7b58519`; tài liệu: commit `docs:` ngay sau đó.
+  - `ForecastService` mới: nhu cầu khung từ chuyến `COMPLETED`, khớp lõi GĐ4, nhớ kết quả; màn Dự báo mới (bảng 7 ngày bằng số khách, biểu đồ 35 ngày, hệ số lễ, tự chấm điểm, khối Tết);
+  - trên DB thật: số trên màn khớp Python tới 9,7·10⁻⁹; tự chấm 16,06% so với 17,54% của SN4 (Tết 2026: 19,83% so với 35,92%);
+  - Đề xuất và What-if chạy qua cầu nối, không sửa code: cả ba màn cùng 41 khung đông;
+  - `mvnw test` 204/204.
+- **Việc tiếp theo:** thảo luận GĐ6 (Recommendation và What-if theo nhu cầu; cần chốt M-14), mở ngày 2026-10-22.
+- **Code app:** đã đổi ở GĐ1, GĐ2 và GĐ3, đều đã commit; GĐ4 thêm hai lớp mới (commit `c5a830c`); GĐ5 viết lại `ForecastService` để dùng chúng (commit `b6dced9`). **DB thật:** đã mang dữ liệu của bộ sinh mới từ ngày 2026-10-22. Bản sao `busmanagement_gd2` giống DB thật, giữ tới hết GĐ5 để thử thao tác ghi.
+- **Commit:** mọi commit của đợt này đã push lên `origin/temp`:
+  - `2eebc25` (tài liệu 14/10 → 21/10) push ngày 2026-10-21;
+  - ngày 2026-10-22, theo lời chủ dự án *"commit và push tất cả lên đi"*: GĐ1 (`79ba96c`, `fa50ac3`), GĐ2 (`01560cc`, `6a68937`, `d04352a`), GĐ3 (`09f4a4c`, `71e3486`, `db111c9`, `4dea67b`), GĐ4 (`c5a830c`, `36ddc9a`) và GĐ5 (`b6dced9`, `7b58519`, cùng commit `docs:` chứa dòng này).
   - Không đưa vào commit: transcript `forecast_research/2026-10-20-chưa xong.txt`. Transcript này để ngoài git như mọi transcript khác.
   - Không thuộc đợt này: bài học `docs/study/05` và `06`. Hai bài này đã commit riêng thành `5a5f30f` và `1dc429f`, và đã push, cùng ngày 2026-10-21.
 - **Đang chờ chủ dự án trả lời:**
@@ -61,11 +69,11 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
 | 0 | Thí nghiệm chọn thuật toán (Python, ngoài app) | 0 | ĐÃ COMMIT | 2026-10-20 |
 | — | Chốt QĐ-1…QĐ-7 | — | ĐÃ COMMIT | 2026-10-21 |
 | KH | Đọc lại project; chia bước 1–4 thành 7 giai đoạn | — | ĐÃ COMMIT `fa50ac3` | 2026-10-21 |
-| GĐ1 | Nền móng: `Route.holidayFlow` và lịch ngày lễ | 1 | ĐÃ COMMIT `79ba96c` (chưa push) | 2026-10-21 |
-| GĐ2 | Bộ sinh mới, chạy trên bản sao DB; chạy lại thí nghiệm Python | 1 | ĐÃ COMMIT `01560cc`, `6a68937` (chưa push) | 2026-10-21 → 22 |
-| GĐ3 | Thay dữ liệu trên DB thật | 1 | ĐÃ COMMIT `09f4a4c`, `71e3486`, `db111c9` và commit docs sau khi chạy (chưa push) | 2026-10-22 |
-| GĐ4 | Lõi toán Java, unit test và đo tốc độ | 2 | ĐÃ COMMIT (`c5a830c`), chưa push | 2026-10-22 |
-| GĐ5 | `ForecastService` mới, cache và màn Dự báo | 2 | CHƯA BẮT ĐẦU | |
+| GĐ1 | Nền móng: `Route.holidayFlow` và lịch ngày lễ | 1 | ĐÃ COMMIT `79ba96c`, đã push | 2026-10-21 |
+| GĐ2 | Bộ sinh mới, chạy trên bản sao DB; chạy lại thí nghiệm Python | 1 | ĐÃ COMMIT `01560cc`, `6a68937`, đã push | 2026-10-21 → 22 |
+| GĐ3 | Thay dữ liệu trên DB thật | 1 | ĐÃ COMMIT `09f4a4c`, `71e3486`, `db111c9`, `4dea67b`, đã push | 2026-10-22 |
+| GĐ4 | Lõi toán Java, unit test và đo tốc độ | 2 | ĐÃ COMMIT `c5a830c`, đã push | 2026-10-22 |
+| GĐ5 | `ForecastService` mới, cache và màn Dự báo | 2 | ĐÃ COMMIT `b6dced9`, `7b58519`, đã push | 2026-10-22 |
 | GĐ6 | Recommendation và What-if theo nhu cầu | 3 | CHƯA BẮT ĐẦU | |
 | GĐ7 | Tài liệu và chuẩn bị bảo vệ | 4 | CHƯA BẮT ĐẦU | |
 
@@ -212,20 +220,40 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
 - [x] **Toàn bộ `mvnw test`: 184/184, 27 lớp, BUILD SUCCESS** (170 cũ + 14 mới).
 - [x] **Chủ dự án bảo commit** (*"commit đi"*). Trước commit, `verify` chỉ đọc trên DB thật: app khởi động với code mới, 16 trang 200, log sạch, màn Dự báo vẫn 22,7% / 23,90%, 11 bảng giữ nguyên (số dòng và `CHECKSUM TABLE`). Code: `c5a830c`; tài liệu: commit `docs:` ngay sau đó.
 
-### GĐ5: `ForecastService` mới và màn Dự báo (thuộc bước 2)
-- Cần chốt trước: M-3, M-5, M-9. (M-6 đã đóng ngày 2026-10-22.)
-- Truy vấn mới lấy nhu cầu theo khung (tuyến, giờ, ngày): cộng mọi chuyến trong khung, có cờ "bán hết vé".
-- Đầu ra cho mỗi ngày-khung: nhu cầu, số chuyến cần, cờ tăng cường (sự thật 1).
-- **Tạm giữ trường `predictedOccupancy`** để Recommendation và What-if vẫn chạy cho tới GĐ6.
-- Cache (sự thật 2).
-- Màn hình hiển thị:
-  - bảng 7 ngày và xem trước 35 ngày;
-  - bảng hệ số lễ;
-  - backtest đo bằng WAPE, so với seasonal naive;
-  - cảnh báo khi lịch lễ không phủ tới ngày cần dự báo.
+### GĐ5: `ForecastService` mới và màn Dự báo (thuộc bước 2). Chủ dự án duyệt G5-1…G5-8 ngày 2026-10-22 (QĐ-16; đóng M-3, M-4, M-5, M-9). Code xong, commit (`b6dced9`, `7b58519`) và push cùng ngày
+- [x] **Số liệu cho vòng thảo luận** (`forecast_discussion.md` §15, `forecast_research/gd5/backtest_reference.py`):
+  - mô hình mới báo 41/105 ô cần tăng cường cho 23–29/10, màn cũ báo 14; thực tế 12 tuần cuối có 43,8% khung bán quá 90% xe chuẩn;
+  - so thẳng nhu cầu với số vé làm mô hình trông kém hơn SN4 (20,11% so với 18,28%), vì nó đúng ở những khung bán hết vé. Cách công bằng — min(dự báo; số ghế) so với số vé — cho 16,06% so với 17,54%.
+- [x] **Gom khung (G5-2, M-3):** `ForecastService.aggregateSlots` cộng vé và ghế của mọi chuyến `COMPLETED` cùng (tuyến, giờ, ngày). Dùng lại `findDemandHistoryByStatus`; bỏ dòng ngoài lịch lễ hoặc sau hôm nay. Chuỗi cần ≥ 28 ngày quan sát; nhóm chiều theo `Route.holidayFlow`.
+- [x] **Dự báo và cầu nối (G5-1, G5-3, G5-6):**
+  - ngày gốc là ngày cuối có dữ liệu; dự báo 7 ngày (`points`) và 35 ngày (`preview`) từ ngày mai, không vượt quá lịch lễ;
+  - `predictedDemand`, `demandRatio`, `tripsNeeded`; giữ `predictedOccupancy` (kẹp [0, 1]) và `needsReinforcement` cho Recommendation, What-if;
+  - xe chuẩn = `Route.suitableBusType`, hoặc sức chứa trung bình đội xe.
+- [x] **Nhớ kết quả (G5-4, M-5):** so nguyên ma trận đầu vào; giống hệt thì dùng lại, khác thì khớp lại. Phần tự chấm điểm chỉ chạy trong `buildForecastPage()` và được nhớ cùng đầu vào.
+- [x] **Màn Dự báo (G5-5, G5-7, M-9):**
+  - thẻ tóm tắt; bảng 7 ngày bằng số khách, có xe chuẩn, ô đỏ ghi "cần N chuyến";
+  - biểu đồ 35 ngày (Chart.js 4.4.1); bảng hệ số lễ theo chiều;
+  - khối tự chấm điểm (8 mốc, SN4 sạch, WAPE trên số vé, khung bán hết được báo trước, cờ bắt được / báo đúng) và khối "Tết vừa qua";
+  - cảnh báo dữ liệu mô phỏng / dữ liệu cũ / hết lịch lễ.
+- [x] **Test:** `ForecastServiceRulesTest` (8), `ForecastServiceReferenceTest` (4: khớp Python ở ngày gốc 21/10/2026 và Tết 25/01/2026, khớp mọi thước đo trong `reference_backtest.csv`), `ForecastServiceTest` (8, đi qua DB test).
+  - 11 lần thử làm hỏng đều làm đỏ đúng test, có một lần chạy đối chứng (không phá gì) để chứng minh bộ chạy thử hoạt động.
+  - `mvnw test` **204/204**, 30 lớp.
+- [x] **Chạy app trên DB thật (chỉ đọc):**
+  - màn Dự báo lần đầu 3,6–7,3 giây (tùy lần đo), lần sau 0,16–0,6 giây;
+  - 510 số khớp Python tới 9,7·10⁻⁹, khối Tết khớp tới 2,4·10⁻¹³, 12 con số tự chấm đúng;
+  - 41 ô đỏ = 41 thẻ Đề xuất = 41 khung đông What-if; Đề xuất mất 5,0–6,7 giây (41 thẻ);
+  - 18 trang 200, log sạch, DB giữ nguyên.
+- [x] **Tài liệu:**
+  - `Proj_functions_summary.md` §16 (viết lại);
+  - `current_functional_spec.md`;
+  - `test_case.md` mục 8 (TC_FC_001–009);
+  - `forecast_discussion.md` §15;
+  - roadmap (trạng thái Phase 6, §7, §8, §9);
+  - 4 bài học 00a/00b/03/05 trỏ sang code mới, HTML build lại.
+- [x] **Chủ dự án bảo commit và push** (*"commit và push tất cả lên đi"*). Trước commit, `verify` chỉ đọc trên DB thật: 17 trang 200, log sạch, DB giữ nguyên. Code `b6dced9`, bài học `7b58519`, tài liệu: commit `docs:` ngay sau đó; push mọi commit lên `origin/temp`.
 
 ### GĐ6: Recommendation và What-if (thuộc bước 3)
-- Cần chốt trước: M-4, M-14.
+- Cần chốt trước: M-14. (M-4 đã chốt ở GĐ5, QĐ-16 G5-6: số chuyến cần = max(1; ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉), có sẵn trong `ForecastPointDto.tripsNeeded`.)
 - Recommendation:
   - số chuyến thêm = số chuyến cần − 1;
   - doanh thu = phần khách tràn mà xe được chọn chở được (thay `RecommendationService.java:213-215`).
@@ -236,7 +264,7 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
 - Bỏ trường tạm `predictedOccupancy`.
 
 ### GĐ7: tài liệu và chuẩn bị bảo vệ (thuộc bước 4)
-- Cần chốt trước: M-10.
+- Cần chốt trước: không còn mục nào (M-10 đã đóng ngày 2026-10-21).
 - `THESIS_ROADMAP.md`:
   - §5: phần "As delivered" của Phase 5, 6, 7, 8;
   - §9: đánh dấu note "occupancy RATE" là đã bị thay thế, và thêm note mới;
@@ -272,6 +300,7 @@ Thêm một dòng mới vào cuối bảng sau mỗi phiên; không sửa các d
 | 2026-10-22 (GĐ3) | Thảo luận GĐ3: rà ra lỗi #33 (bộ sinh không né chuyến có sẵn) và phần tài liệu GĐ2 để sót; đo tốc độ trang trên 21 nghìn chuyến. Chủ dự án hỏi về quy luật và nhiễu của bộ sinh (đo lại trên dữ liệu đã sinh), rồi duyệt G3-1…G3-7 (QĐ-14). Làm G3-1 (code, 4 test, 5 lần thử làm hỏng, 170/170), G3-2 (sao lưu, khôi phục thử khớp 11/11 bảng), G3-3 (tổng duyệt lại trên bản sao: 0 vi phạm), G3-6 phần trước (121 + 9 chỗ trích trong bài học, build lại HTML). Ghi lỗi #33, M-16 | Code bộ sinh đổi (chưa commit); DB thật chỉ `SELECT` và `mysqldump`, giống hệt lúc sao lưu; bản sao `busmanagement_gd2` tạo lại | Chưa |
 | 2026-10-22 (GĐ3 trên DB thật) | Chủ dự án bảo commit rồi làm DB thật. `verify` chỉ đọc rồi commit 3 phần. Trên DB thật: kiểm ảnh chụp = lúc sao lưu, phần A (giống tổng duyệt), phần B, bộ sinh từ commit `09f4a4c`, phần C (0 vi phạm), so từng chuyến với bản sao (giống hệt), `verify` (17 trang 200, danh sách chuyến khớp SQL). Đóng #31, #32, #33; cập nhật roadmap, QĐ-11, QĐ-14, setup_guide | **DB thật thay lịch sử**: 2.225 → 21.211 chuyến; sao lưu và file nhu cầu thật trong `ProjectBackup/db` | `09f4a4c`, `71e3486`, `db111c9`; tài liệu sau khi chạy chưa commit; chưa push |
 | 2026-10-22 (GĐ4) | Commit tài liệu GĐ3 sau khi chạy (`4dea67b`). Thảo luận GĐ4, đo chung cấu hình cuối (§14.1); chủ dự án duyệt G4-1…G4-8 (QĐ-15). Xuất dữ liệu đối chiếu từ DB thật (chỉ đọc), viết `reference.py`, `SlotDemandModel`, `ArrowSolver`, 14 test; Java khớp Python tới 9,7·10⁻⁹; 0,2–0,6 giây mỗi lần khớp; 5 lần thử làm hỏng; `mvnw test` 184/184 | Thêm 2 lớp, chưa nơi nào gọi tới; DB thật chỉ `SELECT` | `4dea67b` (tài liệu GĐ3); `c5a830c` (GĐ4) + commit `docs:` ngay sau đó |
+| 2026-10-22 (GĐ5) | Commit GĐ4 (`c5a830c`, `36ddc9a`) sau `verify` chỉ đọc. Thảo luận GĐ5 kèm số liệu (§15); chủ dự án duyệt G5-1…G5-8 (QĐ-16). Viết lại `ForecastService`, 4 DTO, màn Dự báo; `backtest_reference.py`; 20 test; 11 lần thử làm hỏng; `mvnw test` 204/204; chạy app trên DB thật, số trên màn khớp Python tới 9,7·10⁻⁹ | Viết lại `ForecastService` và màn Dự báo; Recommendation, What-if không đổi code; DB thật chỉ `SELECT` | `c5a830c`, `36ddc9a` (GĐ4); `b6dced9`, `7b58519` + commit `docs:` (GĐ5); push tất cả lên `origin/temp` |
 
 ---
 

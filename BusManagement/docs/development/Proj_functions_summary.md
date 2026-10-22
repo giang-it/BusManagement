@@ -28,9 +28,9 @@
 | `Bus` | Xe khách | `licensePlate`, `busType` (N-1 `BusType`), `odometer`, `lastMaintenanceOdometer`, `maintenanceThreshold`, `status` (enum `BusStatus`); methods `getKmSinceLastMaintenance()`, `needsMaintenance()` |
 | `BusStatus` | Enum | `READY`, `TRAVELING`, `REPAIRING` |
 | `BusType` | Loại xe | `typeName` (unique), `capacity` |
-| `Route` | Tuyến đường | `distanceKm`, `estimatedDuration`, `suitableBusType` (N-1 `BusType`), `holidayFlow` (enum `HolidayFlow`, cho phép null — dành cho dự báo nhu cầu, QĐ-8 của `forecast_decisions.md`; từ GĐ2 bộ sinh dữ liệu đọc nó), `routeStations` (1-N, `@BatchSize(20)`). **Không còn** hai cột text `departurePoint`/`destinationPoint` (đã xoá — `Route.java` chỉ còn comment "ĐÃ XÓA"; đính chính 2026-09-19, câu cũ ở đây mâu thuẫn với `database_schema.md`): điểm đi/đến được **suy ra** từ `routeStations` theo `stopOrder` qua `getDepartureStation()`/`getDestinationStation()`, và `getDeparturePointDisplay()`/`getDestinationPointDisplay()` trả tên trạm (hoặc "(Chưa gán trạm)") cho tầng view; method `getSuitableBusType()` chỉ trả field, không có AI logic dù docstring nói có |
+| `Route` | Tuyến đường | `distanceKm`, `estimatedDuration`, `suitableBusType` (N-1 `BusType`), `holidayFlow` (enum `HolidayFlow`, cho phép null — dành cho dự báo nhu cầu, QĐ-8 của `forecast_decisions.md`; bộ sinh dữ liệu đọc nó từ GĐ2, Demand Forecast từ GĐ5 để chia nhóm học hệ số lễ), `routeStations` (1-N, `@BatchSize(20)`). **Không còn** hai cột text `departurePoint`/`destinationPoint` (đã xoá — `Route.java` chỉ còn comment "ĐÃ XÓA"; đính chính 2026-09-19, câu cũ ở đây mâu thuẫn với `database_schema.md`): điểm đi/đến được **suy ra** từ `routeStations` theo `stopOrder` qua `getDepartureStation()`/`getDestinationStation()`, và `getDeparturePointDisplay()`/`getDestinationPointDisplay()` trả tên trạm (hoặc "(Chưa gán trạm)") cho tầng view; method `getSuitableBusType()` chỉ trả field, không có AI logic dù docstring nói có |
 | `HolidayFlow` | Enum | `LEAVING_HUB` (rời TP lớn), `TOWARD_HUB` (về TP lớn); `Route.holidayFlow = null` nghĩa là không theo chiều |
-| `Holiday`, `HolidayCalendar` | Lịch ngày lễ — **không phải entity**, không có bảng | 5 dịp theo Điều 112 BLLĐ 2019 và cửa sổ quanh mỗi dịp; ngày neo âm lịch lấy từ bảng tra 2022–2033 có ghi nguồn, phủ 01/01/2023 → 31/12/2032, ngoài phạm vi thì ném lỗi (QĐ-9). Dùng bởi bộ sinh dữ liệu (`HistorySimulation`, `HistoricalDataBackfill`, từ GĐ2) và lõi toán dự báo mới `SlotDemandModel` (GĐ4) |
+| `Holiday`, `HolidayCalendar` | Lịch ngày lễ — **không phải entity**, không có bảng | 5 dịp theo Điều 112 BLLĐ 2019 và cửa sổ quanh mỗi dịp; ngày neo âm lịch lấy từ bảng tra 2022–2033 có ghi nguồn, phủ 01/01/2023 → 31/12/2032, ngoài phạm vi thì ném lỗi (QĐ-9). Dùng bởi bộ sinh dữ liệu (`HistorySimulation`, `HistoricalDataBackfill`, từ GĐ2) và Demand Forecast (`SlotDemandModel` từ GĐ4, `ForecastService` từ GĐ5) |
 | `Station` | Bến xe | `stationName`, `address`, `routeStations` (1-N) |
 | `RouteStation` | Bảng nối Route-Station (Embeddable composite key `RouteStationId`) | `stopOrder` |
 | `Trip` | Chuyến xe — entity trung tâm | `route`, `bus`, `driver` (tài xế chính), `assistant` (phụ xe, cũng là `Driver`), `coDrivers` (`List<Driver>`, ManyToMany — tài xế phụ cho chuyến dài), `departureTime`, `arrivalTimeExpected`, `totalSeats`, `ticketsSold`, `price`, `status` (enum `TripStatus`, default `PENDING_APPROVAL`), `originalTrip` (self-reference cho chuyến tăng cường), `isExtraTrip`, `saleOpenedAt`, `isDeleted` (soft-delete flag). Methods: `getOccupancyRate()`, `needsReinforcement()` (>90%), `getTripDurationHours()`, `getHoursOnSale()`, `getHoursUntilDeparture()` |
@@ -448,44 +448,67 @@ Sắp xếp **tăng dần** theo số giờ đã phân công (rảnh nhất lên
 
 ## 16. Module: Dự báo nhu cầu (Demand Forecast) — `ForecastController` (`/admin/analytics/forecast`)
 
-Thành phần **AI Prediction**, và là module **duy nhất có tính dự đoán** trong hệ thống — mọi module khác đều báo cáo chuyện đã xảy ra. Chỉ đọc.
+Thành phần **AI Prediction**, và là module **duy nhất có tính dự đoán** trong hệ thống — mọi module khác đều báo cáo chuyện đã xảy ra. Chỉ đọc. Viết lại ở GĐ5 của đợt thiết kế lại dự báo (2026-10-22, QĐ-16 trong `forecast_decisions.md`); mô hình cũ (tỉ lệ lấp đầy, hồi quy tuyến tính) không còn trong code.
 
 ### 16.1. Cấu trúc
-- **Controller:** `ForecastController` — 1 `GET`, không tham số (chân trời cố định 7 ngày kể từ ngày mai). Chỉ inject Service.
-- **Service:** `ForecastService` — `@Transactional(readOnly = true)`, inject `TripRepository` và `RouteRepository`.
-- **DTO:** `ForecastPointDto` (một ngày dự báo), `ForecastSeriesDto` (một chuỗi), `ForecastAccuracyDto` (kết quả tự chấm điểm), `DemandForecastViewDto` (toàn màn hình).
-- **Template:** `admin/demand-forecast.html`.
-- **Lõi toán mới, chưa nối vào (GĐ4 của đợt thiết kế lại dự báo, 2026-10-22, QĐ-15):** `SlotDemandModel` (hồi quy Poisson theo lịch có ridge và EM, dự báo nhu cầu theo khung giờ, QĐ-1) và `ArrowSolver` (giải hệ phương trình của nó theo khối). Hai lớp package-private trong `service`, không phải bean, chưa nơi nào gọi tới. GĐ5 sẽ dùng chúng thay phần toán của `ForecastService`; tới lúc đó, mục 16.2–16.7 vẫn mô tả mô hình đang chạy.
+- **Controller:** `ForecastController` — 1 `GET`, không tham số, gọi `buildForecastPage()`. Chỉ inject Service.
+- **Service:** `ForecastService` — `@Transactional(readOnly = true)`, inject `TripRepository`, `RouteRepository`, `BusRepository`. Hai cửa:
+  - `buildForecast()` cho Recommendation, What-if và phần chính của màn;
+  - `buildForecastPage()` thêm phần tự chấm điểm, chỉ màn Dự báo dùng.
+- **Lõi toán:** `SlotDemandModel` (mô hình) và `ArrowSolver` (đại số), package-private trong `service`, viết ở GĐ4 (QĐ-15), khớp bản Python đã đo tới 10⁻⁸. `ForecastService` chỉ gom dữ liệu, gọi mô hình và dựng màn hình.
+- **DTO:**
+  - `ForecastPointDto`: một ngày-khung;
+  - `ForecastSeriesDto`: một chuỗi;
+  - `ForecastAccuracyDto`: tự chấm điểm, kèm khối Tết;
+  - `DemandForecastViewDto`: toàn màn hình, gồm cả hệ số lễ, dữ liệu biểu đồ và thông tin lần khớp.
+- **Template:** `admin/demand-forecast.html` — Bootstrap; biểu đồ dùng Chart.js 4.4.1 như màn Analytics.
 
-### 16.2. Đơn vị dự báo
-Một **chuỗi** = một tuyến ở một khung giờ khởi hành. Nhóm chỉ được dự báo khi có **≥ 28 chuyến `COMPLETED`** (4 tuần trọn, để mỗi thứ trong tuần có ít nhất 4 điểm); nhóm dưới ngưỡng bị đếm và báo ra chứ không âm thầm biến mất.
+### 16.2. Đơn vị dự báo: khung
+Một **khung** = một tuyến, một giờ khởi hành, một ngày; một **chuỗi** = một tuyến ở một giờ.
+- Cộng mọi chuyến `COMPLETED` của khung, kể cả chuyến tăng cường (khởi hành phút 30/40/50, cùng giờ với chuyến gốc). Khung **bán hết vé** khi tổng vé ≥ tổng ghế.
+- Khung không có chuyến hoàn thành (bão, hủy) là **không quan sát được**, không phải "0 khách". Chuyến bị hủy hay chưa kết thúc không được tính.
+- Chuỗi chỉ được dự báo khi có **≥ 28 ngày quan sát** (4 tuần trọn). Nhóm dưới ngưỡng, ví dụ chuyến lẻ Admin tự tạo lúc 13h hay 21h, bị đếm và báo ra chứ không âm thầm biến mất.
+- Dùng **ngưỡng** chứ không dùng danh sách khung giờ cứng: danh sách cứng sẽ lạc hậu ngay khi có thêm một chuyến giờ lạ.
+- Bỏ các dòng ngoài lịch ngày lễ (trước 2023, sau 2032) và các dòng sau hôm nay.
 
-Dùng **ngưỡng** thay vì danh sách khung giờ hợp lệ cứng, vì ngoài các chuỗi do backfill sinh ra, dữ liệu thật còn lẫn chuyến lẻ Admin tự tạo ở giờ bất kỳ — danh sách cứng sẽ lạc hậu ngay khi có thêm một chuyến giờ lạ.
-
-### 16.3. Dự báo cái gì — và vì sao không phải số vé
-Dự báo **tỉ lệ lấp đầy**, cùng đại lượng với `Trip.getOccupancyRate()`. Đây là ràng buộc kiến trúc: hệ thống đã có đúng **một** định nghĩa "chuyến đông" (`Trip.needsReinforcement()`, > 0.90) đang điều khiển luồng chuyến tăng cường ở mục 7. Dự báo bằng occupancy nghĩa là ngưỡng đó được dùng lại nguyên vẹn với đầu vào là số dự báo; dự báo bằng số vé sẽ buộc phải đẻ ra ngưỡng thứ hai bằng đơn vị codebase chưa từng dùng.
-
-Lý do đo được đi kèm: số vé = occupancy × sức chứa **chiếc xe được xếp hôm đó**, mà đội xe có ba loại 22/40/50 ghế xuất hiện trong cả 15 chuỗi. Hệ số biến thiên của số vé là 0,32–0,35 còn của occupancy chỉ 0,08–0,11.
+### 16.3. Dự báo cái gì
+**Nhu cầu**: số khách muốn đi cả khung, không kẹp ở số ghế (QĐ-2). Tỉ lệ lấp đầy của mô hình cũ kẹp ở 100%, nên không thấy được nhu cầu vượt một xe: Tết làm nhu cầu gấp đôi cũng chỉ hiện ra là "100%".
+- **Cần tăng cường** khi nhu cầu > 90% số ghế **xe chuẩn** của tuyến. Đây đúng là ngưỡng `Trip.needsReinforcement()`, chỉ thay số vé thật bằng nhu cầu dự báo. Xe chuẩn là `Route.suitableBusType`; tuyến chưa có loại xe thì lấy sức chứa trung bình đội xe, như What-if.
+- **Số chuyến cần** = max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉). Số này ≥ 2 đúng khi cần tăng cường, nên vẫn chỉ một định nghĩa "chuyến nóng".
+- **Cầu nối tới GĐ6:** hai trường `predictedOccupancy` = min(1, nhu cầu ÷ ghế xe chuẩn) và `needsReinforcement` giữ nguyên tên, nên Recommendation và What-if chạy tiếp mà không sửa code. Hệ quả tạm:
+  - số thẻ Đề xuất đổi theo dự báo mới;
+  - doanh thu thẻ vẫn tính "đầy xe × giá vé";
+  - What-if dưới 100% nhu cầu đếm thiếu khung nóng, vì tỉ lệ đã bị kẹp trước khi nhân.
 
 ### 16.4. Mô hình
-1. **Khử mùa vụ:** chia tỉ lệ lấp đầy cho hệ số thứ-trong-tuần.
-2. **Hồi quy tuyến tính** bình phương tối thiểu trên phần đã khử → mức nền + độ dốc.
-3. **Dự báo** ngày D = `(mức nền + độ dốc × số ngày) × hệ số thứ của D`, kẹp trong [0, 1].
+Hồi quy Poisson theo lịch, khớp chung mọi chuỗi (QĐ-1, QĐ-3):
+- mức, hệ số thứ trong tuần riêng từng chuỗi, xu hướng gấp khúc; khi dự báo, xu hướng đóng băng tại ngày cuối có dữ liệu;
+- hệ số lễ (dịp, ngày lệch) gộp theo nhóm chiều `Route.holidayFlow`, kéo về ×1 bằng ridge λ = 2, cộng phần lệch riêng của từng chuỗi;
+- **EM 5 vòng:** khung bán hết chỉ cho biết "nhu cầu ≥ số ghế"; bước E thay số vé bằng E[nhu cầu | nhu cầu ≥ ghế] theo phân phối nhị thức âm;
+- nhân hệ số chỉnh mức = Σ thực tế / Σ mô hình trên 28 ngày không lễ gần nhất.
 
-Hệ số thứ-trong-tuần tính **gộp** trên toàn bộ quan sát đủ điều kiện, không tính riêng từng chuỗi (mỗi chuỗi chỉ ~78 điểm ⇒ ~11 điểm/thứ, quá mỏng).
+Ngày gốc là ngày cuối có dữ liệu. Dự báo bắt đầu từ ngày mai: 7 ngày cho thẻ (QĐ-5) và 35 ngày xem trước. Dự báo không vượt quá lịch ngày lễ (31/12/2032); quá thì màn hình cảnh báo.
 
-Trung bình trượt tính theo **7 ngày lịch**, không phải "7 quan sát gần nhất" — vì ~6% chuyến bị hủy đã bị loại nên chuỗi thủng vài ngày, và "7 quan sát" sẽ trải quá 7 ngày rồi tự nhiễm lại đúng chu kỳ tuần mà nó phải khử.
+### 16.5. Tự chấm điểm (chỉ màn Dự báo)
+- **Cách làm:** lùi về 8 ngày gốc, mỗi tuần một ngày, trong 8 tuần cuối. Ở mỗi ngày gốc, mô hình chỉ học dữ liệu **cắt tại** ngày đó, rồi dự báo 7 ngày sau.
+- **Mốc đối chứng SN4 sạch:** trung bình 4 ngày cùng thứ gần nhất, bỏ ngày lễ.
+- **Chỉ chấm trên cái app thấy được:** WAPE của min(dự báo; số ghế đã chạy) so với số vé thật, vì khung bán hết chỉ cho biết "nhu cầu ≥ số ghế". So thẳng nhu cầu với số vé sẽ phạt mô hình đúng lúc nó đúng. Ví dụ Tết: dự báo 54 khách, xe 22 chỗ bán hết 22 vé.
+- **Kèm thước đo quyết định:** % khung bán hết được báo trước; cờ tăng cường bắt được và báo đúng, so với các khung có số vé > 90% ghế xe chuẩn.
+- **Khối "Tết vừa qua":** học tới Chủ nhật gần nhất cách Tết ít nhất 3 tuần, dự báo 35 ngày, chấm cùng cách; có biểu đồ theo từng chuỗi.
+- **Kết quả trên DB thật ngày 2026-10-22:**
+  - 8 tuần cuối: sai số số vé 16,06%, SN4 sạch 17,54%;
+  - Tết 2026: 19,83%, SN4 sạch 35,92%.
+  - Nếu mô hình **thua**, màn hình cũng nói thẳng.
 
-### 16.5. Tự chấm điểm (backtest)
-Giấu 14 ngày cuối, huấn luyện trên phần còn lại, dự báo lại quãng đã giấu rồi so với số thật; báo sai số phần trăm tuyệt đối trung bình cạnh sai số của baseline "giữ phẳng trung bình trượt". **Hệ số mùa vụ được tính lại chỉ từ phần huấn luyện** — dùng lại hệ số tính trên toàn bộ dữ liệu sẽ rò rỉ quãng kiểm tra vào mô hình và cho ra con số đẹp một cách vô nghĩa. Trường hợp mô hình **thua** baseline cũng được hiển thị thẳng chứ không giấu.
-
-### 16.6. Hiệu năng
-Đọc qua projection 4 cột `TripRepository.findDemandHistoryByStatus(...)` chứ không nạp entity `Trip`, theo tiền lệ `findSeatsAndSoldByStatus`. Trang chạy ~0,10 s / ~37 KB trên 1.200+ chuyến, nên không góp thêm vào vấn đề tổng hợp in-memory đã biết của `DashboardService`.
+### 16.6. Hiệu năng và bộ nhớ
+- Đọc qua projection 4 cột `TripRepository.findDemandHistoryByStatus(...)`, không nạp entity `Trip`.
+- Một lần khớp (15 chuỗi × ~1.400 ngày) mất ~0,2–0,6 s; phần tự chấm điểm (9 lần khớp) mất ~2–3 s.
+- **Nhớ trong bộ nhớ:** mỗi lần gọi vẫn đọc lại lịch sử. Đầu vào của mô hình giống hệt lần trước thì dùng lại kết quả; khác dù một vé thì khớp lại. Không cron, không bảng mới. Lần mở đầu tiên sau khi khởi động app, hoặc sau khi dữ liệu đổi, là lần chậm nhất.
 
 ### 16.7. Giới hạn phải nói rõ
 - **Dữ liệu lịch sử là MÔ PHỎNG** (sinh bằng profile `backfill`, xem `setup_guide.md` §4.3). Trang tự hiển thị cảnh báo này. Số liệu minh họa *phương pháp*, không phải kết quả kinh doanh thật.
-- Bộ dữ liệu có **ngày kết thúc cố định và cũ dần**; trang hiển thị nó đã cũ bao nhiêu ngày.
-- Đây là **thống kê, không phải máy học** — không có mô hình ML nào, chỉ hồi quy tuyến tính và trung bình theo nhóm.
+- Bộ dữ liệu **cũ dần** nếu không chạy bổ sung; trang hiển thị nó đã cũ bao nhiêu ngày.
+- Đây là **thống kê, không phải máy học**: hồi quy Poisson viết tay bằng Java, không thêm thư viện (Non-Goal §4).
 - Chỉ dự báo theo tuyến × khung giờ; không có chiều theo trạm, loại xe hay độ nhạy giá.
 
 ---
