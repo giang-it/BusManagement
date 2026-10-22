@@ -403,8 +403,8 @@ là trùng.</p>
        "WHERE t.status = :status AND t.totalSeats &gt; 0 ORDER BY t.departureTime")
 List&lt;Object[]&gt; findDemandHistoryByStatus(@Param("status") TripStatus status);
 // mỗi phần tử: [routeId, departureTime, ticketsSold, totalSeats]</code></pre></div>
-<p>Service tự bóc từng ô và ép kiểu, ví dụ <code>ForecastService.toObservation()</code>:
-<code>long routeId = ((Number) row[0]).longValue();</code>.</p>
+<p>Service tự bóc từng ô và ép kiểu, ví dụ <code>ForecastService.aggregateSlots()</code> (:391):
+<code>int seats = ((Number) row[3]).intValue();</code>.</p>
 <h3 id="2-3-jpql-khac-sql-the-nao">2.3. JPQL khác SQL thế nào</h3>
 <div class="table-wrap"><table><thead><tr>
 <th>JPQL</th>
@@ -552,7 +552,7 @@ trạng thái &quot;đã gán xe nhưng chưa duyệt&quot;.</p>
 <tr>
 <td><code>@Transactional(readOnly = true)</code></td>
 <td>Transaction chỉ đọc — báo cho Hibernate không cần theo dõi thay đổi để ghi</td>
-<td>mọi service Decision Support: <code>ForecastService.java:147</code>, <code>DashboardService.java:72</code>...</td>
+<td>mọi service Decision Support: <code>ForecastService.java:211</code>, <code>DashboardService.java:72</code>...</td>
 </tr>
 </tbody></table></div>
 <p><strong>Lỗi nào gây rollback?</strong> <span class="tag tag-spring">SPRING</span> Mặc định: <code>RuntimeException</code> (và các lớp con) cùng <code>Error</code> →
@@ -1093,7 +1093,7 @@ tầng controller bằng MockMvc và chưa có test giao diện tự động.</p
 <tr>
 <td><code>@Transactional(readOnly = true)</code></td>
 <td>Transaction chỉ đọc</td>
-<td><code>ForecastService.java:147</code></td>
+<td><code>ForecastService.java:211</code></td>
 </tr>
 <tr>
 <td>Proxy (Spring AOP)</td>

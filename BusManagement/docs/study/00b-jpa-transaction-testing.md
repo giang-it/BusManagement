@@ -241,8 +241,8 @@ List<Object[]> findDemandHistoryByStatus(@Param("status") TripStatus status);
 // mỗi phần tử: [routeId, departureTime, ticketsSold, totalSeats]
 ```
 
-Service tự bóc từng ô và ép kiểu, ví dụ `ForecastService.toObservation()`:
-`long routeId = ((Number) row[0]).longValue();`.
+Service tự bóc từng ô và ép kiểu, ví dụ `ForecastService.aggregateSlots()` (:391):
+`int seats = ((Number) row[3]).intValue();`.
 
 ### 2.3. JPQL khác SQL thế nào
 
@@ -399,7 +399,7 @@ Trong Spring chỉ cần đặt `@Transactional` lên method của bean [SPRING]
 | Dạng | Nghĩa | Ví dụ |
 |---|---|---|
 | `@Transactional` | Mở transaction trước khi method chạy, commit khi method kết thúc bình thường, rollback khi method ném lỗi | `TripService.approveTrip()` `:955-956` |
-| `@Transactional(readOnly = true)` | Transaction chỉ đọc — báo cho Hibernate không cần theo dõi thay đổi để ghi | mọi service Decision Support: `ForecastService.java:147`, `DashboardService.java:72`... |
+| `@Transactional(readOnly = true)` | Transaction chỉ đọc — báo cho Hibernate không cần theo dõi thay đổi để ghi | mọi service Decision Support: `ForecastService.java:211`, `DashboardService.java:72`... |
 
 **Lỗi nào gây rollback?** [SPRING] Mặc định: `RuntimeException` (và các lớp con) cùng `Error` →
 rollback; checked exception (loại phải khai báo `throws`) → **không** rollback. Dự án chỉ ném
@@ -781,7 +781,7 @@ trang qua HTTP và đối chiếu DB trước/sau. Vì sao cần cả hai [CODE 
 | Mass assignment | Form gửi thêm field không được phép (vd `id`) | lỗi #21 |
 | `@InitBinder` | Khai báo field nào được bind từ form | không dùng |
 | Transaction / commit / rollback | Trọn gói / chốt / hoàn tác | §4.1 |
-| `@Transactional(readOnly = true)` | Transaction chỉ đọc | `ForecastService.java:147` |
+| `@Transactional(readOnly = true)` | Transaction chỉ đọc | `ForecastService.java:211` |
 | Proxy (Spring AOP) | Người đứng cửa bọc bean, mở/đóng transaction | §4.2 |
 | Self-invocation | Gọi method của chính mình, không qua proxy | javadoc `TripService.java:69-75` |
 | Persistence context / managed entity | Sổ theo dõi entity đã nạp / entity trong sổ | §4.3 |

@@ -759,7 +759,7 @@ was blocked"*).
     (roadmap §9, `project_report.md` Warn #4), không đi qua `RouteService`.
   - Chuyến tăng cường (Bài 08): giờ đến = khởi hành + `estimatedDuration` (`TripService.java:157-160`).
   - Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc `findAllWithStations()`
-    (`DashboardService.java:201`, `ForecastService.java:239`, `RecommendationService.java:102`,
+    (`DashboardService.java:201`, `ForecastService.java:256`, `RecommendationService.java:102`,
     `WhatIfSimulationService.java:178`); chi phí nhiên liệu = đơn giá × `distanceKm`.
 - **Màn này bị ảnh hưởng bởi:** bến xe (Bài 02 — nguồn của dropdown, và guard xoá bến đọc
   `route_stations`); loại xe (Bài 01 — `BusService.findAllBusTypes()`); chuyến (quyết định tuyến có

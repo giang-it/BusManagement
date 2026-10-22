@@ -464,14 +464,16 @@ if (bus == null) throw new RuntimeException("Không tìm thấy xe với ID: " +
 <code>.orElse(null)</code> (rỗng thì trả null), <code>.orElseGet(() -&gt; ...)</code> (rỗng thì tạo mới — xem
 <code>CostParameterService.getOrDefault()</code>).</p>
 <h3 id="2-5-record-class-chi-de-cho-du-lieu-viet-mot-dong">2.5. <code>record</code> — &quot;class chỉ để chở dữ liệu, viết một dòng&quot;</h3>
-<p><span class="tag tag-code">CODE</span> <code>…/service/ForecastService.java:140</code>:</p>
-<div class="code-wrap"><pre class="code"><code class="language-java">private record Observation(long routeId, int hour, LocalDate date, double occupancy) { }</code></pre></div>
-<p>Một dòng này tương đương một class có 4 field <code>final</code>, constructor 4 tham số, 4 method đọc
-(<code>routeId()</code>, <code>hour()</code>, <code>date()</code>, <code>occupancy()</code> — <strong>không có chữ <code>get</code></strong>), cùng <code>equals</code>,
-<code>hashCode</code>, <code>toString</code>. Dự án dùng <code>record</code> cho dữ liệu trung gian trong tính toán:
-<code>ForecastService.SeriesKey</code> (:144), <code>WhatIfSimulationService.HotSlot</code> (:134), <code>Derivation</code> (:138).</p>
+<p><span class="tag tag-code">CODE</span> <code>…/service/ForecastService.java:185</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">record Scored(int series, double model, double baseline, double ticketsSold, double seatsRun) {
+}</code></pre></div>
+<p>Khai báo này tương đương một class có 5 field <code>final</code>, constructor 5 tham số, 5 method đọc
+(<code>series()</code>, <code>model()</code>, <code>baseline()</code>, <code>ticketsSold()</code>, <code>seatsRun()</code> — <strong>không có chữ <code>get</code></strong>), cùng
+<code>equals</code>, <code>hashCode</code>, <code>toString</code>. Dự án dùng <code>record</code> cho dữ liệu trung gian trong tính toán:
+<code>ForecastService.SlotKey</code> (:176), <code>WhatIfSimulationService.HotSlot</code> (:134), <code>Derivation</code> (:138).</p>
 <p>Vì <code>record</code> có sẵn <code>equals/hashCode</code> theo các field, nó dùng được làm <strong>khóa của Map</strong> — đúng như
-<code>ForecastService.java:164</code> nhóm quan sát theo <code>new SeriesKey(o.routeId(), o.hour())</code>.</p>
+<code>ForecastService.java:400</code> gom các chuyến theo <code>new SlotKey(routeId, giờ)</code>. <code>SlotKey</code> còn
+<code>implements Comparable</code> để làm khóa của <code>TreeMap</code>, giữ các chuỗi theo thứ tự tuyến rồi giờ.</p>
 <h3 id="2-6-switch-expression-va-vi-sao-co-y-khong-co-default">2.6. Switch expression — và vì sao cố ý <strong>không có <code>default</code></strong></h3>
 <p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1874-1895</code> (rút gọn):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">public String deleteRefusalReason(Trip trip) {
@@ -1257,7 +1259,7 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>record</code></td>
 <td>Class chở dữ liệu viết một dòng</td>
-<td><code>ForecastService.java:140</code></td>
+<td><code>ForecastService.java:185</code></td>
 </tr>
 <tr>
 <td>Switch expression</td>

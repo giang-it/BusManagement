@@ -279,19 +279,21 @@ Mẫu `findById(...).orElseThrow(...)` xuất hiện ở gần như **mọi** se
 
 ### 2.5. `record` — "class chỉ để chở dữ liệu, viết một dòng"
 
-[CODE] `…/service/ForecastService.java:140`:
+[CODE] `…/service/ForecastService.java:185`:
 
 ```java
-private record Observation(long routeId, int hour, LocalDate date, double occupancy) { }
+record Scored(int series, double model, double baseline, double ticketsSold, double seatsRun) {
+}
 ```
 
-Một dòng này tương đương một class có 4 field `final`, constructor 4 tham số, 4 method đọc
-(`routeId()`, `hour()`, `date()`, `occupancy()` — **không có chữ `get`**), cùng `equals`,
-`hashCode`, `toString`. Dự án dùng `record` cho dữ liệu trung gian trong tính toán:
-`ForecastService.SeriesKey` (:144), `WhatIfSimulationService.HotSlot` (:134), `Derivation` (:138).
+Khai báo này tương đương một class có 5 field `final`, constructor 5 tham số, 5 method đọc
+(`series()`, `model()`, `baseline()`, `ticketsSold()`, `seatsRun()` — **không có chữ `get`**), cùng
+`equals`, `hashCode`, `toString`. Dự án dùng `record` cho dữ liệu trung gian trong tính toán:
+`ForecastService.SlotKey` (:176), `WhatIfSimulationService.HotSlot` (:134), `Derivation` (:138).
 
 Vì `record` có sẵn `equals/hashCode` theo các field, nó dùng được làm **khóa của Map** — đúng như
-`ForecastService.java:164` nhóm quan sát theo `new SeriesKey(o.routeId(), o.hour())`.
+`ForecastService.java:400` gom các chuyến theo `new SlotKey(routeId, giờ)`. `SlotKey` còn
+`implements Comparable` để làm khóa của `TreeMap`, giữ các chuỗi theo thứ tự tuyến rồi giờ.
 
 ### 2.6. Switch expression — và vì sao cố ý **không có `default`**
 
@@ -864,7 +866,7 @@ Test canh quy ước này: `src/test/.../domain/EntityEqualsHashCodeCycleTest.ja
 | `Comparator` | Luật so sánh để sắp xếp | `TripService.java:343-346` |
 | `Optional` | Hộp có thể rỗng | `AdminBusController.java:47-48` |
 | `orElseThrow` | Hộp rỗng thì ném lỗi | như trên |
-| `record` | Class chở dữ liệu viết một dòng | `ForecastService.java:140` |
+| `record` | Class chở dữ liệu viết một dòng | `ForecastService.java:185` |
 | Switch expression | switch trả về giá trị, dùng `->` | `TripService.java:1874-1895` |
 | Text block `"""` | Chuỗi nhiều dòng | `TripRepository.java:54-67` |
 | `BigDecimal` | Số thập phân chính xác, dùng cho tiền | `Trip.price` |
