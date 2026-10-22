@@ -35,13 +35,16 @@ public class ForecastController {
     private final ForecastService forecastService;
 
     /**
-     * Không nhận tham số: chân trời dự báo cố định 7 ngày kể từ ngày mai, và
-     * phạm vi lịch sử là toàn bộ dữ liệu sẵn có. Chưa có nhu cầu nào cần Admin
-     * chỉnh hai giá trị đó, nên không thêm tham số chỉ vì có thể thêm.
+     * Không nhận tham số: chân trời dự báo cố định 7 ngày kể từ ngày mai (xem trước 35
+     * ngày), và phạm vi lịch sử là toàn bộ dữ liệu sẵn có. Chưa có nhu cầu nào cần Admin
+     * chỉnh các giá trị đó, nên không thêm tham số chỉ vì có thể thêm.
+     *
+     * buildForecastPage() chứ không phải buildForecast(): chỉ màn này cần phần tự chấm
+     * điểm (QĐ-16, G5-4).
      */
     @GetMapping
     public String viewForecast(Model model) {
-        model.addAttribute("view", forecastService.buildForecast());
+        model.addAttribute("view", forecastService.buildForecastPage());
         return "admin/demand-forecast";
     }
 }

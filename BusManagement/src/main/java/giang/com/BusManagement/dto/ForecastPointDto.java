@@ -9,9 +9,10 @@ import java.time.LocalDate;
 /**
  * Một ngày được dự báo trong chuỗi (tuyến × khung giờ).
  *
- * Giá trị dự báo là TỈ LỆ LẤP ĐẦY (0..1), không phải số vé — xem javadoc của
- * ForecastService để biết vì sao đây là đơn vị bắt buộc chứ không phải lựa chọn
- * phong cách.
+ * Giá trị dự báo là NHU CẦU của khung — số khách muốn đi, cộng mọi chuyến của khung —
+ * không bị kẹp ở số ghế (QĐ-2, GĐ5 của đợt thiết kế lại; xem javadoc của ForecastService).
+ * predictedOccupancy và needsReinforcement là CẦU NỐI cho Recommendation và What-if, hai nơi
+ * còn đọc tỉ lệ lấp đầy cho tới GĐ6 (QĐ-16, G5-1).
  */
 @Data
 @NoArgsConstructor
@@ -23,15 +24,34 @@ public class ForecastPointDto {
     /** Nhãn thứ trong tuần đã Việt hoá (T2..CN) — tính ở service, template chỉ hiển thị. */
     private String dayLabel;
 
-    /** Có phải cuối tuần không — dùng để tô nhạt cột trên biểu đồ. */
+    /** Có phải cuối tuần không — dùng để tô nhạt cột trên bảng. */
     private boolean weekend;
 
-    /** Tỉ lệ lấp đầy dự báo, đã kẹp trong [0, 1]. */
+    /** Dịp lễ của ngày, ví dụ "Tết D−4"; null nếu là ngày thường. */
+    private String holidayLabel;
+
+    /** Nhu cầu dự báo của khung: số khách muốn đi, không bị kẹp ở số ghế. */
+    private double predictedDemand;
+
+    /** Nhu cầu ÷ số ghế xe chuẩn của tuyến, KHÔNG kẹp: 1,44 nghĩa là cần thêm 44% một xe. */
+    private double demandRatio;
+
+    /**
+     * Cầu nối tới GĐ6: min(1, nhu cầu ÷ ghế xe chuẩn) — tỉ lệ lấp đầy của MỘT xe chuẩn nếu chỉ
+     * chạy một xe. Recommendation nhân nó với sức chứa xe được chọn, What-if nhân với hệ số nhu
+     * cầu; cả hai giả định số đã kẹp trong [0, 1] như mô hình cũ.
+     */
     private double predictedOccupancy;
 
     /**
-     * Vượt ngưỡng "chuyến đông" của hệ thống (Trip.needsReinforcement(), > 0.90).
-     * Đây chính là tín hiệu Phase 7 sẽ dùng để sinh chuyến tăng cường ứng viên.
+     * Nhu cầu vượt 90% số ghế xe chuẩn — cùng ngưỡng Trip.needsReinforcement() (> 0.90), áp
+     * lên nhu cầu dự báo. Đây là tín hiệu Recommendation dùng để sinh thẻ tăng cường.
      */
     private boolean needsReinforcement;
+
+    /**
+     * Số chuyến cần = max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉) (QĐ-16, G5-6). Số này ≥ 2 đúng
+     * khi needsReinforcement — một định nghĩa "chuyến nóng", không phải hai.
+     */
+    private int tripsNeeded;
 }

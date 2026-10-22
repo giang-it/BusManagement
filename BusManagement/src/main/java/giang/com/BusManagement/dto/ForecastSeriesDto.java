@@ -9,9 +9,9 @@ import java.util.List;
 /**
  * Dự báo cho MỘT chuỗi = một tuyến ở một khung giờ khởi hành cố định.
  *
- * Chuỗi là đơn vị dự báo vì nhu cầu của tuyến A lúc 06:00 và lúc 18:00 là hai
- * câu chuyện khác nhau (bộ sinh dữ liệu Phase 5 gán hệ số khung giờ riêng cho
- * từng mốc, và số liệu thực tế xác nhận khung giữa trưa luôn yếu nhất).
+ * Chuỗi là đơn vị dự báo vì nhu cầu của tuyến A lúc 06:00 và lúc 18:00 là hai câu chuyện
+ * khác nhau. Mỗi ngày của chuỗi là một KHUNG: mọi chuyến của tuyến khởi hành trong giờ đó,
+ * kể cả chuyến tăng cường (QĐ-16, G5-2).
  */
 @Data
 @NoArgsConstructor
@@ -29,28 +29,30 @@ public class ForecastSeriesDto {
     /** "06:00" — nhãn hiển thị của khung giờ. */
     private String slotLabel;
 
-    /** Số chuyến COMPLETED có thật trong lịch sử của chuỗi này. */
-    private int observationCount;
+    /** Nhóm học hệ số lễ: "Rời TP lớn" / "Về TP lớn" / "Không theo chiều" (Route.holidayFlow). */
+    private String flowLabel;
 
-    /** Tỉ lệ lấp đầy trung bình trong toàn bộ lịch sử của chuỗi. */
-    private double averageOccupancy;
+    /** Số ghế xe chuẩn: loại xe phù hợp của tuyến, hoặc sức chứa trung bình đội xe nếu tuyến chưa có. */
+    private int standardSeats;
 
-    /** Trung bình trượt 7 ngày cuối — mức nền hiện tại, cũng là baseline để so sánh. */
-    private double movingAverage;
+    /** false khi standardSeats là sức chứa trung bình đội xe vì tuyến chưa có loại xe phù hợp. */
+    private boolean standardSeatsFromRoute;
 
-    /**
-     * Độ dốc xu hướng quy về MỘT TUẦN, tính bằng điểm phần trăm lấp đầy.
-     * Dương = nhu cầu đang tăng. Hiển thị để Admin thấy vì sao dự báo cao/thấp
-     * hơn mức nền.
-     */
-    private double trendPerWeek;
+    /** Số ngày có ít nhất một chuyến COMPLETED của khung — số quan sát mô hình học được. */
+    private int observedDays;
 
-    /** Dự báo từng ngày trong chân trời dự báo. */
+    /** Trong số đó, số ngày bán hết vé: chỉ biết "nhu cầu ≥ số ghế", EM phải đoán lại. */
+    private int soldOutDays;
+
+    /** 7 ngày từ ngày mai — chân trời của thẻ Recommendation và What-if (QĐ-5). */
     private List<ForecastPointDto> points;
 
-    /** Giá trị dự báo cao nhất trong chân trời — dùng để xếp hạng chuỗi cần chú ý trước. */
-    private double peakOccupancy;
+    /** Tới 35 ngày từ ngày mai — chỉ để xem trước trên màn Dự báo. */
+    private List<ForecastPointDto> preview;
 
-    /** Có ít nhất một ngày vượt ngưỡng tăng cường. */
+    /** demandRatio cao nhất trong 7 ngày — dùng để xếp chuỗi cần chú ý lên trước. */
+    private double peakDemandRatio;
+
+    /** Có ít nhất một ngày trong 7 ngày cần tăng cường. */
     private boolean anyReinforcement;
 }
