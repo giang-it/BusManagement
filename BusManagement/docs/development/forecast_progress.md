@@ -14,7 +14,7 @@
 
 ---
 
-## 1. Trạng thái hiện tại (cập nhật 2026-10-23)
+## 1. Trạng thái hiện tại (cập nhật 2026-11-10)
 
 - **Đã chốt** QĐ-1…QĐ-17 (`forecast_decisions.md` mục 1). QĐ-8, QĐ-9 là thiết kế của GĐ1; QĐ-10…QĐ-13 của GĐ2; QĐ-14 của GĐ3; QĐ-15 của GĐ4; QĐ-16 của GĐ5; QĐ-17 của GĐ6.
 - **Đã chia** bước 1–4 thành 7 giai đoạn (mục 2–3 dưới đây). Mỗi giai đoạn xong thì app vẫn chạy được.
@@ -50,12 +50,19 @@
   - What-if: hệ số nhân vào số khách, đếm theo chuyến thêm, tiền theo khách tràn, dòng "chỉ chạy chuyến có lãi"; bỏ cầu nối `predictedOccupancy`;
   - trên DB thật: 41 thẻ, mỗi thẻ khớp Python tới từng đồng; 5 xe, 9 tài xế, 0 trùng (trước: 2 xe, 1 tài xế); 4 có lãi · 37 lỗ dự kiến; What-if 70% báo 2 chuyến thêm thay cho 0;
   - `mvnw test` 217/217; 15 lần thử làm hỏng đúng test đỏ.
-- **Việc tiếp theo:** thảo luận GĐ7 (tài liệu và chuẩn bị bảo vệ).
-- **Code app:** đã đổi ở GĐ1, GĐ2 và GĐ3, đều đã commit; GĐ4 thêm hai lớp mới (commit `c5a830c`); GĐ5 viết lại `ForecastService` để dùng chúng (commit `b6dced9`); GĐ6 chuyển Recommendation và What-if sang đơn vị nhu cầu (commit `81b94af`). **DB thật:** đã mang dữ liệu của bộ sinh mới từ ngày 2026-10-22. Bản sao `busmanagement_gd2` giống DB thật, giữ tới hết GĐ5 để thử thao tác ghi.
+- **GĐ7 xong ngày 2026-10-23, đã commit và push ngày 2026-11-10** (chủ dự án bảo *"hãy làm GD7 đi. đảm bảo bao quát toàn bộ tài liệu… đọc code để thay đổi"*; chi tiết ở mục 3):
+  - rà mọi tài liệu đang tracked, sửa theo code: roadmap §5 Phase 5–8 "As delivered" viết lại, §6 thêm Hidden Cost #10, §9 note "occupancy RATE" đánh dấu bị thay thế và thêm note GĐ7; spec, summary, project context, schema, setup guide, test case, sổ lỗi, prompt `docs/ai`, `README.md` gốc repo;
+  - sửa 6 chỗ javadoc lỗi thời trong code (chỉ comment, giữ nguyên số dòng);
+  - phụ lục so với LightGBM và Prophet bằng Python (`forecast_discussion.md` §17, `forecast_research/gd7/`);
+  - bài học 14 (Demand Forecast), build HTML; bài 00a sửa một bài tập.
+  - Javadoc: `c04a216`; phụ lục: `159aa7b`; bài học: `e9096d1`; tài liệu: commit `docs:` ngay sau đó.
+- **Việc tiếp theo:** đợt thiết kế lại dự báo đã xong cả 7 giai đoạn. Còn: Phase 9 (M-12), hoặc các mục còn mở (M-11, M-16, G3-7).
+- **Code app:** đã đổi ở GĐ1, GĐ2 và GĐ3, đều đã commit; GĐ4 thêm hai lớp mới (commit `c5a830c`); GĐ5 viết lại `ForecastService` để dùng chúng (commit `b6dced9`); GĐ6 chuyển Recommendation và What-if sang đơn vị nhu cầu (commit `81b94af`); GĐ7 chỉ sửa comment (commit `c04a216`). **DB thật:** đã mang dữ liệu của bộ sinh mới từ ngày 2026-10-22. Bản sao `busmanagement_gd2` giống DB thật, giữ tới hết GĐ5 để thử thao tác ghi.
 - **Commit:** mọi commit của đợt này đã push lên `origin/temp`:
   - `2eebc25` (tài liệu 14/10 → 21/10) push ngày 2026-10-21;
   - ngày 2026-10-22, theo lời chủ dự án *"commit và push tất cả lên đi"*: GĐ1 (`79ba96c`, `fa50ac3`), GĐ2 (`01560cc`, `6a68937`, `d04352a`), GĐ3 (`09f4a4c`, `71e3486`, `db111c9`, `4dea67b`), GĐ4 (`c5a830c`, `36ddc9a`) và GĐ5 (`b6dced9`, `7b58519`, `aa82299`);
-  - ngày 2026-10-23, theo lời chủ dự án *"commit và push đi bro"*: GĐ6 (`81b94af`, `ef3f0eb`, cùng commit `docs:` chứa dòng này).
+  - ngày 2026-10-23, theo lời chủ dự án *"commit và push đi bro"*: GĐ6 (`81b94af`, `ef3f0eb`, cùng một commit `docs:`);
+  - ngày 2026-11-10, theo lời chủ dự án *"hãy commit và push nó đi"*: GĐ7 (`c04a216`, `159aa7b`, `e9096d1`, cùng commit `docs:` chứa dòng này).
   - Không đưa vào commit: transcript `forecast_research/2026-10-20-chưa xong.txt`. Transcript này để ngoài git như mọi transcript khác.
   - Không thuộc đợt này: bài học `docs/study/05` và `06`. Hai bài này đã commit riêng thành `5a5f30f` và `1dc429f`, và đã push, cùng ngày 2026-10-21.
 - **Đang chờ chủ dự án trả lời:**
@@ -82,7 +89,7 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
 | GĐ4 | Lõi toán Java, unit test và đo tốc độ | 2 | ĐÃ COMMIT `c5a830c`, đã push | 2026-10-22 |
 | GĐ5 | `ForecastService` mới, cache và màn Dự báo | 2 | ĐÃ COMMIT `b6dced9`, `7b58519`, đã push | 2026-10-22 |
 | GĐ6 | Recommendation và What-if theo nhu cầu | 3 | ĐÃ COMMIT `81b94af`, `ef3f0eb`, đã push | 2026-10-22 → 23 |
-| GĐ7 | Tài liệu và chuẩn bị bảo vệ | 4 | CHƯA BẮT ĐẦU | |
+| GĐ7 | Tài liệu và chuẩn bị bảo vệ | 4 | ĐÃ COMMIT `c04a216`, `159aa7b`, `e9096d1`, đã push | 2026-10-23 → 11-10 |
 
 ---
 
@@ -277,20 +284,32 @@ Thứ tự: GĐ1 → GĐ2 → GĐ3 → GĐ5 → GĐ6 → GĐ7. GĐ4 làm song so
 - [x] **Tài liệu:** QĐ-17 (đóng M-14); `forecast_discussion.md` §16; `Proj_functions_summary.md` §13, §16, §18 viết lại, §19 mới (What-if); `current_functional_spec.md` (Recommendation viết lại, What-if mới); `test_case.md` Module 10 viết lại (TC_RC_001–007), Module 11 mới (TC_WI_001–005), TC_FC_009; `current_bugs_found.md` (mục What-if 50–90% đã hết); roadmap; 5 bài học 00a/00b/03/05/06 trỏ sang code mới, HTML build lại; `forecast_research/README.md`.
 - [x] **Chủ dự án bảo commit và push** (*"commit và push đi bro"*). Trước commit, `verify` chỉ đọc trên DB thật: 18 lượt mở trang 200 (17 trang, What-if thêm 70% và 150%), log sạch, màn Đề xuất đúng 41 thẻ / 37 nhãn "lỗ dự kiến" / không còn cảnh báo trùng khung, DB giữ nguyên (11 bảng). Code `81b94af`, bài học `ef3f0eb`, tài liệu: commit `docs:` ngay sau đó; push lên `origin/temp`.
 
-### GĐ7: tài liệu và chuẩn bị bảo vệ (thuộc bước 4)
-- Cần chốt trước: không còn mục nào (M-10 đã đóng ngày 2026-10-21).
-- `THESIS_ROADMAP.md`:
-  - §5: phần "As delivered" của Phase 5, 6, 7, 8;
-  - §9: đánh dấu note "occupancy RATE" là đã bị thay thế, và thêm note mới;
-  - Hidden Costs.
-- Các file đang nhắc tới phần dự báo. Danh sách lấy bằng grep ngày 2026-10-21; lúc làm phải grep lại:
-  - `docs/development/current_functional_spec.md`
-  - `docs/development/Proj_functions_summary.md`
-  - `docs/architecture/setup_guide.md` (cách chạy bộ sinh mới)
-  - `docs/todo/current_bugs_found.md`
-  - `docs/ai/02_feature_doc_prompt.md`
-  - `docs/ai/03_defense_study_prompt.md`
-- Bài học về phần dự báo, và phụ lục so sánh với LightGBM và Prophet bằng Python.
+### GĐ7: tài liệu và chuẩn bị bảo vệ (thuộc bước 4). Chủ dự án bảo làm ngày 2026-10-23 (*"hãy làm GD7 đi. đảm bảo bao quát toàn bộ tài liệu, đúng chuẩn sau những gì đã thay đổi. đọc code để thay đổi thay vì đọc tài liệu để viết lại tài liệu"*). Xong cùng ngày; commit (`c04a216`, `159aa7b`, `e9096d1`) và push ngày 2026-11-10
+- Không có vòng thảo luận riêng: chủ dự án giao thẳng việc, phạm vi lấy theo danh sách sơ bộ ở đây, mở rộng thành "mọi tài liệu đang tracked". Không có quyết định mới nào (không QĐ-18).
+- [x] **Cách làm:** đọc lại code của mọi phần GĐ1–GĐ6 đã đổi (domain lễ, `Route`, bộ sinh, danh sách chuyến, `ForecastService`, `SlotDemandModel`, `ArrowSolver`, Recommendation, What-if, DTO, controller, template, test), rồi rà **mọi** file `.md` đang tracked bằng grep theo từ khoá, sửa theo code chứ không theo tài liệu khác. Mọi con số trên DB thật kiểm lại bằng `SELECT` (chỉ đọc).
+- [x] **`THESIS_ROADMAP.md`:**
+  - §5 Phase 5, 6, 7 (bước 2 và 3), 8: "As delivered (current)" viết lại từ code; phần giao lần đầu giữ thành một dòng lịch sử ở cuối; dòng phạm vi Phase 6 và thiết kế Phase 8 thêm chú thích sửa đổi (giữ nguyên chữ đã duyệt);
+  - §6: Hidden Cost #2 ghi `CostParameters.updatedAt`; thêm **#10** (lịch lễ hết 2032, đổi mô hình phải đo lại bằng Python, lịch chạy thường lệ chưa có trong DB, dữ liệu cũ dần);
+  - §9: note "occupancy RATE" đánh dấu SUPERSEDED kèm lý do; chú thích cho note cửa sổ lễ (đo ở GĐ2), note projection, note giá vé; thêm note GĐ7 "trả lời câu hỏi về LightGBM/Prophet bằng số đo".
+- [x] **Tài liệu khác:**
+  - `current_functional_spec.md`: §1, Demand Forecast (so với ML), §6 (profile `backfill`, đủ 11 bảng), §9 mục 6 (đã có analytics), thuật ngữ SLOT / STANDARD BUS / SN4 CLEAN;
+  - `Proj_functions_summary.md`: §0 Boot 4.0.8; **§7.6 bỏ câu "fallback bảo trì" — code không có nhánh đó**; §10 thêm các query Decision Support; §11 đủ template; §13 ghi chú nợ tài liệu; §16.1, §16.7;
+  - `02_project_context.md`: mục đích, package, `backfill`, `updatedAt`, thêm §11 Decision Support;
+  - `database_schema.md`: **cột enum là `ENUM` gốc của MySQL, không phải VARCHAR** (kiểm trên DB thật), `holiday_flow` nay được đọc, `suitable_bus_type_id` là xe chuẩn, thêm enum `HolidayFlow`;
+  - `setup_guide.md`: Maven 3.9.12 qua wrapper (trước ghi nhầm 4.0.2), §4.3 thêm "dừng thay vì đoán" và "chạy bổ sung trước buổi demo" (kèm M-16);
+  - `test_case.md`: mục lục đủ Module 8–11 (thêm neo), ghi test tự động của GĐ1–GĐ3;
+  - `current_bugs_found.md`: các mục nhỏ còn mở trỏ đúng tên hằng `MIN_OBSERVED_DAYS` và số dòng mới; đánh dấu đã sửa mục README;
+  - `docs/ai/03_defense_study_prompt.md`: bỏ dòng "tài liệu đã biết lệch" đã hết đúng, ví dụ tính tay mới cho dự báo, thêm điểm phải nói thật về ML;
+  - `forecast_discussion.md`: đầu file ghi trạng thái hiện tại, thêm §17; `forecast_research/README.md`; `README.md` gốc repo viết lại (Boot 4.0.8, URL DB, ba profile, Decision Support).
+- [x] **Javadoc lỗi thời trong code (chỉ comment, số dòng giữ nguyên nên mọi trích dẫn `file:dòng` không lệch):** `Holiday` (cửa sổ đã đo ở GĐ2), `HolidayFlow` và `HolidayCalendar` ("tới GĐ1 chưa nơi nào đọc/gọi"), `SlotDemandModel` ("chưa có nơi nào gọi tới"), `TripRepository.findDemandHistoryByStatus` (còn nói "tỉ lệ lấp đầy").
+- [x] **Phụ lục LightGBM / Prophet (`forecast_discussion.md` §17, `forecast_research/gd7/`):**
+  - dữ liệu của app (GĐ2, 72 ngày gốc): mô hình trong app 22,35% so với Prophet 23,53%, LightGBM 24,84% ở tầm 1–7 (KTC không chứa 0), thắng cả ba lần Tết; bắt được 52% khung đông so với 36–37%;
+  - dữ liệu thật Hồng Kông: LightGBM tốt nhất ở ngày thường và Tết 2026; mô hình trong app ngang LightGBM ở tầm 1–7, tốt hơn cả hai ở Tết 2025 (lần mới thấy một Tết trước);
+  - LightGBM và Prophet chạy lại code bước 0, không chỉnh, trên đúng dữ liệu và ngày gốc của §14.1; mô hình trong app cho lại đúng 22,35% / 22,58%.
+- [x] **Bài học 14** `docs/study/14-demand-forecast.md` + `.html` (đủ 11 mục theo `03_defense_study_prompt.md`, số tính tay bằng scipy); viết trước 07–13, ghi trong prompt. Bài 00a: bài tập 6 dùng `SlotKey` thay record `Observation` không còn tồn tại; build lại HTML (build tái lập được: bản HEAD build lại giống từng byte).
+- [x] **Kiểm:** `mvnw test` sau khi sửa comment: **217/217**, 32 lớp, 0 lỗi (32 báo cáo surefire đều tạo mới trong lần chạy này). Số dòng của 5 file Java không đổi (`git diff --numstat`: thêm = bớt ở từng file). Không chạy app: GĐ7 không đổi hành vi nào.
+- [x] **Chủ dự án bảo commit và push** (2026-11-10, *"hãy commit và push nó đi"*). Trước commit: mọi thay đổi chưa commit đều từ phiên 23/10, sau đó không file nào bị sửa; chạy lại `mvnw test`: **217/217**, 0 lỗi (32 báo cáo surefire tạo mới). Không chạy `verify` trên app vì GĐ7 chỉ đổi comment và tài liệu. 4 commit: `c04a216` (javadoc), `159aa7b` (phụ lục, kèm `forecast_discussion.md` và `forecast_research/README.md`), `e9096d1` (bài học 14 và 00a), rồi commit `docs:`; push lên `origin/temp`. Transcript `.txt` vẫn để ngoài git.
+- [ ] **G3-7** (xoá bản sao `busmanagement_gd2`): vẫn chưa làm — xoá DB cần chủ dự án bảo.
 
 ---
 
@@ -316,6 +335,8 @@ Thêm một dòng mới vào cuối bảng sau mỗi phiên; không sửa các d
 | 2026-10-22 (GĐ4) | Commit tài liệu GĐ3 sau khi chạy (`4dea67b`). Thảo luận GĐ4, đo chung cấu hình cuối (§14.1); chủ dự án duyệt G4-1…G4-8 (QĐ-15). Xuất dữ liệu đối chiếu từ DB thật (chỉ đọc), viết `reference.py`, `SlotDemandModel`, `ArrowSolver`, 14 test; Java khớp Python tới 9,7·10⁻⁹; 0,2–0,6 giây mỗi lần khớp; 5 lần thử làm hỏng; `mvnw test` 184/184 | Thêm 2 lớp, chưa nơi nào gọi tới; DB thật chỉ `SELECT` | `4dea67b` (tài liệu GĐ3); `c5a830c` (GĐ4) + commit `docs:` ngay sau đó |
 | 2026-10-22 (GĐ5) | Commit GĐ4 (`c5a830c`, `36ddc9a`) sau `verify` chỉ đọc. Thảo luận GĐ5 kèm số liệu (§15); chủ dự án duyệt G5-1…G5-8 (QĐ-16). Viết lại `ForecastService`, 4 DTO, màn Dự báo; `backtest_reference.py`; 20 test; 11 lần thử làm hỏng; `mvnw test` 204/204; chạy app trên DB thật, số trên màn khớp Python tới 9,7·10⁻⁹ | Viết lại `ForecastService` và màn Dự báo; Recommendation, What-if không đổi code; DB thật chỉ `SELECT` | `c5a830c`, `36ddc9a` (GĐ4); `b6dced9`, `7b58519` + commit `docs:` (GĐ5); push tất cả lên `origin/temp` |
 | 2026-10-22 → 23 (GĐ6) | Thảo luận GĐ6 kèm số liệu (§16), giải thích lại từng điểm kèm ví dụ và ưu nhược; chủ dự án duyệt G6-1…G6-7 (QĐ-17, đóng M-14). Viết lại phần dựng thẻ của `RecommendationService` và phần đếm/tiền của `WhatIfSimulationService`; khách tràn kỳ vọng; giữ chỗ trong `AvailabilityContext`; bỏ cầu nối; 13 test mới; 15 lần thử làm hỏng; `mvnw test` 217/217; chạy app trên DB thật, mọi thẻ khớp Python tới từng đồng, 0 trùng xe/tài xế | Đổi Recommendation, What-if, hai template, 5 DTO, `ForecastService`, `SlotDemandModel` (thêm một hàm), `AvailabilityContext`; `TripService` không đổi; DB thật chỉ `SELECT` | `81b94af`, `ef3f0eb` + commit `docs:`; push lên `origin/temp` |
+| 2026-10-23 (GĐ7) | Giải thích cho chủ dự án đợt này đã làm gì, còn gì. Chủ dự án bảo làm GĐ7, đọc code để sửa tài liệu. Đọc lại code GĐ1–GĐ6; rà mọi `.md` đang tracked; viết lại roadmap §5 Phase 5–8, thêm Hidden Cost #10, sửa §9; sửa spec, summary (kể cả §7.6 lệch code từ trước), project context, schema (enum là `ENUM` gốc), setup guide, test case, sổ lỗi, prompt, README; 6 chỗ javadoc lỗi thời; chạy LightGBM và Prophet bằng Python cho phụ lục §17; viết bài học 14 | Chỉ comment trong 5 file Java (số dòng giữ nguyên); DB thật chỉ `SELECT` | Chưa |
+| 2026-11-10 (commit GĐ7) | Chủ dự án bảo commit và push. Kiểm mọi thay đổi chưa commit đều từ 23/10; chạy lại `mvnw test` 217/217; chia 4 commit; push | Không đổi; không chạm DB | `c04a216`, `159aa7b`, `e9096d1` + commit `docs:`; push lên `origin/temp` |
 
 ---
 

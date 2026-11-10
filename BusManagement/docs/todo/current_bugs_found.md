@@ -545,7 +545,7 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
 
 ## Mục nhỏ, ghi để không bị quên
 
-- **`TripRepository.findScheduleForAvailability` javadoc (dòng 420-425) nêu lý do đã
+- **`TripRepository.findScheduleForAvailability` javadoc (dòng 420-425 lúc ghi; 520-524 ngày 2026-10-23) nêu lý do đã
   hết hiệu lực:** vẫn giải thích việc không `JOIN FETCH` `coDrivers` là vì *"@Data
   trên Trip/Driver/User sinh hashCode đệ quy hai chiều → StackOverflow"*. Nguyên
   nhân đó đã bị loại bỏ ngày 2026-07-24 (`2e101f9`, equals/hashCode theo id).
@@ -553,15 +553,16 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
   là lạc hậu. Cùng loại với defect #3.
 - **What-if: khung thiếu giá vé lịch sử vào chi phí nhưng không vào doanh thu**
   (`WhatIfSimulationService.java:258-266` và `286-294`; từ GĐ6 đơn vị là chuyến thêm, luật
-  không đổi) → lợi nhuận bị hụt, màn không nói có bao nhiêu chuyến được định giá; dòng
+  không đổi; ngày 2026-10-23 là `:259-266` và `:286-300`) → lợi nhuận bị hụt, màn không nói có bao nhiêu chuyến được định giá; dòng
   "nếu chỉ chạy chuyến có lãi" của GĐ6 bỏ qua chuyến không có giá. Phase 7 không bị vì thẻ thiếu giá thì `profit = null`.
-  Hiện chưa cắn: cả 15 chuỗi đều cần ≥28 chuyến `COMPLETED` tại (tuyến, giờ) đó và
-  `findPriceHistoryByStatus` đã lọc `price IS NOT NULL`.
+  Hiện chưa cắn: cả 15 chuỗi đều cần ≥ 28 ngày có chuyến `COMPLETED` tại (tuyến, giờ) đó
+  (`ForecastService.MIN_OBSERVED_DAYS`) và `findPriceHistoryByStatus` đã lọc `price IS NOT NULL`.
 - **What-if: công thức throughput thoái hoá nếu chỉ còn 1 khung giờ đủ điều kiện**
-  (`deriveThroughput`, dòng 404-427): `operatingWindow = maxHour + avgDur − minHour`
+  (`deriveThroughput`, dòng 404-428): `operatingWindow = maxHour + avgDur − minHour`
   → còn đúng `avgDur` → `tripsPerBusPerDay = avgDur/(avgDur+1) < 1`, tức một xe không
-  chạy nổi một chuyến/ngày. Chưa xảy ra (dữ liệu có 06/12/18 → window 15.0h, đã đo).
-  `MIN_OBSERVATIONS = 28` không bảo đảm có ≥2 khung giờ.
+  chạy nổi một chuyến/ngày. Chưa xảy ra (dữ liệu có 06/12/18 → window 15.0h, đã đo; vẫn
+  15,0h trên DB thật sau GĐ3). Ngưỡng `ForecastService.MIN_OBSERVED_DAYS = 28` (tên cũ
+  `MIN_OBSERVATIONS`, trước GĐ5) không bảo đảm có ≥2 khung giờ.
 - ~~**What-if: mọi hệ số nhu cầu từ 50% đến 90% đều cho kết quả y hệt nhau**~~ **✅ HẾT TỪ
   GĐ6 (2026-10-23, QĐ-17 G6-5, chủ dự án duyệt):** hệ số giờ nhân vào **số khách** dự báo,
   không kẹp, và số chuyến thêm tính bằng `ForecastService.tripsNeeded`. Trên DB thật, 70%
@@ -2660,6 +2661,7 @@ là mới — bài học 2026-09-19 buổi sáng.
   chết). Doc lạc hậu một phiên bản; cùng loại với các mục docs khác. Sửa: một từ. Chưa sửa vì ngoài
   phạm vi phiên này.
   *(Bổ sung 2026-09-23, tự rà: badge ở `README.md:4` cũng ghi `Spring%20Boot-3.x` — sửa cả hai chỗ.)*
+  **✅ ĐÃ SỬA 2026-10-23 (GĐ7 của đợt thiết kế lại dự báo, lượt rà toàn bộ tài liệu):** `README.md` gốc repo viết lại theo code — Spring Boot 4.0.8 ở badge và mục Tech Stack (`pom.xml` đã lên 4.0.8 từ `6101279`), URL DB đúng `busmanagement`, ba profile thay cho câu "tự khởi tạo DB", lối vào `/admin/dashboard`, thêm phần Decision Support. Cùng lượt: `setup_guide.md` §1 ghi Maven 3.9.12 qua wrapper (trước ghi nhầm "4.0.2"), `Proj_functions_summary.md` §0 ghi Boot 4.0.8.
 
 ## ĐÃ KIỂM ở lần rà 2026-09-19 — không phải lỗi, đừng nêu lại
 
@@ -3085,7 +3087,7 @@ này vì ở đó số ghế sửa được cùng lúc (xem mục nhỏ ngay dư
   theo cho tới khi lưu. Danh sách xe vốn đã tính theo tuyến đã lưu từ trước (`showEditTripForm()` gọi
   `getAvailableBusesForTrip(id)`); C(a) chỉ thêm ★ theo đúng cách đó. Nhỏ; ghi để biết.
 - **`README.md` còn "3.x" ở cả dòng 4 (badge)** — mục `README.md:37` phía trên chỉ ghi dòng 37. Xem
-  ghi chú bổ sung ở mục đó.
+  ghi chú bổ sung ở mục đó. **✅ Đã sửa 2026-10-23** cùng mục đó.
 
 ---
 

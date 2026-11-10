@@ -1,80 +1,69 @@
 # Bus Management System
 
 [![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.8-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
 [![MySQL](https://img.shields.io/badge/MySQL-8.x-blue?logo=mysql)](https://www.mysql.com/)
-[![Maven](https://img.shields.io/badge/Maven-3.x-red?logo=apachemaven)](https://maven.apache.org/)
+[![Maven](https://img.shields.io/badge/Maven-3.9%20(wrapper)-red?logo=apachemaven)](https://maven.apache.org/)
 [![License](https://img.shields.io/badge/License-Academic%20Project-lightgrey)](#license)
 
-Bus Management System is a Spring Boot application for managing bus fleets, routes, drivers, and trip operations. It features an AI-assisted scheduling engine that recommends additional trips and validates operational constraints such as driver availability and vehicle maintenance.
+Bus Management System is a Spring Boot application for running a coach company's operations — fleet, routes, drivers, trips and incidents — with a decision-support layer on top: a demand forecast, reinforcement recommendations with cost and profit, and a what-if simulation. Everything is used by an administrator; there is no customer or driver portal yet.
+
+The "AI" parts are **rule-based automation and statistics**, not machine learning: the extra-trip scanner and auto-assignment apply business rules, and the demand forecast is a calendar Poisson regression written in plain Java. The historical data the forecast learns from is **simulated** (see `BusManagement/docs/architecture/setup_guide.md` §4.3).
 
 ---
 
 ## 🚀 Key Features
 
-### 1. Fleet & Vehicle Management
-*   **Bus Configuration:** Track bus profiles, license plates, odometer mileage, and status monitoring.
-*   **Capacity Definition:** Define seat capacities for different vehicle categories.
-*   **Maintenance Warnings:** Monitor vehicle conditions and prevent the dispatch of buses requiring service.
+### Operations
+*   **Fleet & vehicle management:** buses, bus types and seat capacity, odometer and maintenance thresholds, status (`READY` / `TRAVELING` / `REPAIRING`).
+*   **Routes & stations:** ordered stop lists, distance, duration, a preferred bus type, and an optional holiday passenger flow used by the forecast.
+*   **Drivers:** one form creates the user account and the driver profile; licence expiry and an 8-hour daily driving limit are enforced.
+*   **Trip scheduling & lifecycle:** manual trips with conflict checks, a trip state machine (`PENDING_APPROVAL → ACTIVE → DEPARTED → COMPLETED`, or `CANCELLED`) that keeps bus status in sync, soft delete.
+*   **Extra-trip scanner:** a background job flags trips selling above 90 % of their seats and prepares an extra trip with a bus and crew for the administrator to approve.
+*   **Dispatch board, incident log, dashboard & analytics.**
 
-### 2. Route & Station Management
-*   **Station Registry:** Define operational stops and terminals.
-*   **Route Setup:** Configure routes, calculate total distances, and organize ordered station sequences.
-
-### 3. Trip Scheduling & Lifecycle
-*   **Manual Dispatch:** Schedule trips directly and validate driver and bus conflicts.
-*   **Resource Finder:** Dynamically scan and display available buses and drivers for selected timeframes.
-*   **FSM Transitions:** Drive trips through systematic operational states (e.g., Active, Departed, Completed).
-
-### 4. AI Scheduling Recommendation
-*   **AI Recommendation Engine:** Automatically detects high-demand trips and recommends additional trips with automatic resource allocation.
-*   **Constraint Checking:** Auto-assigns ready vehicles and qualified staff while auditing rest limits and driving hours.
+### Decision support
+*   **Demand forecast** (`/admin/analytics/forecast`): passengers per route × departure hour for the next 7 days (35-day preview), holiday effects learned from data, and a self-check against a naive baseline.
+*   **Reinforcement recommendation** (`/admin/analytics/recommendation`): one card per extra trip a busy slot needs, with a bus and driver reserved across cards, the expected passengers it would carry, revenue, cost and profit.
+*   **What-if simulation** (`/admin/analytics/what-if`): add or remove buses and drivers, scale demand, override cost rates — and see how many needed extra trips the fleet can cover.
+*   **Driver recommendation, vehicle replacement ranking, cost parameters.**
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Backend:** Java 17, Spring Boot 3.x, Spring Security, Spring Scheduler
-*   **Database & ORM:** MySQL, Spring Data JPA, Hibernate
-*   **Frontend Views:** Thymeleaf, CSS
+*   **Backend:** Java 17, Spring Boot 4.0.8 (Spring MVC, Spring Data JPA / Hibernate, Spring Scheduler, Spring Security on the classpath but permit-all by code), Lombok
+*   **Database:** MySQL 8
+*   **Frontend views:** Thymeleaf, Bootstrap 5, Chart.js
+*   **Build:** Maven wrapper (`mvnw`, Maven 3.9.12)
 
 ---
 
 ## 📐 Architecture
 
-The application is structured following a standard layered architecture:
+The application follows a layered architecture:
 
 ```
-[Browser / Frontend] 
-       │ (HTTP Requests / Thymeleaf / AJAX)
-       ▼
-[Controller Layer] (REST & MVC Controllers)
-       │ (Interactions)
-       ▼
-[Service Layer] (Core Business Logic & Validations)
-       │ (JPA Queries)
-       ▼
-[Repository Layer] (Spring Data JPA Repositories)
-       │ (SQL Commands)
-       ▼
-[MySQL Database]
+[Browser]  — Thymeleaf pages, a little JavaScript / AJAX
+     │ HTTP
+     ▼
+[Controller layer]  (MVC controllers + one REST controller)
+     │
+     ▼
+[Service layer]     (business rules, trip FSM, validation, forecast, recommendation)
+     │
+     ▼
+[Repository layer]  (Spring Data JPA)
+     │
+     ▼
+[MySQL]
 ```
-
-*   **Controller Layer:** Manages web routes, request routing, and handles REST requests.
-*   **Service Layer:** Executes business rules, FSM checks, and handles resource constraint calculations.
-*   **Repository Layer:** Handles database communication and custom persistence queries.
 
 ---
 
 ## 🗄️ Database
 
-### Main Entities
-*   **Users:** System accounts.
-*   **Drivers:** Staff profiles and license tracking.
-*   **Buses:** Vehicle profiles.
-*   **Routes:** Defined paths between stations.
-*   **Stations:** Dispatch terminals and stops.
-*   **Trips:** Scheduled dispatches associating a route, bus, and crew.
+Tables: `users`, `drivers`, `bus_types`, `buses`, `stations`, `routes`, `route_stations`, `trips`, `trip_co_drivers`, `incidents`, `cost_parameters`. Full reference: `BusManagement/docs/architecture/database_schema.md`.
 
 ---
 
@@ -85,72 +74,51 @@ BusManagement/
 ├── src/
 │   ├── main/
 │   │   ├── java/giang/com/BusManagement/
-│   │   │   ├── config/          # Configurations (Security, Web)
-│   │   │   ├── controller/      # REST APIs & MVC View Controllers
-│   │   │   ├── domain/          # Database JPA Entity models
-│   │   │   ├── repository/      # Spring Data JPA Repositories
-│   │   │   └── service/         # Business logic & FSM validators
+│   │   │   ├── config/          # Security, demo seed (DataInitializer), history generator (HistoricalDataBackfill)
+│   │   │   ├── controller/      # MVC controllers (admin/) and the REST controller
+│   │   │   ├── domain/          # JPA entities, enums, the holiday calendar
+│   │   │   ├── dto/             # View models for the dashboard and decision-support pages
+│   │   │   ├── repository/      # Spring Data JPA repositories
+│   │   │   └── service/         # Business logic, trip FSM, forecast model, recommendation, what-if
 │   │   └── resources/
-│   │       ├── templates/       # Thymeleaf HTML pages
-│   │       └── application.properties # App configurations
-│   └── test/                    # Unit & integration tests
-├── docs/                        # Project documentation
-│   ├── ai/                      # AI assistant context guidelines
-│   ├── development/             # Specifications and setups
-│   └── archive/                 # Historical specifications & reports
-└── pom.xml                      # Maven configuration
+│   │       ├── templates/       # Thymeleaf pages
+│   │       └── application*.properties
+│   └── test/                    # JUnit tests (separate test database) and the forecast reference fixtures
+├── docs/
+│   ├── ai/                      # Prompts and rules for AI assistants
+│   ├── architecture/            # Setup guide, database schema, trip lifecycle
+│   ├── development/             # Roadmap, functional spec, forecast decisions and research
+│   ├── study/                   # Study lessons for the thesis defence
+│   ├── testing/                 # Test cases
+│   └── todo/                    # Defect register
+└── pom.xml
 ```
 
 ---
 
 ## 💻 Getting Started
 
-### Prerequisites
-*   Java 17 JDK or higher installed
-*   MySQL database instance running locally
-*   Maven installed (or use the included Maven wrapper)
+Full instructions: `BusManagement/docs/architecture/setup_guide.md`.
 
-### Setup & Launch
-1.  **Configure Database Credentials:**
-    Update your MySQL username, password, and database URI inside `src/main/resources/application.properties`:
-    ```properties
-    spring.datasource.url=jdbc:mysql://localhost:3306/bus_management?createDatabaseIfNotExist=true
-    spring.datasource.username=...
-    spring.datasource.password=....
-    ```
-
-2.  **Run the Application:**
-    Navigate to the project root directory containing the Maven wrapper and run:
+1.  **Database:** run MySQL 8 and set the credentials in `BusManagement/src/main/resources/application.properties` (default URL `jdbc:mysql://localhost:3306/busmanagement`; the host can be overridden with `MYSQL_HOST`).
+2.  **Run:**
     ```bash
     cd BusManagement
-    ./mvnw spring-boot:run
+    ./mvnw spring-boot:run                                          # default: keeps the data
+    ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo          # WIPES the database and seeds sample data
+    ./mvnw spring-boot:run -Dspring-boot.run.profiles=backfill      # adds the simulated trip history the forecast needs
     ```
-    *(On Windows Command Prompt/PowerShell, use: `.\mvnw.cmd spring-boot:run`)*
-
-3.  **Access Dashboard:**
-    Open your browser and navigate to `http://localhost:8080/admin/trips`. The project includes automatic database initialization for development.
-
----
-
-## 📸 Demo & Screenshots
-
-*Demo screenshots and UI previews coming soon.*
+    *(On Windows, use `.\mvnw.cmd`.)* A fresh database is empty: run `demo` once, then `backfill`. Never run `demo` on a database whose history you want to keep.
+3.  **Open:** `http://localhost:8080/admin/dashboard`.
+4.  **Tests:** `./mvnw test` — uses its own database `busmanagement_test`, never the real one.
 
 ---
 
 ## 📊 Current Status
 
-### Implemented Modules
-*   ✓ Fleet Management
-*   ✓ Route Management
-*   ✓ Trip Scheduling
-*   ✓ AI Recommendation
-
-### Future Roadmap
-*   Planned - Authentication & Authorization
-*   Planned - Customer Ticketing & Booking
-*   Planned - Notification Services
-*   Planned - Online Payment Integrations
+*   **Done (roadmap Phases 0–8):** operations modules, business-rule validation, incident management, driver recommendation, simulated history, demand forecast, reinforcement recommendation with cost and profit, vehicle replacement ranking, what-if simulation. The demand forecast was redesigned in October 2026 (slot demand, calendar Poisson regression with EM) — see `BusManagement/docs/development/forecast_decisions.md`.
+*   **Not started:** Phase 9, a minimal customer portal (search, seat availability, simple booking).
+*   **Out of scope by decision:** real login and roles, online payment, notifications, a driver portal. See `BusManagement/docs/development/THESIS_ROADMAP.md` §4.
 
 ---
 

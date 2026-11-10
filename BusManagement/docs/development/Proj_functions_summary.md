@@ -6,7 +6,7 @@
 
 ## 0. Thông tin chung
 
-- **Tech stack:** Java 17, Spring Boot 4.0.2, Spring Data JPA (Hibernate), Thymeleaf, MySQL, Lombok.
+- **Tech stack:** Java 17, Spring Boot 4.0.8 (`pom.xml:8`), Spring Data JPA (Hibernate), Thymeleaf, MySQL, Lombok.
 - **Kiến trúc:** Layered (Controller → Service → Repository → Domain/Entity), có một REST Controller (`TripRestController`) phục vụ AJAX.
 - **Bảo mật:** `SecurityConfig` cho phép **mọi request không cần đăng nhập** (`anyRequest().permitAll()`, CSRF/form-login/http-basic đều bị tắt). Không có phân quyền ROLE_ADMIN/ROLE_DRIVER/ROLE_USER nào được enforce ở tầng Spring Security, dù entity `User`/`Role` có định nghĩa enum 3 vai trò.
 - **Database init:** Mặc định `spring.jpa.hibernate.ddl-auto=update` — dữ liệu **được giữ** qua các lần khởi động, `DataInitializer` không chạy. Chỉ profile `demo` (`-Dspring-boot.run.profiles=demo`) mới dùng `create-drop` + chạy `DataInitializer` (`@Profile("demo")`) để xóa sạch và seed lại dữ liệu test. Test dùng DB riêng `busmanagement_test`.
@@ -206,8 +206,8 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 ### 7.6. `findBestAvailableBus(trip, departure, arrival)`
 - Lấy candidate: mọi xe `READY`; xếp **xe đúng `route.suitableBusType` trước**, rồi theo `kmSinceLastMaintenance` — comparator `preferredTypeThenLeastWorn()`, dùng chung với dropdown Duyệt/Sửa. Hết xe đúng loại thì chọn xe loại khác, không trả null. *(Chủ dự án chốt 2026-09-24, mục #26. Câu dưới đây là trạng thái trước đó, giữ để thấy lịch sử:)* ~~nếu route có `suitableBusType` thì lọc theo đúng loại + `READY`; ngược lại lấy tất cả `READY`.~~ *(Ghi chú cũ, hết hiệu lực từ 2026-09-24 — Cố ý giữ sau Group C(a), 2026-09-23: loại xe là **gợi ý** — validator không kiểm, dropdown Duyệt/Sửa/Tạo mời mọi loại và xếp đúng loại lên đầu — nhưng đường AI không có người xem lại lựa chọn lúc chọn nên áp gợi ý như bộ lọc; mời hẹp hơn validator là được phép.)*
 - Cửa sổ bận mở rộng `±BUS_PREP_BUFFER_HOURS (1h)`.
-- Ưu tiên xe **chưa** bận và **sau chuyến này vẫn chưa vượt** `maintenanceThreshold`, chọn xe có `kmSinceLastMaintenance` nhỏ nhất (xe "mới" nhất).
-- Fallback: nếu không có xe nào thỏa ngưỡng bảo trì, vẫn chọn xe ít km nhất trong số xe không bận, kèm log cảnh báo "SÁT/QUÁ NGƯỠNG BẢO TRÌ".
+- Lọc cứng: xe **không** bận trong cửa sổ, **chưa** `needsMaintenance()`, và **sau chuyến này vẫn chưa** `isNearMaintenance(quãng đường)`; trong số còn lại chọn theo `preferredTypeThenLeastWorn` (đúng loại trước, rồi `kmSinceLastMaintenance` nhỏ nhất).
+- **Không có fallback bảo trì:** không xe nào qua ba bộ lọc thì trả `null` (`TripService.java:326-331`, kiểm 2026-10-23). ~~Fallback: nếu không có xe nào thỏa ngưỡng bảo trì, vẫn chọn xe ít km nhất trong số xe không bận, kèm log cảnh báo "SÁT/QUÁ NGƯỠNG BẢO TRÌ".~~ — câu cũ này lệch code; comment trong `validateBusForTrip()` (`TripService.java:1184`) vẫn còn nhắc "fallback cuối cùng" đó.
 
 ### 7.7. `findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount, excludeDrivers)`
 - Cửa sổ bận: `±MIN_REST_BETWEEN_TRIPS_MINUTES (30 phút)`.
@@ -285,6 +285,12 @@ Hai hàm `...Assistants...` áp **ba** điều kiện đầu trừ trần 8h —
   - `DriverRepository.countByIsActive(Boolean)`, `findAverageExperienceYears()`, `countActiveDriversWithLicenseExpiringBetween(from, to)`.
   - `TripRepository.countAiSuggestionsByStatus()`, `findSeatsAndSoldByStatus(status)`, `sumTicketsSoldAndRevenueByStatuses(statuses)`, `aggregateByRoute(statuses)`, `findDistinctRouteIdsWithTrips()`.
   - **Lưu ý kỹ thuật đã gặp thực tế khi triển khai:** khai báo 1 query aggregate đa cột (`SUM`, không `GROUP BY`) trả về `Object[]` trực tiếp bị Spring Data hiểu nhầm thành "ép cả result list thành mảng" thay vì "1 dòng kết quả duy nhất" → `ClassCastException` lúc runtime. Lỗi này **không** bị compile hay context-load test bắt được, chỉ lộ ra khi gọi qua HTTP thật. Đã sửa `sumTicketsSoldAndRevenueByStatuses` sang `List<Object[]>` + lấy phần tử đầu ở tầng service — đây là pattern chuẩn, không mơ hồ của Spring Data JPA cho loại query này.
+- **Bổ sung cho Decision Support và bộ sinh dữ liệu (đọc-only trừ bộ sinh; đều là projection scalar, không nạp entity — Hidden Cost #4):**
+  - `TripRepository.findDemandHistoryByStatus(status)` — (tuyến, giờ khởi hành, vé, ghế) cho Dự báo nhu cầu (mục 16).
+  - `TripRepository.findPriceHistoryByStatus(status)` — giá vé lịch sử cho Đề xuất và What-if (mục 18, 19).
+  - `TripRepository.findScheduleForAvailability(statuses, spanStart, spanEnd)` — nạp lịch một lần cho `AvailabilityContext` (mục 18.7); JOIN FETCH xe, tài xế, phụ xe.
+  - `TripRepository.findDepartureTimesByRouteIdsBetween(...)`, `findResourceUseBetween(...)` — bộ sinh lịch sử biết ngày nào đã sinh và xe, người nào chuyến có sẵn đang giữ (`setup_guide.md` §4.3).
+  - `IncidentRepository.countIncidentsPerBusAndType(...)` — Đề xuất thay xe (mục 17).
 
 ---
 
@@ -293,16 +299,26 @@ Hai hàm `...Assistants...` áp **ba** điều kiện đầu trừ trần 8h —
 | Template | Chức năng |
 |---|---|
 | `admin/dashboard.html` | Trang tổng quan: tổng users, tổng buses, số trip pending |
-| `admin/bus/bus-list.html`, `admin/bus/bus-form.html` (và bản cũ `admin/bus-form.html`) | CRUD xe |
+| `admin/bus/bus-list.html`, `admin/bus/bus-form.html` | CRUD xe |
 | `admin/station/station-list.html`, `admin/station/station-form.html` | CRUD bến xe |
+| `admin/route/route-list.html`, `admin/route/route-form.html` | CRUD tuyến: lộ trình nhiều điểm dừng, loại xe phù hợp, hướng dòng khách dịp lễ |
+| `admin/driver/driver-list.html`, `admin/driver/driver-form.html` | CRUD tài xế (form gộp `User` + `Driver`) |
+| `admin/incident/incident-list.html`, `admin/incident/incident-form.html` | Ghi nhận sự cố |
+| `admin/dispatch-board.html` | Bảng điều phối: quá giờ / đang chạy / sắp khởi hành 48h |
 | `admin/user-form.html` | Tạo user |
-| `admin/trip-list.html` | Danh sách + filter trip theo status |
+| `admin/trip-list.html` | Danh sách + filter trip theo status, cửa sổ 7/30/90 ngày cho chuyến đã kết thúc (mục 6.1) |
 | `admin/trip-create-form.html` | Form tạo trip thủ công (wizard, có gọi REST API `available-resources`) |
 | `admin/trip-edit-form.html` | Form sửa trip, hiển thị sẵn coDrivers đã lưu |
 | `admin/pending-trips.html` | Danh sách trip chờ duyệt, phân loại auto-assigned vs cần thủ công |
 | `admin/approve-form.html` | Form duyệt trip (2 mode: auto-confirm 1-click hoặc chọn thủ công) |
-| `admin/suggestions.html` | (tồn tại trong templates, liên quan đề xuất AI — chưa rõ controller route gọi tới) |
-| `admin/dashboard-analytics.html` | Dashboard & Analytics (xem mục 14): dải KPI vận hành cố định + 6 tab Strategic Analytics (Fleet/Trips/Routes/Drivers/Occupancy/AI), 7 chart Chart.js |
+| `admin/suggestions.html` | Tồn tại trong templates nhưng **không controller nào trả về nó** (grep `"suggestions"` trong `src/main/java` không có kết quả, kiểm 2026-10-23) — template chết |
+| `admin/dashboard-analytics.html` | Dashboard & Analytics (xem mục 14): dải KPI vận hành cố định + 6 tab Strategic Analytics (Fleet/Trips/Routes/Drivers/Occupancy/AI), 7 chart Chart.js; tab "Lấp đầy" có lối vào Dự báo, Đề xuất tăng cường, What-if |
+| `admin/driver-recommendation.html` | Đề xuất tài xế (mục 15) |
+| `admin/demand-forecast.html` | Dự báo nhu cầu (mục 16): bảng 7 ngày, biểu đồ 35 ngày, hệ số lễ, tự chấm điểm (Chart.js) |
+| `admin/vehicle-replacement.html` | Đề xuất thay xe (mục 17) |
+| `admin/recommendation.html` | Đề xuất tăng cường (mục 18): mỗi chuyến thêm một thẻ |
+| `admin/cost-parameters.html` | Tham số chi phí (nhiên liệu/km, lương/giờ) dùng cho mục 18, 19 |
+| `admin/what-if.html` | Mô phỏng kịch bản (mục 19) |
 | `hello.html` | Trang chủ mặc định (`/`) qua `helloController` |
 
 ---
@@ -368,7 +384,7 @@ Hai hàm `...Assistants...` áp **ba** điều kiện đầu trừ trần 8h —
 
 > **Đã đối soát lại toàn bộ mục 13 ngày 2026-07-22.** Trước lần đối soát này, danh sách "Đã làm" phản ánh trạng thái *trước Phase 1* — thiếu CRUD Tài xế, CRUD Tuyến đường, Bảng Điều phối (Phase 1), Quản lý Sự cố (Phase 2), API dry-run (Phase 3), bộ sinh dữ liệu lịch sử (Phase 5), Đề xuất tài xế (Phase 4) và Dự báo nhu cầu (Phase 6). Tất cả đã được bổ sung, và dòng "app/trang riêng cho Driver" ở phần "Chưa làm" đã được làm rõ để không bị đọc nhầm thành "chưa có quản lý sự cố".
 >
-> **Còn nợ, không phải nợ tính năng mà là nợ tài liệu:** trong số các module vừa bổ sung, mới có Phase 4 và Phase 6 được viết thành mục chi tiết riêng (mục 15 và 16). Phase 1, 2, 3, 5 hiện chỉ có mô tả gọn ở danh sách trên; nếu cần mức chi tiết như mục 14–16 thì phải viết thêm mục riêng cho từng module. Nguồn tham chiếu đầy đủ nhất cho chúng lúc này là `THESIS_ROADMAP.md` mục 5 (phần "As delivered" của từng phase) và mục 8 (Session Log).
+> **Còn nợ, không phải nợ tính năng mà là nợ tài liệu:** trong số các module vừa bổ sung, Phase 4, 6, 7 và 8 đã có mục chi tiết riêng (mục 15–19; mục 16, 18, 19 viết lại theo đợt thiết kế lại dự báo, 2026-10-22 → 23). Phase 1, 2, 3, 5 hiện chỉ có mô tả gọn ở danh sách trên; nếu cần mức chi tiết như mục 14–19 thì phải viết thêm mục riêng cho từng module — riêng bộ sinh dữ liệu (Phase 5) đã có mô tả đầy đủ ở `docs/architecture/setup_guide.md` §4.3. Nguồn tham chiếu đầy đủ nhất cho chúng lúc này là `THESIS_ROADMAP.md` mục 5 (phần "As delivered" của từng phase) và mục 8 (Session Log).
 
 ---
 
@@ -453,10 +469,9 @@ Thành phần **AI Prediction**, và là module **duy nhất có tính dự đo�
 
 ### 16.1. Cấu trúc
 - **Controller:** `ForecastController` — 1 `GET`, không tham số, gọi `buildForecastPage()`. Chỉ inject Service.
-- **Service:** `ForecastService` — `@Transactional(readOnly = true)`, inject `TripRepository`, `RouteRepository`, `BusRepository`. Hai cửa:
-  - `buildForecast()` cho Recommendation, What-if và phần chính của màn;
-  - hai hàm tĩnh dùng chung cho hai màn kia: `tripsNeeded()` (số chuyến cần) và `extraTripPassengers()` (số khách một chuyến thêm chở được, mục 18.4);
-  - `buildForecastPage()` thêm phần tự chấm điểm, chỉ màn Dự báo dùng.
+- **Service:** `ForecastService` — `@Transactional(readOnly = true)`, inject `TripRepository`, `RouteRepository`, `BusRepository`.
+  - Hai cửa công khai: `buildForecast()` cho Recommendation, What-if và phần chính của màn; `buildForecastPage()` thêm phần tự chấm điểm, chỉ màn Dự báo dùng.
+  - Hai hàm tĩnh package-private dùng chung cho hai màn kia: `tripsNeeded()` (số chuyến cần) và `extraTripPassengers()` (số khách một chuyến thêm chở được, mục 18.4).
 - **Lõi toán:** `SlotDemandModel` (mô hình) và `ArrowSolver` (đại số), package-private trong `service`, viết ở GĐ4 (QĐ-15), khớp bản Python đã đo tới 10⁻⁸. `ForecastService` chỉ gom dữ liệu, gọi mô hình và dựng màn hình.
 - **DTO:**
   - `ForecastPointDto`: một ngày-khung;
@@ -509,6 +524,8 @@ Ngày gốc là ngày cuối có dữ liệu. Dự báo bắt đầu từ ngày 
 - Bộ dữ liệu **cũ dần** nếu không chạy bổ sung; trang hiển thị nó đã cũ bao nhiêu ngày.
 - Đây là **thống kê, không phải máy học**: hồi quy Poisson viết tay bằng Java, không thêm thư viện (Non-Goal §4).
 - Chỉ dự báo theo tuyến × khung giờ; không có chiều theo trạm, loại xe hay độ nhạy giá.
+- Lịch ngày lễ chỉ phủ tới **31/12/2032**; dự báo dừng ở đó và màn hình cảnh báo khi 35 ngày xem trước chạm mốc này.
+- **So với LightGBM và Prophet** (chỉ bằng Python, ngoài app — `forecast_discussion.md` §17): trên dữ liệu của app mô hình tốt hơn cả hai ở mọi tầm và mọi dịp Tết, vì chỉ nó xử lý khung bán hết; trên dữ liệu thật Hồng Kông, LightGBM tốt hơn ở ngày thường và ở Tết thứ ba. Phải nói đủ cả hai vế.
 
 ---
 

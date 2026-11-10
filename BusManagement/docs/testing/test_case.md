@@ -17,6 +17,10 @@
 5. [Module 5: Quy trình Phê duyệt của Admin (Admin Approval Flow)](#module-5)
 6. [Module 6: Tầng Bảo mật & Cấu hình (Security & Config)](#module-6)
 7. [Module 7: Quản lý Sự cố (Incident Management)](#module-7)
+8. [Module 8: Dự báo Nhu cầu (Demand Forecast)](#module-8)
+9. [Module 9: Đề xuất Thay thế Phương tiện (Vehicle Replacement)](#module-9)
+10. [Module 10: Đề xuất Tăng cường (Recommendation Engine)](#module-10)
+11. [Module 11: Mô phỏng Kịch bản (What-if)](#module-11)
 
 ---
 
@@ -1801,6 +1805,7 @@
 
 ---
 
+<a name="module-7"></a>
 ## MODULE 7: QUẢN LÝ SỰ CỐ (Incident Management)
 
 > Module này tương ứng Phase 2 của `docs/development/THESIS_ROADMAP.md`.
@@ -2116,6 +2121,7 @@
 
 ---
 
+<a name="module-8"></a>
 ## MODULE 8 — DỰ BÁO NHU CẦU (Phase 6; viết lại ở GĐ5 của đợt thiết kế lại dự báo, 2026-10-22, QĐ-16)
 
 Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
@@ -2231,6 +2237,7 @@ Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
 
 ---
 
+<a name="module-9"></a>
 ## MODULE 9 — ĐỀ XUẤT THAY THẾ PHƯƠNG TIỆN (Phase 7, bước 1)
 
 Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/vehicle-replacement`.
@@ -2286,6 +2293,7 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/vehicle-replacem
 
 ---
 
+<a name="module-10"></a>
 ## MODULE 10 — ĐỀ XUẤT TĂNG CƯỜNG (Phase 7, bước 2–3; chuyển sang đơn vị nhu cầu ở GĐ6 của đợt thiết kế lại dự báo, 2026-10-23, QĐ-17)
 
 Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`. Điều kiện chung: đã chạy `backfill` để Dự báo có dữ liệu. Mỗi thẻ là **một chuyến thêm**. Các luật còn được khoá bằng test tự động: `RecommendationServiceTest` (6, đi qua DB test), `ForecastServiceRulesTest` và `SlotDemandModelReferenceTest` (số khách tràn), `TripServiceAvailabilityContextTest` (giữ chỗ).
@@ -2379,6 +2387,7 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 
 ---
 
+<a name="module-11"></a>
 ## MODULE 11 — MÔ PHỎNG KỊCH BẢN / WHAT-IF (Phase 8; chuyển sang đơn vị nhu cầu ở GĐ6, 2026-10-23, QĐ-17)
 
 Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô phỏng. Trang là `GET /admin/analytics/what-if`, nhận `deltaBuses`, `deltaDrivers`, `demandFactorPercent`, `fuelCostPerKm`, `driverWagePerHour`. Các luật còn được khoá bằng `WhatIfSimulationServiceTest` (3, đi qua DB test) và `WhatIfCoverageTest` (11, JUnit thuần).
@@ -2504,6 +2513,14 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua
 > TC_INC_012/TC_INC_013. Phase 4 (Đề xuất tài xế khả dụng) cũng chưa có case nào. Đây là nợ
 > tài liệu, không phải nợ tính năng.
+>
+> *(Bổ sung 2026-10-23, GĐ7 của đợt thiết kế lại dự báo.)* Ba thay đổi của đợt đó chưa có case thủ công
+> nhưng đã được khoá bằng test tự động: **hướng dòng khách dịp lễ** trên form tuyến (GĐ1) —
+> `RouteServiceHolidayFlowTest` (tạo, sửa, sửa về "Không theo chiều", giá trị lưu ở cột) cùng
+> `HolidayCalendarTest` (ngày Tết / Giỗ Tổ 2023–2032, cửa sổ, từ chối ngoài phạm vi); **bộ sinh dữ liệu
+> lịch sử** (GĐ2–GĐ3) — `HistorySimulationTest`, `HistoricalDataBackfillPlanTest`,
+> `HistoricalDataBackfillGenerateTest`; **cửa sổ ngày của danh sách chuyến** (GĐ2) có cả TC_TRIP_043
+> lẫn `TripServiceTripListTest`.
 
 > **Viết lại 2026-10-23 (đợt thiết kế lại dự báo, GĐ6, QĐ-17):** Module 10 viết lại theo đơn vị nhu cầu:
 > 7 case `TC_RC_001`–`TC_RC_007` (TC_RC_003 cũ "cảnh báo trùng khung" thành "giữ chỗ" vì cảnh báo đó đã bỏ;

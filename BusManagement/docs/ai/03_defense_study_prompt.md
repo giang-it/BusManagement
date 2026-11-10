@@ -113,8 +113,6 @@ server trả trang web".
   cuối cùng", trong khi code của `findBestAvailableBus()` đã bỏ fallback đó.
 - **Số dòng ghi trong comment** (kiểu `TripService:621-627`, `canTransition:541`) thường đã lệch —
   không tin, luôn grep lại.
-- Tài liệu đã biết là lệch code: `Proj_functions_summary.md` mục 7.6 (fallback bảo trì của AI) và
-  mục 18.7 ("chỉ doanh thu, chưa có chi phí" — Phase 7 bước 3 đã thêm chi phí).
 - Gặp mâu thuẫn mới thì **nói rõ cho mình biết** (trích cả hai phía, kèm `file:dòng`).
 
 **Chống bịa — bắt buộc:**
@@ -496,8 +494,8 @@ chỉ nhắc ngắn và dẫn mục.
 
 **8. Ví dụ tính tay** — **bắt buộc** với chức năng có 🧮 trong danh sách, tùy chọn với chức năng
 khác. Lấy một bộ số cụ thể đi qua đúng công thức trong code, từng bước (ví dụ: 4 cổng "hot trip"
-với occupancy, giờ còn lại, giờ mở bán; chia giờ lái cho tài xế phụ; hồi quy + hệ số thứ; điểm
-70/30; độ phủ theo ngày của What-if). Ghi rõ số liệu là **minh hoạ** hay lấy từ dữ liệu thật; nếu
+với occupancy, giờ còn lại, giờ mở bán; chia giờ lái cho tài xế phụ; số chuyến cần và khách tràn
+kỳ vọng của một khung dự báo; điểm 70/30; độ phủ theo ngày của What-if). Ghi rõ số liệu là **minh hoạ** hay lấy từ dữ liệu thật; nếu
 minh hoạ, tự chọn số tròn cho dễ theo dõi và chỉ đúng dòng code của mỗi phép tính.
 
 **9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử**
@@ -521,6 +519,9 @@ minh hoạ, tự chọn số tròn cho dễ theo dõi và chỉ đúng dòng cod
   - hệ thống là **tự động hoá theo luật (rule-based), không phải AI/ML thật** — chữ "AI" trong log
     và tên hàm chỉ là tên gọi;
   - dữ liệu lịch sử là **mô phỏng** (profile `backfill`);
+  - Dự báo nhu cầu là **thống kê viết tay** (hồi quy Poisson theo lịch + EM), không phải máy học;
+    LightGBM và Prophet chỉ được so bằng Python ngoài app, và trên dữ liệu thật LightGBM tốt hơn ở
+    ngày thường (`forecast_discussion.md` §17) — nói đủ cả hai vế;
   - **không có đăng nhập/phân quyền**, mật khẩu lưu thô (Non-Goal);
   - ghi nhận sự cố là **Admin ghi thay tài xế** (diễn giải lại có chủ đích);
   - `totalDrivingHours24h` là **giờ nền mock**, chỉ cộng khi xét ngày hôm nay;
@@ -556,6 +557,10 @@ ngờ nhưng chưa đủ căn cứ kết luận, hoặc chỗ tài liệu/commen
   `WhatIfSimulationService` cũng đọc tham số chi phí (kèm ghi đè tạm trong phiên); "Dashboard" và
   phần tạo User của `AdminController` gộp theo màn hình mà chúng phục vụ; `DataInitializer` được
   thêm vào 13 vì kịch bản demo dựa vào dữ liệu seed của nó.
-- Các ví dụ "đã biết lệch" trong LUẬT CHUNG (comment fallback bảo trì, `Proj_functions_summary.md`
-  mục 7.6 / 18.7, thông điệp "hoàn vé / GPS") ghi ngày 2026-09-26. Khi các chỗ đó được sửa, xoá
-  chúng khỏi file này để prompt không dạy một điều đã hết đúng.
+- Các ví dụ "đã biết lệch" trong LUẬT CHUNG (comment fallback bảo trì, thông điệp "hoàn vé / GPS")
+  ghi ngày 2026-09-26. Khi các chỗ đó được sửa, xoá chúng khỏi file này để prompt không dạy một điều
+  đã hết đúng. *(2026-10-23: đã xoá dòng "tài liệu đã biết là lệch code" — `Proj_functions_summary.md`
+  mục 7.6 sửa ngày đó, mục 18 viết lại ở GĐ6 của đợt thiết kế lại dự báo. Comment trong
+  `validateBusForTrip()` thì vẫn còn, nên ví dụ đó giữ nguyên.)*
+- Bài 14 (Demand Forecast) đã viết trước các bài 07–13, ở GĐ7 của đợt thiết kế lại dự báo
+  (2026-10-23), vì phần dự báo là chỗ thầy hướng dẫn chất vấn; các bài 17, 18 vẫn chờ theo thứ tự.

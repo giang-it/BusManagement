@@ -523,11 +523,11 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | M-9 | ~~Màn hình dự báo~~ **ĐÃ CHỐT 2026-10-22, thành QĐ-16 (G5-5, G5-7).** Câu hỏi cũ: hiển thị gì (bảng hệ số lễ, xem trước 35 ngày), backtest so với mốc nào, đo bằng WAPE hay MAPE | |
 | M-10 | ~~Ghi lỗi "xu hướng reset"~~ | **ĐÃ CHỐT 2026-10-21:** ghi thành #31 trong `current_bugs_found.md`, cùng lỗi #32 (69 chuyến tài xế hết hạn bằng). Gốc ở code đã bỏ ở GĐ2; đóng khi GĐ3 xoá dữ liệu cũ |
 | M-11 | **Vé đặt trước (câu F)** | Đề xuất ngày 20/10: không làm trong đợt này; khi thiết kế Booking ở Phase 9 thì lưu thời điểm đặt vé. Chưa duyệt riêng |
-| M-12 | **Thứ tự so với Phase 9** (Customer Portal) | Chưa quyết |
+| M-12 | **Thứ tự so với Phase 9** (Customer Portal) | Chưa quyết. *(2026-10-23: GĐ1–GĐ7 đã xong; GĐ7 commit và push ngày 2026-11-10 — câu hỏi chỉ còn là việc gì làm sau đợt này.)* |
 | M-13 | ~~Thiếu xe dịp Tết trong bộ sinh~~ | **ĐÃ CHỐT 2026-10-21, thành QĐ-10:** giữ "mỗi xe 1 chuyến/ngày"; chuyến thêm chỉ trong số xe rảnh (5/ngày) |
 | M-14 | ~~Nhiều chuyến tăng cường cho cùng một khung~~ **ĐÃ CHỐT 2026-10-23, thành QĐ-17 (G6-2, G6-3).** Câu hỏi cũ: Recommendation đánh giá từng thẻ độc lập, nên các thẻ cùng khung sẽ đề xuất cùng một xe. Giữ chỗ xe và tài xế đã chọn giữa các thẻ, hay mỗi khung chỉ một thẻ ghi "cần N chuyến"? | Chốt cả hai vế: mỗi chuyến thêm một thẻ, và giữ chỗ giữa các thẻ. Phát hiện ngày 2026-10-21 |
 | M-15 | ~~Hai đề xuất sau lần đo lại GĐ2~~ (`forecast_discussion.md` §13.5): (1) quy tắc (b) thay quy tắc (a) "ít nhất 2 lần"; (2) EM 5 vòng thay vì 15 | **ĐÃ CHỐT CẢ HAI NGÀY 2026-10-22.** Ý 2 vào QĐ-1, ý 1 vào QĐ-3 (viết lại); đóng M-6. Số đo bổ sung cho ý 1: §13.7 |
-| M-16 | **Chạy bổ sung lịch sử về sau:** chuyến Admin tạo tay đúng 06:00/12:00/18:00 (phút 0, 30, 40, 50) trên một tuyến ≤ 8 giờ sẽ bị bộ sinh coi là chuyến của nó, nên ngày đó bị bỏ qua cả ngày và lịch sử ngày đó chỉ còn chuyến tay. Đánh dấu chuyến bộ sinh (cột mới) hay nhận diện chặt hơn? | Phát hiện khi rà GĐ3 (2026-10-22). GĐ3 không bị: 19 chuyến của chủ dự án không có giờ nào như vậy. Chỉ cần khi chạy bổ sung trước buổi demo sau này |
+| M-16 | **Chạy bổ sung lịch sử về sau:** chuyến Admin tạo tay đúng 06:00/12:00/18:00 (phút 0, 30, 40, 50) trên một tuyến ≤ 8 giờ sẽ bị bộ sinh coi là chuyến của nó, nên ngày đó bị bỏ qua cả ngày và lịch sử ngày đó chỉ còn chuyến tay. Đánh dấu chuyến bộ sinh (cột mới) hay nhận diện chặt hơn? | Phát hiện khi rà GĐ3 (2026-10-22). GĐ3 không bị: 19 chuyến của chủ dự án không có giờ nào như vậy. Chỉ cần khi chạy bổ sung trước buổi demo sau này. *(2026-10-23: DB thật không có chuyến nào sau 21/10/2026, nên một lần chạy bổ sung lúc này chưa bị; cách kiểm ghi ở `setup_guide.md` §4.3.)* |
 
 ---
 
@@ -561,3 +561,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-22 (GĐ4) | Thảo luận GĐ4, chủ dự án duyệt G4-1…G4-8: thêm QĐ-15 và dòng của nó ở mục 1. QĐ-1: ghi bản Java và tốc độ đo được. M-5: ghi tốc độ GĐ4 đo được |
 | 2026-10-22 (GĐ5) | Thảo luận GĐ5, chủ dự án duyệt G5-1…G5-8: thêm QĐ-16 và dòng của nó ở mục 1; đóng M-3, M-4 (sớm hơn kế hoạch), M-5, M-9. QĐ-16: thêm "Đã cài" kèm số đo. QĐ-1: ghi nơi gọi dự báo sau GĐ5 |
 | 2026-10-23 (GĐ6) | Thảo luận GĐ6 (mở 2026-10-22), giải thích lại từng điểm kèm ví dụ và ưu nhược; chủ dự án duyệt G6-1…G6-7: thêm QĐ-17 và dòng của nó ở mục 1; đóng M-14. QĐ-16: ghi cầu nối G5-1 đã bỏ. QĐ-17: thêm "Đã cài" kèm số đo |
+| 2026-10-23 (GĐ7) | Không có quyết định mới. Ghi chú thêm vào M-12 và M-16; phụ lục so với LightGBM và Prophet ở `forecast_discussion.md` §17 (QĐ-6: chỉ bằng Python, ngoài app) |

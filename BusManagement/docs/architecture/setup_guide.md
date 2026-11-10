@@ -9,7 +9,7 @@ This guide covers all steps to clone, configure, and run the Bus Management Syst
 | Requirement      | Version         | Notes                                          |
 |------------------|-----------------|------------------------------------------------|
 | Java (JDK)       | 17 or higher    | Required. App uses Java 17 features.           |
-| Apache Maven     | 4.0.2           | A Maven Wrapper (`mvnw`) is included.          |
+| Apache Maven     | 3.9.12 via wrapper | The Maven Wrapper (`mvnw`, `.mvn/wrapper/maven-wrapper.properties`) downloads it; no separate install needed. |
 | MySQL Server     | 8.x recommended | Must be running before starting the app.       |
 | Git              | Any recent      | For cloning the repository.                    |
 | Docker           | —               | **Not implemented.** No Dockerfile or compose file exists in this project. |
@@ -118,6 +118,8 @@ Runs `HistoricalDataBackfill` (decisions QĐ-10/QĐ-11 in `docs/development/fore
 - **Trips already in the DB keep their bus and crew** (forecast redesign GĐ3, defect #33). A trip that is not the generator's own and is not `CANCELLED` — one an Admin created, or a real trip later on — holds its bus, driver, assistant and co-drivers on every calendar day it touches, so the generator assigns them nothing else that day. `COMPLETED` counts too: in history, a completed trip did use the bus.
 - **Updates bus odometers, without disturbing maintenance state.** Completed trips add their route distance to `odometer` **and the same amount to `lastMaintenanceOdometer`**. Because `kmSinceLastMaintenance` is the difference of the two, it is mathematically unchanged — maintenance alerts, `needsMaintenance()`, and bus selection all behave exactly as before, while lifetime mileage becomes a real wear signal for Phase 7. Cancelled trips add nothing, matching the FSM. Re-running adds 0 km.
 - **Never combine with `demo`** — that profile uses `create-drop` and would wipe the schema before the backfill runs.
+- **Stops instead of guessing.** It writes nothing when there are fewer buses than slots per day (eligible routes × 3) or no active driver, and it never generates past 31/12/2032, the last day `HolidayCalendar` covers — extend the lunar table there first.
+- **Top it up before a demo.** The history ends on the last day it was generated (the real DB: 21/10/2026), and the forecast pages say how many days old it is. A top-up adds only the missing days. **Check first (open item M-16 in `forecast_decisions.md`):** a trip an Admin created at exactly 06:00, 12:00 or 18:00 (minute 0, 30, 40 or 50) on a route of ≤ 8 h looks like the generator's own, so the generator skips that whole day and its history keeps only the manual trip. On 2026-10-23 the real DB had no trip at all after 21/10/2026, so a top-up would not hit this.
 
 The generated rows carry the **script's run date** in `created_at` (Hibernate `@CreationTimestamp` cannot be backdated, and the column is `updatable = false`). This is expected: the dataset's time axis is `departure_time`. Do not "fix" it with native SQL.
 
