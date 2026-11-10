@@ -1,0 +1,1505 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bài 14 Dự báo nhu cầu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #F4F6F3;
+  --surface: #FFFFFF;
+  --ink: #17232D;
+  --muted: #58646E;
+  --line: #D8DED9;
+  --accent: #1D6A51;
+  --accent-soft: #E2EFE8;
+  --code-bg: #EDF1EE;
+  --code-ink: #1F2B33;
+  --warn: #8F5C0E;
+  --warn-soft: #FAF0DD;
+  --spring: #2D5AA3;
+  --spring-soft: #E4ECF8;
+  --hl-kw: #8A2E6B;
+  --hl-str: #1D6A51;
+  --hl-com: #6F7B74;
+  --hl-num: #9A4B10;
+  --hl-type: #2D5AA3;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+    --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+    --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+    --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0F1518; --surface: #151D21; --ink: #E2E8E4; --muted: #9AA69F; --line: #263239;
+  --accent: #5BC49B; --accent-soft: #15302A; --code-bg: #1A2429; --code-ink: #DCE4DF;
+  --warn: #E2B25E; --warn-soft: #2D2415; --spring: #8DB2F2; --spring-soft: #1A2537;
+  --hl-kw: #E48FC6; --hl-str: #7FD1A9; --hl-com: #7C8A83; --hl-num: #F0A76A; --hl-type: #8DB2F2;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.65;
+  padding-inline: 16px;
+}
+a { color: var(--accent); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shell {
+  max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  display: grid; grid-template-columns: 1fr; gap: 32px;
+}
+@media (min-width: 1000px) {
+  .shell { grid-template-columns: 250px minmax(0, 1fr); }
+  .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start;
+         max-height: calc(100vh - 40px); overflow-y: auto; }
+  .toc details { display: contents; }
+  .toc summary { display: none; }
+}
+.toc { font-size: 14px; }
+.toc summary { cursor: pointer; font-weight: 600; padding-block: 6px; }
+.toc .label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; border-left: 2px solid var(--line); }
+.toc a { display: block; padding: 4px 10px; color: var(--muted); text-decoration: none; margin-left: -2px; border-left: 2px solid transparent; }
+.toc a:hover { color: var(--ink); border-left-color: var(--accent); }
+main { min-width: 0; max-width: 820px; }
+header.lesson { padding-bottom: 20px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em;
+        color: var(--accent); background: var(--accent-soft); padding: 3px 10px; border-radius: 999px; }
+h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.2; margin: 12px 0 0; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.3; margin: 48px 0 12px; padding-top: 12px; border-top: 1px solid var(--line); text-wrap: balance; }
+h3 { font-size: 18px; margin: 30px 0 8px; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; }
+p, li { max-width: 72ch; }
+ul, ol { padding-left: 22px; }
+li + li { margin-top: 4px; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 32px 0; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); color: var(--code-ink);
+       padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.code-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); }
+pre.code { margin: 0; padding: 14px 16px; font-size: 13.5px; line-height: 1.55; }
+pre.code code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; white-space: pre; }
+.hljs-keyword, .hljs-meta, .hljs-selector-tag, .hljs-built_in { color: var(--hl-kw); }
+.hljs-string, .hljs-attr, .hljs-template-variable { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--hl-num); }
+.hljs-title, .hljs-type, .hljs-name, .hljs-tag { color: var(--hl-type); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--accent-soft); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td { font-variant-numeric: tabular-nums; }
+.callout { margin: 16px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; }
+.callout p { margin: 6px 0; }
+.diagram { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; background: none; text-align: center; font-family: var(--font-body); }
+.tag { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em;
+       padding: 1px 6px; border-radius: 4px; vertical-align: 1px; white-space: nowrap; }
+.tag-code { color: var(--accent); background: var(--accent-soft); }
+.tag-spring { color: var(--spring); background: var(--spring-soft); }
+.tag-guess { color: var(--warn); background: var(--warn-soft); }
+details { margin: 20px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px 16px; }
+details > summary { cursor: pointer; font-weight: 600; padding-block: 10px; color: var(--accent); }
+details[open] > summary { border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+strong { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <nav class="toc" aria-label="Mục lục">
+    <details>
+      <summary>Mục lục</summary>
+      <p class="label">Mục lục</p>
+      <ol>
+<li><a href="#1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</a></li>
+<li><a href="#2-ban-do-tong-quan">§2. Bản đồ tổng quan</a></li>
+<li><a href="#3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</a></li>
+<li><a href="#4-luong-loi-ban-cai-moi-chua-co-lich-su">§4. Luồng lỗi — Bản cài mới, chưa có lịch sử</a></li>
+<li><a href="#5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</a></li>
+<li><a href="#6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</a></li>
+<li><a href="#7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</a></li>
+<li><a href="#8-vi-du-tinh-tay">§8. Ví dụ tính tay</a></li>
+<li><a href="#9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</a></li>
+<li><a href="#10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</a></li>
+<li><a href="#11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</a></li>
+<li><a href="#tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</a></li>
+      </ol>
+    </details>
+  </nav>
+  <main>
+    <header class="lesson">
+      <span class="chip">BÀI 14 · CHỨC NĂNG</span>
+      <h1>Bài 14 — Demand Forecast (Dự báo nhu cầu theo khung giờ)</h1>
+    </header>
+<aside class="callout"><p>Bài chức năng thứ mười bốn, sinh từ <code>docs/ai/03_defense_study_prompt.md</code> (PHẦN B), ngày 2026-10-23,
+ở GĐ7 của đợt thiết kế lại dự báo. Viết <strong>trước</strong> các bài 07–13 vì phần dự báo là chỗ thầy hướng dẫn
+chất vấn; bài này tự giải thích những gì nó cần từ các bài chưa viết. Số dòng là ảnh chụp ngày viết —
+lệch thì grep lại.</p>
+<p>Nhãn: <span class="tag tag-code">CODE</span> đọc thẳng từ code · <span class="tag tag-spring">SPRING</span> hành vi chuẩn của Spring/Hibernate mà code không viết ra ·
+<span class="tag tag-guess">SUY LUẬN</span> suy luận của người viết (&quot;chưa kiểm chứng&quot; nếu chưa chạy thử).</p>
+<p>Viết tắt: <code>…/</code> = <code>src/main/java/giang/com/BusManagement/</code>, <code>test/</code> =
+<code>src/test/java/giang/com/BusManagement/</code>, <code>tpl/</code> = <code>src/main/resources/templates/</code>,
+<code>FS</code> = <code>…/service/ForecastService.java</code>, <code>SDM</code> = <code>…/service/SlotDemandModel.java</code>,
+<code>HC</code> = <code>…/domain/HolidayCalendar.java</code>, <code>TR</code> = <code>…/repository/TripRepository.java</code>.</p>
+<p><strong>Phạm vi.</strong> Một màn hình, một <code>GET</code>: <code>/admin/analytics/forecast</code>. Phần nặng nằm trong ba lớp:
+<code>ForecastService</code> gom dữ liệu, giữ bộ nhớ đệm và dựng màn hình; <code>SlotDemandModel</code> là mô hình;
+<code>ArrowSolver</code> là phần đại số. Hai màn khác dùng lại dự báo này: Đề xuất tăng cường (Bài 17) và
+What-if (Bài 18). Dữ liệu lịch sử do bộ sinh của Bài 13 tạo. Bài này có 🧮: §8 bắt buộc tính tay.
+Nguồn lý do: <code>docs/development/forecast_decisions.md</code> (QĐ-1…QĐ-17) và roadmap §9.</p>
+</aside>
+<hr>
+<h2 id="1-chuc-nang-nay-la-gi-noi-kieu-doi-thuong">§1. Chức năng này là gì — nói kiểu đời thường</h2>
+<p><strong>Vấn đề thật của nhà xe.</strong> Tuần sau là Tết. Chuyến 06:00 Hà Nội → Hải Phòng thường có 15 khách, nhưng
+những ngày trước Tết có thể 45–55 người muốn đi. Nếu tới sát ngày mới biết thì đã muộn: xe và tài xế đã
+xếp hết, khách bị bỏ lại. Nhà xe cần biết <strong>trước</strong> — khung giờ nào sẽ đông, đông tới mức cần mấy xe.</p>
+<p>Chức năng này <strong>dự báo số khách muốn đi</strong> của từng <strong>khung</strong>: một tuyến, một giờ khởi hành, một ngày.
+Nó nhìn lại lịch sử (thứ trong tuần, dịp lễ, xu hướng), dự báo 7 ngày tới cho các thẻ đề xuất và tới 35
+ngày để xem trước. Ô nào nhu cầu vượt 90% số ghế của một xe chuẩn thì tô đỏ và ghi &quot;cần N chuyến&quot;.</p>
+<p>Nó <strong>chỉ dự báo</strong>. Nó không tạo chuyến, không phân công ai: quyết định là của Admin. Đây là module
+<strong>duy nhất có tính dự đoán</strong>; các màn khác chỉ báo cáo chuyện đã xảy ra.</p>
+<p><strong>Không có nó thì ai khổ?</strong> Người điều phối phải đoán bằng kinh nghiệm. Mô hình cũ của dự án (trước
+GĐ5) dự báo <strong>tỉ lệ lấp đầy</strong>, bị kẹp ở 100%: Tết làm nhu cầu gấp đôi cũng chỉ hiện &quot;100%&quot;, nên không
+trả lời được câu &quot;cần mấy chuyến&quot; (QĐ-2).</p>
+<p><strong>Một kịch bản cụ thể</strong> (minh hoạ). Ngày 23/10, anh admin mở <em>Analytics → tab Lấp đầy → Dự báo nhu
+cầu</em>. Trang đứng 4–5 giây (lần mở đầu tiên sau khi app khởi động) rồi hiện:</p>
+<ul>
+<li>bảng 7 ngày: dòng &quot;Hà Nội → Hải Phòng — 06:00&quot; có ô thứ Sáu ghi <strong>20</strong>, &quot;91%&quot;, nền đỏ, &quot;cần 2
+chuyến&quot;;</li>
+<li>biểu đồ 35 ngày của từng chuỗi;</li>
+<li>bảng hệ số lễ: Tết, chiều &quot;Rời TP lớn&quot;, đỉnh ×2,9 ở D−3;</li>
+<li>khối tự chấm điểm: &quot;Sai số số vé 16,1% — SN4 sạch 17,5%&quot;.</li>
+</ul>
+<p>Anh bấm lại F5: lần này trang hiện ngay, cuối trang ghi <em>&quot;lần mở này dùng lại kết quả đó vì lịch sử
+không đổi&quot;</em>. Anh chuyển sang màn Đề xuất tăng cường: thẻ của đúng ô đỏ đó đã có xe và tài xế.</p>
+<hr>
+<h2 id="2-ban-do-tong-quan">§2. Bản đồ tổng quan</h2>
+<h3 id="2-1-cac-manh-ghep">2.1. Các mảnh ghép</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Loại</th>
+<th>File</th>
+<th>Trách nhiệm (1 dòng)</th>
+</tr>
+</thead><tbody><tr>
+<td>Template</td>
+<td><code>tpl/admin/demand-forecast.html</code></td>
+<td>Bảng 7 ngày, biểu đồ 35 ngày, khối tự chấm điểm, khối Tết, bảng hệ số lễ, thông tin lần khớp; hai khối <code>&lt;script&gt;</code> vẽ Chart.js</td>
+</tr>
+<tr>
+<td>JavaScript</td>
+<td><code>tpl/admin/demand-forecast.html:442-492</code>, <code>:494-533</code></td>
+<td>Dựng biểu đồ từ số liệu Thymeleaf đổ vào; đổi chuỗi khi chọn trong ô <code>select</code> (chỉ phía trình duyệt)</td>
+</tr>
+<tr>
+<td>Controller</td>
+<td><code>…/controller/admin/ForecastController.java:45-49</code></td>
+<td>Một <code>GET</code>, không tham số, gọi <code>buildForecastPage()</code>, đưa vào Model key <code>view</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>FS:212-366</code></td>
+<td>Hai cửa <code>buildForecast()</code> / <code>buildForecastPage()</code>; gom khung, chọn chuỗi, gọi mô hình, nhớ kết quả, dựng DTO</td>
+</tr>
+<tr>
+<td>Service — luật dùng chung</td>
+<td><code>FS:482-514</code></td>
+<td><code>isHot()</code>, <code>tripsNeeded()</code>, <code>extraTripPassengers()</code> — Bài 17, 18 gọi</td>
+</tr>
+<tr>
+<td>Service — tự chấm điểm</td>
+<td><code>FS:622-791</code></td>
+<td>Lùi về 8 ngày gốc, khối Tết, SN4 sạch, chấm điểm</td>
+</tr>
+<tr>
+<td>Mô hình</td>
+<td><code>SDM:101-229</code>, <code>:585-685</code></td>
+<td>Hồi quy Poisson theo lịch + EM; <code>Fit.forecast()</code></td>
+</tr>
+<tr>
+<td>Đại số</td>
+<td><code>…/service/ArrowSolver.java:47</code></td>
+<td>Giải hệ &quot;mũi tên&quot; theo khối (bù Schur, Cholesky)</td>
+</tr>
+<tr>
+<td>Lịch lễ</td>
+<td><code>HC:89-133</code>, <code>…/domain/Holiday.java:22-32</code></td>
+<td>Ngày nào thuộc dịp lễ nào, lệch mấy ngày; cửa sổ mỗi dịp</td>
+</tr>
+<tr>
+<td>Entity / enum</td>
+<td><code>…/domain/Route.java:82-84</code>, <code>…/domain/HolidayFlow.java:27-32</code></td>
+<td><code>Route.holidayFlow</code>: tuyến học hệ số lễ chung với tuyến nào</td>
+</tr>
+<tr>
+<td>Repository</td>
+<td><code>TR:483-485</code> <code>findDemandHistoryByStatus</code>; <code>RouteRepository.java:22-26</code> <code>findAllWithStations</code>; <code>BusRepository.java:16-17</code> <code>findAllWithBusType</code></td>
+<td>4 cột lịch sử; tuyến + loại xe; sức chứa trung bình đội xe</td>
+</tr>
+<tr>
+<td>DTO</td>
+<td><code>…/dto/DemandForecastViewDto.java</code>, <code>ForecastSeriesDto</code>, <code>ForecastPointDto</code>, <code>ForecastAccuracyDto</code></td>
+<td>Toàn màn / một chuỗi / một ô / tự chấm điểm</td>
+</tr>
+<tr>
+<td>Người dùng lại</td>
+<td><code>…/service/RecommendationService.java:134</code>, <code>…/service/WhatIfSimulationService.java:159</code></td>
+<td>Gọi <code>buildForecast()</code> (không tự chấm điểm)</td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/service/ForecastServiceTest</code> (8), <code>ForecastServiceRulesTest</code> (10), <code>ForecastServiceReferenceTest</code> (4), <code>SlotDemandModelTest</code> (8), <code>SlotDemandModelReferenceTest</code> (5), <code>ArrowSolverTest</code> (2), <code>test/domain/HolidayCalendarTest</code> (13)</td>
+<td>§9.4</td>
+</tr>
+</tbody></table></div>
+<h3 id="2-2-bang-endpoint-du-moi-diem-bat-dau">2.2. Bảng endpoint — đủ mọi điểm bắt đầu</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>HTTP / trigger</th>
+<th>URL</th>
+<th>Controller method</th>
+<th>Được gọi từ đâu</th>
+<th>Service chính</th>
+<th>Kết quả</th>
+</tr>
+</thead><tbody><tr>
+<td>GET</td>
+<td><code>/admin/analytics/forecast</code></td>
+<td><code>ForecastController.viewForecast()</code> <code>:46-49</code></td>
+<td>nút &quot;Dự báo nhu cầu&quot; ở tab Lấp đầy (<code>tpl/admin/dashboard-analytics.html:409</code>); ô &quot;Dự Báo Nhu Cầu&quot; ở trang chủ admin (<code>tpl/admin/dashboard.html:137</code>)</td>
+<td><code>buildForecastPage()</code> <code>FS:218-221</code></td>
+<td>view <code>admin/demand-forecast</code></td>
+</tr>
+<tr>
+<td>(gọi trong Java)</td>
+<td>—</td>
+<td>—</td>
+<td><code>RecommendationService.buildRecommendations()</code> <code>:134</code> (Bài 17)</td>
+<td><code>buildForecast()</code> <code>FS:212-215</code></td>
+<td><code>DemandForecastViewDto</code> không có phần tự chấm điểm</td>
+</tr>
+<tr>
+<td>(gọi trong Java)</td>
+<td>—</td>
+<td>—</td>
+<td><code>WhatIfSimulationService.simulate()</code> <code>:159</code> (Bài 18)</td>
+<td><code>buildForecast()</code></td>
+<td>như trên</td>
+</tr>
+<tr>
+<td>sự kiện <code>change</code> (JS)</td>
+<td>—</td>
+<td>—</td>
+<td>ô chọn chuỗi <code>#previewSeries</code>, <code>#tetSeries</code></td>
+<td>không gọi server</td>
+<td>biểu đồ vẽ lại chuỗi khác</td>
+</tr>
+</tbody></table></div>
+<p>Không có <code>@Scheduled</code>: không có job tính dự báo ban đêm. Roadmap §4 cấm cron hằng ngày; dự báo được
+tính khi có người mở trang, rồi giữ trong bộ nhớ (§3.2).</p>
+<h3 id="2-3-so-do-toan-canh">2.3. Sơ đồ toàn cảnh</h3>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    A["Admin - trình duyệt"] --&gt;|GET /admin/analytics/forecast| C["ForecastController"]
+    C --&gt;|buildForecastPage| S["ForecastService"]
+    REC["RecommendationService - Bài 17"] --&gt;|buildForecast| S
+    WI["WhatIfSimulationService - Bài 18"] --&gt;|buildForecast| S
+    S --&gt;|4 cột, chuyến COMPLETED| TR["TripRepository"]
+    S --&gt;|tuyến, chiều, loại xe| RR["RouteRepository"]
+    S --&gt;|sức chứa trung bình| BR["BusRepository"]
+    TR &amp; RR &amp; BR --&gt; DB[("MySQL")]
+    S --&gt;|ma trận vé, ghế| M["SlotDemandModel - hồi quy Poisson + EM"]
+    M --&gt;|hệ phương trình| AS["ArrowSolver"]
+    M --&gt;|ngày lễ| HC["HolidayCalendar"]
+    S --&gt;|nhớ kết quả| CACHE["cachedInput, cachedRun, cachedBacktest"]
+    S --&gt;|DemandForecastViewDto| C
+    C --&gt;|Model view| T["demand-forecast.html + Chart.js"]</pre></figure>
+<p>Bên trong <code>build()</code>, theo thứ tự:</p>
+<figure class="diagram"><pre class="mermaid">flowchart TD
+    Q["Đọc lịch sử: findDemandHistoryByStatus COMPLETED"] --&gt; G["Gom thành khung: cộng vé, cộng ghế theo tuyến, giờ, ngày"]
+    G --&gt; F["Giữ chuỗi có ít nhất 28 ngày quan sát"]
+    F --&gt; I["Dựng ModelInput: ma trận vé và ghế, NaN là không quan sát"]
+    I --&gt; K{"Giống hệt lần trước?"}
+    K --&gt;|có| R["Dùng lại kết quả đã khớp"]
+    K --&gt;|không| FIT["SlotDemandModel.fit: IRLS + 5 vòng EM"]
+    FIT --&gt; R
+    R --&gt; P["Dự báo từ ngày mai: 7 ngày thẻ, 35 ngày xem trước"]
+    P --&gt; H["Mỗi ô: nhu cầu, tỉ số với xe chuẩn, cờ 90 phần trăm, số chuyến cần"]
+    H --&gt; V["Dựng DTO: chuỗi, hệ số lễ, biểu đồ"]
+    V --&gt; B{"Màn Dự báo?"}
+    B --&gt;|có| BT["Tự chấm điểm: 8 ngày gốc + khối Tết, cũng được nhớ"]
+    B --&gt;|không| OUT["Trả DTO"]
+    BT --&gt; OUT</pre></figure>
+<h3 id="2-4-dieu-cot-loi-can-nho">2.4. Điều cốt lõi cần nhớ</h3>
+<ol>
+<li><strong>Đơn vị là khung, đại lượng là nhu cầu.</strong> Khung = tuyến × giờ khởi hành × ngày, cộng mọi chuyến
+<code>COMPLETED</code> của khung kể cả chuyến tăng cường. Dự báo số khách <strong>muốn</strong> đi, không kẹp ở số ghế.</li>
+<li><strong>Mô hình là thống kê viết tay, không phải máy học:</strong> hồi quy Poisson theo lịch — mức, thứ, xu hướng,
+hệ số lễ học chung theo chiều tuyến và kéo về ×1 — cộng EM để đoán lại nhu cầu của khung bán hết vé.
+Bản Java khớp bản Python đã đo tới 10⁻⁸.</li>
+<li><strong>Một định nghĩa &quot;chuyến nóng&quot;:</strong> nhu cầu ÷ ghế xe chuẩn &gt; 0,90 — đúng ngưỡng
+<code>Trip.needsReinforcement()</code>. Số chuyến cần = max(1, ⌈nhu cầu ÷ (0,9 × ghế)⌉), tính <strong>qua</strong> cờ đó.</li>
+<li><strong>Tính một lần, dùng lại tới khi dữ liệu đổi.</strong> Mỗi lần gọi vẫn đọc lại lịch sử; ma trận đầu vào
+giống hệt thì dùng lại kết quả. Không cron, không bảng mới.</li>
+<li><strong>Tự chấm điểm trung thực:</strong> chỉ so cái app thấy được — min(dự báo, ghế đã chạy) với số vé — và so
+với một cách làm ngây thơ (SN4 sạch). Trên DB thật: 16,06% so với 17,54%.</li>
+</ol>
+<hr>
+<h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
+<p><strong>Chọn luồng nào và vì sao.</strong></p>
+<ul>
+<li><strong>Luồng A — Mở trang Dự báo lần đầu sau khi khởi động app.</strong> Đi qua mọi tầng: truy vấn, gom khung,
+khớp mô hình (đường chậm), dự báo, tự chấm điểm, Thymeleaf, JavaScript.</li>
+<li><strong>Luồng B — Một màn khác (Đề xuất) gọi <code>buildForecast()</code> khi lịch sử không đổi.</strong> Cho thấy bộ nhớ
+đệm và lý do tách <code>buildForecast()</code> khỏi <code>buildForecastPage()</code>.</li>
+</ul>
+<h3 id="3-1-luong-a-mo-trang-du-bao-lan-dau">3.1. Luồng A — Mở trang Dự báo lần đầu</h3>
+<p><strong>(a) Sơ đồ</strong></p>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant FC as ForecastController
+    participant P as Proxy Transactional
+    participant FS as ForecastService
+    participant TR as TripRepository
+    participant RR as RouteRepository
+    participant M as SlotDemandModel
+    participant DB as MySQL
+    participant T as Thymeleaf và Chart.js
+    A-&gt;&gt;FC: GET /admin/analytics/forecast
+    FC-&gt;&gt;P: buildForecastPage()
+    P-&gt;&gt;FS: mở transaction chỉ đọc, gọi build(hôm nay, true)
+    FS-&gt;&gt;TR: findDemandHistoryByStatus(COMPLETED)
+    TR-&gt;&gt;DB: SELECT route_id, departure_time, tickets_sold, total_seats
+    DB--&gt;&gt;TR: khoảng 19.800 dòng
+    TR--&gt;&gt;FS: danh sách Object mảng 4 phần tử
+    FS-&gt;&gt;FS: aggregateSlots - cộng theo tuyến, giờ, ngày
+    FS-&gt;&gt;FS: lọc chuỗi đủ 28 ngày
+    FS-&gt;&gt;RR: findAllWithStations()
+    RR-&gt;&gt;DB: SELECT tuyến JOIN trạm, loại xe
+    DB--&gt;&gt;FS: các Route
+    FS-&gt;&gt;FS: ModelInput.of - ma trận vé, ghế
+    alt đầu vào khác lần trước hoặc lần đầu
+        FS-&gt;&gt;M: fit(ngày đầu, vé, ghế, nhóm, ngày gốc)
+        Note over M: IRLS + 5 vòng EM, giải bằng ArrowSolver
+        M--&gt;&gt;FS: Fit
+    else giống hệt
+        Note over FS: dùng lại cachedRun
+    end
+    FS-&gt;&gt;M: fit.forecast(lead - 1 + 35)
+    M--&gt;&gt;FS: nhu cầu theo ngày và chuỗi
+    FS-&gt;&gt;FS: point() cho từng ô - cờ 90 phần trăm, số chuyến
+    FS-&gt;&gt;FS: runBacktest - 8 ngày gốc + khối Tết, 9 lần fit
+    FS--&gt;&gt;P: DemandForecastViewDto
+    P--&gt;&gt;FC: commit transaction chỉ đọc
+    FC--&gt;&gt;T: Model view, tên view admin/demand-forecast
+    T--&gt;&gt;A: HTML, rồi trình duyệt chạy Chart.js</pre></figure>
+<p><strong>(b) Bảng từng bước</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Method / thành phần</th>
+<th>Nhận vào</th>
+<th>Làm gì</th>
+<th>Trả về / gọi tiếp</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1</td>
+<td>Trình duyệt</td>
+<td><code>tpl/admin/dashboard-analytics.html:409</code></td>
+<td>link &quot;Dự báo nhu cầu&quot;</td>
+<td>—</td>
+<td>gửi <code>GET /admin/analytics/forecast</code></td>
+<td>request</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Spring MVC</td>
+<td>—</td>
+<td>DispatcherServlet</td>
+<td>URL</td>
+<td>tìm handler theo <code>@RequestMapping(&quot;/admin/analytics/forecast&quot;)</code> + <code>@GetMapping</code></td>
+<td><code>viewForecast(Model)</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Controller</td>
+<td><code>ForecastController.java:46-47</code></td>
+<td><code>viewForecast</code></td>
+<td><code>Model</code></td>
+<td>gọi <code>forecastService.buildForecastPage()</code> — bean được Spring tiêm qua constructor (<code>@RequiredArgsConstructor</code>)</td>
+<td>proxy</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Proxy</td>
+<td><code>FS:218</code></td>
+<td><code>@Transactional(readOnly = true)</code></td>
+<td>—</td>
+<td>mở transaction <strong>chỉ đọc</strong>: Hibernate không theo dõi thay đổi để ghi</td>
+<td>gọi <code>build(LocalDate.now(), true)</code></td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Service</td>
+<td><code>FS:224-225</code></td>
+<td><code>build</code></td>
+<td>hôm nay</td>
+<td><code>forecastFrom</code> = ngày mai; <code>calendarEnd</code> = 31/12/2032</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Repository</td>
+<td><code>TR:483-485</code></td>
+<td><code>findDemandHistoryByStatus(COMPLETED)</code></td>
+<td>trạng thái</td>
+<td>JPQL 4 cột, lọc <code>totalSeats &gt; 0</code>, sắp theo giờ khởi hành. <span class="tag tag-guess">SUY LUẬN — SQL tương đương</span> <code>SELECT t.route_id, t.departure_time, t.tickets_sold, t.total_seats FROM trips t WHERE t.status = &#39;COMPLETED&#39; AND t.total_seats &gt; 0 AND (t.is_deleted = false) ORDER BY t.departure_time</code> — vế <code>is_deleted</code> do <code>@SQLRestriction</code> của <code>Trip</code> thêm</td>
+<td><code>List&lt;Object[]&gt;</code></td>
+<td><span class="tag tag-code">CODE</span>/<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Service</td>
+<td><code>FS:385-407</code></td>
+<td><code>aggregateSlots(rows, today)</code></td>
+<td>các dòng</td>
+<td>bỏ dòng thiếu cột, ghế ≤ 0, ngày sau hôm nay hoặc ngoài lịch lễ; cộng vé và ghế vào <code>slots[SlotKey(tuyến, giờ)][ngày]</code></td>
+<td><code>SortedMap</code> khung</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Service</td>
+<td><code>FS:229-232</code></td>
+<td>lọc chuỗi</td>
+<td>các chuỗi</td>
+<td>giữ chuỗi có <strong>≥ 28 ngày</strong> quan sát (<code>MIN_OBSERVED_DAYS</code>, <code>:118</code>); số chuỗi bị bỏ ghi vào <code>skippedSeriesCount</code> (<code>:239</code>)</td>
+<td><code>keys</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Service</td>
+<td><code>FS:245-255</code></td>
+<td>phạm vi lịch sử</td>
+<td>—</td>
+<td>ngày đầu, ngày cuối, số ngày đã cũ; <strong>không chuỗi nào đủ</strong> ⇒ trả DTO rỗng ngay (§4)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Repository</td>
+<td><code>RouteRepository.java:22-26</code></td>
+<td><code>findAllWithStations()</code></td>
+<td>—</td>
+<td>nạp tuyến kèm trạm và loại xe trong một câu — tránh <code>LazyInitializationException</code> khi lấy tên tuyến (<code>FS:873-878</code>)</td>
+<td><code>Map&lt;Long, Route&gt;</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Service</td>
+<td><code>FS:259</code>, <code>:466-475</code></td>
+<td><code>groupOf(route)</code></td>
+<td><code>Route.holidayFlow</code></td>
+<td><code>LEAVING_HUB</code> → 0, <code>TOWARD_HUB</code> → 1, null → 2</td>
+<td><code>int[] groups</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Service</td>
+<td><code>FS:260</code>, <code>:432-450</code></td>
+<td><code>ModelInput.of</code></td>
+<td>khung, nhóm</td>
+<td>ma trận <code>sales[ngày][chuỗi]</code>, <code>seats[ngày][chuỗi]</code>; ô không quan sát là <code>NaN</code></td>
+<td><code>input</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Service</td>
+<td><code>FS:264-275</code></td>
+<td><code>synchronized (cacheLock)</code></td>
+<td><code>input</code></td>
+<td><code>input.sameAs(cachedInput)</code>? Lần đầu là <strong>không</strong> ⇒ đo giờ, gọi <code>SlotDemandModel.fit(...)</code>, lưu <code>cachedRun</code>, xoá <code>cachedBacktest</code></td>
+<td><code>run</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Mô hình</td>
+<td><code>SDM:101-229</code></td>
+<td><code>fit</code></td>
+<td>ma trận, nhóm, ngày gốc</td>
+<td>dựng cột lịch (thứ, xu hướng, cặp (dịp, ngày lệch)), chia số đếm cho mức chuỗi, IRLS + 5 vòng EM, hệ số chỉnh mức 28 ngày</td>
+<td><code>Fit</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Mô hình</td>
+<td><code>SDM:287-388</code>, <code>ArrowSolver.java:47</code></td>
+<td><code>irls</code> → <code>ArrowSolver.solve</code></td>
+<td>—</td>
+<td>mỗi vòng IRLS giải hệ khoảng 1.400 ẩn theo khối; giảm nửa bước khi mục tiêu tụt</td>
+<td>hệ số</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Service</td>
+<td><code>FS:279-282</code></td>
+<td>dự báo</td>
+<td><code>lead</code> = số ngày từ ngày gốc tới ngày mai</td>
+<td><code>fit.forecast(lead − 1 + previewDays)</code>, <code>previewDays</code> ≤ 35 và không vượt 2032</td>
+<td><code>demand[ngày][chuỗi]</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Service</td>
+<td><code>FS:284-299</code></td>
+<td>xe chuẩn</td>
+<td><code>Route.suitableBusType</code></td>
+<td>sức chứa loại xe của tuyến; tuyến chưa có loại xe ⇒ <code>fleetAverageCapacity()</code> (<code>:530-535</code>, <code>BusRepository.findAllWithBusType</code>)</td>
+<td><code>standardSeats[]</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>18</td>
+<td>Service</td>
+<td><code>FS:301-324</code>, <code>:516-528</code></td>
+<td><code>point(...)</code></td>
+<td>ngày, nhu cầu, ghế</td>
+<td>tỉ số, <code>isHot</code>, <code>tripsNeeded</code>, nhãn thứ, nhãn lễ → <code>ForecastPointDto</code>; 7 ô đầu là <code>points</code>, 35 ô là <code>preview</code></td>
+<td><code>ForecastSeriesDto</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>19</td>
+<td>Service</td>
+<td><code>FS:325-344</code></td>
+<td>sắp xếp, gắn thông tin</td>
+<td>—</td>
+<td>chuỗi có tỉ số đỉnh cao nhất lên đầu; thông tin lần khớp, bảng hệ số lễ (<code>:545-589</code>), dữ liệu biểu đồ (<code>:591-607</code>)</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>20</td>
+<td>Service</td>
+<td><code>FS:346-364</code>, <code>:622-689</code></td>
+<td>tự chấm điểm</td>
+<td><code>input</code></td>
+<td><code>cachedBacktest</code> trống ⇒ <code>runBacktest</code>: 8 lần khớp ở 8 ngày gốc + 1 lần cho khối Tết; chấm bằng <code>score()</code> (<code>:724-764</code>)</td>
+<td><code>ForecastAccuracyDto</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>21</td>
+<td>Proxy</td>
+<td>—</td>
+<td>kết thúc <code>buildForecastPage()</code></td>
+<td>—</td>
+<td>commit transaction chỉ đọc (không có gì để ghi)</td>
+<td>DTO</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>22</td>
+<td>Controller</td>
+<td><code>ForecastController.java:47-48</code></td>
+<td><code>model.addAttribute(&quot;view&quot;, …)</code></td>
+<td>DTO</td>
+<td>trả tên view <code>admin/demand-forecast</code></td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>23</td>
+<td>View</td>
+<td><code>tpl/admin/demand-forecast.html:134-184</code></td>
+<td>bảng 7 ngày</td>
+<td><code>view.series</code></td>
+<td>mỗi ô in nhu cầu, %, ô đỏ khi <code>needsReinforcement</code> kèm &quot;cần N chuyến&quot; (<code>:170-181</code>)</td>
+<td>HTML</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>24</td>
+<td>View</td>
+<td><code>:440-492</code></td>
+<td><code>th:inline=&quot;javascript&quot;</code></td>
+<td><code>view.previewChart</code></td>
+<td>Thymeleaf in mảng số vào biến JS; trình duyệt tải Chart.js 4.4.1 và vẽ ba đường: nhu cầu, ghế một xe, 90% xe</td>
+<td>biểu đồ</td>
+<td><span class="tag tag-code">CODE</span>/<span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>25</td>
+<td>JS</td>
+<td><code>:484-490</code></td>
+<td>sự kiện <code>change</code> của <code>#previewSeries</code></td>
+<td>chỉ số chuỗi</td>
+<td>thay dữ liệu ba đường, <code>chart.update()</code> — không gọi server</td>
+<td>—</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Ranh giới transaction.</strong> Một transaction chỉ đọc, mở ở bước 4, đóng ở bước 21. <code>build()</code> được gọi
+từ bên trong <code>buildForecastPage()</code> nên không qua proxy lần nữa — đó là gọi nội bộ, không mở thêm
+transaction <span class="tag tag-spring">SPRING</span>.</p>
+<p><strong>(c) Trích code then chốt</strong></p>
+<p><code>FS:396-404</code> — gom một dòng lịch sử vào khung của nó:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">LocalDateTime departure = (LocalDateTime) row[1];            // giờ khởi hành của chuyến
+LocalDate date = departure.toLocalDate();                     // ngày của khung
+if (date.isAfter(today) || !HolidayCalendar.covers(date)) {  // sau hôm nay, hoặc ngoài lịch lễ 2023–2032
+    continue;                                                 // → bỏ: chưa là lịch sử / lịch sẽ ném lỗi
+}
+int[] total = slots.computeIfAbsent(new SlotKey(((Number) row[0]).longValue(), departure.getHour()),
+        k -&gt; new TreeMap&lt;&gt;()).computeIfAbsent(date, d -&gt; new int[2]);  // khung (tuyến, giờ) → (ngày) → {vé, ghế}
+total[0] += sold;                                             // cộng vé: chuyến chính + chuyến thêm cùng giờ
+total[1] += seats;                                            // cộng ghế đã chạy</code></pre></div>
+<p>Chuyến tăng cường khởi hành phút 30/40/50, cùng <strong>giờ</strong> với chuyến gốc, nên <code>departure.getHour()</code> tự
+đưa nó vào đúng khung.</p>
+<p><code>FS:229-232</code> — giữ chuỗi đủ 28 ngày:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;SlotKey&gt; keys = slots.entrySet().stream()
+        .filter(e -&gt; e.getValue().size() &gt;= MIN_OBSERVED_DAYS)   // số NGÀY quan sát của chuỗi
+        .map(Map.Entry::getKey)
+        .toList();</code></pre></div>
+<p>Viết lại bằng vòng <code>for</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">List&lt;SlotKey&gt; keys = new ArrayList&lt;&gt;();
+for (Map.Entry&lt;SlotKey, SortedMap&lt;LocalDate, int[]&gt;&gt; e : slots.entrySet()) {
+    if (e.getValue().size() &gt;= MIN_OBSERVED_DAYS) {   // map ngày → khung: size() = số ngày có chuyến hoàn thành
+        keys.add(e.getKey());
+    }
+}</code></pre></div>
+<p><code>FS:264-275</code> — bộ nhớ đệm:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">synchronized (cacheLock) {                       // hai request cùng lúc không khớp hai lần
+    reused = input.sameAs(cachedInput);          // so NGUYÊN ma trận, không so "dấu vân tay"
+    if (!reused) {
+        long started = System.nanoTime();
+        SlotDemandModel.Fit fit = SlotDemandModel.fit(input.firstDay, input.sales, input.seats,
+                input.groups, input.origin);     // phần chậm: 0,2–0,6 giây
+        cachedRun = new ModelRun(fit, (System.nanoTime() - started) / 1_000_000, LocalDateTime.now());
+        cachedInput = input;
+        cachedBacktest = null;                   // phần chấm điểm thuộc về đầu vào cũ
+    }
+    run = cachedRun;
+}</code></pre></div>
+<p><code>FS:482-496</code> — một định nghĩa &quot;chuyến nóng&quot;:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">static boolean isHot(double demand, int standardSeats) {
+    return standardSeats &gt; 0 &amp;&amp; demand / standardSeats &gt; REINFORCEMENT_THRESHOLD;   // &gt; 0,90
+}
+
+static int tripsNeeded(double demand, int standardSeats) {
+    if (!isHot(demand, standardSeats)) {      // đi QUA cờ, không tự chia lại
+        return 1;
+    }
+    return Math.max(2, (int) Math.ceil(demand / (REINFORCEMENT_THRESHOLD * standardSeats)));
+}</code></pre></div>
+<p><code>SDM:198-208</code> — EM:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">for (int round = 0; round &lt;= EM_ROUNDS; round++) {           // 0 = lần khớp đầu, rồi 5 vòng EM
+    double[] scaled = new double[observations];
+    for (int i = 0; i &lt; observations; i++) {
+        scaled[i] = target[i] / scale[rows.series[i]];       // chia cho mức trung bình của chuỗi
+    }
+    iterations += irls(rows, dayColumns, dayValues, dayKeys, groups, scaled, beta, knotCount);  // bước M
+    if (round == EM_ROUNDS) {
+        break;                                               // vòng cuối không cần bước E nữa
+    }
+    nbSize = expectationStep(rows, dayColumns, dayValues, dayKeys, groups, scale, beta, target); // bước E
+}</code></pre></div>
+<p><code>SDM:440-444</code> — bước E thay số vé của khung bán hết:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">for (int i = 0; i &lt; rows.size; i++) {
+    if (rows.sales[i] &gt;= rows.cap[i]) {                          // bán hết: chỉ biết "nhu cầu ≥ số ghế"
+        target[i] = meanAtLeast(mu[i], rows.cap[i], size);       // thay bằng E[nhu cầu | nhu cầu ≥ ghế]
+    }
+}</code></pre></div>
+<h3 id="3-2-luong-b-man-de-xuat-goi-buildforecast-khi-lich-su-khong-doi">3.2. Luồng B — Màn Đề xuất gọi <code>buildForecast()</code> khi lịch sử không đổi</h3>
+<figure class="diagram"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor A as Admin
+    participant RC as RecommendationController
+    participant RS as RecommendationService
+    participant FS as ForecastService
+    participant TR as TripRepository
+    A-&gt;&gt;RC: GET /admin/analytics/recommendation
+    RC-&gt;&gt;RS: buildRecommendations()
+    RS-&gt;&gt;FS: buildForecast() - đúng một lần
+    FS-&gt;&gt;TR: findDemandHistoryByStatus(COMPLETED)
+    TR--&gt;&gt;FS: các dòng - vẫn đọc lại mỗi lần
+    FS-&gt;&gt;FS: gom khung, dựng ModelInput
+    alt sameAs(cachedInput) đúng
+        Note over FS: dùng lại cachedRun, không khớp
+    end
+    FS-&gt;&gt;FS: dự báo, point() cho từng ô
+    Note over FS: withAccuracy = false, không chấm điểm
+    FS--&gt;&gt;RS: DemandForecastViewDto, accuracy = null
+    RS-&gt;&gt;RS: mỗi ô nóng → tripsNeeded − 1 chuyến thêm</pre></figure>
+<div class="table-wrap"><table><thead><tr>
+<th>#</th>
+<th>Tầng</th>
+<th>Vị trí</th>
+<th>Làm gì</th>
+<th>Nhãn</th>
+</tr>
+</thead><tbody><tr>
+<td>1–2</td>
+<td>Controller → Service</td>
+<td><code>RecommendationController</code>, <code>RecommendationService.java:129-134</code></td>
+<td>mở transaction chỉ đọc của <code>buildRecommendations()</code>, gọi <code>buildForecast()</code> <strong>một lần</strong> cho cả request</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Proxy</td>
+<td><code>FS:212</code></td>
+<td><code>buildForecast()</code> cũng <code>@Transactional(readOnly = true)</code>; đang có transaction bên ngoài nên <strong>tham gia</strong> transaction đó (mặc định <code>REQUIRED</code>)</td>
+<td><span class="tag tag-spring">SPRING</span></td>
+</tr>
+<tr>
+<td>4–5</td>
+<td>Service, Repository</td>
+<td><code>FS:227-260</code></td>
+<td>đọc lại 4 cột và dựng lại ma trận — rẻ hơn nhiều so với một lần khớp: cả trang Dự báo khi dùng lại kết quả chỉ mất 0,16–0,6 giây trên DB thật</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Service</td>
+<td><code>FS:264-275</code></td>
+<td>ma trận giống hệt ⇒ <code>reused = true</code>, dùng <code>cachedRun</code></td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Service</td>
+<td><code>FS:346</code></td>
+<td><code>withAccuracy = false</code> ⇒ bỏ qua 9 lần khớp của phần tự chấm điểm</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Service</td>
+<td><code>RecommendationService.java:181-187</code></td>
+<td>ô có <code>needsReinforcement</code> ⇒ <code>tripsNeeded − 1</code> chuyến thêm, hỏi <code>ForecastService.extraTripPassengers</code> mỗi chuyến chở bao nhiêu khách (Bài 17)</td>
+<td><span class="tag tag-code">CODE</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Vì sao tách hai cửa.</strong> Phần tự chấm điểm cần 9 lần khớp thêm (2–3 giây). Chỉ màn Dự báo hiện nó;
+Đề xuất và What-if chỉ cần dự báo. Tách ra thì hai màn đó không bao giờ trả chi phí này (QĐ-16, G5-4).
+Nếu lịch sử đổi dù một vé, <code>sameAs</code> sai, mô hình khớp lại và <code>cachedBacktest</code> bị xoá (<code>FS:272</code>).</p>
+<hr>
+<h2 id="4-luong-loi-ban-cai-moi-chua-co-lich-su">§4. Luồng lỗi — Bản cài mới, chưa có lịch sử</h2>
+<p>Màn này không có thao tác ghi, nên không có &quot;lưu thất bại&quot;. Luồng thất bại có thật là <strong>không có dữ
+liệu để học</strong>, ví dụ ngay sau khi chạy profile <code>demo</code> mà chưa chạy <code>backfill</code>.</p>
+<ol>
+<li><code>findDemandHistoryByStatus(COMPLETED)</code> trả danh sách rỗng hoặc rất ít dòng.</li>
+<li><code>aggregateSlots</code> cho ra vài khung; không chuỗi nào đủ 28 ngày ⇒ <code>keys</code> rỗng (<code>FS:229-232</code>).</li>
+<li><code>FS:253-255</code>: <code>if (keys.isEmpty()) return view;</code> — trả DTO với <code>series</code> rỗng, <code>model = null</code>,
+<code>accuracy = null</code>. <strong>Không ném exception nào</strong>, transaction chỉ đọc kết thúc bình thường.</li>
+<li>Template <code>tpl/admin/demand-forecast.html:185-194</code> hiện <em>&quot;Chưa đủ dữ liệu lịch sử để dự báo. Mỗi nhóm
+(tuyến × khung giờ) cần ít nhất 28 ngày có chuyến đã hoàn thành&quot;</em> kèm đúng lệnh
+<code>mvnw spring-boot:run -Dspring-boot.run.profiles=backfill</code>. Khối tự chấm điểm, biểu đồ, bảng hệ số lễ
+tự ẩn nhờ các <code>th:if</code> (<code>:214</code>, <code>:232</code>, <code>:363</code>, <code>:422</code>).</li>
+<li>Màn Đề xuất nhận cùng DTO rỗng ⇒ 0 thẻ; What-if ghi &quot;chưa có dữ liệu&quot; (<code>dataAvailable = false</code>).</li>
+</ol>
+<p>Test giữ luồng này: <code>ForecastServiceTest.noHistory_givesAnEmptyForecast_notAnError</code> (<code>:206</code>); case thủ
+công TC_FC_008.</p>
+<p><strong>Một luồng lỗi đã được chặn trước.</strong> <code>HolidayCalendar.holidaysOn()</code> <strong>ném</strong>
+<code>IllegalArgumentException</code> cho ngày ngoài 2023–2032 (<code>HC:114-119</code>). Nếu DB có một chuyến ngày 2033 mà
+<code>aggregateSlots</code> không lọc, exception sẽ bay ra khỏi <code>SlotDemandModel.fit</code> khi dựng cột lịch → ra khỏi
+method <code>@Transactional</code> (chỉ đọc, không có gì để hoàn tác) → không có <code>@ControllerAdvice</code> nào trong
+project bắt nó → Spring Boot trả trang lỗi 500 mặc định <span class="tag tag-spring">SPRING</span>. Dòng <code>FS:398-400</code> bỏ những ngày đó
+trước, nên trang không bao giờ sập vì lý do này. Dự báo cũng không vượt 31/12/2032 (<code>FS:280-281</code>), và
+màn hình báo khi 35 ngày xem trước chạm mốc ấy (<code>tpl/admin/demand-forecast.html:53-60</code>).</p>
+<hr>
+<h2 id="5-cac-luong-con-lai-trace-rut-gon">§5. Các luồng còn lại — trace rút gọn</h2>
+<ul>
+<li><strong>What-if (Bài 18):</strong> <code>WhatIfController</code> → <code>WhatIfSimulationService.simulate()</code> → <code>buildForecast()</code>
+(<code>:159</code>) → nhân hệ số kịch bản vào nhu cầu → <code>ForecastService.tripsNeeded(nhu cầu × hệ số, ghế)</code>
+(<code>:254</code>). Ở 100% nhu cầu, số chuyến thêm bằng số thẻ Đề xuất vì cùng một hàm.</li>
+<li><strong>Trang chủ admin:</strong> <code>tpl/admin/dashboard.html:137</code> chỉ là một link tới cùng <code>GET</code>.</li>
+<li><strong>Ô chọn chuỗi của khối Tết</strong> <code>#tetSeries</code> (<code>tpl/admin/demand-forecast.html:524-531</code>): JS đổi dữ liệu
+bốn đường của biểu đồ Tết (vé thật, ghế đã chạy, mô hình, SN4), không gọi server.</li>
+</ul>
+<hr>
+<h2 id="6-hai-lop-bao-ve-va-tac-dong-len-du-lieu">§6. Hai lớp bảo vệ và tác động lên dữ liệu</h2>
+<h3 id="6-1-bang-khong-moi-chan-that">6.1. Bảng &quot;không-mời / chặn thật&quot;</h3>
+<p>Màn này chỉ đọc, nên &quot;luật&quot; ở đây là luật <strong>chọn dữ liệu</strong> và luật <strong>diễn giải</strong>:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Luật</th>
+<th>Lớp không-mời</th>
+<th>Lớp chặn thật</th>
+<th>Ghi chú</th>
+</tr>
+</thead><tbody><tr>
+<td>Chỉ chuyến <code>COMPLETED</code> làm nên lịch sử</td>
+<td>—</td>
+<td><code>FS:228</code> truyền <code>TripStatus.COMPLETED</code>; <code>TR:483-484</code> lọc <code>status</code></td>
+<td>Chuyến <code>CANCELLED</code> giữ số vé bán trước khi hủy; gộp vào là trộn nhu cầu không được phục vụ (roadmap §9)</td>
+</tr>
+<tr>
+<td>Chuyến 0 ghế không tính</td>
+<td>—</td>
+<td><code>TR:484</code> <code>totalSeats &gt; 0</code>; lưới an toàn <code>FS:393-395</code></td>
+<td>Một lớp ở DB, một lớp phòng thủ ở service</td>
+</tr>
+<tr>
+<td>Chuỗi phải đủ 28 ngày</td>
+<td>—</td>
+<td><code>FS:229-232</code></td>
+<td>Nhóm bị bỏ được đếm và hiện (&quot;bỏ qua N nhóm thiếu dữ liệu&quot;, <code>tpl:71-73</code>)</td>
+</tr>
+<tr>
+<td>Ngày ngoài 2023–2032 không dùng</td>
+<td>—</td>
+<td><code>FS:398</code>; <code>HC</code> ném lỗi nếu lọt</td>
+<td>§4</td>
+</tr>
+<tr>
+<td>&quot;Cần tăng cường&quot; chỉ một định nghĩa</td>
+<td>màn hình chỉ tô đỏ theo <code>needsReinforcement</code> (<code>tpl:171</code>)</td>
+<td><code>FS:482-496</code></td>
+<td>Bài 17, 18 gọi lại đúng các hàm này</td>
+</tr>
+<tr>
+<td>Không tạo chuyến, không phân công</td>
+<td>không có nút nào trên trang</td>
+<td>không có method ghi nào trong <code>ForecastService</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<h3 id="6-2-bang-thay-doi-gi-trong-db">6.2. Bảng &quot;thay đổi gì trong DB&quot;</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Thao tác</th>
+<th>Bảng / cột đổi</th>
+</tr>
+</thead><tbody><tr>
+<td>Mở <code>/admin/analytics/forecast</code></td>
+<td><strong>Không ghi DB.</strong> Chỉ <code>SELECT</code> trên <code>trips</code>, <code>routes</code>, <code>route_stations</code>, <code>stations</code>, <code>bus_types</code> (và <code>buses</code> khi có tuyến chưa có loại xe)</td>
+</tr>
+<tr>
+<td>Kết quả khớp</td>
+<td>Giữ trong <strong>bộ nhớ</strong> của tiến trình Java (<code>cachedInput</code>, <code>cachedRun</code>, <code>cachedBacktest</code>, <code>FS:202-205</code>); khởi động lại app là mất, lần mở sau khớp lại</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="7-annotation-va-co-che-dung-trong-chuc-nang-nay">§7. Annotation và cơ chế dùng trong chức năng này</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>Annotation / cơ chế</th>
+<th>Nghĩa đời thường</th>
+<th>Tác dụng ở đây</th>
+<th>Bỏ đi thì sao</th>
+</tr>
+</thead><tbody><tr>
+<td><code>@Controller</code> + <code>@RequestMapping</code> + <code>@GetMapping</code> (<code>ForecastController.java:30-31</code>, <code>:45</code>)</td>
+<td>&quot;Quầy lễ tân nhận yêu cầu tới địa chỉ này&quot; (Bài 00a)</td>
+<td>URL <code>/admin/analytics/forecast</code> vào <code>viewForecast</code></td>
+<td>404</td>
+</tr>
+<tr>
+<td><code>@RequiredArgsConstructor</code> (Lombok)</td>
+<td>&quot;Tự viết constructor nhận mọi field <code>final</code>&quot;</td>
+<td>Spring tiêm <code>ForecastService</code> vào controller, ba repository vào service (<code>FS:101-106</code>)</td>
+<td>Phải tự viết constructor</td>
+</tr>
+<tr>
+<td><code>@Service</code> (<code>FS:100</code>)</td>
+<td>&quot;Đăng ký làm nhân viên xử lý&quot;</td>
+<td>Một bean duy nhất ⇒ <strong>một</strong> bộ nhớ đệm cho cả ba màn</td>
+<td>Không tiêm được; nhiều bản ⇒ nhiều bộ nhớ đệm</td>
+</tr>
+<tr>
+<td><code>@Transactional(readOnly = true)</code> (<code>FS:212</code>, <code>:218</code>)</td>
+<td>&quot;Phiên làm việc chỉ đọc&quot; (Bài 00b)</td>
+<td>Hibernate không theo dõi thay đổi; LAZY load được trong phiên</td>
+<td>Mỗi câu repository thành một transaction riêng; nhờ JOIN FETCH và open-in-view (mặc định bật) trang có lẽ vẫn chạy, nhưng mất lời hứa &quot;chỉ đọc&quot; và Bài 17, 18 không còn đọc chung một ảnh chụp <span class="tag tag-guess">SUY LUẬN — chưa kiểm chứng</span></td>
+</tr>
+<tr>
+<td><code>record</code> (<code>FS:177-200</code>)</td>
+<td>&quot;Class chỉ để chở dữ liệu, viết một dòng&quot; (Bài 00a §2.5)</td>
+<td><code>SlotKey</code> có sẵn <code>equals/hashCode</code> nên làm khóa Map được; <code>implements Comparable</code> để làm khóa <code>TreeMap</code></td>
+<td>Phải tự viết <code>equals/hashCode</code>, dễ sai</td>
+</tr>
+<tr>
+<td><code>TreeMap</code> / <code>SortedMap</code> (<code>FS:385-406</code>)</td>
+<td>&quot;Tủ hồ sơ tự xếp theo thứ tự&quot;</td>
+<td>Chuỗi xếp theo tuyến rồi giờ, ngày xếp tăng dần ⇒ ma trận dựng đúng thứ tự, đối chiếu được với Python</td>
+<td>Thứ tự chuỗi ngẫu nhiên; nhóm số không khớp file tham chiếu</td>
+</tr>
+<tr>
+<td><code>synchronized (cacheLock)</code> (<code>FS:264</code>, <code>:348</code>)</td>
+<td>&quot;Một người dùng phòng tại một thời điểm&quot;</td>
+<td>Hai request cùng lúc không khớp hai lần và không đọc bộ nhớ đệm đang ghi dở</td>
+<td>Có thể khớp trùng, hoặc đọc <code>cachedRun</code> lệch <code>cachedInput</code></td>
+</tr>
+<tr>
+<td><code>Double.NaN</code> (<code>FS:439-440</code>)</td>
+<td>&quot;Ô để trống có chủ đích&quot;</td>
+<td>Khung không có chuyến hoàn thành = <strong>không quan sát</strong>, khác hẳn &quot;0 khách&quot;</td>
+<td>Ngày bão thành &quot;nhu cầu bằng 0&quot; — mô hình học sai</td>
+</tr>
+<tr>
+<td><code>static</code> package-private (<code>FS:482-514</code>)</td>
+<td>&quot;Hàm thuần dùng chung trong cùng gói&quot;</td>
+<td><code>RecommendationService</code>, <code>WhatIfSimulationService</code> cùng gói <code>service</code> gọi được; test gọi thẳng không cần Spring</td>
+<td>Mở <code>public</code> thì lộ ra ngoài gói; để <code>private</code> thì hai màn kia phải chép lại ngưỡng</td>
+</tr>
+<tr>
+<td><code>th:inline=&quot;javascript&quot;</code> + <code>/*[[${…}]]*/</code> (<code>tpl:442-447</code>)</td>
+<td>&quot;Thymeleaf đổ số liệu vào biến JavaScript&quot;</td>
+<td>Danh sách Java thành mảng JS cho Chart.js</td>
+<td>Phải tự dựng chuỗi JSON</td>
+</tr>
+<tr>
+<td><code>@SQLRestriction</code> trên <code>Trip</code> (Bài 00b)</td>
+<td>&quot;Điều kiện ngầm cho mọi câu SELECT&quot;</td>
+<td>Chuyến xóa mềm không vào lịch sử</td>
+<td>Chuyến đã xóa vẫn thành nhu cầu</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="8-vi-du-tinh-tay">§8. Ví dụ tính tay</h2>
+<p>Số liệu <strong>minh hoạ</strong> trừ chỗ ghi &quot;DB thật&quot;. Mọi con số nhị thức âm dưới đây tính bằng scipy với tham số
+size = 82,2 — đúng size của lần khớp trên DB thật ngày 21/10/2026.</p>
+<h3 id="8-1-gom-khung">8.1. Gom khung</h3>
+<p>Tuyến 1, 06:00, một ngày Tết. DB có: chuyến chính 06:00 xe 22 chỗ bán 22 vé (<code>COMPLETED</code>); chuyến thêm
+06:30 xe 40 chỗ bán 9 vé (<code>COMPLETED</code>); không có chuyến nào bị hủy.</p>
+<ul>
+<li><code>aggregateSlots</code> (<code>FS:401-404</code>): khung (tuyến 1, giờ 6, ngày đó) = {22 + 9, 22 + 40} = <strong>{31 vé, 62
+ghế}</strong>.</li>
+<li>31 &lt; 62 ⇒ khung <strong>không</strong> bán hết, dù chuyến chính đầy: nhu cầu thật quan sát được là 31.</li>
+<li>Một ngày khác chỉ có chuyến chính 22/22 ⇒ {22, 22} ⇒ bán hết ⇒ EM sẽ đoán lại (8.3).</li>
+<li>Một ngày bão, cả hai chuyến <code>CANCELLED</code> ⇒ không dòng nào ⇒ ô <code>NaN</code> — không quan sát.</li>
+</ul>
+<h3 id="8-2-mot-o-du-bao-di-qua-mo-hinh">8.2. Một ô dự báo đi qua mô hình</h3>
+<p>Mô hình cộng các hệ số trên thang log, tức <strong>nhân</strong> chúng trên thang thường (<code>SDM:266-277</code>, <code>:640-641</code>).
+Giả sử chuỗi &quot;Tuyến 1 — 06:00&quot; có:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Thành phần</th>
+<th>Hệ số (thang thường)</th>
+</tr>
+</thead><tbody><tr>
+<td>Mức chuỗi × hệ số mức khi khớp</td>
+<td>16 khách (thứ Hai thường)</td>
+</tr>
+<tr>
+<td>Thứ Sáu (so với thứ Hai)</td>
+<td>×1,25</td>
+</tr>
+<tr>
+<td>Tết D−3, nhóm &quot;Rời TP lớn&quot; (phần gộp)</td>
+<td>×1,9</td>
+</tr>
+<tr>
+<td>Phần lệch riêng của chuỗi ở Tết D−3</td>
+<td>×1,05</td>
+</tr>
+<tr>
+<td>Xu hướng đóng băng tại ngày gốc</td>
+<td>×1,02</td>
+</tr>
+<tr>
+<td>Hệ số chỉnh mức 28 ngày (<code>SDM:225</code>)</td>
+<td>×0,98</td>
+</tr>
+</tbody></table></div>
+<p>Nhu cầu = 16 × 1,25 × 1,9 × 1,05 × 1,02 × 0,98 = 20 × 1,9 = 38 → × 1,05 = 39,9 → × 1,02 = 40,70 →
+× 0,98 = <strong>39,9 khách</strong>.</p>
+<p>Xe chuẩn 22 chỗ: tỉ số 39,9 ÷ 22 = 1,81 &gt; 0,90 ⇒ <strong>cần tăng cường</strong>; số chuyến =
+⌈39,9 ÷ (0,9 × 22)⌉ = ⌈39,9 ÷ 19,8⌉ = ⌈2,015⌉ = <strong>3</strong> ⇒ 2 chuyến thêm.</p>
+<p>Ghi chú: ngày dự báo nào có cặp (dịp, ngày lệch) <strong>chưa từng gặp</strong> khi học thì không có hệ số lễ cho cặp
+đó — <code>SDM:630-636</code> bỏ qua khóa không có trong <code>keyIndex</code>.</p>
+<h3 id="8-3-buoc-e-cua-em">8.3. Bước E của EM</h3>
+<p>Khung bán hết 22/22. Mô hình đang tin nhu cầu kỳ vọng hôm đó là μ = 20.</p>
+<ul>
+<li>Với nhị thức âm (μ = 20, size 82,2), xác suất nhu cầu ≥ 22 là <strong>0,365</strong>.</li>
+<li><code>meanAtLeast(20, 22, 82,2)</code> (<code>SDM:455-463</code>) = E[nhu cầu | nhu cầu ≥ 22] = <strong>25,2</strong>.</li>
+<li>Vòng sau, mô hình học khung này như thể có 25,2 khách chứ không phải 22. Nếu μ đang là 26 thì giá
+trị thay thế là 28,2.</li>
+</ul>
+<p>Vì sao không lấy luôn μ = 20? Vì ta <strong>biết</strong> hôm đó ít nhất 22 người tới; con số phải ≥ 22. Vì sao không
+giữ 22? Vì 22 chỉ là trần của xe, giữ nguyên thì mô hình học rằng nhu cầu không bao giờ vượt một xe —
+đúng lỗi của mô hình cũ.</p>
+<h3 id="8-4-nguong-90-va-so-chuyen-ke-ca-cai-bay-lam-tron">8.4. Ngưỡng 90% và số chuyến — kể cả cái bẫy làm tròn</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Nhu cầu</th>
+<th>Ghế xe chuẩn</th>
+<th>Tỉ số</th>
+<th><code>isHot</code></th>
+<th><code>tripsNeeded</code></th>
+</tr>
+</thead><tbody><tr>
+<td>19,0</td>
+<td>22</td>
+<td>0,864</td>
+<td>không</td>
+<td>1</td>
+</tr>
+<tr>
+<td>19,9</td>
+<td>22</td>
+<td>0,905</td>
+<td>có</td>
+<td>max(2, ⌈19,9 ÷ 19,8⌉ = 2) = <strong>2</strong></td>
+</tr>
+<tr>
+<td>57,6 (DB thật, tuyến 4, 18:00, 25/10)</td>
+<td>40</td>
+<td>1,44</td>
+<td>có</td>
+<td>⌈57,6 ÷ 36⌉ = ⌈1,6⌉ = <strong>2</strong></td>
+</tr>
+<tr>
+<td>53,8 (DB thật, tuyến 1, 06:00, 13/02/2026)</td>
+<td>22</td>
+<td>2,45</td>
+<td>có</td>
+<td>⌈53,8 ÷ 19,8⌉ = ⌈2,72⌉ = <strong>3</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>Cái bẫy (roadmap §9, ghi chú GĐ5).</strong> Với xe 21 chỗ, 0,9 × 21 trong máy tính là
+18,900000000000002. Nhu cầu đúng bằng số đó: 18,900000000000002 ÷ 21 &gt; 0,9 ⇒ <strong>nóng</strong>, nhưng
+⌈18,900000000000002 ÷ 18,900000000000002⌉ = 1. Nếu tính số chuyến <strong>độc lập</strong> với cờ, một ô vừa &quot;cần tăng
+cường&quot; vừa &quot;cần 1 chuyến&quot;. Vì vậy <code>tripsNeeded</code> đi <strong>qua</strong> <code>isHot</code> và lấy <code>max(2, …)</code> (<code>FS:491-496</code>).
+<code>ForecastServiceRulesTest.reinforcementFlag_andTripsNeeded_areOneDefinition</code> thử đúng các cỡ xe 13, 21,
+26, 37, 42 chỗ.</p>
+<h3 id="8-5-cham-diem-vi-sao-min-du-bao-so-ghe">8.5. Chấm điểm: vì sao min(dự báo, số ghế)</h3>
+<p><strong>DB thật</strong>, tuyến 1, 06:00, 13/02/2026: mô hình dự báo <strong>53,8</strong>; hôm đó chạy một xe 22 chỗ, bán <strong>22</strong>
+vé (bán hết); nhu cầu thật (bộ sinh xuất ra, app không biết) là <strong>64</strong>.</p>
+<ul>
+<li>Chấm thẳng nhu cầu với số vé: |53,8 − 22| = <strong>31,8</strong> khách sai — phạt mô hình đúng lúc nó <strong>đúng</strong>.</li>
+<li>Cách của app (<code>FS:738</code>): |min(53,8; 22) − 22| = <strong>0</strong>.</li>
+<li>Mốc SN4 (minh hoạ, giả sử 17): |min(17; 22) − 22| = 5.</li>
+</ul>
+<p>WAPE = Σ|sai| ÷ Σ vé thật (<code>FS:757-758</code>). Trên DB thật, 8 tuần cuối: mô hình <strong>16,06%</strong>, SN4 sạch
+<strong>17,54%</strong>; Tết 2026: <strong>19,83%</strong> so với <strong>35,92%</strong>.</p>
+<h3 id="8-6-sn4-sach">8.6. SN4 sạch</h3>
+<p>Dự báo cho một thứ Sáu từ ngày gốc là Chủ nhật (<code>FS:697-713</code>). Đi lùi theo các thứ Sáu ≤ ngày gốc:</p>
+<div class="table-wrap"><table><thead><tr>
+<th>Thứ Sáu (mới → cũ)</th>
+<th>Loại ngày</th>
+<th>Vé</th>
+<th>Tính vào 4 ngày?</th>
+<th>Vào trung bình?</th>
+</tr>
+</thead><tbody><tr>
+<td>F1</td>
+<td>thường</td>
+<td>19</td>
+<td>có (1)</td>
+<td>có</td>
+</tr>
+<tr>
+<td>F2</td>
+<td>trong cửa sổ lễ</td>
+<td>35</td>
+<td><strong>không</strong> — bỏ hẳn</td>
+<td>không</td>
+</tr>
+<tr>
+<td>F3</td>
+<td>thường, không quan sát (bão)</td>
+<td>—</td>
+<td>có (2)</td>
+<td>không</td>
+</tr>
+<tr>
+<td>F4</td>
+<td>thường</td>
+<td>21</td>
+<td>có (3)</td>
+<td>có</td>
+</tr>
+<tr>
+<td>F5</td>
+<td>thường</td>
+<td>17</td>
+<td>có (4)</td>
+<td>có</td>
+</tr>
+</tbody></table></div>
+<p>SN4 sạch = (19 + 21 + 17) ÷ 3 = <strong>19,0</strong>. Ngày lễ bị <strong>bỏ</strong> để mốc so sánh không được lợi nhờ đỉnh lễ;
+ngày không quan sát vẫn <strong>chiếm chỗ</strong> trong 4 ngày nhưng không vào trung bình.</p>
+<h3 id="8-7-khach-tran-ky-vong-cua-mot-chuyen-them">8.7. Khách tràn kỳ vọng của một chuyến thêm</h3>
+<p>Khung dự báo <strong>30</strong> khách, xe chuẩn 22 chỗ. <code>tripsNeeded</code> = ⌈30 ÷ 19,8⌉ = 2 ⇒ 1 chuyến thêm.</p>
+<ul>
+<li>EO(c) = E[(nhu cầu − c)⁺] = số khách kỳ vọng <strong>không có chỗ</strong> khi khung có c ghế (<code>SDM:473-482</code>).</li>
+<li>EO(22) = <strong>8,25</strong>; EO(44) = 0,06.</li>
+<li>Chuyến thêm thứ nhất (xe 22 chỗ) chở <code>extraTripPassengers(30, 22, 22, 82,2)</code> = EO(22) − EO(44) =
+<strong>8,20</strong> khách (<code>FS:511-514</code>).</li>
+<li>Không phải 30 − 22 = 8 (cách trừ thẳng — ở khung 90–100% nó luôn ra 0), cũng không phải 22 (coi chuyến
+thêm chở đầy như cầu nối GĐ5).</li>
+</ul>
+<p>Tiền, với số của tuyến 1 (120 km, 120 phút, giá vé 120.000đ, chi phí mặc định 6.000đ/km và 50.000đ/giờ):
+chi phí = 6.000 × 120 + 50.000 × 2 = 820.000đ; doanh thu = 8,20 × 120.000 ≈ 984.000đ ⇒ lãi khoảng
++164.000đ. Một chuyến thêm của tuyến này cần khoảng 820.000 ÷ 120.000 ≈ <strong>6,8</strong> khách tràn mới hoà vốn.
+Phần này thuộc Bài 17; ở đây chỉ cần nhớ: <strong>con số khách của chuyến thêm cũng đến từ dự báo</strong>.</p>
+<hr>
+<h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>
+<h3 id="9-1-cac-quyet-dinh-thiet-ke">9.1. Các quyết định thiết kế</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Quyết định</th>
+<th>Tránh được gì</th>
+<th>Vì sao không làm đơn giản hơn</th>
+<th>Nguồn</th>
+</tr>
+</thead><tbody><tr>
+<td>Dự báo <strong>nhu cầu của khung</strong>, không phải tỉ lệ lấp đầy</td>
+<td>Tỉ lệ kẹp ở 100% ⇒ không thấy nhu cầu vượt một xe, không trả lời &quot;cần mấy chuyến&quot;</td>
+<td>Dự báo số vé cũng sai: vé bị chặn ở số ghế</td>
+<td>QĐ-2; roadmap §9 (note &quot;occupancy RATE&quot;, nay SUPERSEDED)</td>
+</tr>
+<tr>
+<td>Hồi quy Poisson theo lịch, học chung mọi chuỗi</td>
+<td>Hồi quy tuyến tính kéo thẳng xu hướng; thua cả &quot;trung bình 4 tuần cùng thứ&quot; trên backtest</td>
+<td>Holt-Winters không nhận biến ngày lễ; LightGBM/Prophet cần thư viện ML (Non-Goal §4)</td>
+<td>QĐ-1, QĐ-6; <code>forecast_discussion.md</code> §0, §12</td>
+</tr>
+<tr>
+<td>EM cho khung bán hết</td>
+<td>Mô hình học rằng nhu cầu không bao giờ vượt số ghế</td>
+<td>Bỏ qua khung bán hết = bỏ đúng những ngày đông nhất</td>
+<td>QĐ-1; <code>forecast_discussion.md</code> §12.7</td>
+</tr>
+<tr>
+<td>Hệ số lễ gộp theo <strong>chiều tuyến</strong> (<code>Route.holidayFlow</code>)</td>
+<td>Tuyến rời TP và tuyến về TP có đỉnh lệch nhau; gộp chung thì triệt tiêu</td>
+<td>Admin chọn nhãn vì &quot;TP lớn&quot; là phán đoán nghiệp vụ, không suy được từ cấp hành chính</td>
+<td>QĐ-4, QĐ-8</td>
+</tr>
+<tr>
+<td>Hệ số lễ kéo về ×1 bằng ridge λ = 2 (quy tắc (b))</td>
+<td>Dịp mới thấy một lần cho hệ số cực đoan</td>
+<td>Quy tắc &quot;ít nhất 2 lần&quot; cho kết quả trái ngược giữa hai bộ dữ liệu</td>
+<td>QĐ-3</td>
+</tr>
+<tr>
+<td>Lịch lễ là <strong>code</strong>, bảng âm lịch tra sẵn</td>
+<td>Lịch là sự thật như thứ trong tuần, không phải tham số của nhà xe</td>
+<td>Thư viện lịch Trung Quốc sai Tết 2030 (GMT+8)</td>
+<td>QĐ-9</td>
+</tr>
+<tr>
+<td>Xu hướng <strong>đóng băng</strong> tại ngày gốc</td>
+<td>Kéo thẳng xu hướng ra tương lai — đúng lỗi của mô hình cũ</td>
+<td>—</td>
+<td>QĐ-1</td>
+</tr>
+<tr>
+<td>Một ngưỡng 0,90, số chuyến tính qua cờ</td>
+<td>Hai định nghĩa &quot;chuyến nóng&quot; lệch nhau ở sát ngưỡng (8.4)</td>
+<td>—</td>
+<td>QĐ-16 G5-6; roadmap §9 (GĐ5)</td>
+</tr>
+<tr>
+<td>Nhớ trong bộ nhớ, so <strong>nguyên</strong> ma trận</td>
+<td>Cron bị cấm (§4); &quot;dấu vân tay&quot; đếm + tổng bỏ lọt hai thay đổi bù nhau</td>
+<td>—</td>
+<td>QĐ-16 G5-4</td>
+</tr>
+<tr>
+<td>Tự chấm bằng min(dự báo, ghế) với số vé</td>
+<td>Phạt mô hình đúng lúc nó đúng; chỉ chấm khung chưa bán hết là chọn mẫu theo kết quả</td>
+<td>—</td>
+<td>QĐ-16 G5-7; <code>forecast_discussion.md</code> §15</td>
+</tr>
+<tr>
+<td>Bản Java bị <strong>khoá</strong> vào kết quả Python</td>
+<td>Con số đo được ở nghiên cứu là của một chương trình khác</td>
+<td>—</td>
+<td>QĐ-15; roadmap §9 (GĐ4)</td>
+</tr>
+<tr>
+<td>Giải hệ theo khối &quot;mũi tên&quot; (<code>ArrowSolver</code>)</td>
+<td>Giải thẳng 1.400 ẩn tốn cỡ một tỉ phép tính mỗi vòng</td>
+<td>—</td>
+<td>QĐ-15 G4-4</td>
+</tr>
+</tbody></table></div>
+<h3 id="9-2-bug-that-da-tung-xay-ra-quanh-chuc-nang-nay">9.2. Bug thật đã từng xảy ra quanh chức năng này</h3>
+<ul>
+<li><strong>Mô hình cũ thua cách ngây thơ</strong> (2026-10-14 → 16). Thầy nhận xét <em>&quot;nếu dùng hồi quy tuyến tính thì
+khả năng cao là đang sai&quot;</em>. Backtest 8 thời điểm: mô hình cũ 4,94% MAPE, &quot;trung bình 4 lần cùng thứ&quot;
+4,68%, Holt-Winters 4,56%. Gốc hiểu sai: <strong>xu hướng kéo thẳng</strong> và <strong>đơn vị bị kẹp</strong> — dữ liệu lúc đó
+còn được sinh đúng bằng công thức &quot;đường thẳng × hệ số tuần&quot;, nên mọi đánh giá đều thiên vị cho nó
+(<code>forecast_discussion.md</code> §0.1). Sửa: thiết kế lại (QĐ-1…QĐ-7).</li>
+<li><strong>#31 — xu hướng của bộ sinh cũ reset sau mỗi lần chạy bổ sung.</strong> Bộ sinh tính xu hướng từ &quot;hôm nay
+− 84&quot; nên mỗi lần chạy lại tạo một bậc tụt: dữ liệu dự báo học có hình răng cưa. Gốc hiểu sai: một bộ
+sinh &quot;chạy bổ sung&quot; phải tất định theo <strong>ngày</strong>, không theo <strong>ngày chạy</strong>. Sửa ở GĐ2 (mốc cố định
+01/01/2023), dữ liệu cũ xoá ở GĐ3.</li>
+<li><strong>#32, #33 — bộ sinh cũ xếp chuyến cho tài xế hết hạn bằng, và không né xe/người của chuyến có sẵn.</strong>
+Đây là dữ liệu dự báo học, nên lỗi ở bộ sinh là lỗi ở đầu vào của mô hình. Sửa ở GĐ2–GĐ3.</li>
+<li><strong>Cái bẫy làm tròn ở xe 21 chỗ</strong> (GĐ5, 8.4): lần thử &quot;tính số chuyến tách khỏi cờ&quot; ban đầu <strong>không</strong>
+làm đỏ test nào, vì test chưa có giá trị sát ngưỡng. Thêm các cỡ xe 13, 21, 26, 37, 42 chỗ mới bắt được.
+Bài học: test phải có giá trị <strong>ở đúng biên</strong>.</li>
+<li><strong>Cách chấm điểm làm mô hình trông kém hơn</strong> (GĐ5): so thẳng nhu cầu với số vé cho 20,11% so với
+18,28% của SN4 — mô hình &quot;thua&quot; vì nó đúng ở khung bán hết. Sửa cách chấm, không sửa mô hình.</li>
+<li><strong>What-if dưới 100% nhu cầu báo 0 khung đông</strong> (cầu nối GĐ5): hệ số nhân vào tỉ lệ đã kẹp 100%. Đã sửa
+ở GĐ6 bằng cách cho What-if gọi thẳng <code>tripsNeeded</code> trên số khách.</li>
+</ul>
+<h3 id="9-3-cam-bay-va-diem-la-ghi-lai-khong-sua">9.3. Cạm bẫy và điểm lạ (ghi lại, không sửa)</h3>
+<ul>
+<li><strong>Lần mở đầu tiên chậm</strong> (3,6–7,3 giây trên DB thật: lần khớp chính + 9 lần tự chấm). Lần sau
+0,16–0,6 giây. Khởi động lại app là mất bộ nhớ đệm.</li>
+<li><strong>Bộ nhớ đệm sống trong một tiến trình.</strong> Chạy hai bản app thì mỗi bản khớp riêng — không sai, chỉ tốn.</li>
+<li><strong>Dịp lễ chưa gặp khi học thì không có hệ số.</strong> Ví dụ một ngày lệch mới của Tết nằm ngoài lịch sử ⇒ ô
+đó được dự báo như ngày thường (8.2).</li>
+<li><strong>Lịch lễ dừng ở 31/12/2032.</strong> Màn hình chỉ cảnh báo khi 35 ngày xem trước chạm mốc này; phải bổ
+sung bảng âm lịch trước đó (roadmap Hidden Cost #10).</li>
+<li><strong>Dữ liệu cũ dần.</strong> Lịch sử kết thúc ở ngày cuối được sinh; xu hướng vẫn đóng băng ở ngày gốc, nên
+ngày gốc càng xa thì dự báo càng kém tin. Trang ghi &quot;dữ liệu kết thúc cách đây N ngày&quot;.</li>
+<li><strong>Chuỗi giờ lẻ bị bỏ.</strong> Chuyến Admin tự tạo lúc 13:00, 21:00… không đủ 28 ngày nên không được dự báo;
+trang đếm chúng (&quot;bỏ qua N nhóm&quot;).</li>
+<li><strong>Ranh giới đúng đắn của khớp Python:</strong> khớp tới 10⁻⁸ chứng minh bản Java <strong>là</strong> mô hình đã đo, không
+chứng minh mô hình đúng ngoài đời (<code>forecast_discussion.md</code> §14.3).</li>
+<li>Javadoc trong code đã được rà ở GĐ7 (2026-10-23): các câu &quot;tới GĐ1 chưa nơi nào gọi&quot; trong
+<code>HolidayCalendar</code>, <code>HolidayFlow</code>, <code>SlotDemandModel</code> đã sửa theo code hiện tại.</li>
+</ul>
+<h3 id="9-4-test-dang-giu-chuc-nang-nay">9.4. Test đang giữ chức năng này</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>Test</th>
+<th>Chốt luật gì</th>
+</tr>
+</thead><tbody><tr>
+<td><code>ForecastServiceRulesTest</code> (10, JUnit thuần)</td>
+<td>chuyến cùng tuyến/giờ/ngày gộp một khung; cờ và số chuyến là một định nghĩa; chuyến thêm chỉ chở khách tràn, chuyến sau chở ít hơn chuyến trước; SN4 sạch bỏ ngày lễ; chấm điểm kẹp ở số ghế; chấm tập rỗng ra &quot;không xác định&quot; chứ không 0; nhãn lễ; nhóm chiều đánh số như Python; <code>ModelInput.sameAs</code></td>
+</tr>
+<tr>
+<td><code>ForecastServiceTest</code> (8, qua DB test)</td>
+<td>khung đều được dự báo bằng số khách từ ngày mai; chỉ <code>COMPLETED</code>, chuyến thêm vào khung gốc; chuỗi &lt; 28 ngày bị bỏ và được đếm; khung gần đầy cần 2 chuyến; khung bán hết được dự báo <strong>trên</strong> số ghế; lần gọi thứ hai dùng lại kết quả tới khi đổi một vé; trang chấm 8 tuần cuối; không lịch sử ⇒ dự báo rỗng, không lỗi</td>
+</tr>
+<tr>
+<td><code>ForecastServiceReferenceTest</code> (4)</td>
+<td>khung do service dựng cho ra đúng dự báo Python; 8 ngày gốc mỗi tuần; điểm số bằng file tham chiếu; khối Tết học tới 3 tuần trước Tết</td>
+</tr>
+<tr>
+<td><code>SlotDemandModelTest</code> (8)</td>
+<td>nhu cầu hằng số; hệ số thứ; xu hướng đóng băng; hệ số lễ học được và áp vào dự báo; EM kéo khung bán hết lên trên số ghế; dữ liệu sau ngày gốc bị bỏ qua; tính chất của trung bình phần đuôi; đầu vào sai bị từ chối</td>
+</tr>
+<tr>
+<td><code>SlotDemandModelReferenceTest</code> (5)</td>
+<td>1.050 dự báo khớp Python tới 10⁻⁶ (thực tế 9,7·10⁻⁹); 402 hệ số lễ; bước E và khách tràn khớp scipy; một lần khớp đủ nhanh</td>
+</tr>
+<tr>
+<td><code>ArrowSolverTest</code> (2)</td>
+<td>nghiệm trùng khử Gauss trên hệ ngẫu nhiên cỡ thật; ma trận không xác định dương bị từ chối</td>
+</tr>
+<tr>
+<td><code>HolidayCalendarTest</code> (13)</td>
+<td>ngày Tết, Giỗ Tổ 2023–2032 (kể cả Tết 2030 theo GMT+7); cửa sổ; từ chối ngoài phạm vi; hai dịp chồng nhau</td>
+</tr>
+</tbody></table></div>
+<p>Mỗi test được thử &quot;làm hỏng code cho nó đỏ&quot; khi viết (GĐ4: 5 lần, GĐ5: 11 lần, GĐ6: 15 lần) — xem
+<code>forecast_progress.md</code> mục 3.</p>
+<h3 id="9-5-lien-ket">9.5. Liên kết</h3>
+<ul>
+<li><strong>Bị ảnh hưởng bởi:</strong> bộ sinh lịch sử (Bài 13) — mọi con số học từ đó; Quản lý tuyến (Bài 03) —
+<code>holidayFlow</code> đổi nhóm học hệ số lễ, <code>suitableBusType</code> đổi xe chuẩn và ngưỡng; FSM (Bài 05) — chỉ chuyến
+<code>COMPLETED</code> vào lịch sử.</li>
+<li><strong>Ảnh hưởng tới:</strong> Đề xuất tăng cường (Bài 17) — số thẻ, số khách mỗi chuyến thêm; What-if (Bài 18) —
+số chuyến thêm cần ở mọi mức nhu cầu.</li>
+<li><strong>Không liên quan:</strong> bộ quét chuyến nóng thời gian thực <code>TripService.scanAndSuggestExtraTrips()</code> (Bài<ol start="8">
+<li>vẫn dùng vé thật và <code>Trip.needsReinforcement()</code>; nó không đọc dự báo.</li>
+</ol>
+</li>
+</ul>
+<hr>
+<h2 id="10-chuan-bi-bao-ve">§10. Chuẩn bị bảo vệ</h2>
+<h3 id="10-1-tom-tat-1-phut">10.1. Tóm tắt 1 phút</h3>
+<aside class="callout"><p>Màn Dự báo nhu cầu dự báo số khách muốn đi của từng khung — một tuyến, một giờ khởi hành, một ngày —
+cho 7 ngày tới và xem trước 35 ngày. Em không dự báo tỉ lệ lấp đầy như bản đầu, vì tỉ lệ bị kẹp ở 100%
+nên không thấy được nhu cầu vượt một xe. Mô hình là hồi quy Poisson theo lịch viết tay bằng Java: mức,
+thứ trong tuần, xu hướng, và hệ số lễ học chung theo chiều tuyến, kéo về một khi ít dữ liệu. Khung bán
+hết vé chỉ cho biết nhu cầu lớn hơn số ghế, nên em dùng EM để đoán lại. Ô nào nhu cầu vượt 90% xe chuẩn
+là cần tăng cường, đúng ngưỡng hệ thống đang dùng. Màn hình tự chấm điểm trên số vé thật: sai 16% so với
+17,5% của cách trung bình 4 tuần. Dữ liệu là mô phỏng, và em nói rõ điều đó trên màn hình.</p>
+</aside>
+<h3 id="10-2-cau-hoi-hoi-dong-goi-y-tra-loi">10.2. Câu hỏi hội đồng + gợi ý trả lời</h3>
+<p><strong>1. (Cái gì) Màn này dự báo cái gì, đơn vị là gì?</strong>
+Số khách <strong>muốn</strong> đi của một khung: tuyến × giờ khởi hành × ngày, cộng mọi chuyến hoàn thành của khung kể
+cả chuyến tăng cường (<code>FS:385-407</code>). Không kẹp ở số ghế. Dự báo 7 ngày từ ngày mai cho thẻ đề xuất và tới
+35 ngày để xem trước (<code>FS:121</code>, <code>:124</code>). Mỗi ô kèm tỉ số với xe chuẩn và &quot;cần N chuyến&quot;.</p>
+<p><strong>2. (Thế nào) Một ô được tính ra sao?</strong>
+Nhân các hệ số: mức của chuỗi, hệ số thứ trong tuần, xu hướng đóng băng tại ngày gốc, hệ số lễ của cặp
+(dịp, ngày lệch) theo nhóm chiều tuyến và phần lệch riêng của chuỗi, rồi hệ số chỉnh mức 28 ngày
+(<code>SDM:622-645</code>). Trên thang log thì đó là phép cộng — mô hình tuyến tính trên log, khớp bằng IRLS. Ví dụ
+§8.2.</p>
+<p><strong>3. (Vì sao) Sao bỏ mô hình cũ?</strong>
+Backtest cho thấy nó thua cả cách &quot;trung bình 4 tuần cùng thứ&quot;. Hai lỗi gốc: kéo thẳng xu hướng ra
+tương lai, và dự báo tỉ lệ bị kẹp ở 100% nên Tết gấp đôi cũng chỉ là 100%. Thầy đã chỉ đúng hướng.</p>
+<p><strong>4. (Vì sao) EM để làm gì?</strong>
+Khung bán hết vé chỉ nói &quot;nhu cầu ≥ số ghế&quot;. Giữ nguyên số vé thì mô hình học rằng nhu cầu không bao giờ
+vượt một xe. Bước E thay số vé bằng kỳ vọng của nhu cầu khi đã biết nó ≥ số ghế, theo phân phối nhị
+thức âm (<code>SDM:440-444</code>); bước M khớp lại. 5 vòng là đủ (đo ở GĐ2). Trên dữ liệu có 21% khung bán hết, EM
+nâng tỉ lệ bắt được khung đông từ 0,39 lên 0,53.</p>
+<p><strong>5. (Thế nào) Dịp lễ học thế nào? Ai nhập hệ số Tết?</strong>
+Không ai nhập. Lịch chỉ nói ngày nào là Tết (<code>HolidayCalendar</code>, bảng âm lịch tra sẵn); <strong>độ lớn</strong> do mô
+hình học. Mỗi cặp (dịp, ngày lệch) có một hệ số gộp theo chiều tuyến, kéo về ×1 bằng ridge λ = 2 (<code>SDM:343</code>)
+— dịp ít dữ liệu bị kéo mạnh, nhiều dữ liệu thì gần như giữ số đo. Màn hình in bảng hệ số này.</p>
+<p><strong>6. (Vì sao) Sao cần nhãn chiều tuyến?</strong>
+Dịp Tết, tuyến rời Hà Nội đông trước Tết, tuyến về Hà Nội đông sau Tết. Học chung mọi tuyến thì hai đỉnh
+triệt tiêu. Nhãn do Admin chọn vì &quot;thành phố lớn&quot; là phán đoán nghiệp vụ. Phải nói thật: số đo trên dữ
+liệu thật cho thấy lợi ích nhỏ, 0,2–1 điểm ở Tết (<code>forecast_discussion.md</code> §13.4).</p>
+<p><strong>7. (Vì sao) Sao chấm điểm bằng min(dự báo, số ghế)?</strong>
+Vì app chỉ biết số vé, mà số vé bị chặn ở số ghế. Ví dụ 13/02/2026: dự báo 53,8, bán hết 22 vé, nhu cầu
+thật 64 — so thẳng thì phạt 31,8 dù mô hình đúng. Kẹp ở số ghế cho cả mô hình lẫn mốc SN4 là công bằng
+(<code>FS:738-739</code>).</p>
+<p><strong>8. (Nếu… thì sao) Dữ liệu là mô phỏng thì kết quả có nghĩa gì?</strong>
+Nó chứng minh mô hình chạy đúng trên <strong>loại</strong> dữ liệu app có — chặn trần, chuyến thêm, khung hủy —
+không chứng minh độ chính xác ngoài đời. Vì vậy em đo thêm trên dữ liệu thật lượt xuất nhập cảnh Hồng
+Kông: mô hình vẫn thắng mốc SN4 1,1 điểm ở tầm 1–7 ngày (10,18% so với 11,30%). Bộ sinh cố ý khác cấu trúc mô hình để tránh
+&quot;dữ liệu tự chứng minh&quot;.</p>
+<p><strong>9. (Vì sao) Sao không dùng LightGBM hay Prophet?</strong>
+Non-Goal §4 cấm thư viện ML. Em vẫn đo bằng Python (<code>forecast_discussion.md</code> §17): trên dữ liệu của app,
+mô hình của em thắng cả hai (22,35% so với Prophet 23,53%, LightGBM 24,84%) vì chỉ nó xử lý khung bán hết;
+trên dữ liệu thật Hồng Kông, LightGBM tốt hơn ở ngày thường và ở lần Tết thứ ba, nhưng trượt khi mới
+thấy một lần Tết. Mô hình của em còn đọc được hệ số, LightGBM là hộp đen.</p>
+<p><strong>10. (Thế nào) Làm sao biết code Java đúng?</strong>
+Bản Python là mô hình đã đo. <code>SlotDemandModelReferenceTest</code> đọc lịch sử thật đóng băng và bắt 1.050 dự báo
+Java khớp Python tới 10⁻⁶ (thực tế 9,7·10⁻⁹); bước E khớp scipy. Thêm 8 test tính chất để biết phần nào
+hỏng khi test tham chiếu đỏ.</p>
+<p><strong>11. (Vì sao) Sao không chạy một job đêm để tính sẵn?</strong>
+Roadmap §4 cấm cron hằng ngày. Một lần khớp chỉ 0,2–0,6 giây nhờ giải theo khối, nên tính khi có người
+mở trang và nhớ trong bộ nhớ là đủ. So nguyên ma trận đầu vào: khác một vé là khớp lại, nên không bao giờ
+hiện số cũ (<code>FS:456-463</code>).</p>
+<p><strong>12. (Nếu… thì sao) Năm 2033 thì sao? Thêm một tuyến mới hôm nay thì sao?</strong>
+Lịch lễ chỉ có tới 2032: lịch sử ngoài phạm vi bị bỏ, dự báo dừng ở 31/12/2032 và màn hình cảnh báo;
+phải bổ sung bảng âm lịch. Tuyến mới chưa có chuyến hoàn thành thì chưa có chuỗi; cần ≥ 28 ngày quan sát
+mới được dự báo — chạy bổ sung bộ sinh, hoặc đợi dữ liệu thật.</p>
+<h3 id="10-3-diem-phai-noi-that">10.3. Điểm phải nói thật</h3>
+<ul>
+<li><strong>Đây là thống kê viết tay, không phải máy học.</strong> Chữ &quot;AI Prediction&quot; trong roadmap là tên thành phần;
+mô hình là hồi quy Poisson + EM, không có mạng nơ-ron, không thư viện ML.</li>
+<li><strong>Dữ liệu lịch sử là mô phỏng</strong> (profile <code>backfill</code>); trang có cảnh báo vàng ngay đầu
+(<code>tpl/admin/demand-forecast.html:43-51</code>). Mọi độ lớn của bộ sinh là giả định.</li>
+<li><strong>Một số lựa chọn được chọn sau khi xem kết quả</strong> (K = 0 ở bước 0, quy tắc (b) ở GĐ2), trên chính các
+bộ dữ liệu dùng để đo. Bù lại, chúng thắng trên hai bộ dữ liệu độc lập.</li>
+<li><strong>So với ML:</strong> trên dữ liệu thật, LightGBM tốt hơn ở ngày thường. Phải nói cả hai vế (§10.2 câu 9).</li>
+<li><strong>Lợi ích của nhãn chiều tuyến nhỏ hơn con số ban đầu</strong> (3,8–5,8 điểm ở bước 0 là do bộ sinh cũ).</li>
+<li><strong>Màn hình chỉ dự báo</strong>, không tạo chuyến; chuyến thật vẫn qua luồng tạo / duyệt của Admin.</li>
+</ul>
+<hr>
+<h2 id="11-bai-tap-tu-kiem-tra">§11. Bài tập tự kiểm tra</h2>
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Một ngày có chuyến chính 22/22 (<code>COMPLETED</code>) và chuyến thêm 06:40 bị <code>CANCELLED</code> với 10 vé. Khung đó
+là bao nhiêu vé, bao nhiêu ghế, có bán hết không?</li>
+<li>Một nhóm (tuyến, 13:00) có 40 chuyến hoàn thành nhưng chỉ trong 25 ngày khác nhau. Nó có được dự báo
+không?</li>
+<li>Mở trang Dự báo hai lần liền, giữa hai lần Admin sửa số vé một chuyến đã hoàn thành từ 18 thành 19.
+Lần thứ hai có khớp lại không?</li>
+<li>Màn Đề xuất có trả chi phí 9 lần khớp của phần tự chấm điểm không? Vì sao?</li>
+<li>Nhu cầu 18 khách, xe chuẩn 20 chỗ: có cần tăng cường không? Cần mấy chuyến?</li>
+<li>Tuyến chưa có loại xe phù hợp thì xe chuẩn lấy ở đâu?</li>
+<li>Vì sao trang không có nút &quot;Tạo chuyến từ dự báo&quot;?</li>
+</ol>
+<p><strong>Bài tự trace.</strong> Admin vừa chạy <code>demo</code> (xoá sạch, seed lại dữ liệu mẫu) và mở ngay màn Dự báo. Viết chuỗi
+<code>Controller → Service → Repository → view</code>, nói rõ dừng ở dòng nào của <code>build()</code> và trang hiện gì. Sau đó
+Admin mở màn Đề xuất: có bao nhiêu thẻ?</p>
+<p><strong>Câu đọc code.</strong> <code>FS:456-463</code>:</p>
+<div class="code-wrap"><pre class="code"><code class="language-java">boolean sameAs(ModelInput other) {
+    return other != null
+            &amp;&amp; firstDay.equals(other.firstDay)
+            &amp;&amp; origin.equals(other.origin)
+            &amp;&amp; Arrays.equals(groups, other.groups)
+            &amp;&amp; Arrays.deepEquals(sales, other.sales)
+            &amp;&amp; Arrays.deepEquals(seats, other.seats);
+}</code></pre></div>
+<p>Đoạn này làm gì? Nếu bỏ dòng <code>Arrays.equals(groups, …)</code>, Admin đổi <code>holidayFlow</code> của một tuyến thì chuyện
+gì xảy ra? Nếu thay hai dòng <code>deepEquals</code> bằng so &quot;tổng số vé và tổng số ghế&quot;, trường hợp nào bị lọt?</p>
+<p><strong>Bài tính tay 🧮.</strong>
+(a) Khung dự báo 46 khách, xe chuẩn 22 chỗ: tỉ số, cờ, số chuyến cần, số chuyến thêm?
+(b) Khung bán hết 40/40, mô hình đang tin μ = 38 và cho biết E[nhu cầu | nhu cầu ≥ 40] = 43,1. Vòng EM sau
+học khung này với giá trị nào? Vì sao không phải 38?
+(c) Chấm một ô: dự báo 47, hôm đó chạy 44 ghế, bán 44 vé; SN4 dự báo 30. Sai số của mô hình và của SN4
+theo cách của app?</p>
+<details><summary>Đáp án</summary>
+
+<p><strong>Câu hỏi ngắn</strong></p>
+<ol>
+<li>Chuyến <code>CANCELLED</code> không vào lịch sử (<code>FS:228</code>). Khung = {22 vé, 22 ghế} ⇒ <strong>bán hết</strong> (22 ≥ 22).</li>
+<li><strong>Không.</strong> Ngưỡng đếm <strong>ngày</strong> quan sát (<code>FS:230</code>, <code>size()</code> của map ngày), không đếm chuyến: 25 &lt; 28.</li>
+<li><strong>Có.</strong> Ma trận <code>sales</code> khác một ô ⇒ <code>sameAs</code> sai ⇒ khớp lại, <code>cachedBacktest</code> bị xoá (<code>FS:264-273</code>).</li>
+<li><strong>Không.</strong> Nó gọi <code>buildForecast()</code> ⇒ <code>withAccuracy = false</code> (<code>FS:214</code>, <code>:346</code>).</li>
+<li>18 ÷ 20 = 0,90 — <strong>không</strong> lớn hơn 0,90 ⇒ không nóng ⇒ <strong>1</strong> chuyến (<code>FS:482-496</code>). Ngưỡng là &quot;lớn hơn&quot;,
+đúng như <code>Trip.needsReinforcement()</code>.</li>
+<li>Sức chứa trung bình của đội xe, làm tròn (<code>FS:292-298</code>, <code>:530-535</code>); bảng đánh dấu <code>*</code> ở cột Xe Chuẩn.</li>
+<li>Vì đây là dự báo hỗ trợ quyết định: không tạo chuyến, không phân công (roadmap §5 Phase 6; thẻ đề xuất ở
+Bài 17 cũng không tạo chuyến). Chuyến thật đi qua luồng tạo / duyệt.</li>
+</ol>
+<p><strong>Bài tự trace</strong></p>
+<p><code>GET /admin/analytics/forecast</code> → <code>ForecastController.viewForecast()</code> → proxy mở transaction chỉ đọc →
+<code>build(hôm nay, true)</code> → <code>findDemandHistoryByStatus(COMPLETED)</code>: dữ liệu <code>demo</code> chỉ có vài chuyến (seed của
+<code>DataInitializer</code>), không chuỗi nào đủ 28 ngày ⇒ <code>keys</code> rỗng ⇒ <code>return view</code> ở <code>FS:253-255</code> (trước cả bước
+khớp và tự chấm điểm) → commit → view <code>admin/demand-forecast</code> → <code>tpl:185-194</code> hiện &quot;Chưa đủ dữ liệu lịch sử
+để dự báo…&quot; kèm lệnh chạy <code>backfill</code>; các khối khác ẩn. Màn Đề xuất nhận <code>series</code> rỗng ⇒ <strong>0 thẻ</strong>.</p>
+<p><strong>Câu đọc code</strong></p>
+<p>Nó quyết định có dùng lại lần khớp cũ không: chỉ khi ngày đầu, ngày gốc, nhóm chiều và <strong>từng ô</strong> vé, ghế
+giống hệt. Bỏ dòng <code>groups</code>: đổi <code>holidayFlow</code> không đổi ma trận vé, ghế ⇒ app vẫn dùng kết quả khớp với
+nhóm cũ ⇒ bảng hệ số lễ và dự báo dịp lễ <strong>sai</strong> cho tới khi có một vé đổi. So bằng tổng: hai thay đổi bù
+nhau (một khung +1 vé, khung khác −1 vé) cho cùng tổng ⇒ lọt; đó chính là lý do so nguyên ma trận (javadoc
+<code>FS:409-413</code>).</p>
+<p><strong>Bài tính tay</strong></p>
+<p>(a) 46 ÷ 22 = 2,09 &gt; 0,90 ⇒ nóng; ⌈46 ÷ 19,8⌉ = ⌈2,32⌉ = <strong>3</strong> chuyến ⇒ <strong>2</strong> chuyến thêm.
+(b) Học với <strong>43,1</strong> (<code>SDM:442</code>). Không phải 38 vì ta biết chắc hôm đó ít nhất 40 người tới (bán hết 40
+ghế); giá trị thay thế phải ≥ 40.
+(c) Mô hình: |min(47; 44) − 44| = <strong>0</strong>. SN4: |min(30; 44) − 44| = <strong>14</strong>.</p>
+</details>
+
+<hr>
+<h2 id="tom-tat-5-dieu-quan-trong-nhat">Tóm tắt 5 điều quan trọng nhất</h2>
+<ol>
+<li><strong>Dự báo nhu cầu của khung</strong> (tuyến × giờ × ngày, mọi chuyến <code>COMPLETED</code> cộng lại), không phải tỉ lệ lấp
+đầy — vì tỉ lệ kẹp ở 100% không trả lời được &quot;cần mấy chuyến&quot;.</li>
+<li><strong>Mô hình:</strong> hồi quy Poisson theo lịch viết tay — mức, thứ, xu hướng đóng băng, hệ số lễ học chung theo
+chiều tuyến và kéo về ×1 — cộng <strong>EM</strong> cho khung bán hết. Khớp Python tới 10⁻⁸.</li>
+<li><strong>Một ngưỡng:</strong> nhu cầu ÷ ghế xe chuẩn &gt; 0,90; số chuyến cần tính qua cờ đó. Bài 17, 18 gọi lại đúng các
+hàm <code>tripsNeeded()</code> và <code>extraTripPassengers()</code>.</li>
+<li><strong>Tính khi mở trang, nhớ tới khi dữ liệu đổi</strong> (so nguyên ma trận); phần tự chấm điểm chỉ màn này trả.</li>
+<li><strong>Nói thật:</strong> dữ liệu mô phỏng; tự chấm 16,06% so với 17,54% của SN4; trên dữ liệu thật LightGBM tốt hơn
+ở ngày thường, còn trên loại dữ liệu của app (chặn trần) mô hình này tốt hơn cả LightGBM lẫn Prophet.</li>
+</ol>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+  try {
+    document.querySelectorAll('pre.code code').forEach(function (el) {
+      if (window.hljs) window.hljs.highlightElement(el);
+    });
+  } catch (e) { /* tô màu là tiện ích, lỗi thì để code thường */ }
+
+  // Sơ đồ Mermaid: artifact trên claude.ai tự vẽ. Khi mở file cục bộ (file://)
+  // thì tự nạp thư viện Mermaid từ CDN để vẽ.
+  (function () {
+    if (location.protocol !== 'file:') return;
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js';
+    s.onload = function () {
+      var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      window.mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      window.mermaid.run({ querySelector: 'pre.mermaid' });
+    };
+    document.head.appendChild(s);
+  })();
+</script>

@@ -993,8 +993,8 @@ theo id và loại mọi quan hệ khỏi `toString`, có `EntityEqualsHashCodeC
 3. `@PathVariable` và `@RequestParam` khác nhau ở đâu? Cho một ví dụ URL cho mỗi loại.
 4. Vì sao `BusRepository` là interface mà vẫn gọi được method?
 5. Một flash attribute tồn tại được bao lâu?
-6. `record Observation(long routeId, int hour, LocalDate date, double occupancy)` — gọi method nào để
-   lấy ngày của một `Observation o`?
+6. `record SlotKey(long routeId, int hour)` (`ForecastService.java:177`) — gọi method nào để
+   lấy giờ khởi hành của một `SlotKey k`?
 7. Vì sao `deleteRefusalReason()` không có `default`? Chuyện gì xảy ra nếu thêm `TripStatus.DELAYED`?
 8. Chạy app với profile `demo` có hậu quả gì với dữ liệu?
 
@@ -1050,7 +1050,7 @@ document.getElementById('createTripForm').addEventListener('submit', function (e
 4. Spring Data JPA tự sinh một class cài đặt (proxy) lúc khởi động, dựa trên tên method và `@Query`.
 5. Qua **đúng một** lần chuyển trang: đặt ở request POST, đọc được ở request GET ngay sau redirect,
    rồi mất.
-6. `o.date()` — `record` sinh method đọc **không có chữ `get`**.
+6. `k.hour()` — `record` sinh method đọc **không có chữ `get`**.
 7. Để trình biên dịch buộc phủ đủ mọi giá trị enum. Thêm `DELAYED` thì switch không còn phủ đủ →
    **lỗi biên dịch** ở `deleteRefusalReason()` (và `editRefusalReason()`), người thêm buộc phải
    quyết định chính sách xóa/sửa cho trạng thái mới.

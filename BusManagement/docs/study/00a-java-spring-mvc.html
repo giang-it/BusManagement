@@ -1573,8 +1573,8 @@ theo id và loại mọi quan hệ khỏi <code>toString</code>, có <code>Entit
 <li><code>@PathVariable</code> và <code>@RequestParam</code> khác nhau ở đâu? Cho một ví dụ URL cho mỗi loại.</li>
 <li>Vì sao <code>BusRepository</code> là interface mà vẫn gọi được method?</li>
 <li>Một flash attribute tồn tại được bao lâu?</li>
-<li><code>record Observation(long routeId, int hour, LocalDate date, double occupancy)</code> — gọi method nào để
-lấy ngày của một <code>Observation o</code>?</li>
+<li><code>record SlotKey(long routeId, int hour)</code> (<code>ForecastService.java:177</code>) — gọi method nào để
+lấy giờ khởi hành của một <code>SlotKey k</code>?</li>
 <li>Vì sao <code>deleteRefusalReason()</code> không có <code>default</code>? Chuyện gì xảy ra nếu thêm <code>TripStatus.DELAYED</code>?</li>
 <li>Chạy app với profile <code>demo</code> có hậu quả gì với dữ liệu?</li>
 </ol>
@@ -1622,7 +1622,7 @@ này. <code>redirect:</code> bảo trình duyệt <strong>gửi request GET mớ
 <li>Spring Data JPA tự sinh một class cài đặt (proxy) lúc khởi động, dựa trên tên method và <code>@Query</code>.</li>
 <li>Qua <strong>đúng một</strong> lần chuyển trang: đặt ở request POST, đọc được ở request GET ngay sau redirect,
 rồi mất.</li>
-<li><code>o.date()</code> — <code>record</code> sinh method đọc <strong>không có chữ <code>get</code></strong>.</li>
+<li><code>k.hour()</code> — <code>record</code> sinh method đọc <strong>không có chữ <code>get</code></strong>.</li>
 <li>Để trình biên dịch buộc phủ đủ mọi giá trị enum. Thêm <code>DELAYED</code> thì switch không còn phủ đủ →
 <strong>lỗi biên dịch</strong> ở <code>deleteRefusalReason()</code> (và <code>editRefusalReason()</code>), người thêm buộc phải
 quyết định chính sách xóa/sửa cho trạng thái mới.</li>
