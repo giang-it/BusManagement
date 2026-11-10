@@ -1,13 +1,14 @@
 # forecast_research
 
-Read-only research behind [`../forecast_discussion.md`](../forecast_discussion.md) (2026-10-14 → 20).
-Nothing here is part of the application; nothing here writes to the database.
+Research behind [`../forecast_discussion.md`](../forecast_discussion.md) (2026-10-14 → 23) and the evidence the
+forecast tests are pinned to. Nothing here is part of the application. Everything is read-only except
+`gd3_delete_old_history.sql`, the one-off GĐ3 deletion on the real database (see its row).
 
 | File | What it is |
 |---|---|
 | `hist_snapshot_2026-10-14.tsv` | Snapshot of the `COMPLETED` trip history (route_id, `YYYY-MM-DD HH`, tickets_sold, total_seats), 2,065 rows, 2026-04-27 → 2026-09-20 |
-| `forecast_replica.py` | Exact Python replica of `ForecastService.buildForecast()` and its backtest |
-| `compare_methods.py` | Rolling-origin backtest of 5 methods (current LR, MA7, seasonal naive ×2, Holt-Winters damped) |
+| `forecast_replica.py` | Exact Python replica of the **old** `ForecastService.buildForecast()` (occupancy rate, linear regression; replaced in GĐ5) and its backtest |
+| `compare_methods.py` | Rolling-origin backtest of 5 methods (the old LR, MA7, seasonal naive ×2, Holt-Winters damped) |
 | `per_origin.py` | Per-origin breakdown of `compare_methods.py` |
 | `queries.sql` | Every read-only SQL query used, including the export (Q0) |
 | `step0/`, `step0_data/` | Step 0 (2026-10-20): algorithm selection on real Hong Kong border data and on a new censored synthetic generator; needs numpy/pandas/scipy/statsmodels/prophet/lightgbm. See `step0/README.md`; results in `../forecast_discussion.md` §12 |
@@ -17,10 +18,12 @@ Nothing here is part of the application; nothing here writes to the database.
 | `gd4/` | GĐ4 (decision QĐ-15, 2026-10-22), the Java model's evidence: `run_final.py` backtests the final configuration (EM 5 rounds + rule (b)) next to the GĐ2 main model on the GĐ2 dataset, scored with `step0/compare.py` (usage in its header; §14.1). `export_slot_history.sql` (read-only) exports the real DB's slot history, frozen as `src/test/resources/forecast/slot_history.csv` + `routes.csv`. `reference.py` runs GĐ2's `slot_glm` with the final configuration on that history and writes the expected values `SlotDemandModelReferenceTest` compares against (`reference_*.csv` in the same folder). Needs numpy/pandas/scipy (the step 0 venv). Results in `../forecast_discussion.md` §14 |
 | `gd5/` | GĐ5 (decision QĐ-16, 2026-10-22), the forecast page's self-check: `backtest_reference.py` runs GĐ2's `slot_glm` with the final configuration on the GĐ4 frozen history at the page's 8 weekly origins and its Tết origin (25/01/2026). It scores model and SN4 sạch the way the page does — `min(forecast, seats that ran)` against tickets sold, sold-out slots foreseen, reinforcement-flag recall/precision — prints the scorings QĐ-16 rejects, and writes `src/test/resources/forecast/reference_backtest.csv`, which `ForecastServiceReferenceTest` compares against. Needs numpy/pandas/scipy (the step 0 venv). Results in `../forecast_discussion.md` §15 |
 | `gd6/` | GĐ6 (decision QĐ-17, 2026-10-23), Recommendation and What-if in demand units: `discussion_numbers.py` reproduces the discussion's numbers from `reference_forecast.csv` — what an extra trip is worth under GĐ5's bridge, the deterministic overflow and the expected overflow, for the week 23–29/10/2026 and the Tết week 08–14/02/2026, plus the What-if table at 70–150% (plain Python; usage in its header). `overflow_reference.py` writes `src/test/resources/forecast/reference_overflow.csv`: E[(D − c)⁺] for a negative binomial D summed directly with scipy, which `SlotDemandModelReferenceTest` compares `SlotDemandModel.expectedOverflow` against. Needs numpy/scipy (the step 0 venv). Results in `../forecast_discussion.md` §16 |
+| `gd7/` | GĐ7 (2026-10-23), the defence appendix: the final model next to **LightGBM and Prophet** (QĐ-6 keeps them Python-only). `run_ml_baselines.py` runs step 0's LightGBM and Prophet, unchanged, on the GĐ2 dataset at the 72 origins of `gd4/run_final.py`; `pick_methods.py` copies step 0's Hong Kong LightGBM/Prophet forecasts out so they can be scored with GĐ2's `hk_rules.csv` (same 90 origins); `report_gd7.py` scores either pair with `step0/report.py`. Usage in each header. Result tables in `gd7/results/` (`app_*` = the app's generated data, `hk_*` = real Hong Kong data). Needs the step 0 venv (numpy, pandas, scipy, prophet, lightgbm). Results in `../forecast_discussion.md` §17 |
 | `holiday_calendar_check.py` | GĐ1 (2026-10-21): independent GMT+7 re-implementation of Ho Ngoc Duc's Vietnamese lunar-calendar algorithm, used to cross-check the Tết / Giỗ Tổ table in `HolidayCalendar.java` (2022–2033). Plain Python, no packages: `python -I holiday_calendar_check.py` |
 | `2026-10-20-chưa xong.txt` | The owner's own terminal copy of the 2026-10-20 morning session (summarised in `../forecast_discussion.md` §11) |
 
-Run from this folder (plain Python 3, no numpy):
+The 2026-10-14 → 16 scripts (the OLD model, on the OLD data the GĐ3 deletion removed from the real DB). Run from
+this folder (plain Python 3, no numpy):
 
 ```
 python forecast_replica.py hist_snapshot_2026-10-14.tsv 2026-09-21   # 15 series, MAPE 4.29% vs 7.43%, 17 signals

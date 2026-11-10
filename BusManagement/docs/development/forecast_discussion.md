@@ -1,7 +1,7 @@
 # Thảo luận thiết kế lại Demand Forecast (2026-10-14 → 2026-10-20)
 
-> **Trạng thái: CHỈ THẢO LUẬN VÀ THÍ NGHIỆM, CHƯA SỬA CODE APP.**
-> **Mới nhất (2026-10-21, GĐ2):** đo lại trên dữ liệu của bộ sinh mới, xem mục 13. Có hai đề xuất đổi so với QĐ-3 và QĐ-1, chờ chủ dự án.
+> **Trạng thái (2026-10-23): hồ sơ lý do và số đo của cả đợt thiết kế lại; code app đã đổi xong ở GĐ1–GĐ6.** Mục 0–10 mô tả mô hình CŨ (hồi quy tuyến tính trên tỉ lệ lấp đầy) đúng như lúc đó; mô hình đó không còn trong code từ GĐ5. Mục 13–16 là số đo của từng giai đoạn; **mục 17 là phụ lục so với LightGBM và Prophet** (GĐ7).
+> 2026-10-21 → 22, GĐ2: đo lại trên dữ liệu của bộ sinh mới (mục 13); hai đề xuất đổi QĐ-3 và QĐ-1 đã được chủ dự án duyệt ngày 2026-10-22.
 > **2026-10-21: chủ dự án đã duyệt 7 quyết định.** Xem [`forecast_decisions.md`](forecast_decisions.md); tiến độ ở [`forecast_progress.md`](forecast_progress.md). File này giờ chỉ là hồ sơ lý do và số đo; chỗ nào nói "chưa chốt" là đúng tại thời điểm viết.
 > 2026-10-20: chủ dự án nghiêng về B1 + C2 (mục 11), và bước 0, tức thí nghiệm chọn thuật toán, đã xong (mục 12).
 >
@@ -61,7 +61,7 @@ Năm kết luận chính:
 
 > Mục này tả mô hình **cũ** (tỉ lệ lấp đầy, hồi quy tuyến tính) như nó có ngày 2026-10-16, kèm số dòng của lúc đó. GĐ5 (2026-10-22, QĐ-16) đã viết lại `ForecastService`; code hiện tại được tả ở `Proj_functions_summary.md` §16.
 
-**Màn hình:** `/admin/analytics/forecast` (một tab trong `dashboard-analytics.html`).
+**Màn hình:** `/admin/analytics/forecast` (trang riêng, có liên kết từ tab "Lấp đầy" của `dashboard-analytics.html`).
 
 **Dữ liệu đầu vào:**
 - `TripRepository.findDemandHistoryByStatus` (`TripRepository.java:442`), gọi với `COMPLETED` (`ForecastService.java:211`):
@@ -1042,6 +1042,98 @@ Hôm nay là 23/10 nên chân trời là 24–30/10. Thứ Sáu 30/10 có đúng
 - "Khách tràn kỳ vọng" dựa vào giả định nhu cầu một ngày theo nhị thức âm với **một** độ phân tán chung cho mọi chuỗi — đúng giả định bước E của mô hình. Nó không tính sai số của chính con số dự báo.
 - Lỗ dự kiến của đa số chuyến thêm tuần thường là kết luận **kinh doanh** về giá vé và chi phí đang cấu hình, không phải lỗi của ngưỡng 90%: ngưỡng là quy tắc dịch vụ (chừa chỗ, không bỏ khách), còn lãi/lỗ là thông tin cho Admin.
 - Lịch chạy thường lệ của những ngày tới không có trong DB, nên xe của chuyến chính không bị trừ khi giữ chỗ.
+
+---
+
+## 17. GĐ7 — Phụ lục: mô hình trong app so với LightGBM và Prophet (2026-10-23)
+
+> **Chỉ nghiên cứu.** Không đụng app, không truy vấn DB. QĐ-6: LightGBM và Prophet chỉ là đối chứng bằng Python khi bảo vệ, không vào app. Script: `forecast_research/gd7/`; bảng số đầy đủ: `forecast_research/gd7/results/`.
+
+### 17.1 Đo thế nào
+
+Hai bộ dữ liệu, mỗi bộ một câu hỏi:
+
+| | (A) Dữ liệu thật Hồng Kông | (B') Dữ liệu của app |
+|---|---|---|
+| Câu hỏi | Mô hình có đứng được trên nhu cầu **thật** không? | Mô hình có tốt hơn trên **đúng loại dữ liệu app có**: bán hết vé bị chặn trần, chuyến thêm, khung bị hủy? |
+| Nguồn | Lượt xuất nhập cảnh hằng ngày, 20 chuỗi (§12.2) | Bộ sinh của app (GĐ2), 15 chuỗi; nhu cầu thật giống hệt DB thật ở mọi khung (§13.1), 21,0% khung bán hết |
+| Ngày gốc | 90, mỗi tuần một ngày, 29/12/2024 → 13/09/2026 | 72, mỗi 2 tuần, 24/12/2023 → 13/09/2026 |
+| Chấm so với | Số đếm thật | **Nhu cầu thật** do bộ sinh xuất ra; bỏ ngày bão |
+| Mô hình trong app | G1', K = 0, quy tắc (b); không có ghế nên không có EM (`gd2/hk_rules.py`, `hk_rule_b`) | Cấu hình cuối: EM 5 vòng, K = 0, quy tắc (b) (`gd4/run_final.py`, `glm_final`, §14.1) |
+| LightGBM, Prophet | Lần chạy của bước 0 (§12.3), cùng ngày gốc | **Chạy mới** ở GĐ7: `gd7/run_ml_baselines.py` |
+
+- **LightGBM** (code bước 0, không chỉnh): một mô hình chung cho mọi chuỗi; đích là log(vé ÷ SN4 sạch); đặc trưng gồm chuỗi, nhóm chiều, tầm, thứ, ngày trong năm, cặp (dịp lễ, ngày lệch), đà 7/28 ngày; học lại mỗi 4 ngày gốc.
+- **Prophet** (code bước 0, không chỉnh): mỗi chuỗi một mô hình trên log vé, mùa tuần và mùa năm, bảng ngày lễ là đúng các cửa sổ lễ của app.
+- Cả hai học từ **số vé** — thứ duy nhất app ghi lại. Ở (B') số vé bị chặn bởi số ghế; chỉ mô hình trong app có EM để đoán lại khung bán hết.
+- Mô hình trong app chạy ở đây là bản Python `slot_glm`, mà bản Java khớp tới 10⁻⁸ (§14.2). Lần chạy này cho lại đúng 22,35% / 22,58% của §14.1.
+- Lệnh chạy:
+  - (B'): `run_ml_baselines.py` rồi `report_gd7.py` và `step0/compare.py` trên hai file dự báo ghép lại;
+  - (A): `pick_methods.py` lấy LightGBM, Prophet từ file của bước 0 rồi chấm cùng file `hk_rules.csv`.
+  - Thời gian trên máy này: Prophet 172 giây cho 1.080 lần khớp (8 tiến trình), LightGBM 114 giây.
+
+### 17.2 Kết quả trên dữ liệu của app (B', WAPE % so với nhu cầu thật; thấp hơn là tốt hơn)
+
+| | Tầm 1–7 | Tầm 15–35 | Tết 2024 | Tết 2025 | Tết 2026 | Lễ nhỏ | Ngày thường |
+|---|---|---|---|---|---|---|---|
+| SN4 sạch | 25,29 | 25,32 | 41,53 | 39,29 | 40,63 | 27,48 | 23,06 |
+| App cũ (tỉ lệ × ghế) | 25,46 | 25,41 | | | | | |
+| LightGBM | 24,84 | 24,80 | 43,48 | 30,34 | 29,57 | 27,62 | 23,36 |
+| Prophet | 23,53 | 23,58 | 37,80 | 27,74 | 26,79 | 29,57 | 22,07 |
+| **Mô hình trong app** | **22,35** | **22,58** | **33,19** | **24,82** | **25,26** | **26,56** | **21,48** |
+
+Các cột Tết và lễ tính trên tầm 1–35. Hiệu số "mô hình trong app − đối thủ", khoảng tin cậy 95% bootstrap theo ngày gốc (`gd7/results/app_pairs.md`):
+
+| | Tầm 1–7 | Tầm 15–35 | Tết 2024 | Tết 2025 | Tết 2026 | Lễ nhỏ | Ngày thường |
+|---|---|---|---|---|---|---|---|
+| so với Prophet | **−1,17** [−1,65; −0,69] | **−1,00** | **−4,61** | **−2,92** | −1,53 (KTC chứa 0) | **−3,01** | **−0,59** |
+| so với LightGBM | **−2,49** [−3,42; −1,79] | **−2,22** | **−10,29** | **−5,51** | −4,31 (KTC chứa 0) | **−1,06** | **−1,88** |
+
+Chất lượng **quyết định**, tầm 1–7 (`gd7/results/app_report.md`; "bỏ lại" = % khách không có chỗ nếu chạy đúng số chuyến dự báo đòi):
+
+| | Cờ tăng cường: bắt được (recall) | Cờ: báo đúng (precision) | Khách bị bỏ lại | Chuyến thừa / 100 khung |
+|---|---|---|---|---|
+| SN4 sạch | 0,37 | 0,63 | 3,74% | 7,8 |
+| LightGBM | 0,36 | 0,64 | 3,39% | 7,1 |
+| Prophet | 0,37 | 0,69 | 2,76% | 6,0 |
+| **Mô hình trong app** | **0,52** | 0,66 | **1,72%** | 9,4 |
+| (sàn: biết kỳ vọng thật) | 0,57 | 0,70 | 1,19% | 9,1 |
+
+Lên kế hoạch Tết trước 15–35 ngày: mô hình trong app bỏ lại **1,74%** khách, Prophet 3,49%, LightGBM 7,47%, SN4 sạch 10,87%.
+
+### 17.3 Kết quả trên dữ liệu thật Hồng Kông (A, WAPE % so với số đếm thật)
+
+| | Tầm 1–7 | Tầm 15–35 | Tết 2025 | Tết 2026 | Lễ | Ngày thường |
+|---|---|---|---|---|---|---|
+| SN4 sạch | 11,30 | 12,66 | 18,98 | 19,77 | 18,39 | 10,35 |
+| Holt-Winters | 12,09 | 14,81 | | | | |
+| LightGBM | **9,92** | **10,94** | 20,75 | **10,93** | 15,49 | **9,20** |
+| Prophet | 10,91 | 12,60 | 30,96 | 11,55 | 16,67 | 10,42 |
+| Mô hình trong app | 10,18 | 11,81 | **18,90** | 13,88 | **14,91** | 10,13 |
+
+Các cột Tết, lễ và ngày thường tính trên tầm 1–35. Hiệu số "mô hình trong app − đối thủ" (`gd7/results/hk_pairs.md`):
+
+| | Tầm 1–7 | Tầm 15–35 | Tết 2025 | Tết 2026 | Lễ | Ngày thường |
+|---|---|---|---|---|---|---|
+| so với Prophet | −0,72 (KTC chứa 0) | −0,79 (KTC chứa 0) | **−12,06** | **+2,33** | **−1,75** | −0,29 (KTC chứa 0) |
+| so với LightGBM | +0,26 (KTC chứa 0) | **+0,87** | −1,84 (KTC chứa 0) | **+2,96** | −0,58 (KTC chứa 0) | **+0,94** |
+
+### 17.4 Đọc kết quả
+
+1. **Trên dữ liệu của app, mô hình trong app tốt hơn cả hai ở mọi tầm và mọi loại ngày.** Khoảng tin cậy không chứa 0, trừ Tết 2026. Khoảng cách lớn nhất nằm ở quyết định: nó bắt được 52% khung đông thật, hai đối thủ chỉ khoảng 36–37%, và bỏ lại 1,7% khách thay vì 2,8–3,4%. Lý do chính: cả hai học từ số vé đã bị chặn ở số ghế, nên khung bán hết trông như "đầy đúng một xe". Chỉ mô hình trong app có EM để đoán lại phần vượt.
+2. **Trên dữ liệu thật, LightGBM là phương pháp tốt nhất ở ngày thường và ở lần Tết thứ ba (2026).** Mô hình trong app đứng thứ hai: ngang LightGBM ở tầm 1–7 (khoảng tin cậy chứa 0), kém 0,9 điểm ở tầm 15–35. Nó có sai số thấp hơn Prophet ở mọi cột trừ Tết 2026; chắc chắn ở Tết 2025 và các dịp lễ, còn ở các cột khác khoảng tin cậy chứa 0.
+3. **Khi chỉ mới thấy một lần Tết (Tết 2025 trên dữ liệu thật), cả hai đối thủ đều trượt:** Prophet 30,96%, LightGBM 20,75%, trong khi mô hình trong app 18,90%. Đây đúng là tình huống của một nhà xe mới có ít năm dữ liệu, và là lý do của quy tắc (b) (QĐ-3).
+4. **Vì sao app vẫn không dùng LightGBM hay Prophet** — không phải vì chúng luôn kém:
+   - Non-Goal §4: không mô hình ML, không thêm thư viện; LightGBM là thư viện C++, Prophet là thư viện Python.
+   - Cả hai không xử lý chặn trần. Ở đúng dữ liệu app có, đó là điểm yếu quyết định (mục 1).
+   - Hệ số của mô hình trong app đọc được thành bảng ("Tết D−3, chiều về ×1,9") — màn Dự báo hiện bảng đó. LightGBM là hộp đen.
+   - Mô hình trong app chạy trong JVM 0,2–0,6 giây mỗi lần khớp, không cần tiến trình Python bên cạnh.
+
+### 17.5 Điều phải nói thật
+
+- **(B') là dữ liệu do bộ sinh của chính dự án tạo.** Bộ sinh cố ý khác cấu trúc mô hình (QĐ-7), nhưng vẫn là giả định của dự án. Cái (B') chứng minh là mô hình đúng với **loại** dữ liệu app có (chặn trần), không phải độ chính xác ngoài đời. Ngoài đời, câu trả lời gần nhất là (A) — nơi LightGBM thắng ở ngày thường.
+- **Cấu hình mô hình trong app được chọn sau khi xem kết quả trên chính hai bộ dữ liệu này** (K = 0 ở §12.5, quy tắc (b) ở §13). LightGBM và Prophet chạy cấu hình của bước 0, **không tinh chỉnh**. Điều đó nghiêng về phía mô hình trong app; khoảng cách thật có thể nhỏ hơn.
+- Các cột Tết chỉ có 5 (B') hoặc 7–9 (A) ngày gốc; khoảng tin cậy chỉ tính theo ngày gốc.
+- Prophet ở các ngày gốc sớm nhất của (B') có chưa tới 2 năm lịch sử, và tự cảnh báo rằng mùa năm có thể không xác định được. Đó là một phần của kết quả, không phải lỗi chạy: app gặp đúng tình huống này khi mới có ít dữ liệu.
 
 ---
 
