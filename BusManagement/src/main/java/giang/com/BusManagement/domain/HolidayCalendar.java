@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Lịch ngày lễ dùng chung, dành cho bộ sinh dữ liệu lịch sử (GĐ2) và bộ dự báo nhu
- * cầu (GĐ5) của đợt thiết kế lại Demand Forecast (QĐ-9,
- * docs/development/forecast_decisions.md); tới GĐ1 chưa nơi nào gọi. Chỉ trả lời câu
+ * Lịch ngày lễ dùng chung của bộ sinh dữ liệu lịch sử (HistorySimulation,
+ * HistoricalDataBackfill) và bộ dự báo nhu cầu (SlotDemandModel, ForecastService) (QĐ-9,
+ * docs/development/forecast_decisions.md). Chỉ trả lời câu
  * hỏi "ngày này nằm quanh dịp lễ nào, lệch mấy ngày so với ngày lễ"; độ lớn hiệu ứng
  * của từng dịp là việc của mô hình học từ dữ liệu (QĐ-3), không nằm ở đây.
  *
@@ -22,9 +22,9 @@ import java.util.Map;
  * ====================================================================
  * Ngoài khoảng này mọi câu hỏi đều bị TỪ CHỐI (IllegalArgumentException) thay vì trả
  * lời thiếu: một ngày Tết năm 2033 bị coi như ngày thường là lỗi âm thầm làm hỏng dự
- * báo đúng vào lúc cần nó nhất. Nơi gọi phải hỏi covers() trước — màn dự báo mới
- * (GĐ5) sẽ dùng nó để cảnh báo khi lịch không phủ tới ngày cần dự báo; hết phạm vi
- * thì bổ sung bảng âm lịch bên dưới.
+ * báo đúng vào lúc cần nó nhất. Nơi gọi phải hỏi covers() trước: ForecastService bỏ dòng
+ * lịch sử ngoài phạm vi và dừng dự báo ở 31/12/2032 kèm cảnh báo, bộ sinh dừng ở đó; hết
+ * phạm vi thì bổ sung bảng âm lịch bên dưới.
  *
  * ====================================================================
  * NGÀY ÂM LỊCH: BẢNG TRA, KHÔNG TỰ TÍNH

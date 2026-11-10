@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * Lõi toán của Demand Forecast mới — "G1' + EM, K=0" (QĐ-1, QĐ-3 trong
  * docs/development/forecast_decisions.md), viết tay bằng Java 17, không thư viện (Non-Goal §4).
- * Làm ở GĐ4 (QĐ-15): chưa có nơi nào trong app gọi tới; GĐ5 mới nối nó vào ForecastService.
+ * Làm ở GĐ4 (QĐ-15); ForecastService gọi nó từ GĐ5 (QĐ-16), expectedOverflow thêm ở GĐ6 (QĐ-17).
  *
  * ====================================================================
  * MÔ HÌNH

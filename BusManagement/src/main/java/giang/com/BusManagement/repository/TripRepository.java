@@ -467,13 +467,13 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         * trạng thái, sắp theo thời gian khởi hành.
         *
         * Chỉ lấy 4 cột và không JOIN FETCH gì — cùng lý do đã ghi ở
-        * findSeatsAndSoldByStatus: đây là phép tính thuần số trên hàng nghìn dòng.
+        * findSeatsAndSoldByStatus: đây là phép tính thuần số trên hàng chục nghìn dòng.
         * Nạp hẳn entity Trip sẽ over-fetch đúng vào điểm yếu đã biết của hệ thống
         * (THESIS_ROADMAP.md, Hidden Cost #4: aggregation in-memory trên entity
         * trong DashboardService).
         *
-        * totalSeats > 0 được lọc ngay ở DB để tầng service không phải phòng thủ
-        * phép chia cho 0 khi tính tỉ lệ lấp đầy. Chuyến đã soft-delete tự động bị
+        * totalSeats > 0 được lọc ngay ở DB: chuyến không có ghế không làm nên một khung
+        * quan sát được (ForecastService.aggregateSlots). Chuyến đã soft-delete tự động bị
         * loại nhờ @SQLRestriction trên Trip.
         *
         * Trục thời gian là departureTime, KHÔNG phải createdAt — xem

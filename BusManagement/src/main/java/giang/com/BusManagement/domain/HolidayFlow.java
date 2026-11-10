@@ -8,8 +8,8 @@ package giang.com.BusManagement.domain;
  * dạng" lễ; hai tuyến ngược hướng thì đỉnh của tuyến này rơi vào lúc tuyến kia
  * vắng, nên học gộp mọi tuyến sẽ làm hai hiệu ứng triệt tiêu nhau. Nhãn này để
  * Demand Forecast mới biết tuyến nào học hệ số lễ chung với tuyến nào (QĐ-8,
- * docs/development/forecast_decisions.md). Người đọc nó là bộ sinh dữ liệu (GĐ2)
- * và bộ dự báo (GĐ5) của đợt thiết kế lại; tới GĐ1 chưa nơi nào đọc.
+ * docs/development/forecast_decisions.md). Người đọc nó: bộ sinh dữ liệu (HistorySimulation,
+ * hình dạng lễ theo chiều) và bộ dự báo (ForecastService.groupOf, nhóm học hệ số lễ).
  *
  * "TP lớn" là phán đoán nghiệp vụ của Admin — nơi tập trung người lao động —
  * KHÔNG suy từ cấp hành chính: Hải Phòng, Cần Thơ, Huế cũng là thành phố trực

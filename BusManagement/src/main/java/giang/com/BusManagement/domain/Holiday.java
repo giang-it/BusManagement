@@ -13,9 +13,9 @@ import lombok.Getter;
  * SỔ quanh ngày đó. Mô hình học một hệ số cho từng cặp (dịp, số ngày lệch so với ngày
  * neo), ví dụ "Tết D−3"; ngày neo của từng năm do HolidayCalendar trả về.
  *
- * Cửa sổ là THAM SỐ MÔ HÌNH, không phải sự thật lịch: số hiện tại lấy nguyên từ thí
- * nghiệm bước 0 (forecast_research/step0/run_synth.py, mục WINDOWS) và sẽ được chốt
- * lại bằng số đo ở GĐ2. Cửa sổ càng rộng thì càng nhiều hệ số phải học. Mỗi phía tối
+ * Cửa sổ là THAM SỐ MÔ HÌNH, không phải sự thật lịch: số lấy từ thí nghiệm bước 0
+ * (forecast_research/step0/run_synth.py, mục WINDOWS); GĐ2 đo lại và giữ nguyên (QĐ-13,
+ * forecast_discussion.md §13.4). Cửa sổ càng rộng thì càng nhiều hệ số phải học. Mỗi phía tối
  * đa 365 ngày — HolidayCalendar chỉ xét ngày neo của năm trước, năm nay và năm sau.
  */
 @Getter
