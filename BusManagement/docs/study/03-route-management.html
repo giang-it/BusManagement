@@ -247,8 +247,8 @@ sử vận hành và doanh thu phải được giữ nguyên)!&quot;</em>.</p>
 </tr>
 <tr>
 <td>Seed</td>
-<td><code>…/config/DataInitializer.java:175-190</code>, <code>:237-248</code></td>
-<td>6 tuyến mẫu, mỗi tuyến 2 bến (profile <code>demo</code>)</td>
+<td><code>…/config/DataInitializer.java:175-202</code>, <code>:249-262</code></td>
+<td>10 tuyến mẫu, mỗi tuyến 2 bến (profile <code>demo</code>); 3 cặp hai chiều quanh Miền Đông (QĐ-19, QĐ-20)</td>
 </tr>
 </tbody></table></div>
 <h3 id="2-2-bang-endpoint-du-moi-diem-bat-dau">2.2. Bảng endpoint — đủ mọi điểm bắt đầu</h3>
@@ -1113,7 +1113,7 @@ khoá chính. Cả hai test sửa tuyến hiện có đều đi đúng ca &quot;
 </tbody></table></div>
 <p><strong>Thứ tự ghi quan trọng.</strong> <code>RouteStationId</code> cần <code>route.getId()</code> (<code>:167</code>), mà id chỉ có sau
 <code>INSERT routes</code>. Vì vậy phải <code>save(route)</code> trước rồi mới dựng điểm dừng bằng đối tượng <code>saved</code>
-(<code>:83-84</code>). Seed làm y hệt: <code>DataInitializer.java:242</code> lưu tuyến, <code>:244-245</code> mới nối bến.</p>
+(<code>:83-84</code>). Seed làm y hệt: <code>DataInitializer.java:256</code> lưu tuyến, <code>:258-259</code> mới nối bến.</p>
 <p><strong>(c) Code then chốt</strong> — <code>tpl/admin/route/route-form.html:119-147</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-javascript">function refresh() {
     const rows = stopList.querySelectorAll('.stop-row');           // mọi dòng bến hiện có
@@ -1548,7 +1548,7 @@ sinh ra giờ đến dự kiến của chuyến (JS form tạo chuyến <code>tr
 (<code>TripService.java:1226-1236</code>):</p>
 <ul>
 <li>Tuyến 120 phút: 2 giờ ⇒ <code>ceil(2 / 8) = 1</code> tài xế.</li>
-<li>Tuyến 1800 phút (tuyến Hà Nội → Sài Gòn của seed, <code>DataInitializer.java:190</code>): 30 giờ ⇒
+<li>Tuyến 1800 phút (tuyến Hà Nội → Sài Gòn của seed, <code>DataInitializer.java:194</code>): 30 giờ ⇒
 <code>ceil(30 / 8) = ceil(3,75) = 4</code> tài xế.
 Vì vậy một con số Admin gõ ở màn tuyến làm thay đổi luật kiểm tài xế ở màn chuyến (Bài 06).</li>
 </ul>

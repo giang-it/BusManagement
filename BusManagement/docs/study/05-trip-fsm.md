@@ -541,7 +541,7 @@ mới**, không phải sửa lỗi.
 - **Sinh ra ở `PENDING_APPROVAL`** — job `@Scheduled(fixedRate = 10_000)` `TS:76-78` →
   `createExtraTrip()` đặt `PENDING_APPROVAL` (`TS:166`). Đây cũng là giá trị mặc định của field
   (`Trip.java:84`).
-- **Dữ liệu seed và lịch sử** — `DataInitializer:332` (profile `demo`) và `HistoricalDataBackfill:593`
+- **Dữ liệu seed và lịch sử** — `DataInitializer:346` (profile `demo`) và `HistoricalDataBackfill:593`
   (profile `backfill`) gọi `setStatus()` thẳng. Cố ý: dựng dữ liệu không đi qua service (roadmap §5
   Phase 5, "DataInitializer sets the precedent that seeding bypasses services"). Backfill tự cộng
   odometer cho chuyến `COMPLETED` nó tạo ra, **đúng như FSM** — nhưng cộng vào **cả hai** cột (§8.3).

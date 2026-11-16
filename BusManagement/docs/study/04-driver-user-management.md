@@ -67,7 +67,7 @@ vì anh A đã từng lái chuyến: *"…Hãy khóa hồ sơ (bỏ tick 'Đang 
 | Entity | `…/domain/Driver.java` | Bảng `drivers`: khoá chính **là** `user_id`; số bằng, hạn bằng, kinh nghiệm, `isActive`, hai cột ẩn |
 | Enum | `…/domain/Role.java` | `ROLE_ADMIN`, `ROLE_DRIVER`, `ROLE_USER` |
 | Test | `test/service/AdminServiceTest.java`; `test/service/CreatePathIdTripwireTest.java:195`, `:227`, `:240`; `test/domain/EntityEqualsHashCodeCycleTest.java:88` | 6 test luật tài khoản; 3 tripwire; vòng User↔Driver không đệ quy |
-| Seed | `…/config/DataInitializer.java:290-300` | `createDriver()` mẫu — form gộp bắt chước đúng hàm này |
+| Seed | `…/config/DataInitializer.java:304-314` | `createDriver()` mẫu — form gộp bắt chước đúng hàm này |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
 

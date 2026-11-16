@@ -133,7 +133,8 @@ flowchart TD
    hệ số lễ học chung theo chiều tuyến và kéo về ×1 — cộng EM để đoán lại nhu cầu của khung bán hết vé.
    Bản Java khớp bản Python đã đo tới 10⁻⁸.
 3. **Một định nghĩa "chuyến nóng":** nhu cầu ÷ ghế xe chuẩn > 0,90 — đúng ngưỡng
-   `Trip.needsReinforcement()`. Số chuyến cần = max(1, ⌈nhu cầu ÷ (0,9 × ghế)⌉), tính **qua** cờ đó.
+   `Trip.needsReinforcement()`. Số chuyến cần = 1 nếu không nóng, max(2, ⌈nhu cầu ÷ ghế⌉) nếu nóng
+   (QĐ-18, 2026-11-16), tính **qua** cờ đó.
 4. **Tính một lần, dùng lại tới khi dữ liệu đổi.** Mỗi lần gọi vẫn đọc lại lịch sử; ma trận đầu vào
    giống hệt thì dùng lại kết quả. Không cron, không bảng mới.
 5. **Tự chấm điểm trung thực:** chỉ so cái app thấy được — min(dự báo, ghế đã chạy) với số vé — và so
@@ -482,7 +483,8 @@ Nhu cầu = 16 × 1,25 × 1,9 × 1,05 × 1,02 × 0,98 = 20 × 1,9 = 38 → × 1,
 × 0,98 = **39,9 khách**.
 
 Xe chuẩn 22 chỗ: tỉ số 39,9 ÷ 22 = 1,81 > 0,90 ⇒ **cần tăng cường**; số chuyến =
-⌈39,9 ÷ (0,9 × 22)⌉ = ⌈39,9 ÷ 19,8⌉ = ⌈2,015⌉ = **3** ⇒ 2 chuyến thêm.
+max(2, ⌈39,9 ÷ 22⌉) = max(2, ⌈1,81⌉) = **2** ⇒ 1 chuyến thêm. *(Trước QĐ-18 ngày 2026-11-16, app chia cho
+0,9 × 22 = 19,8 nên ra ⌈2,015⌉ = 3, tức 2 chuyến thêm, mà chuyến thêm thứ hai chỉ chở khoảng 1,5 khách.)*
 
 Ghi chú: ngày dự báo nào có cặp (dịp, ngày lệch) **chưa từng gặp** khi học thì không có hệ số lễ cho cặp
 đó — `SDM:630-636` bỏ qua khóa không có trong `keyIndex`.
@@ -505,13 +507,14 @@ giữ 22? Vì 22 chỉ là trần của xe, giữ nguyên thì mô hình học r
 | Nhu cầu | Ghế xe chuẩn | Tỉ số | `isHot` | `tripsNeeded` |
 |---|---|---|---|---|
 | 19,0 | 22 | 0,864 | không | 1 |
-| 19,9 | 22 | 0,905 | có | max(2, ⌈19,9 ÷ 19,8⌉ = 2) = **2** |
-| 57,6 (DB thật, tuyến 4, 18:00, 25/10) | 40 | 1,44 | có | ⌈57,6 ÷ 36⌉ = ⌈1,6⌉ = **2** |
-| 53,8 (DB thật, tuyến 1, 06:00, 13/02/2026) | 22 | 2,45 | có | ⌈53,8 ÷ 19,8⌉ = ⌈2,72⌉ = **3** |
+| 19,9 | 22 | 0,905 | có | max(2, ⌈19,9 ÷ 22⌉ = 1) = **2** |
+| 40 (ví dụ của QĐ-18) | 22 | 1,82 | có | max(2, ⌈1,82⌉ = 2) = **2** (trước QĐ-18: ⌈40 ÷ 19,8⌉ = 3) |
+| 57,6 (DB thật, tuyến 4, 18:00, 25/10) | 40 | 1,44 | có | ⌈57,6 ÷ 40⌉ = ⌈1,44⌉ = **2** |
+| 53,8 (DB thật, tuyến 1, 06:00, 13/02/2026) | 22 | 2,45 | có | ⌈53,8 ÷ 22⌉ = ⌈2,45⌉ = **3** |
 
 **Cái bẫy (roadmap §9, ghi chú GĐ5).** Với xe 21 chỗ, 0,9 × 21 trong máy tính là
 18,900000000000002. Nhu cầu đúng bằng số đó: 18,900000000000002 ÷ 21 > 0,9 ⇒ **nóng**, nhưng
-⌈18,900000000000002 ÷ 18,900000000000002⌉ = 1. Nếu tính số chuyến **độc lập** với cờ, một ô vừa "cần tăng
+⌈18,900000000000002 ÷ 21⌉ = 1. Nếu tính số chuyến **độc lập** với cờ, một ô vừa "cần tăng
 cường" vừa "cần 1 chuyến". Vì vậy `tripsNeeded` đi **qua** `isHot` và lấy `max(2, …)` (`FS:491-496`).
 `ForecastServiceRulesTest.reinforcementFlag_andTripsNeeded_areOneDefinition` thử đúng các cỡ xe 13, 21,
 26, 37, 42 chỗ.
@@ -545,7 +548,7 @@ ngày không quan sát vẫn **chiếm chỗ** trong 4 ngày nhưng không vào 
 
 ### 8.7. Khách tràn kỳ vọng của một chuyến thêm
 
-Khung dự báo **30** khách, xe chuẩn 22 chỗ. `tripsNeeded` = ⌈30 ÷ 19,8⌉ = 2 ⇒ 1 chuyến thêm.
+Khung dự báo **30** khách, xe chuẩn 22 chỗ. `tripsNeeded` = max(2, ⌈30 ÷ 22⌉) = 2 ⇒ 1 chuyến thêm.
 
 - EO(c) = E[(nhu cầu − c)⁺] = số khách kỳ vọng **không có chỗ** khi khung có c ghế (`SDM:473-482`).
 - EO(22) = **8,25**; EO(44) = 0,06.
@@ -811,7 +814,8 @@ nhau (một khung +1 vé, khung khác −1 vé) cho cùng tổng ⇒ lọt; đó
 
 **Bài tính tay**
 
-(a) 46 ÷ 22 = 2,09 > 0,90 ⇒ nóng; ⌈46 ÷ 19,8⌉ = ⌈2,32⌉ = **3** chuyến ⇒ **2** chuyến thêm.
+(a) 46 ÷ 22 = 2,09 > 0,90 ⇒ nóng; max(2, ⌈2,09⌉) = **3** chuyến ⇒ **2** chuyến thêm (QĐ-18;
+công thức cũ ⌈46 ÷ 19,8⌉ cũng ra 3).
 (b) Học với **43,1** (`SDM:442`). Không phải 38 vì ta biết chắc hôm đó ít nhất 40 người tới (bán hết 40
 ghế); giá trị thay thế phải ≥ 40.
 (c) Mô hình: |min(47; 44) − 44| = **0**. SN4: |min(30; 44) − 44| = **14**.

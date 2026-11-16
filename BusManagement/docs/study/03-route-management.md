@@ -66,7 +66,7 @@ sử vận hành và doanh thu phải được giữ nguyên)!"*.
 | Entity | `…/domain/RouteStation.java`, `RouteStationId.java` | Bảng nối `route_stations`, khoá kép `(route_id, station_id)`, cột `stop_order` |
 | Test | `test/service/RouteServiceDistanceWarningTest.java` | 4 test cho cảnh báo km |
 | Test | `test/service/CreatePathIdTripwireTest.java:260`, `:300` | Tripwire tạo tuyến; sửa tuyến chép field và dựng lại lộ trình |
-| Seed | `…/config/DataInitializer.java:175-190`, `:237-248` | 6 tuyến mẫu, mỗi tuyến 2 bến (profile `demo`) |
+| Seed | `…/config/DataInitializer.java:175-202`, `:249-262` | 10 tuyến mẫu, mỗi tuyến 2 bến (profile `demo`); 3 cặp hai chiều quanh Miền Đông (QĐ-19, QĐ-20) |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
 
@@ -418,7 +418,7 @@ sequenceDiagram
 
 **Thứ tự ghi quan trọng.** `RouteStationId` cần `route.getId()` (`:167`), mà id chỉ có sau
 `INSERT routes`. Vì vậy phải `save(route)` trước rồi mới dựng điểm dừng bằng đối tượng `saved`
-(`:83-84`). Seed làm y hệt: `DataInitializer.java:242` lưu tuyến, `:244-245` mới nối bến.
+(`:83-84`). Seed làm y hệt: `DataInitializer.java:256` lưu tuyến, `:258-259` mới nối bến.
 
 **(c) Code then chốt** — `tpl/admin/route/route-form.html:119-147`:
 
@@ -629,7 +629,7 @@ sinh ra giờ đến dự kiến của chuyến (JS form tạo chuyến `trip-cr
 `arrMs = depMs + routeDurationMinutes × 60 × 1000`), và `validateStaffForTrip()` tính từ đó
 (`TripService.java:1226-1236`):
 - Tuyến 120 phút: 2 giờ ⇒ `ceil(2 / 8) = 1` tài xế.
-- Tuyến 1800 phút (tuyến Hà Nội → Sài Gòn của seed, `DataInitializer.java:190`): 30 giờ ⇒
+- Tuyến 1800 phút (tuyến Hà Nội → Sài Gòn của seed, `DataInitializer.java:194`): 30 giờ ⇒
   `ceil(30 / 8) = ceil(3,75) = 4` tài xế.
 Vì vậy một con số Admin gõ ở màn tuyến làm thay đổi luật kiểm tài xế ở màn chuyến (Bài 06).
 

@@ -59,7 +59,7 @@ của một số tuyến đường hiện hành!"*.
 | Entity (liên quan) | `…/domain/RouteStation.java`, `RouteStationId.java` | Bảng nối tuyến ↔ bến, khoá kép `(routeId, stationId)`, có `stopOrder` |
 | Người dùng bến | `…/service/RouteService.java:50-52, :160-173` | Đổ dropdown bến cho form tuyến; dựng `RouteStation` khi lưu tuyến |
 | Test | `test/service/CreatePathIdTripwireTest.java:281, :321` | 2 test cho bến: tripwire tạo, và sửa chép field |
-| Seed | `…/config/DataInitializer.java:166-172` | 7 bến mẫu (profile `demo`) |
+| Seed | `…/config/DataInitializer.java:166-173` | 8 bến mẫu (profile `demo`; bến Vũng Tàu thêm ngày 2026-11-16, CT2) |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
 
@@ -468,8 +468,8 @@ Ngoài #21, sổ lỗi **không có lỗi nào riêng cho bến xe**. Mục "xó
      tiêu đề đó có lẽ chỉ xét các service nhận **số**; ghi lại để khỏi trích nguyên văn khi bảo vệ.
    - Comment `StationRepository.java:12` nói query tìm theo tên "phục vụ tính năng gợi ý khi khách
      đặt vé" — tính năng đặt vé (Phase 9) **chưa triển khai**; query có 0 nơi gọi.
-   - Test tay TC_STA_001 kỳ vọng 7 bến (đúng với seed `demo`, `DataInitializer.java:166-172`); DB
-     thật hiện có 11 bến (roadmap §8 ghi `stations 11`). Không mâu thuẫn — chỉ là hai bộ dữ liệu.
+   - Test tay TC_STA_001 kỳ vọng 8 bến (đúng với seed `demo`, `DataInitializer.java:166-173`); DB
+     thật hiện có 12 bến (đếm ngày 2026-11-16, sau khi thêm Vũng Tàu). Không mâu thuẫn — chỉ là hai bộ dữ liệu.
 5. **Bến trùng trong một tuyến không biểu diễn được** — khoá chính `(routeId, stationId)`
    (`RouteStation.java:16-18`, `RouteStationId.java:13-16`), nên tuyến vòng A→B→A không tạo được.
    Spec đã ghi đây là giới hạn (`current_functional_spec.md:55`).
