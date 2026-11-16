@@ -3374,3 +3374,19 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
 - **Hai chiều Mỹ Đình ↔ Niệm Nghĩa gợi ý hai loại xe khác nhau** (tuyến 1: Limousine 22, tuyến 4:
   Giường nằm 40). Dữ liệu cấu hình, không phải lỗi code. Hai tuyến này nằm ngoài phạm vi sinh dữ liệu (QĐ-19),
   nên chỉ ghi lại.
+
+# Mục nhỏ (2026-11-17, CT5a của đợt cặp tuyến) — CHƯA SỬA
+
+- **Form tạo xe tự chọn sẵn loại xe đầu danh sách.**
+  - Ô "Cấu Hình Loại Xe" (`bus-form.html:40-44`) dùng `th:field="*{busType}"` với dòng nhắc
+    `<option value="" disabled selected>`.
+  - `th:field` tự tính lại thuộc tính `selected` theo giá trị của field. Khi tạo xe, field là `null`, nên dòng
+    nhắc mất `selected`; HTML thật ra trình duyệt là `<option value="" disabled>-- Chọn loại xe --</option>`
+    (đo 2026-11-17 trên app thật).
+  - Không option nào được chọn, nên trình duyệt chọn option đầu tiên không bị khoá, tức "Limousine (22 Ghế)".
+    Ô `required` vì vậy không còn tác dụng: Admin bấm Lưu mà không đổi gì thì xe mới nhận loại Limousine.
+  - **Phân loại:** sai sót thật, nhỏ. Không vỡ dữ liệu, vì loại xe nào cũng hợp lệ, nhưng trái ý của dòng nhắc
+    `-- Chọn loại xe --`.
+  - **Phát hiện khi làm ô "Bến Nhà" của CT5a.** Ô đó ban đầu mắc đúng lỗi này (xe mới âm thầm nhận bến Mỹ Đình).
+    Đã sửa ngay cho ô bến nhà bằng `name` + `th:selected`, có comment ở template giải thích lý do.
+  - Ô loại xe để nguyên, vì nằm ngoài phạm vi CT5a. Muốn sửa thì dùng đúng cách đó.

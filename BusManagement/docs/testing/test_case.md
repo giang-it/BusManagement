@@ -244,6 +244,38 @@
 
 ---
 
+### TC_BUS_012 — Tạo / sửa xe: bến nhà là bắt buộc (QĐ-23, CT5a)
+
+- **Mã TC:** TC_BUS_012
+- **Tên Kịch Bản:** Lưu xe mà không chọn bến nhà
+- **Điều kiện tiên quyết:** Có ít nhất một bến xe; xe ID=1 có bến nhà Miền Đông (id 3)
+- **Các bước thực hiện:**
+  1. `GET /admin/buses/create` — ô "Bến Nhà" hiện dòng nhắc `-- Chọn bến nhà --` **đang được chọn** (không tự rơi vào bến đầu danh sách)
+  2. Gửi `POST /admin/buses/create` đủ các ô khác nhưng **không** có `homeStation` (vượt qua `required` của trình duyệt bằng request tự soạn)
+  3. Gửi `POST /admin/buses/edit/1` đủ các ô khác nhưng **không** có `homeStation`
+- **Kết quả mong đợi:**
+  - Bước 2: `flash[error]` = `"Lỗi: Phải chọn bến nhà cho xe — nơi xe đứng khi chưa chạy chuyến nào!"`; số xe không đổi
+  - Bước 3: cùng thông báo; `home_station_id` của xe 1 vẫn là 3
+- **Đã chạy:** 2026-11-17 trên bản sao của DB thật (`busmanagement_test`, cổng 8098) — đúng như trên. Khoá thêm bằng `BusServiceTest.create_rejectsMissingHomeStation` và `update_rejectsMissingHomeStation_andKeepsTheOldOne`
+
+---
+
+### TC_BUS_013 — Sửa xe: đổi bến nhà (QĐ-23, CT5a)
+
+- **Mã TC:** TC_BUS_013
+- **Tên Kịch Bản:** Đổi bến nhà của một xe
+- **Điều kiện tiên quyết:** Xe ID=1 có bến nhà Miền Đông (id 3)
+- **Các bước thực hiện:**
+  1. `GET /admin/buses/edit/1` — ô "Bến Nhà" chọn sẵn đúng **một** bến: "Bến xe Miền Đông"
+  2. Chọn "Bến xe Đà Lạt", giữ nguyên các ô khác, bấm Lưu
+- **Kết quả mong đợi:**
+  - `flash[success]` = `"Cập nhật thông tin xe thành công!"`; cột "Bến Nhà" ở danh sách hiện "Bến xe Đà Lạt"
+  - DB: `buses.home_station_id = 4`; các cột khác không đổi
+  - Việc chọn xe (Đề xuất, tự phân công, dropdown) **chưa** đọc bến nhà ở CT5a — bật ở CT5b
+- **Đã chạy:** 2026-11-17 trên bản sao (`busmanagement_test`): flash và DB đúng như trên. Cột "Bến Nhà" của danh sách mới được kiểm trên DB thật (20 xe hiện "Bến xe Miền Đông"), chưa kiểm sau khi đổi. Khoá thêm bằng `BusServiceTest.update_changesHomeStation`
+
+---
+
 <a name="module-2"></a>
 ## MODULE 2: QUẢN LÝ BẾN XE (Station Management)
 **Controller:** `AdminStationController` — `@RequestMapping("/admin/stations")`  
@@ -2491,14 +2523,14 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 
 | Module | Số TC | Happy Path | Error/Edge Case |
 |---|---|---|---|
-| Module 1 — Bus Management | 11 | 4 | 7 |
+| Module 1 — Bus Management | 13 | 5 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
 | Module 3 — Trip FSM & CRUD | 25 | 6 | 19 |
 | Module 4 — AI Scheduler | 18 | 5 | 13 |
 | Module 5 — Admin Approval | 13 | 6 | 7 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **99** | **38** | **61** |
+| **TỔNG** | **101** | **39** | **62** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2507,7 +2539,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

@@ -347,7 +347,7 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
     - study lesson 14 (Demand Forecast) written and built.
   - **Next:** all seven stages are done. Still open: M-11 (booking time, for Phase 9), M-12 (what comes after this workstream), M-16 (top-up caveat), G3-7 (drop the clone `busmanagement_gd2` — needs the owner).
   - **Multi-session workstream. Read, in order:** `docs/development/forecast_progress.md` (status, step checklist, session log), then `forecast_decisions.md` (the decisions and the open design items M-1…M-16). Read `forecast_discussion.md` §11–12 only for the reasoning and the measured numbers.
-- **Route pairs and forecast-driven dispatch — DECISIONS QĐ-18…QĐ-27 APPROVED 2026-11-11 → 16; PLAN CT0–CT10 WRITTEN AND APPROVED 2026-11-16; CT0, CT1 AND CT2 DONE, COMMITTED 2026-11-17 AS `963aa71` (CT1) + `bbedfd8` (CT2) + `ed38ce6` (study lessons) + THE DOCS COMMIT THAT FOLLOWS, ALL PUSHED. Next: CT3 (new generator), opening with CM-2 and CM-3:**
+- **Route pairs and forecast-driven dispatch — DECISIONS QĐ-18…QĐ-27 APPROVED 2026-11-11 → 16; PLAN CT0–CT10 WRITTEN AND APPROVED 2026-11-16; CT0, CT1 AND CT2 DONE, COMMITTED 2026-11-17 AS `963aa71` (CT1) + `bbedfd8` (CT2) + `ed38ce6` (study lessons) + THE DOCS COMMIT THAT FOLLOWS, ALL PUSHED. 2026-11-17 (later): CM-2 ("return at once" in history) and CM-3 (return ratio centred on 100 %) decided; CT5 split into CT5a (location rule + home stations, before CT3) and CT5b (location switched on in bus/driver selection, after CT4). CT5a DONE 2026-11-17 (CM-5: hard for the machine, soft for people, drivers too; CM-12: a home-station column on buses and drivers), COMMITTED `4c3ce51` + `d39c17e` + the docs commit that follows, ALL PUSHED. Next: CT3 (the new generator, on a clone):**
   - **CT2 (QĐ-19, QĐ-20) done 2026-11-16:**
     - after a `mysqldump` backup, routes 10/11 (Miền Đông ↔ Vũng Tàu) were switched to Limousine 22 through the route form, and only that column changed;
     - a read-only SQL check shows the three pairs mirrored, with the same km, minutes and bus type, and flows LEAVING_HUB/TOWARD_HUB;
@@ -1698,6 +1698,46 @@ The project is evolving from a simple Bus Management System into a **thesis-leve
 
   Pushed to `origin/temp`. The `.txt` transcripts stay out of git.
 - **Next:** CT3, the new generator on a clone, opening with the CM-2 and CM-3 discussion.
+
+### 2026-11-17 (later) — Route pairs: CM-2 and CM-3 decided, CT5 split into CT5a / CT5b — DOCS ONLY, NO CODE CHANGED, NOT COMMITTED
+- **CM-2:** the history generator uses "return at once" (H1). An extra bus rides back on the earliest regular return slot that the bus (1 h prep) and its driver (8 h per calendar day) can make, carrying that slot's overflow (usually 0 tickets, stored as a `COMPLETED` extra trip). A far-end extra with no bus there is fed by sending a bus out the same way. This history is CT9's baseline against the hold-or-return rule (QĐ-25).
+- **CM-3:** the return-after-holiday ratio r is uniform in [0.85, 1.15], centred on 100 %, drawn per pair × holiday × year, for every holiday but not for ordinary weekends.
+- **CT5 split.** The owner asked *"sao k thêm vị trí rồi làm bộ sinh"*. Measured on the real DB (read-only): applying the location rule to the old history would leave 11 of 20 buses at stations outside the three pairs (Mỹ Đình 4, Niệm Nghĩa 4, Huế 3), with only 6 at Miền Đông, 3 at Đà Lạt and none at Cần Thơ or Vũng Tàu. So:
+  - **CT5a** (before CT3): the location rule written once, shared by the generator, the post-generation check and the app; home stations for buses and drivers; selection behaviour unchanged.
+  - **CT5b** (after CT4): the rule switched on in bus and driver selection.
+- **Docs:** `route_pairs_decisions.md` (QĐ-21 (b)(d), CM-2/CM-3 closed, history) and `route_pairs_progress.md` (stage table, CT5a section, CT3/CT5b adjusted, log).
+- **Next:** CT5a opens with CM-5 (hard or soft, drivers too?) and CM-12 (where the home station lives).
+
+### 2026-11-17 (CT5a) — Route pairs CT5a: home stations and the shared location rule — REAL DB WRITE (2 new columns, 56 cells), COMMITTED `4c3ce51` + `d39c17e` (docs in the commit that follows), ALL PUSHED
+- **Ask:** *"chốt CM-5 cách B, CM-12 cách (a). xong thì hãy kiểm tra lại 1 lần nữa, ổn và ok thì commit và push"*.
+- **Code:**
+  - `domain/LocationRule` — the only location rule: the last station of the latest non-cancelled trip, else the home station; `canDepart` = at that station and rested for the given duration. It is pure, takes the rest time from the caller, and is not yet called by bus or driver selection.
+  - `Bus.homeStation` / `Driver.homeStation` (`home_station_id`, LAZY, FK to `stations`), placed at the end of each class so that no cited line moves.
+  - Required by `BusService.validate()` (create and edit) and `DriverService` (create checks before anything is written).
+  - A "Bến Nhà" select on both forms, fed by an end-of-class `@ModelAttribute("stations")` in each controller (still Service-only injection), and a "Bến Nhà" column in both lists.
+- **Found while verifying and fixed:** `th:field` strips `selected` from the select's placeholder, so a new bus would silently take the first station (Mỹ Đình); the home-station select now uses `name` + `th:selected`. The bus-type select has the same pre-existing flaw, recorded as a small item in the defect register and not fixed.
+- **Tests:**
+  - `LocationRuleTest` (6), `BusServiceTest` +3, `DriverServiceHomeStationTest` (4);
+  - one test first failed because it read the transaction's own in-memory entity, and was fixed to flush and clear and read the DB;
+  - sabotage (three guards removed) → exactly the four expected tests red, restored;
+  - `mvnw test` 230/230.
+- **Real DB:**
+  - backup `busmanagement_2026-11-17_truoc-CT5a.sql`;
+  - the new app added both columns, then one `UPDATE` each set home station 3 (Miền Đông) for 20 buses and 36 drivers;
+  - against the pre-CT5a snapshot, row counts of 7 tables and MD5 of `trips`/`buses`/`drivers` are identical apart from the new columns.
+- **Verify:**
+  - Read-only on the real DB: selection output byte-identical to a baseline taken before any code change (available resources for two windows, recommendation, what-if, the approve dropdown of trip #8; the forecast page differs only in its "Tính lúc" timestamp), and lists and forms show the home station.
+  - Write probes on a clone (`busmanagement_test`, port 8098, 10 connections, all on the clone): bus and driver edit / create with and without a home station behave as intended; a driver create without one leaves no `users` row.
+- **Docs:**
+  - `database_schema.md`, spec, summary, `test_case.md` (TC_BUS_012/013), lessons 01 and 04;
+  - 72 line citations re-pointed by a diff-based script plus 6 by hand, with lesson HTML rebuilt. Three dated notes ("kiểm 2026-09-22") were left as written.
+- **Re-check before committing, as the owner asked:**
+  - `mvnw test` 230/230;
+  - `verify` on the real app (PID 18736): 16 pages answered 200, and selection output was again byte-identical to the baseline;
+  - lists showed 20 buses and 36 drivers with a home station, the create form showed the placeholder selected, and the log was clean;
+  - two docs that the citation script had rewritten byte-for-byte (`setup_guide.md`, `02_project_context.md`, empty diff) were restored.
+- **Commits** (no Co-Authored-By trailer): `4c3ce51` (`feat(location):` code and tests), `d39c17e` (`docs(study):` lessons), then the docs commit with this entry. Pushed to `origin/temp`.
+- **Next:** CT3 — the new generator on a clone.
 
 ---
 

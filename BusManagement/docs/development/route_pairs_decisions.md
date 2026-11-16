@@ -18,7 +18,7 @@
 | QĐ-20 | Hai chiều một cặp cùng loại xe; Vũng Tàu dùng Limousine 22; giờ chạy 06/12/18 | 2026-11-16 | CT2 |
 | QĐ-21 | Sinh lại dữ liệu: quy luật + nhiễu, chung mức theo cặp, khách về sau lễ ±15%, xe chạy vòng | 2026-11-16 | CT3, CT4 |
 | QĐ-22 | Mức làm M2 + luật giữ–về; "tối ưu" = lãi cả vòng; lãi tính cả chiều về | 2026-11-16 | CT6, CT7 |
-| QĐ-23 | Xe được chọn phải đang ở bến xuất phát; xe dự phòng = xe rảnh tại bến; bến nhà Miền Đông | 2026-11-16 | CT5 |
+| QĐ-23 | Xe được chọn phải đang ở bến xuất phát; xe dự phòng = xe rảnh tại bến; bến nhà Miền Đông | 2026-11-16 | CT5a (định nghĩa, bến nhà), CT5b (bật vào chọn xe) |
 | QĐ-24 | Dự báo tự tạo chuyến CHỜ DUYỆT (7 điểm); job 10 giây chỉ lo phần bất ngờ | 2026-11-16 | CT8 |
 | QĐ-25 | Luật giữ–về cho xe tăng cường: một phép so, nhìn trước 35 ngày | 2026-11-13, 2026-11-16 | CT9 |
 | QĐ-26 | Kíp lái ở lại cùng xe, nhận lương cơ bản khi chờ; giữ mức 8 giờ lái/ngày | 2026-11-13, 2026-11-16 | CT9 |
@@ -101,7 +101,9 @@
 - **Thêm (a). Chung mức theo cặp:** mức tuyến, độ trôi, lần nhảy bậc và độ lớn lễ từng năm được rút ngẫu nhiên theo **cặp**. Chỉ hình dạng theo chiều (thứ trong tuần, trước hay sau lễ) là để riêng.
   - Hiện nay mỗi tuyến tự rút theo id tuyến, nên có thể xảy ra chuyện chiều đi bị nhảy bậc −15% mà chiều về thì không.
 - **Thêm (b). Khách quay về sau lễ:** phần khách tăng thêm của cả đợt chiều về = phần tăng thêm của cả đợt chiều đi × **r**. r rút ngẫu nhiên đều trong [0,85; 1,15], mỗi bộ (cặp, dịp lễ, năm) một lần.
-  - Tâm của r (đề xuất 100%) chờ xác nhận ở CM-3.
+  - **Tâm 100%, đã chốt 2026-11-17 (CM-3).** Trung bình bao nhiêu người đi thì bấy nhiêu người về. Không có số liệu thật để nói hơn hay kém, và mọi dao động đã nằm trong ±15%.
+  - r áp cho **mọi dịp lễ**, không riêng Tết. Không áp cho cuối tuần thường; nhịp cuối tuần do hệ số thứ trong tuần lo.
+  - r được rải theo hình dạng đợt về sẵn có, đông nhất quanh ngày nghỉ cuối.
   - **Ảnh hưởng tới dự báo:**
     - Mô hình vẫn học đúng mức trung bình, vì hệ số lễ của nó chung cho mọi năm.
     - Từng năm, đợt về lệch đi một mức không đoán được. Ví dụ tính nhẩm: ngày đông nhất Đà Lạt→Sài Gòn khoảng 84 khách có thể thành 76–92 khách.
@@ -112,7 +114,14 @@
   - Đầu lịch sử, mọi xe và tài xế ở Miền Đông (QĐ-23).
   - Thay bất biến "mỗi xe, mỗi tài xế một chuyến/ngày" của QĐ-10.
   - **Lý do:** 6 tuyến × 3 giờ = 18 chuyến thường/ngày. Nếu mỗi xe chỉ 1 chuyến/ngày thì chỉ còn 2 xe cho tăng cường. Cặp Vũng Tàu chạy theo vòng thì chỉ cần 2 xe cho cả 6 lượt/ngày.
-- Chi tiết thiết kế bộ sinh (CM-2, CM-3) chốt ở vòng thảo luận đầu CT3.
+- **Thêm (d). Xe tăng cường trong lịch sử "về ngay" (CM-2, chốt 2026-11-17, cách H1):**
+  - Xe tăng cường tới bến xa thì quay về bằng chuyến thường lệ chiều về sớm nhất mà cả xe (nghỉ ≥ 1 giờ) lẫn tài xế (≤ 8 giờ trong ngày lịch) đều kịp. Nó chạy như chuyến tăng cường của khung đó và chở khách tràn của khung, thường là 0 vé.
+  - Ngược lại, chiều về cần thêm xe ở bến xa mà ở đó không có xe rảnh: nhà xe trong quá khứ gửi xe từ bến nhà lên trước, đi cùng một chuyến thường lệ chiều đi, cũng chở khách tràn của khung đó.
+  - Lượt chạy rỗng được ghi là chuyến tăng cường `COMPLETED` có 0 vé. Nhu cầu của khung không đổi, còn khung có thêm ghế trống nên không bị coi là bán hết, đúng sự thật.
+  - Ví dụ: Sài Gòn→Vũng Tàu chạy thêm 06:30, về cùng khung Vũng Tàu→Sài Gòn 12:00 trong ngày. Sài Gòn→Đà Lạt chạy thêm 06:30, về 06:30 sáng hôm sau, vì tài xế đã lái 6 giờ.
+  - **Lý do:** lịch sử là "nhà xe trong quá khứ", chưa có luật giữ–về. Chính lịch sử "về ngay" này là **mốc để so** với QĐ-25 ở CT9 (số lượt chạy rỗng, số xe, tiền lãi).
+  - **Không chọn H2** (áp luật giữ–về vào lịch sử): vòng lặp, vì luật cần dự báo mà dự báo học từ lịch sử; và làm mất mốc so sánh.
+  - **Không chọn H3** (xe "bay" về như bộ sinh cũ): trái (c) và QĐ-23.
 
 ### QĐ-22. Mức làm M2, thước đo "tối ưu", lãi cả vòng (chốt 2026-11-16)
 
@@ -137,7 +146,19 @@
 - **Xe dự phòng** của một bến = các xe rảnh đang đứng ở bến đó. Không có danh sách xe dự phòng cố định.
 - **Bến nhà ban đầu** của mọi xe và tài xế: Miền Đông.
 - **Hiện trạng:** app chưa biết vị trí. `TripService.findBestAvailableBus` (dòng 308) chọn từ mọi xe READY trong cả công ty.
-- Chi tiết chốt ở đầu CT5: áp cứng hay mềm ở luồng thủ công, có áp cho tài xế không, bến nhà lưu ở đâu (CM-5, CM-12).
+- **Cách áp (CM-5, chốt 2026-11-17, cách B):**
+  - **Máy chọn** (job 10 giây, màn Đề xuất, tự tạo chuyến sau này): **cứng**. Chỉ xét xe và người đang ở bến xuất phát.
+  - **Người chọn** (ô chọn ở các màn Duyệt, Sửa, Tạo): **mềm**. Hiện mọi xe hợp lệ; xe cùng bến xếp đầu, xe ở bến khác có ghi chú.
+  - `validateBusForTrip` **không** chặn theo vị trí.
+  - Đúng tiền lệ "loại xe phù hợp là gợi ý" (2026-09-23, 2026-09-24).
+  - **Áp cả cho tài xế, phụ xe và tài xế phụ, cùng một luật.**
+  - Lý do không chọn cứng ở mọi nơi: khi mọi xe có bến nhà Miền Đông, không ai tạo được chuyến xuất phát ở Mỹ Đình. Và app chưa có lối "chạy rỗng để điều xe".
+- **Bến nhà (CM-12, chốt 2026-11-17, cách (a)):**
+  - Cột riêng `home_station_id` trên `buses` và `drivers`.
+  - Ô bắt buộc trên form; service cũng từ chối khi thiếu. DB cho phép trống, vì cột được thêm vào bảng đã có dữ liệu.
+  - Xe hay người chưa có bến nhà và chưa chạy chuyến nào thì coi là "không biết ở đâu": máy không chọn.
+  - Không chọn (b), một cấu hình chung: mọi xe sẽ cùng một bến nhà. Không chọn (c), suy từ chuyến đầu: xe mới chưa có chuyến thì không biết ở đâu.
+- **Luật vị trí viết ở đúng một chỗ:** `domain/LocationRule`, hàm thuần, CT5a. Vị trí lúc t = bến cuối của chuyến gần nhất (không huỷ) có giờ đến ≤ t; chưa có chuyến thì là bến nhà. Bộ sinh (CT3), script kiểm và app (CT5b) cùng gọi.
 
 ### QĐ-24. Dự báo tự tạo chuyến chờ duyệt (chốt 2026-11-16)
 
@@ -213,17 +234,17 @@
 | Mã | Câu hỏi | Đề xuất | Giai đoạn |
 |---|---|---|---|
 | CM-1 | **ĐÃ CHỐT 2026-11-16: bỏ (đã làm).** `ForecastService.java` đang có một diff chưa commit, chỉ là IDE format lại (+197/−91, không đổi logic). Giữ hay bỏ? | **Bỏ** (`git checkout -- <file>`). Bài học trích số dòng theo HEAD (ví dụ `FS:482-514` ở bài 14); giữ diff này thì các trích dẫn lệch hết. Phải quyết trước CT1, vì CT1 sửa đúng file này | CT0 |
-| CM-2 | Trong lịch sử, xe tăng cường về bằng cách nào? | **H1:** đi cùng chuyến thường lệ chiều về sớm nhất, chở khách tràn của khung đó. Không áp luật giữ–về vào lịch sử: lịch sử là "nhà xe trong quá khứ", và chính nó là mốc để so với QĐ-25 | CT3 |
-| CM-3 | Tâm của r (khách về sau lễ) | 100%, tức r đều trong [0,85; 1,15] | CT3 |
+| CM-2 | **ĐÃ CHỐT 2026-11-17: H1 "về ngay" (ghi ở QĐ-21 (d)).** Trong lịch sử, xe tăng cường về bằng cách nào? | **H1:** đi cùng chuyến thường lệ chiều về sớm nhất, chở khách tràn của khung đó. Không áp luật giữ–về vào lịch sử: lịch sử là "nhà xe trong quá khứ", và chính nó là mốc để so với QĐ-25 | CT3 |
+| CM-3 | **ĐÃ CHỐT 2026-11-17: 100% (ghi ở QĐ-21 (b)).** Tâm của r (khách về sau lễ) | 100%, tức r đều trong [0,85; 1,15] | CT3 |
 | CM-4 | Lịch thường lệ lưu ở đâu? | Một hằng số dùng chung cho bộ sinh và app (06/12/18). Chưa thêm bảng mới | CT6 |
-| CM-5 | Vị trí áp cứng hay mềm? Có áp cho tài xế không? | Áp **cứng** cho AI (tự phân công, Đề xuất, tự tạo chuyến). Luồng thủ công thì **mềm**: xếp xe cùng bến lên đầu và ghi chú, giống cách làm với loại xe. **Áp cả cho tài xế**, cùng quy tắc | CT5 |
+| CM-5 | **ĐÃ CHỐT 2026-11-17: cách B (cứng cho máy, mềm cho người), áp cả cho tài xế (ghi ở QĐ-23).** Vị trí áp cứng hay mềm? Có áp cho tài xế không? | Áp **cứng** cho AI (tự phân công, Đề xuất, tự tạo chuyến). Luồng thủ công thì **mềm**: xếp xe cùng bến lên đầu và ghi chú, giống cách làm với loại xe. **Áp cả cho tài xế**, cùng quy tắc | CT5 |
 | CM-6 | Liên kết cặp tuyến | Suy ra bằng cách đảo bến đầu/cuối (`Route.getDepartureStation()`/`getDestinationStation()`), phải có đúng một tuyến khớp. Không đổi schema của `Route` | CT6 |
 | CM-7 | What-if có tính lãi cả vòng không? | Có, để chỉ có một định nghĩa chi phí | CT7 |
 | CM-8 | Giá trị tiền chờ | Chưa có số. Lúc bàn đã dùng tạm: lương chờ 333.000đ/người/ngày, xe nằm bến 330.000đ/ngày | CT9 |
 | CM-9 | Màn M2 đặt ở đâu? | Trang mới "Kế hoạch cặp tuyến" trong nhóm phân tích. Tránh nhầm với "Bảng điều hành" (`/admin/dispatch`), vốn là màn chuyển trạng thái chuyến | CT7 |
 | CM-10 | Job đêm chạy lúc mấy giờ? Làm gì khi dự báo thiếu dữ liệu? | Chốt ở CT8 | CT8 |
 | CM-11 | **ĐÃ CHỐT 2026-11-16 (đã ghi: lỗi #34 và 7 mục có hướng xử lý).** 8 phát hiện phụ ghi vào sổ nào? | `docs/todo/current_bugs_found.md`, sau phép thử ba ngả | CT0 |
-| CM-12 | Bến nhà lưu ở đâu? | Cột mới `Bus.homeStation` (và cột tương tự cho tài xế), cho phép null, thêm bằng `ddl-auto=update` | CT5 |
+| CM-12 | **ĐÃ CHỐT 2026-11-17: cách (a), cột riêng trên từng xe và từng tài xế (ghi ở QĐ-23).** Bến nhà lưu ở đâu? | Cột mới `Bus.homeStation` (và cột tương tự cho tài xế), cho phép null, thêm bằng `ddl-auto=update` | CT5 |
 | CM-13 | **ĐÃ CHỐT 2026-11-16: có (đã làm ở CT2).** Seed vốn đã có Ghế ngồi 50; chỉ đổi loại xe 2 tuyến, thêm bến Vũng Tàu và 4 tuyến chiều ngược; giữ 6 tuyến cũ. Dữ liệu mẫu (`DataInitializer`) có đổi theo DB thật không? | Có: thêm bến Vũng Tàu, loại Ghế ngồi 50, 3 cặp Sài Gòn với loại xe theo QĐ-20 | CT2 |
 | CM-14 | Chuyến thường lệ tương lai: tạo bằng nút hay bằng job đêm? Trạng thái gì? | Nút cho Admin ở CT6, nối vào job đêm ở CT8. Trạng thái `ACTIVE` (vì lịch thường lệ đã được chủ dự án chốt), vẫn đi qua cổng validate | CT6 |
 | CM-15 | Chuyến tự tạo khởi hành đúng giờ khung hay +30 phút? | Đúng giờ khung, như thẻ Đề xuất | CT8 |
@@ -259,3 +280,12 @@
   - CM-13 đóng theo đề xuất, và giữ 6 tuyến cũ trong seed cho khớp QĐ-19.
   - Sửa một sự thật sai trong `route_pairs_progress.md` mục 3: dữ liệu mẫu **có** loại Ghế ngồi.
 - **2026-11-17:** QĐ-18 (`963aa71`) và phần seed của QĐ-19/QĐ-20 (`bbedfd8`) đã commit và push. Không có quyết định mới.
+- **2026-11-17 (sau):** chủ dự án chốt *"đồng ý tách CT5, chốt CM-2 và CM-3"*.
+  - **CM-2:** H1 "về ngay", ghi vào QĐ-21 (d).
+  - **CM-3:** tâm 100%, ghi vào QĐ-21 (b).
+  - **Tách CT5** thành CT5a (định nghĩa luật vị trí dùng chung, bến nhà; chưa bật vào chọn xe; làm **trước** CT3) và CT5b (bật vị trí vào chọn xe, tài xế; làm **sau** CT4).
+  - **Lý do tách, đo trên DB thật:** nếu bật luật vị trí trên lịch sử cũ thì chỉ 6 xe ở Miền Đông, 3 ở Đà Lạt, 0 ở Cần Thơ và Vũng Tàu, còn 11/20 xe "kẹt" ở Mỹ Đình (4), Niệm Nghĩa (4), Huế (3), là các bến ngoài 3 cặp.
+- **2026-11-17 (CT5a):** chủ dự án chốt CM-5 cách B và CM-12 cách (a), ghi vào QĐ-23.
+  - CT5a đã cài: cột bến nhà trên xe và tài xế (bắt buộc ở form và service); luật `domain/LocationRule`, chưa bật vào việc chọn xe.
+  - DB thật: cả 20 xe và 36 tài xế có bến nhà Miền Đông.
+  - Không có quyết định mới ngoài hai mục trên.

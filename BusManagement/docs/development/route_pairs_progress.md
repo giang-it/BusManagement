@@ -47,7 +47,17 @@
   - `ed38ce6`: bài học;
   - commit `docs:` ngay sau đó: kế hoạch, quyết định, sổ lỗi, các tài liệu còn lại;
   - trước khi commit đã chạy lại `verify` trên app thật (PID 21568): 11 trang chính trả 200, What-if 200% ra 85, log sạch.
-- **Việc tiếp theo:** CT3. Mở bằng vòng thảo luận để chốt CM-2 (xe tăng cường trong lịch sử về bằng cách nào) và CM-3 (tâm của r).
+- **2026-11-17 (sau):** chốt CM-2 (H1 "về ngay") và CM-3 (tâm 100%). Tách CT5 thành CT5a (trước CT3) và CT5b (sau CT4).
+- **CT5a xong ngày 2026-11-17** (CM-5 cách B, CM-12 cách (a)):
+  - bến nhà cho xe và tài xế; luật vị trí `domain/LocationRule`;
+  - DB thật: 20 xe và 36 tài xế có bến nhà Miền Đông, có sao lưu trước;
+  - việc chọn xe giống hệt trước (chưa bật);
+  - test 230/230.
+
+  Chi tiết ở mục 4.
+- **CT5a đã commit và push:** `4c3ce51` (code + test), `d39c17e` (bài học), và commit `docs:` ngay sau đó.
+  - Trước khi commit đã kiểm lại một lượt trên app thật: 16 trang trả 200; việc chọn xe giống hệt mốc; danh sách và form đúng; log sạch.
+- **Việc tiếp theo:** CT3 (bộ sinh mới, chạy trên bản sao). CM-2 và CM-3 đã chốt.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -59,7 +69,9 @@
 
 Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG LÀM` / `XONG, CHƯA COMMIT` / `ĐÃ COMMIT`.
 
-**Thứ tự:** CT0 → CT1 → CT2 → CT3 → CT4 → CT5 → CT6 → CT7 → CT8 → CT9 → CT10.
+**Thứ tự:** CT0 → CT1 → CT2 → **CT5a** → CT3 → CT4 → **CT5b** → CT6 → CT7 → CT8 → CT9 → CT10.
+- CT5 được tách đôi ngày 2026-11-17. Định nghĩa vị trí và bến nhà (CT5a) làm trước bộ sinh, để bộ sinh tuân đúng luật đó. Bật vị trí vào việc chọn xe (CT5b) làm sau khi có lịch sử mới.
+- Lý do đo trên DB thật: trên lịch sử cũ, 11/20 xe "đứng" ở bến ngoài 3 cặp.
 - CT1 không phụ thuộc CT2–CT4, nên có thể làm xen kẽ.
 - Mọi giai đoạn khác phải theo đúng thứ tự, vì giai đoạn sau dùng kết quả của giai đoạn trước (cột "Cần trước").
 
@@ -68,10 +80,11 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT0 | Khung theo dõi, ghi quyết định, dọn việc tồn | tất cả | — | không | ĐÃ COMMIT (commit `docs:` sau `ed38ce6`), đã push | 2026-11-16 → 17 |
 | CT1 | Công thức số chuyến: max(2, ⌈nhu cầu ÷ ghế⌉) | QĐ-18 | CT0 (CM-1) | không | ĐÃ COMMIT `963aa71`, `ed38ce6`, đã push | 2026-11-16 → 17 |
 | CT2 | Cấu hình tuyến và loại xe; dữ liệu mẫu | QĐ-19, QĐ-20 | CT0 | **có** (loại xe tuyến 10, 11) | ĐÃ COMMIT `bbedfd8`, `ed38ce6`, đã push | 2026-11-16 → 17 |
-| CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng — chạy trên bản sao | QĐ-21 | CT2 | không | CHƯA BẮT ĐẦU | |
+| CT5a | Định nghĩa vị trí (luật dùng chung cho bộ sinh và app), bến nhà xe và tài xế; **chưa bật** vào việc chọn xe | QĐ-23 | CT2 | **có** (bến nhà) | ĐÃ COMMIT `4c3ce51`, `d39c17e` + commit `docs:` sau đó, đã push | 2026-11-17 |
+| CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | CHƯA BẮT ĐẦU | |
 | CT4 | Thay lịch sử trên DB thật | QĐ-21 | CT3 đã commit | **có** | CHƯA BẮT ĐẦU | |
-| CT5 | Vị trí xe và tài xế; bến nhà | QĐ-23 | CT4 | **có** (bến nhà) | CHƯA BẮT ĐẦU | |
-| CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5 | **có** (chuyến tương lai) | CHƯA BẮT ĐẦU | |
+| CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | CHƯA BẮT ĐẦU | |
+| CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | CHƯA BẮT ĐẦU | |
 | CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | CHƯA BẮT ĐẦU | |
 | CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7 | **có** (chuyến chờ duyệt) | CHƯA BẮT ĐẦU | |
 | CT9 | Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe | QĐ-25, QĐ-26 | CT8 | có | CHƯA BẮT ĐẦU | |
@@ -275,11 +288,55 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Xong khi:** 6 tuyến trên DB thật đúng QĐ-19, QĐ-20; seed khớp (nếu CM-13 chọn sửa).
 
+### CT5a — Định nghĩa vị trí và bến nhà (QĐ-23; tách ra ngày 2026-11-17)
+
+**Mục tiêu:** luật "xe hay tài xế đang ở bến nào" được viết **một lần**, để bộ sinh (CT3), script kiểm (PART C) và app (CT5b) cùng dùng. Mỗi xe, mỗi tài xế có bến nhà. **Hành vi chọn xe của app chưa đổi.**
+
+**Cần trước:** CT2. **Đã chốt 2026-11-17:** CM-5 (cách B: cứng cho máy, mềm cho người, áp cả tài xế), CM-12 (cách (a): cột riêng trên xe và tài xế).
+
+- [x] **Bến nhà:** cột `home_station_id` trên `buses` và `drivers`. Hibernate tự thêm khi khởi động (`ddl-auto=update`), cho phép null, có khoá ngoại tới `stations`. 2026-11-17.
+  - Field `Bus.homeStation` và `Driver.homeStation` (LAZY, `@ToString.Exclude`) đặt **ở cuối lớp**. Với `Driver`, tên annotation viết đầy đủ để không thêm dòng import. Nhờ vậy không dòng nào đang được trích bị xê dịch (tiền lệ `Route.holidayFlow`).
+  - **Bắt buộc:**
+    - `BusService.validate()` gọi `requireHomeStation()`, nên áp cho cả tạo lẫn sửa; `updateBus()` chép trường ngay trước `validate()`.
+    - `DriverService.createDriver()` kiểm **trước mọi lần ghi**; `updateDriver()` chép qua `requireHomeStation()`.
+  - **Form:** ô "Bến Nhà" `required` ở cuối form xe và form tài xế. Danh sách bến lấy từ `@ModelAttribute("stations")` ở cuối `AdminBusController` / `AdminDriverController`, tiêm `StationService`, vẫn đúng mẫu "chỉ tiêm Service".
+  - **Danh sách:** thêm cột "Bến Nhà" ngay trước cột "Hành Động".
+  - **Phát hiện khi kiểm:** `th:field` làm mất `selected` của dòng nhắc, nên xe mới âm thầm nhận bến đầu danh sách (Mỹ Đình). Đã sửa ô bến nhà bằng `name` + `th:selected`. Ô loại xe có sẵn cùng lỗi, đã ghi vào sổ lỗi (mục nhỏ 2026-11-17), chưa sửa.
+- [x] **Luật vị trí viết ở đúng một chỗ:** `domain/LocationRule`. 2026-11-17.
+  - Gồm `Leg`, `legOf(Trip)`, `lastLegArrivedBy`, `stationAt`, và `canDepart` (hai bản: nhận cả danh sách lượt, hoặc nhận sẵn lượt gần nhất cho bộ sinh).
+  - Thời gian nghỉ do nơi gọi truyền vào, không khai lại hằng số của `TripService`.
+  - **Chưa** gắn vào `findBestAvailableBus` hay `findBestAvailableDriver`.
+- [x] **Test**, 2026-11-17:
+  - `LocationRuleTest`: 6 test.
+  - `BusServiceTest` +3 (tạo thiếu bến nhà, sửa thiếu bến nhà, đổi bến nhà); helper form có bến nhà.
+  - `DriverServiceHomeStationTest`: 4 test, mới.
+  - Test "sửa thiếu bến nhà" của xe lần đầu đỏ, vì đọc bản trong bộ nhớ của chính transaction. Đã sửa để đọc lại từ DB (`flush` + `clear`), đúng điều app thật đảm bảo (transaction bị huỷ).
+  - **Thử làm hỏng:** bỏ kiểm ở `validate()`, bỏ kiểm ở `createDriver()`, bỏ điều kiện "nghỉ đủ" trong `canDepart` thì đúng 4 test mong đợi đỏ. Đã khôi phục.
+- [x] **Ghi DB thật**, 2026-11-17.
+  - Sao lưu `ProjectBackup\db\busmanagement_2026-11-17_truoc-CT5a.sql` (3,7 MB, đầy đủ).
+  - App mới tự thêm 2 cột; sau đó `UPDATE … SET home_station_id = 3` đổi đúng 20 xe và 36 tài xế.
+  - So với ảnh chụp trước CT5a: số dòng 7 bảng và MD5 của `trips`, `buses` (trừ cột mới), `drivers` **giống hệt**; chỉ có thêm 2 cột.
+- [x] **`verify` chỉ đọc trên DB thật** (cổng 8099, PID 10300), 2026-11-17:
+  - Danh sách xe và tài xế hiện "Bến xe Miền Đông" 20 và 36 lần.
+  - Form sửa chọn sẵn đúng một bến. Form tạo hiện dòng nhắc có `selected`.
+  - **Việc chọn xe y như trước:** so với mốc chụp lúc code chưa đổi (PID 27848), giống hệt từng byte ở danh sách xe / tài xế khả dụng của hai khung giờ, màn Đề xuất, What-if, ô chọn xe của màn Duyệt (chuyến #8). Màn Dự báo chỉ khác dòng "Tính lúc … trong … ms".
+  - Log không có `TemplateProcessingException` hay `LazyInitializationException`.
+- [x] **`verify` có ghi, trên bản sao** (`busmanagement_test` sao từ DB thật, khớp số dòng và MD5; cổng 8098, PID 21796, 10 kết nối, tất cả vào bản sao), 2026-11-17:
+  - xe: sửa sang Đà Lạt → lưu; sửa thiếu bến nhà → từ chối, giữ Đà Lạt; tạo thiếu → từ chối, số xe không đổi; tạo có → lưu;
+  - tài xế: sửa sang Cần Thơ → lưu, các trường khác giống DB thật tới MD5; sửa thiếu → từ chối, giữ Cần Thơ; tạo thiếu → từ chối, **không** sinh tài khoản (37 → 37); tạo có → lưu.
+- [x] **Tài liệu**, 2026-11-17:
+  - `database_schema.md` (2 cột, quan hệ, sơ đồ ER), spec, summary, `test_case.md` (TC_BUS_012, TC_BUS_013), sổ lỗi (mục nhỏ ô loại xe).
+  - Bài 01 và 04: bảng thành phần, mục điều cốt lõi.
+  - **Trỏ lại 72 trích dẫn số dòng** bằng script so dòng với HEAD, cộng 6 chỗ sửa tay. Ba ghi chép có ngày ở `Proj_functions_summary.md` (dòng 332, 342, 343, "kiểm 2026-09-22") **cố ý giữ nguyên**, vì đó là số của code ngày ấy.
+  - Build lại HTML bài 00a, 00b, 01, 03, 04, 05.
+
+**Xong khi:** mọi xe và tài xế có bến nhà; luật vị trí có test; app chọn xe y như cũ.
+
 ### CT3 — Bộ sinh mới, chạy trên bản sao (QĐ-21)
 
 **Mục tiêu:** lịch sử 3 cặp Sài Gòn có quy luật cặp, khách về sau lễ ±15%, và xe chạy theo vòng. Kiểm chứng đầy đủ trên bản sao trước khi đụng DB thật.
 
-**Cần trước:** CT2. **Cần chốt:** CM-2, CM-3, và cách bộ sinh đặt bến nhà ban đầu (QĐ-23: Miền Đông).
+**Cần trước:** CT2, CT5a. **Đã chốt 2026-11-17:** CM-2 (H1 "về ngay", QĐ-21 (d)), CM-3 (tâm 100%, QĐ-21 (b)). Bến nhà và luật vị trí lấy từ CT5a.
 
 - [ ] **Danh sách tuyến:** thêm thuộc tính kiểu `backfill.route-ids` thay cho việc lọc ≤ 480 phút ở `eligibleRoutes()`. Vẫn từ chối tuyến > 8 giờ.
 - [ ] **`HistorySimulation`, chung mức theo cặp:** các luồng `LEVEL`, `WALK`, `JUMP`, `JITTER` rút theo khoá cặp. Hình dạng theo chiều (`WEEK`, `addTet`, `addSmallHoliday`) giữ riêng.
@@ -291,8 +348,9 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
   - chọn tài xế ở đúng bến, đã nghỉ ≥ 30 phút, lái ≤ 8 giờ trong ngày lịch;
   - khung thiếu xe vẫn bỏ trống và được đếm;
   - chuyến tăng cường lấy từ xe rảnh tại bến;
-  - xe tăng cường về theo CM-2;
-  - ngày đầu lịch sử, mọi xe và tài xế ở Miền Đông.
+  - xe tăng cường "về ngay" theo QĐ-21 (d): đi cùng chuyến thường lệ chiều về sớm nhất mà xe và tài xế kịp, chở khách tràn của khung đó (thường 0 vé). Cần xe ở bến xa thì gửi xe từ bến nhà lên trước theo cách tương tự;
+  - ngày đầu lịch sử, mọi xe và tài xế ở **bến nhà đọc từ DB** (CT5a);
+  - mọi phép "xe hay tài xế đang ở đâu, chạy tiếp được chưa" gọi **luật vị trí của CT5a**, không viết lại.
 - [ ] **Chuyến có sẵn của chủ dự án** (#33): vẫn giữ xe và người của chuyến đó trong ngày nó chạy. Chốt cách cập nhật vị trí sau các chuyến ấy (chúng nằm trên tuyến ngoài phạm vi).
 - [ ] Viết lại chú thích đầu hai lớp cho đúng bất biến mới.
 - [ ] **Test:**
@@ -332,16 +390,12 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Xong khi:** PART C báo 0 vi phạm trên DB thật, kết quả giống tổng duyệt, các trang chạy.
 
-### CT5 — Vị trí xe và tài xế, bến nhà (QĐ-23)
+### CT5b — Bật vị trí vào việc chọn xe và tài xế (QĐ-23)
 
 **Mục tiêu:** khi máy chọn xe hay tài xế, nó chỉ chọn người và xe đang ở bến xuất phát.
 
-**Cần chốt:** CM-5, CM-12.
+**Cần trước:** CT4 (lịch sử mới, vị trí có nghĩa). Bến nhà, luật vị trí, CM-5 và CM-12 đã có từ CT5a.
 
-- [ ] **Bến nhà:** cột mới (`Bus.homeStation`, và cột tương tự cho tài xế nếu CM-5 chọn), cho phép null, thêm bằng `ddl-auto=update`.
-  - Thêm vào form và danh sách xe, tài xế.
-  - Đặt Miền Đông cho mọi xe và tài xế trên DB thật (có sao lưu).
-- [ ] **Quy tắc vị trí, viết ở đúng một chỗ:** vị trí lúc t = bến cuối của chuyến gần nhất (không huỷ, không xoá mềm) có giờ đến ≤ t. Chưa có chuyến nào → bến nhà.
 - [ ] **AI:** thêm bộ lọc "đang ở bến xuất phát" vào `findBestAvailableBus` và `findBestAvailableDriver`, ở cả bản truy vấn DB lẫn bản dùng `AvailabilityContext`.
   - Nạp sẵn chuyến gần nhất của mỗi xe trước khoảng thời gian xét.
   - Có test chứng minh hai bản cho cùng kết quả.
@@ -455,6 +509,8 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-16 (sau) | `d7e11adb` | Chủ dự án duyệt kế hoạch. Làm CT0 (CM-1, CM-11) và CT1 | Bỏ diff format; ghi lỗi #34 và 7 mục; sửa câu sai ở QĐ-26. CT1: code, test 217/217, thử làm hỏng, `verify` (DB giống hệt), tài liệu, bài 14. **Chưa commit**, chờ chủ dự án test |
 | 2026-11-16 (sau nữa) | `d7e11adb` | *"làm CT02 luôn đi"*: làm CT2 | Sao lưu; tuyến 10, 11 sang Limousine 22 qua form (chỉ cột đó đổi); 3 cặp kiểm bằng SQL; `DataInitializer` khớp DB thật, chạy thử trên DB test; test 217/217; sửa trích dẫn lệch ở bài 02–05. **Chưa commit** |
 | 2026-11-17 | `d7e11adb` | *"oke, hãy commit và push đi"* | `verify` lại trước khi commit (11 trang 200). Commit `963aa71` (CT1), `bbedfd8` (CT2), `ed38ce6` (bài học), rồi commit `docs:`; push lên `origin/temp` |
+| 2026-11-17 (sau) | `d7e11adb` | Giải thích CM-2, CM-3. Chủ dự án hỏi *"sao k thêm vị trí rồi làm bộ sinh"*; đo trên DB thật: 11/20 xe sẽ "kẹt" ở bến ngoài 3 cặp | Chốt CM-2, CM-3; tách CT5 thành CT5a / CT5b. Chỉ sửa tài liệu, chưa commit |
+| 2026-11-17 (CT5a) | `d7e11adb` | *"chốt CM-5 cách B, CM-12 cách (a). xong thì hãy kiểm tra lại 1 lần nữa, ổn và ok thì commit và push"* | CT5a: luật vị trí, bến nhà (code, form, danh sách), test (thử làm hỏng ok), sao lưu + đặt bến nhà trên DB thật, `verify` chỉ đọc (chọn xe giống hệt) và có ghi (bản sao), tài liệu + trỏ lại 78 trích dẫn. Kiểm lại lần cuối (test 230/230, 16 trang 200, chọn xe giống hệt), rồi commit `4c3ce51`, `d39c17e`, commit `docs:` và push |
 
 ---
 

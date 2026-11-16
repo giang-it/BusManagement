@@ -61,9 +61,11 @@ Stores driver-specific profile data. Shares its primary key with `users` (shared
 | `monthly_rest_days`       | `Integer`       | nullable            |                                             |
 | `is_active`               | `Boolean`       | nullable, default `true` |                                        |
 | `license_expiry_date`     | `LocalDate`     | nullable            |                                             |
+| `home_station_id`         | `Station`       | FK → `stations.id`, nullable in DB | Home station (QĐ-23, CT5a, added 2026-11-17): where the driver stands before any trip. Required by the form **and** by `DriverService` (create and update); nullable only because `ddl-auto=update` added it to a populated table. All 36 real drivers set to Miền Đông (id 3) |
 
 **Relationships:**
 - `OneToOne` → `users.id` via `@MapsId` + `@JoinColumn(name = "user_id")`
+- `ManyToOne` (LAZY) → `stations` via `home_station_id`
 
 **Business helper:**
 - `isLicenseValid(LocalDate onDate)`: returns `true` if `licenseExpiryDate != null && licenseExpiryDate.isAfter(onDate)`. This is the form used by every trip-assignment check, which passes the trip's **departure date** — a licence must be valid on the day the driver actually drives, not merely on the day the assignment is made.
@@ -97,9 +99,11 @@ Physical bus records including odometer tracking and maintenance data.
 | `last_maintenance_odometer` | `Double`     | nullable               | Odometer reading at last maintenance       |
 | `maintenance_threshold`     | `Double`     | nullable, default 5000 | Default applied **on creation** by `BusService.saveBus()`; on edit an empty box keeps the stored value (`updateBus`) |
 | `status`                    | `String`     | Enum, native `ENUM`    | `READY`, `TRAVELING`, `REPAIRING`          |
+| `home_station_id`           | `Station`    | FK → `stations.id`, nullable in DB | Home station (QĐ-23, CT5a, added 2026-11-17): where the bus stands before any trip; afterwards its location is the last station of its latest trip (`domain/LocationRule`). Required by the form **and** by `BusService.validate()`; nullable only because `ddl-auto=update` added it to a populated table. All 20 real buses set to Miền Đông (id 3) |
 
 **Relationships:**
 - `ManyToOne` → `bus_types` via `bus_type_id`
+- `ManyToOne` (LAZY) → `stations` via `home_station_id`
 
 **Business helpers (computed, not persisted):**
 - `getKmSinceLastMaintenance()` = `odometer - lastMaintenanceOdometer`
@@ -368,6 +372,7 @@ erDiagram
         Integer monthlyRestDays
         Boolean isActive
         Date licenseExpiryDate
+        Long homeStationId FK
     }
     bus_types {
         Integer id PK
@@ -383,6 +388,7 @@ erDiagram
         Double lastMaintenanceOdometer
         Double maintenanceThreshold
         String status
+        Long homeStationId FK
     }
     stations {
         Long id PK
@@ -430,6 +436,8 @@ erDiagram
     routes ||--o{ trips : "served by"
     routes ||--o{ route_stations : "composed of"
     stations ||--o{ route_stations : "appears in"
+    stations |o--o{ buses : "home station of"
+    stations |o--o{ drivers : "home station of"
     drivers ||--o{ trips : "drives (main)"
     drivers ||--o{ trips : "assists (assistant)"
     trips ||--o{ trip_co_drivers : "has co-drivers"

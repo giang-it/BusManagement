@@ -23,7 +23,8 @@ Only the Administrator workflow is currently exposed through the application:
 *   **Purpose:** Track and manage the physical bus fleet.
 *   **Implemented Functionality:**
     *   CRUD management of Bus Types (defining standard seat capacities).
-    *   CRUD management of Bus vehicles (license plate, brand, current status, current odometer, odometer at last maintenance, and maintenance threshold limit).
+    *   CRUD management of Bus vehicles (license plate, brand, current status, current odometer, odometer at last maintenance, maintenance threshold limit, and **home station**).
+    *   **Home station (QĐ-23, CT5a, 2026-11-17):** where the bus stands before it has run any trip; afterwards its location is the last station of its latest non-cancelled trip (`domain/LocationRule`, a pure rule shared by the history generator and, from CT5b, by bus selection). Required on the form and in `BusService.validate()` (create and edit). Bus selection does **not** read it yet — it is switched on in CT5b; until then every selection screen behaves exactly as before.
 *   **Business Rules:**
     *   A bus has one of three statuses: `READY` (available for dispatch), `TRAVELING` (currently on a trip), or `REPAIRING` (under maintenance).
     *   Vehicles exceeding their maintenance thresholds cannot be assigned to trips.
@@ -36,7 +37,7 @@ Only the Administrator workflow is currently exposed through the application:
 ### Driver Management
 *   **Purpose:** Maintain driver personnel records.
 *   **Implemented Functionality:**
-    *   CRUD management of Drivers (`AdminDriverController` / `DriverService`, entry point `/admin/drivers`): login account details, full name, contact, licence number, licence expiry, years of experience, and an active/locked switch.
+    *   CRUD management of Drivers (`AdminDriverController` / `DriverService`, entry point `/admin/drivers`): login account details, full name, contact, licence number, licence expiry, years of experience, an active/locked switch, and a **home station** (QĐ-23, CT5a — same meaning and same rule as a bus's home station; required on the form and in `DriverService`, checked on create before anything is written; not yet read by driver selection, which switches on in CT5b).
     *   Creating a driver creates the backing `User` in the same form and forces its role to `ROLE_DRIVER` — `Driver` maps its primary key to `User.id` via `@MapsId` and cannot exist without one.
 *   **Business Rules:**
     *   A driver who is locked (`isActive = false`), or whose licence will have expired by the departure date of the trip in question, is excluded from every trip assignment path (see Trip Management constraints). The "Hết hạn" badge on the driver list itself reports validity **today**, since that screen has no trip context.
