@@ -45,12 +45,13 @@
                                 <th>Hạn Bằng Lái</th>
                                 <th>Kinh Nghiệm</th>
                                 <th>Trạng Thái</th>
+                                <th>Bến Nhà</th>
                                 <th class="text-center">Hành Động</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr th:if="${#lists.isEmpty(drivers)}">
-                                <td colspan="9" class="text-center text-muted py-4">
+                                <td colspan="10" class="text-center text-muted py-4">
                                     Chưa có tài xế nào. Bấm <strong>Thêm Tài Xế Mới</strong> để bắt đầu.
                                 </td>
                             </tr>
@@ -78,6 +79,7 @@
                                     <span th:if="${driver.isActive}" class="badge bg-success">Đang hoạt động</span>
                                     <span th:unless="${driver.isActive}" class="badge bg-secondary">Đã khóa</span>
                                 </td>
+                                <td th:text="${driver.homeStation != null ? driver.homeStation.stationName : '—'}"></td>
                                 <td class="text-center">
                                     <a th:href="@{/admin/drivers/edit/{id}(id=${driver.userId})}"
                                         class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Sửa</a>

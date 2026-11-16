@@ -59,4 +59,16 @@ public class Driver {
     public boolean isLicenseValid() {
         return isLicenseValid(java.time.LocalDate.now());
     }
+
+    /**
+     * Bến nhà (QĐ-23, CT5a trong docs/development/route_pairs_decisions.md): nơi tài xế (hay phụ
+     * xe) đứng khi chưa chạy chuyến nào; sau đó là bến cuối của chuyến gần nhất — xem LocationRule.
+     * Form bắt buộc chọn, DriverService cũng từ chối khi trống; cột cho phép null chỉ vì được thêm
+     * bằng ddl-auto=update vào bảng đã có dữ liệu. Tên annotation viết đầy đủ và đặt ở cuối lớp để
+     * không thêm dòng import, không xê dịch số dòng mà các bài học đang trích.
+     */
+    @ToString.Exclude // association LAZY — xem quy ước ở User.driver
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(name = "home_station_id")
+    private Station homeStation;
 }

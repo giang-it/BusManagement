@@ -74,4 +74,16 @@ public class Bus {
             return false;
         return (getKmSinceLastMaintenance() + additionalKm) >= (maintenanceThreshold * NEAR_MAINTENANCE_RATIO);
     }
+
+    /**
+     * Bến nhà (QĐ-23, CT5a trong docs/development/route_pairs_decisions.md): nơi xe đứng khi chưa
+     * chạy chuyến nào. Sau đó vị trí của xe là bến cuối của chuyến gần nhất — xem LocationRule.
+     * Form bắt buộc chọn, BusService.validate() cũng từ chối khi trống; cột cho phép null chỉ vì
+     * được thêm bằng ddl-auto=update vào bảng đã có dữ liệu (cùng lý do Route.holidayFlow).
+     * Đặt ở cuối lớp để không xê dịch số dòng mà các bài học đang trích.
+     */
+    @ToString.Exclude // association LAZY — xem quy ước ở User.driver
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "home_station_id")
+    private Station homeStation;
 }

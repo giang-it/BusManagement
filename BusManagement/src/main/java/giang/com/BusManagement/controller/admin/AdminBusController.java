@@ -79,4 +79,15 @@ public class AdminBusController {
         }
         return "redirect:/admin/buses";
     }
+
+    // Bến nhà (QĐ-23, CT5a): danh sách bến cho ô "Bến nhà" của form tạo / sửa. @ModelAttribute ở
+    // mức lớp nên Spring tự đưa vào model của mọi trang thay vì sửa từng hàm hiện form; field và
+    // kiểu viết đầy đủ, đặt ở cuối lớp để không xê dịch số dòng mà các bài học đang trích. Vẫn chỉ
+    // tiêm Service, đúng mẫu AdminBusController (roadmap §3).
+    private final giang.com.BusManagement.service.StationService stationService;
+
+    @ModelAttribute("stations")
+    public java.util.List<giang.com.BusManagement.domain.Station> stations() {
+        return stationService.findAll();
+    }
 }

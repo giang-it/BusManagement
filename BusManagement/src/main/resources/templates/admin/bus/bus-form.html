@@ -75,6 +75,20 @@
                                     <input type="number" step="0.1" min="1" class="form-control"
                                         th:field="*{maintenanceThreshold}">
                                 </div>
+                                <hr class="my-4">
+                                <h5 class="text-muted"><i class="bi bi-geo-alt"></i> Vị Trí</h5>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Bến Nhà <span class="text-danger">*</span></label>
+                                    <!-- Không dùng th:field: nó bỏ thuộc tính selected của dòng nhắc, trình duyệt
+                                         sẽ tự chọn bến đầu danh sách và xe mới âm thầm nhận một bến nhà sai. -->
+                                    <select class="form-select" name="homeStation" required>
+                                        <option value="" disabled th:selected="${bus.homeStation == null}">-- Chọn bến nhà --</option>
+                                        <option th:each="st : ${stations}" th:value="${st.id}" th:text="${st.stationName}"
+                                            th:selected="${bus.homeStation != null and bus.homeStation.id == st.id}"></option>
+                                    </select>
+                                    <div class="form-text text-muted">ℹ️ Nơi xe đứng khi chưa chạy chuyến nào; sau đó vị trí
+                                        của xe là bến cuối của chuyến gần nhất.</div>
+                                </div>
                             </div>
                             <div class="d-flex justify-content-end mt-4">
                                 <a href="/admin/buses" class="btn btn-outline-secondary me-2">Hủy Bỏ</a>

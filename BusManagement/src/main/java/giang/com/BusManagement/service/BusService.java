@@ -194,6 +194,7 @@ public class BusService {
             existing.setMaintenanceThreshold(form.getMaintenanceThreshold());
         }
 
+        existing.setHomeStation(form.getHomeStation());
         validate(existing);
         busRepository.save(existing);
     }
@@ -230,6 +231,7 @@ public class BusService {
         if (bus.getMaintenanceThreshold() == null || bus.getMaintenanceThreshold() <= 0) {
             throw new IllegalArgumentException("Ngưỡng cảnh báo bảo trì phải lớn hơn 0 km!");
         }
+        requireHomeStation(bus);
     }
 
     @Transactional
@@ -259,5 +261,18 @@ public class BusService {
         }
 
         busRepository.delete(bus);
+    }
+
+    /**
+     * Bến nhà là bắt buộc (QĐ-23, CM-12 trong docs/development/route_pairs_decisions.md): xe chưa
+     * chạy chuyến nào thì đứng ở bến nhà (LocationRule), và máy không chọn một xe mà nó không biết
+     * đang ở đâu. Form đã đánh dấu ô này required; kiểm lại ở đây vì form chỉ là hàng rào phía
+     * client (cùng lý do validate()). Gọi từ cuối validate() nên áp cho cả tạo lẫn sửa; đặt ở cuối
+     * lớp để không xê dịch số dòng mà các bài học đang trích.
+     */
+    private static void requireHomeStation(Bus bus) {
+        if (bus.getHomeStation() == null || bus.getHomeStation().getId() == null) {
+            throw new IllegalArgumentException("Phải chọn bến nhà cho xe — nơi xe đứng khi chưa chạy chuyến nào!");
+        }
     }
 }

@@ -45,6 +45,7 @@
                                 <th>Chạy Từ Lần Bảo Trì Cuối</th>
                                 <th>Trạng Thái</th>
                                 <th>Cảnh Báo Bảo Dưỡng</th>
+                                <th>Bến Nhà</th>
                                 <th class="text-center">Hành Động</th>
                             </tr>
                         </thead>
@@ -75,6 +76,7 @@
                                     <span th:unless="${bus.needsMaintenance()}"
                                         class="badge bg-light text-success border border-success">An Toàn</span>
                                 </td>
+                                <td th:text="${bus.homeStation != null ? bus.homeStation.stationName : '—'}"></td>
                                 <td class="text-center">
                                     <a th:href="@{/admin/buses/edit/{id}(id=${bus.id})}"
                                         class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i> Sửa</a>
@@ -85,7 +87,7 @@
                                 </td>
                             </tr>
                             <tr th:if="${#lists.isEmpty(buses)}">
-                                <td colspan="10" class="text-center text-muted py-4">
+                                <td colspan="11" class="text-center text-muted py-4">
                                     Chưa có xe nào. Bấm <strong>Thêm Xe Mới</strong> để bắt đầu.
                                 </td>
                             </tr>

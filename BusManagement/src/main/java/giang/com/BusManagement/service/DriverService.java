@@ -73,6 +73,7 @@ public class DriverService {
         }
         normalizeUser(user);
         adminService.requireUsernameAvailable(user.getUsername(), null);
+        requireHomeStation(driver); // trước mọi lần ghi: thiếu bến nhà thì không tạo cả tài khoản
 
         user.setRole(Role.ROLE_DRIVER);
         user.setStatus(Boolean.TRUE);
@@ -122,6 +123,7 @@ public class DriverService {
         existing.setLicenseExpiryDate(formDriver.getLicenseExpiryDate());
         existing.setExperienceYears(formDriver.getExperienceYears());
         existing.setIsActive(Boolean.TRUE.equals(formDriver.getIsActive()));
+        existing.setHomeStation(requireHomeStation(formDriver));
 
         userRepository.save(user);
         driverRepository.save(existing);
@@ -176,5 +178,20 @@ public class DriverService {
         if (user.getPhone() != null && user.getPhone().isBlank()) {
             user.setPhone(null);
         }
+    }
+
+    /**
+     * Bến nhà là bắt buộc (QĐ-23, CM-12 trong docs/development/route_pairs_decisions.md): tài xế
+     * chưa chạy chuyến nào thì đứng ở bến nhà (LocationRule), và máy không chọn một người mà nó
+     * không biết đang ở đâu. Form đã đánh dấu ô này required; kiểm lại ở đây vì form chỉ là hàng rào
+     * phía client. Trả về chính bến đó để lối sửa chép thẳng; đặt ở cuối lớp để không xê dịch số
+     * dòng mà các bài học đang trích.
+     */
+    private static giang.com.BusManagement.domain.Station requireHomeStation(Driver driver) {
+        if (driver.getHomeStation() == null || driver.getHomeStation().getId() == null) {
+            throw new IllegalArgumentException(
+                    "Phải chọn bến nhà cho tài xế — nơi tài xế đứng khi chưa chạy chuyến nào!");
+        }
+        return driver.getHomeStation();
     }
 }

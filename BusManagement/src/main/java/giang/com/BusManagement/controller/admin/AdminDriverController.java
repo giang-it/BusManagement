@@ -90,4 +90,14 @@ public class AdminDriverController {
         }
         return "redirect:/admin/drivers";
     }
+
+    // Bến nhà (QĐ-23, CT5a): danh sách bến cho ô "Bến nhà" của form tạo / sửa — cùng cách
+    // AdminBusController: @ModelAttribute mức lớp, field và kiểu viết đầy đủ, đặt ở cuối lớp để
+    // không xê dịch số dòng mà các bài học đang trích; vẫn chỉ tiêm Service.
+    private final giang.com.BusManagement.service.StationService stationService;
+
+    @ModelAttribute("stations")
+    public java.util.List<giang.com.BusManagement.domain.Station> stations() {
+        return stationService.findAll();
+    }
 }

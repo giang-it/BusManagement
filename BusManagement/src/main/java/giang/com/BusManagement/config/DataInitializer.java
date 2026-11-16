@@ -234,7 +234,10 @@ public class DataInitializer implements CommandLineRunner {
         createTrip(tuyenSG_DL, xeSanSang2, txRanh6, txRanh7, 40, 20, "300000", TripStatus.ACTIVE, 8);
         // SG-DL #3 (test không có phụ xe): dùng xeExtraL2, khởi hành lúc now (50% ghế)
         createTrip(tuyenSG_DL, xeSanSang3, txDaLai1h, null, 40, 20, "300000", TripStatus.ACTIVE, 0);
-
+        // Bến nhà (QĐ-23, CT5a): mọi xe, tài xế mẫu xuất phát từ Miền Đông như DB thật. Entity đang được
+        // quản lý trong transaction của run() nên đặt field là đủ, không cần save lại.
+        busRepository.findAll().forEach(b -> b.setHomeStation(sg));
+        driverRepository.findAll().forEach(d -> d.setHomeStation(sg));
     }
 
     // =====================================================================

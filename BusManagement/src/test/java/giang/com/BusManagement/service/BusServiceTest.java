@@ -3,11 +3,16 @@ package giang.com.BusManagement.service;
 import giang.com.BusManagement.domain.Bus;
 import giang.com.BusManagement.domain.BusStatus;
 import giang.com.BusManagement.domain.BusType;
+import giang.com.BusManagement.domain.Station;
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.repository.BusRepository;
 import giang.com.BusManagement.repository.BusTypeRepository;
+import giang.com.BusManagement.repository.StationRepository;
 import giang.com.BusManagement.repository.TripRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +76,7 @@ class BusServiceTest {
         bus.setOdometer(8000.0);
         bus.setLastMaintenanceOdometer(4000.0);
         bus.setMaintenanceThreshold(5000.0);
+        bus.setHomeStation(home);
         return busRepository.save(bus);
     }
 
@@ -83,6 +89,7 @@ class BusServiceTest {
         f.setOdometer(odometer);
         f.setLastMaintenanceOdometer(lastMaintenance);
         f.setMaintenanceThreshold(threshold);
+        f.setHomeStation(home); // ô bắt buộc của form (QĐ-23, CT5a)
         return f;
     }
 
@@ -422,5 +429,74 @@ class BusServiceTest {
 
         assertDoesNotThrow(() -> busService.updateBus(bus.getId(), formWithType(big)));
         assertEquals(40, busRepository.findById(bus.getId()).orElseThrow().getBusType().getCapacity());
+    }
+
+    // =========================================================================
+    // BẾN NHÀ (QĐ-23, CM-12, CT5a): bắt buộc ở cả lối tạo lẫn lối sửa
+    // =========================================================================
+
+    @Autowired
+    private StationRepository stationRepository;
+
+    /** Bến nhà dùng chung cho các form của test; tạo mới mỗi test, rollback cùng test. */
+    private Station home;
+
+    @BeforeEach
+    void createHomeStation() {
+        Station s = new Station();
+        s.setStationName("Bến test CT5a");
+        s.setAddress("UNIT-TEST");
+        home = stationRepository.save(s);
+    }
+
+    @Test
+    @DisplayName("Tạo xe thiếu bến nhà → bị từ chối, không có xe nào được lưu")
+    void create_rejectsMissingHomeStation() {
+        Bus f = form(0.0, 0.0, 5000.0);
+        f.setLicensePlate("99T-HOME.01");
+        f.setHomeStation(null);
+        long before = busRepository.count();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> busService.saveBus(f));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("bến nhà"), ex.getMessage());
+        assertEquals(before, busRepository.count());
+    }
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    /**
+     * Như mọi field khác, updateBus() chép bến nhà vào bản ghi đang quản lý RỒI validate() mới từ
+     * chối — thứ bảo vệ DB là transaction bị hủy, không phải thứ tự chép. Test dùng chung transaction
+     * với service nên bản trong bộ nhớ vẫn mang giá trị đã chép; vì vậy flush những gì đã ghi
+     * trước đó, rồi clear() để đọc lại đúng thứ đang nằm trong DB.
+     */
+    @Test
+    @DisplayName("Sửa xe mà bỏ trống bến nhà → bị từ chối, bến nhà trong DB giữ nguyên")
+    void update_rejectsMissingHomeStation_andKeepsTheOldOne() {
+        Bus bus = persistedBus();
+        entityManager.flush();
+        Bus f = form(8000.0, 4000.0, 5000.0);
+        f.setHomeStation(null);
+
+        assertThrows(IllegalArgumentException.class, () -> busService.updateBus(bus.getId(), f));
+        entityManager.clear();
+        assertEquals(home.getId(), busRepository.findById(bus.getId()).orElseThrow().getHomeStation().getId());
+    }
+
+    @Test
+    @DisplayName("Sửa xe sang bến nhà khác → lưu đúng bến mới")
+    void update_changesHomeStation() {
+        Bus bus = persistedBus();
+        Station other = new Station();
+        other.setStationName("Bến test CT5a khác");
+        other.setAddress("UNIT-TEST");
+        other = stationRepository.save(other);
+        Bus f = form(8000.0, 4000.0, 5000.0);
+        f.setHomeStation(other);
+
+        busService.updateBus(bus.getId(), f);
+
+        assertEquals(other.getId(), busRepository.findById(bus.getId()).orElseThrow().getHomeStation().getId());
     }
 }
