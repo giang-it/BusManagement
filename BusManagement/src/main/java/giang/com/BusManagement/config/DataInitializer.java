@@ -170,6 +170,7 @@ public class DataInitializer implements CommandLineRunner {
         Station dn = createStation("Bến xe Đà Nẵng", "Đà Nẵng");
         Station hue = createStation("Bến xe Huế", "Huế");
         Station ct = createStation("Bến xe Cần Thơ", "Cần Thơ");
+        Station vt = createStation("Bến xe Vũng Tàu", "Vũng Tàu");
 
         // Hướng dòng khách dịp lễ theo QĐ-8 (docs/development/forecast_decisions.md):
         // rời / về Hà Nội, TP.HCM; null = không theo chiều (hai đầu tuyến tương đương).
@@ -177,8 +178,8 @@ public class DataInitializer implements CommandLineRunner {
         // Tuyến ngắn (2h) — Limousine: Mỹ Đình -> Niệm Nghĩa
         Route tuyenHN_HP = createRoute(hn, hp, 120.0, 120, limousine, HolidayFlow.LEAVING_HUB);
 
-        // Tuyến trung bình (6h) — Limousine: Miền Đông -> Đà Lạt
-        Route tuyenSG_DL = createRoute(sg, dl, 300.0, 360, limousine, HolidayFlow.LEAVING_HUB);
+        // Tuyến trung bình (6h) — Giường nằm: Miền Đông -> Đà Lạt
+        Route tuyenSG_DL = createRoute(sg, dl, 300.0, 360, giuongNam, HolidayFlow.LEAVING_HUB);
 
         // Tuyến ngắn (2h) — Giường nằm: Đà Nẵng -> Huế
         Route tuyenDN_Hue = createRoute(dn, hue, 100.0, 120, giuongNam, null);
@@ -186,11 +187,19 @@ public class DataInitializer implements CommandLineRunner {
         // Tuyến cao tốc ngắn (1.5h): Niệm Nghĩa -> Mỹ Đình
         Route tuyenHP_HN = createRoute(hp, hn, 120.0, 90, giuongNam, HolidayFlow.TOWARD_HUB);
 
-        // Tuyến miền Tây (3.5h) — Limousine: Cần Thơ -> Miền Đông
-        Route tuyenCT_SG = createRoute(ct, sg, 180.0, 210, limousine, HolidayFlow.TOWARD_HUB);
+        // Tuyến miền Tây (3.5h) — Ghế ngồi: Cần Thơ -> Miền Đông
+        Route tuyenCT_SG = createRoute(ct, sg, 180.0, 210, gheNgoi, HolidayFlow.TOWARD_HUB);
 
         // Tuyến siêu dài (30h) — Giường nằm: Mỹ Đình -> Miền Đông (hai đầu đều là TP lớn)
         Route tuyenHN_SG = createRoute(hn, sg, 1700.0, 1800, giuongNam, null);
+
+        // Ba cặp hai chiều quanh Miền Đông — phạm vi của bộ sinh lịch sử (QĐ-19, QĐ-20 trong
+        // docs/development/route_pairs_decisions.md). Hai chiều của một cặp cùng km, cùng thời gian,
+        // cùng loại xe gợi ý; hướng dòng khách đảo nhau. Cùng thứ tự tạo với DB thật (tuyến 10–13).
+        createRoute(sg, vt, 100.0, 120, limousine, HolidayFlow.LEAVING_HUB);
+        createRoute(vt, sg, 100.0, 120, limousine, HolidayFlow.TOWARD_HUB);
+        createRoute(dl, sg, 300.0, 360, giuongNam, HolidayFlow.TOWARD_HUB);
+        createRoute(sg, ct, 180.0, 210, gheNgoi, HolidayFlow.LEAVING_HUB);
 
         // =====================================================================
         // 6. CÁC CHUYẾN XE — TẤT CẢ STATUS = ACTIVE
