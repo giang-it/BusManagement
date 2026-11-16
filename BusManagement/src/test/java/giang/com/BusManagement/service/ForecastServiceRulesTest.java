@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Các luật của ForecastService mới (GĐ5, QĐ-16) mà không cần DB: gom khung (G5-2), cờ tăng cường
- * và số chuyến cần (G5-6), mốc SN4 sạch và cách chấm điểm (G5-7), khóa nhớ (G5-4); và số khách của
+ * và số chuyến cần (G5-6, sửa ở QĐ-18), mốc SN4 sạch và cách chấm điểm (G5-7), khóa nhớ (G5-4); và số khách của
  * một chuyến thêm (GĐ6, QĐ-17, G6-1). JUnit thuần — cùng lý do WhatIfCoverageTest chốt thẳng số học
  * của What-if.
  */
@@ -63,23 +63,30 @@ class ForecastServiceRulesTest {
                 assertEquals(hot, demand / seats > 0.90);
                 assertEquals(hot, trips >= 2, demand + " khách / " + seats + " chỗ");
                 if (hot) {
-                    assertEquals(Math.max(2, (int) Math.ceil(demand / (0.9 * seats))), trips);
+                    // QĐ-18: mỗi xe chở tới đủ ghế của nó — không còn chia cho 0,9 × ghế.
+                    assertEquals(Math.max(2, (int) Math.ceil(demand / seats)), trips);
                 }
             }
         }
-        // Sát ngưỡng, hai phép chia làm tròn khác nhau: với xe 21 chỗ, 0,9 × 21 = 18,900000000000002 thì
-        // 18,900000000000002 / 21 > 0,9 nhưng ⌈18,900000000000002 / (0,9 × 21)⌉ = 1. Tính số chuyến QUA cờ
-        // nên "cần tăng cường" và "cần ≥ 2 chuyến" không bao giờ lệch nhau.
+        // Sát ngưỡng: với xe 21 chỗ, 0,9 × 21 = 18,900000000000002 nên 18,900000000000002 / 21 > 0,9 (khung
+        // nóng), trong khi ⌈18,900000000000002 / 21⌉ = 1. Tính số chuyến QUA cờ, cộng max(2, …), nên "cần
+        // tăng cường" và "cần ≥ 2 chuyến" không bao giờ lệch nhau.
         for (int seats : new int[] { 13, 21, 26, 37, 42, 47, 52 }) {
             double demand = 0.9 * seats;
             assertTrue(ForecastService.isHot(demand, seats), seats + " chỗ: phép chia làm tròn lên trên 0,9");
             assertEquals(2, ForecastService.tripsNeeded(demand, seats), seats + " chỗ");
         }
-        // Ví dụ của vòng thảo luận GĐ5.
+        // Ví dụ của vòng thảo luận GĐ5 (kết quả không đổi dưới QĐ-18).
         assertEquals(2, ForecastService.tripsNeeded(57.6, 40), "tuyến 4, 18:00, 25/10/2026");
         assertEquals(3, ForecastService.tripsNeeded(53.8, 22), "tuyến 1, 06:00, 13/02/2026");
         assertEquals(1, ForecastService.tripsNeeded(36.0, 40), "đúng 90% là chưa vượt ngưỡng");
         assertFalse(ForecastService.isHot(30, 0), "chưa rõ xe chuẩn thì không gắn cờ");
+        // Ví dụ của vòng thảo luận QĐ-18 (2026-11-11 → 16), xe 22 chỗ.
+        assertEquals(2, ForecastService.tripsNeeded(40, 22), "40 khách: xe chính 22 + một chuyến thêm (công thức cũ ra 3)");
+        assertEquals(2, ForecastService.tripsNeeded(44, 22), "44 khách vừa đủ hai xe");
+        assertEquals(3, ForecastService.tripsNeeded(44.01, 22), "quá hai xe mới cần xe thứ ba");
+        assertEquals(2, ForecastService.tripsNeeded(21, 22), "21 khách: nóng (95%) nên vẫn cần ít nhất 2");
+        assertEquals(3, ForecastService.tripsNeeded(45, 22), "45 khách: ra 3 ở cả công thức cũ lẫn mới");
     }
 
     /**

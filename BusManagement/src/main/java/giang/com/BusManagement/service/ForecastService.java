@@ -54,8 +54,8 @@ import java.util.stream.Collectors;
  * câu "cần mấy chuyến".
  *
  * Định nghĩa "chuyến nóng" vẫn là MỘT: nhu cầu vượt 90% số ghế xe chuẩn của tuyến — đúng ngưỡng
- * Trip.needsReinforcement(), chỉ thay số vé thật bằng nhu cầu dự báo. Số chuyến cần =
- * max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉), và số này ≥ 2 đúng khi cờ bật (QĐ-16 G5-6, đóng M-4).
+ * Trip.needsReinforcement(), chỉ thay số vé thật bằng nhu cầu dự báo. Khung nóng cần max(2,
+ * ⌈nhu cầu ÷ ghế xe chuẩn⌉) chuyến, khung không nóng cần 1 (QĐ-18, thay mẫu số 0,9 của QĐ-16 G5-6).
  *
  * Recommendation và What-if đọc thẳng nhu cầu (GĐ6, QĐ-17): mỗi khung cần (số chuyến cần − 1)
  * chuyến thêm, và một chuyến thêm chỉ chở phần khách TRÀN rơi vào ghế của nó — tính bằng
@@ -475,7 +475,7 @@ public class ForecastService {
     }
 
     // =========================================================================
-    // NGƯỠNG TĂNG CƯỜNG, SỐ CHUYẾN CẦN (G5-6, đóng M-4) VÀ KHÁCH CỦA CHUYẾN THÊM (G6-1)
+    // NGƯỠNG TĂNG CƯỜNG, SỐ CHUYẾN CẦN (G5-6, QĐ-18) VÀ KHÁCH CỦA CHUYẾN THÊM (G6-1)
     // =========================================================================
 
     /** Nhu cầu vượt 90% số ghế xe chuẩn — cùng ngưỡng Trip.needsReinforcement(). */
@@ -484,15 +484,15 @@ public class ForecastService {
     }
 
     /**
-     * max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉). Tính QUA isHot() để "cần ≥ 2 chuyến" và "cần tăng
-     * cường" không bao giờ lệch nhau ở sát ngưỡng vì làm tròn dấu phẩy động — đó là một định
-     * nghĩa, không phải hai.
+     * Khung không nóng: 1. Khung nóng: max(2, ⌈nhu cầu ÷ ghế xe chuẩn⌉) — mỗi xe chở tới đủ ghế của nó
+     * (QĐ-18; trước đó chia cho 0,9 × ghế nên 40 khách / 22 chỗ ra 3 chuyến). Tính QUA isHot() để
+     * "cần ≥ 2 chuyến" và "cần tăng cường" là một định nghĩa, không bao giờ lệch nhau ở sát ngưỡng.
      */
     static int tripsNeeded(double demand, int standardSeats) {
         if (!isHot(demand, standardSeats)) {
             return 1;
         }
-        return Math.max(2, (int) Math.ceil(demand / (REINFORCEMENT_THRESHOLD * standardSeats)));
+        return Math.max(2, (int) Math.ceil(demand / standardSeats));
     }
 
     /**

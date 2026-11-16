@@ -197,7 +197,7 @@
             <div class="card-footer bg-white small text-muted" th:if="${!#lists.isEmpty(view.series)}">
                 Mỗi ô: số khách muốn đi cả khung (cộng mọi chuyến, không bị kẹp ở số ghế) và % so với một xe chuẩn.
                 <span class="badge bg-danger">&gt; 90%</span> cần tăng cường — cùng ngưỡng hệ thống dùng cho chuyến
-                đang chạy; số chuyến cần = ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉ &nbsp;
+                đang chạy; khi đó số chuyến cần = ⌈nhu cầu ÷ ghế xe chuẩn⌉, ít nhất 2 &nbsp;
                 <span class="badge bg-warning text-dark">80–90%</span> sắp đầy &nbsp;
                 <span class="badge bg-success bg-opacity-25 text-dark">65–80%</span> khả quan.
                 Xếp theo mức đỉnh giảm dần.

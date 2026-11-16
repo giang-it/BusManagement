@@ -77,7 +77,7 @@ class RecommendationServiceTest {
     }
 
     /**
-     * 45 khách / xe chuẩn 22 chỗ: cần ⌈45 ÷ 19,8⌉ = 3 chuyến, tức 2 chuyến thêm mỗi ngày. Hai thẻ
+     * 45 khách / xe chuẩn 22 chỗ: cần ⌈45 ÷ 22⌉ = 3 chuyến (QĐ-18), tức 2 chuyến thêm mỗi ngày. Hai thẻ
      * "1/2" và "2/2" chạy hai xe và hai tài xế khác nhau; thẻ 2/2 chỉ chở phần khách còn tràn sau xe
      * chuẩn VÀ chuyến thêm 1/2, nên có lãi ít hơn hẳn — ở đây là lỗ, và xếp xuống dưới.
      */
@@ -211,8 +211,9 @@ class RecommendationServiceTest {
 
     /**
      * Một xe, hai khung chồng giờ trên tuyến 2 giờ: 06:00 có 21 khách (vừa quá 90% xe 22 chỗ, chuyến thêm
-     * lỗ) và 07:00 có 40 khách (chuyến thêm 1/2 có lãi). Xét theo lãi nên xe về chuyến 07:00; nếu xét
-     * theo giờ thì chuyến lỗ 06:00 sẽ giữ mất xe (G6-4).
+     * lỗ) và 07:00 có 40 khách (một chuyến thêm, có lãi). Xét theo lãi nên xe về chuyến 07:00; nếu xét
+     * theo giờ thì chuyến lỗ 06:00 sẽ giữ mất xe (G6-4). Trước QĐ-18 khung 07:00 cần ⌈40 ÷ 19,8⌉ = 3
+     * chuyến (21 thẻ); nay ⌈40 ÷ 22⌉ = 2 (14 thẻ).
      */
     @Test
     void scarceBus_goesToTheMostProfitableExtraTrip_notTheEarliest() {
@@ -225,7 +226,7 @@ class RecommendationServiceTest {
 
         RecommendationViewDto view = recommendationService.buildRecommendations();
 
-        assertEquals(21, view.getTotalCandidates(), "06:00 cần 1 chuyến thêm, 07:00 cần 2, × 7 ngày");
+        assertEquals(14, view.getTotalCandidates(), "06:00 cần 1 chuyến thêm, 07:00 cần 1 (QĐ-18), × 7 ngày");
         for (RecommendationCardDto card : view.getCards()) {
             boolean profitableOne = card.getDepartureHour() == 7 && card.getExtraIndex() == 1;
             assertEquals(profitableOne ? RecommendationStatus.RECOMMENDED : RecommendationStatus.NO_RESOURCE,
@@ -233,7 +234,7 @@ class RecommendationServiceTest {
             assertEquals(profitableOne, card.getEstimatedProfit().signum() > 0);
         }
         assertEquals(7, view.getProfitableCount());
-        assertEquals(14, view.getLossCount());
+        assertEquals(7, view.getLossCount());
     }
 
     /**

@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * và ở 100% nhu cầu, cùng số chuyến thêm và cùng tiền với các thẻ của màn Đề xuất.
  *
  * Một tuyến 120 km / 2 giờ, xe chuẩn 22 chỗ; lịch sử 45 vé / 50 ghế mỗi ngày lúc 06:00, nên dự báo
- * 45 khách: cần ⌈45 ÷ 19,8⌉ = 3 chuyến, tức 2 chuyến thêm mỗi ngày. 4 xe 22 chỗ và 3 tài xế đủ phủ
+ * 45 khách: cần ⌈45 ÷ 22⌉ = 3 chuyến (QĐ-18), tức 2 chuyến thêm mỗi ngày. 4 xe 22 chỗ và 3 tài xế đủ phủ
  * hết (4 × 2/3 = 2,67 chuyến/ngày theo xe, 12 theo tài xế). @Transactional nên rollback sau mỗi test.
  */
 @SpringBootTest

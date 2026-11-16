@@ -43,7 +43,7 @@ public class ForecastPointDto {
     private boolean needsReinforcement;
 
     /**
-     * Số chuyến cần = max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉) (QĐ-16, G5-6). Số này ≥ 2 đúng
+     * Số chuyến cần: 1 nếu không nóng, max(2, ⌈nhu cầu ÷ ghế xe chuẩn⌉) nếu nóng (QĐ-18). Số này ≥ 2 đúng
      * khi needsReinforcement — một định nghĩa "chuyến nóng", không phải hai. Recommendation sinh
      * một thẻ cho mỗi chuyến thêm, tức tripsNeeded − 1 thẻ (QĐ-17, G6-2).
      */
