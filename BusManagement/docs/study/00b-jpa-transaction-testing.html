@@ -781,7 +781,7 @@ trên chuyến <code>DEPARTED</code>, select liệt kê đủ 5 trạng thái).<
 <h3 id="5-3-toan-ven-du-lieu-nam-o-service-khong-o-db">5.3. Toàn vẹn dữ liệu nằm ở service, không ở DB</h3>
 <p><span class="tag tag-code">CODE</span> <code>application.properties:19</code>: URL kết nối có <code>sessionVariables=foreign_key_checks=0</code> — MySQL
 <strong>không kiểm khóa ngoại</strong>. Xóa một xe còn bản ghi sự cố trỏ tới, DB sẽ im lặng để lại &quot;tham chiếu
-mồ côi&quot;. Vì vậy các guard nằm trong service — comment <code>BusService.java:248-255</code>:</p>
+mồ côi&quot;. Vì vậy các guard nằm trong service — comment <code>BusService.java:250-257</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">boolean hasAnyTrip = tripRepository.existsByBusId(id);          // :242 — xe đã từng chạy chuyến
 if (hasAnyTrip) throw new RuntimeException("Không thể xóa xe này vì xe đã có dữ liệu lịch sử...");
 ...

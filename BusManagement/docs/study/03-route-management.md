@@ -66,7 +66,7 @@ sử vận hành và doanh thu phải được giữ nguyên)!"*.
 | Entity | `…/domain/RouteStation.java`, `RouteStationId.java` | Bảng nối `route_stations`, khoá kép `(route_id, station_id)`, cột `stop_order` |
 | Test | `test/service/RouteServiceDistanceWarningTest.java` | 4 test cho cảnh báo km |
 | Test | `test/service/CreatePathIdTripwireTest.java:260`, `:300` | Tripwire tạo tuyến; sửa tuyến chép field và dựng lại lộ trình |
-| Seed | `…/config/DataInitializer.java:175-202`, `:249-262` | 10 tuyến mẫu, mỗi tuyến 2 bến (profile `demo`); 3 cặp hai chiều quanh Miền Đông (QĐ-19, QĐ-20) |
+| Seed | `…/config/DataInitializer.java:175-202`, `:252-265` | 10 tuyến mẫu, mỗi tuyến 2 bến (profile `demo`); 3 cặp hai chiều quanh Miền Đông (QĐ-19, QĐ-20) |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
 
@@ -418,7 +418,7 @@ sequenceDiagram
 
 **Thứ tự ghi quan trọng.** `RouteStationId` cần `route.getId()` (`:167`), mà id chỉ có sau
 `INSERT routes`. Vì vậy phải `save(route)` trước rồi mới dựng điểm dừng bằng đối tượng `saved`
-(`:83-84`). Seed làm y hệt: `DataInitializer.java:256` lưu tuyến, `:258-259` mới nối bến.
+(`:83-84`). Seed làm y hệt: `DataInitializer.java:259` lưu tuyến, `:261-262` mới nối bến.
 
 **(c) Code then chốt** — `tpl/admin/route/route-form.html:119-147`:
 
@@ -560,7 +560,7 @@ endpoint của bảng §2.2.
 | Không trùng tuyến (cùng lộ trình) | **Không có** | **Không có** | Tạo được hai tuyến giống hệt nhau |
 
 Tuyến có lớp chặn thật **dày hơn** bến xe (Bài 02 §6.1): bốn luật số và cấu trúc đều có ở cả hai
-lớp. Javadoc `BusService.java:204` gọi `RouteService.validateRoute()` là **tiền lệ** mà các
+lớp. Javadoc `BusService.java:205` gọi `RouteService.validateRoute()` là **tiền lệ** mà các
 service khác bắt chước.
 
 ### 6.2. Bảng "thay đổi gì trong DB"

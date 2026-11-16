@@ -625,7 +625,7 @@ trên chuyến `DEPARTED`, select liệt kê đủ 5 trạng thái).
 
 [CODE] `application.properties:19`: URL kết nối có `sessionVariables=foreign_key_checks=0` — MySQL
 **không kiểm khóa ngoại**. Xóa một xe còn bản ghi sự cố trỏ tới, DB sẽ im lặng để lại "tham chiếu
-mồ côi". Vì vậy các guard nằm trong service — comment `BusService.java:248-255`:
+mồ côi". Vì vậy các guard nằm trong service — comment `BusService.java:250-257`:
 
 ```java
 boolean hasAnyTrip = tripRepository.existsByBusId(id);          // :242 — xe đã từng chạy chuyến

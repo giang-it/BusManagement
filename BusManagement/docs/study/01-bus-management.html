@@ -192,7 +192,7 @@ sang bảo trì thay vì xóa.</p>
 <tr>
 <td>Template + JS</td>
 <td><code>tpl/admin/bus/bus-form.html</code></td>
-<td>Form dùng chung cho Thêm và Sửa; khối <code>&lt;script&gt;</code> <code>:90-101</code> chặn submit khi ô <code>required</code> trống</td>
+<td>Form dùng chung cho Thêm và Sửa; khối <code>&lt;script&gt;</code> <code>:104-115</code> chặn submit khi ô <code>required</code> trống</td>
 </tr>
 <tr>
 <td>Template (lối vào)</td>
@@ -202,7 +202,7 @@ sang bảo trì thay vì xóa.</p>
 <tr>
 <td>Controller</td>
 <td><code>…/controller/admin/AdminBusController.java</code></td>
-<td>6 endpoint <code>/admin/buses/*</code>; <strong>chỉ inject <code>BusService</code></strong> (mẫu chuẩn của dự án)</td>
+<td>6 endpoint <code>/admin/buses/*</code>; <strong>chỉ inject Service</strong> (mẫu chuẩn của dự án): <code>BusService</code>, và <code>StationService</code> cho ô &quot;Bến nhà&quot; qua một <code>@ModelAttribute(&quot;stations&quot;)</code> ở cuối lớp (CT5a)</td>
 </tr>
 <tr>
 <td>Service</td>
@@ -232,7 +232,12 @@ sang bảo trì thay vì xóa.</p>
 <tr>
 <td>Entity</td>
 <td><code>…/domain/Bus.java</code></td>
-<td>Bảng <code>buses</code> + 3 method nghiệp vụ về bảo trì</td>
+<td>Bảng <code>buses</code> + 3 method nghiệp vụ về bảo trì; <strong>bến nhà</strong> <code>homeStation</code> (cột <code>home_station_id</code>, CT5a) đặt ở cuối lớp</td>
+</tr>
+<tr>
+<td>Luật thuần</td>
+<td><code>…/domain/LocationRule.java</code></td>
+<td>Xe đang ở bến nào, đã xuất phát được chưa (QĐ-23). Chưa gắn vào việc chọn xe — bật ở CT5b</td>
 </tr>
 <tr>
 <td>Entity</td>
@@ -247,7 +252,12 @@ sang bảo trì thay vì xóa.</p>
 <tr>
 <td>Test</td>
 <td><code>test/service/BusServiceTest.java</code></td>
-<td>18 test ghim tạo/sửa, ba con số bảo trì, hai guard</td>
+<td>21 test ghim tạo/sửa, ba con số bảo trì, hai guard, bến nhà bắt buộc</td>
+</tr>
+<tr>
+<td>Test</td>
+<td><code>test/domain/LocationRuleTest.java</code></td>
+<td>6 test luật vị trí (JUnit thuần)</td>
 </tr>
 <tr>
 <td>Seed</td>
@@ -295,7 +305,7 @@ riêng. Chỉ có 6 endpoint HTTP.</p>
 <td>GET</td>
 <td><code>/admin/buses/edit/{id}</code></td>
 <td><code>showEditForm()</code> <code>:44-57</code></td>
-<td>nút &quot;Sửa&quot; <code>bus-list.html:79-80</code></td>
+<td>nút &quot;Sửa&quot; <code>bus-list.html:81-82</code></td>
 <td><code>findById()</code>, <code>findAllBusTypes()</code></td>
 <td>view <code>bus-form</code>, hoặc redirect + flash <code>error</code> nếu không thấy xe</td>
 </tr>
@@ -311,7 +321,7 @@ riêng. Chỉ có 6 endpoint HTTP.</p>
 <td>GET</td>
 <td><code>/admin/buses/delete/{id}</code></td>
 <td><code>deleteBus()</code> <code>:72-81</code></td>
-<td>nút &quot;Xóa&quot; + <code>confirm()</code> <code>bus-list.html:81-84</code></td>
+<td>nút &quot;Xóa&quot; + <code>confirm()</code> <code>bus-list.html:83-86</code></td>
 <td><code>deleteBus()</code></td>
 <td>redirect <code>/admin/buses</code> + flash</td>
 </tr>
@@ -385,6 +395,13 @@ nhỏ hơn km bảo trì cuối, ngưỡng &gt; 0.</li>
 tắt kiểm tra khóa ngoại, service là lớp chặn duy nhất.</li>
 <li><strong>Màn này là nguồn dữ liệu của cả hệ thống:</strong> <code>validateBusForTrip</code>, AI chọn xe, Dashboard,
 Đề xuất thay xe, What-if đều đọc ba con số km và <code>status</code> mà nó ghi.</li>
+<li><strong>Bến nhà là bắt buộc</strong> (QĐ-23, CM-12; thêm ở CT5a ngày 2026-11-17):<ul>
+<li>Form có ô &quot;Bến Nhà&quot; (<code>required</code>). <code>validate()</code> cũng từ chối khi trống, cả lúc tạo lẫn lúc sửa.</li>
+<li>Vị trí của xe = bến cuối của chuyến gần nhất; chưa chạy chuyến nào thì là bến nhà (<code>LocationRule</code>).</li>
+<li>Hiện mới <strong>lưu</strong>. Việc máy chỉ chọn xe đang đứng ở bến xuất phát được bật ở CT5b.</li>
+<li>Trên DB thật, cả 20 xe có bến nhà Miền Đông.</li>
+</ul>
+</li>
 </ol>
 <hr>
 <h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
@@ -455,7 +472,7 @@ câu hỏi &quot;sao xóa bằng GET&quot;.</li>
 </thead><tbody><tr>
 <td>1</td>
 <td>Trình duyệt</td>
-<td><code>bus-list.html:79-80</code></td>
+<td><code>bus-list.html:81-82</code></td>
 <td>link &quot;Sửa&quot;</td>
 <td>—</td>
 <td><code>th:href=&quot;@{/admin/buses/edit/{id}(id=${bus.id})}&quot;</code> sinh ra <code>/admin/buses/edit/5</code></td>
@@ -565,7 +582,7 @@ câu hỏi &quot;sao xóa bằng GET&quot;.</li>
 <tr>
 <td>12</td>
 <td>JavaScript</td>
-<td><code>bus-form.html:93-98</code></td>
+<td><code>bus-form.html:107-112</code></td>
 <td>listener <code>submit</code></td>
 <td>form</td>
 <td><code>form.checkValidity()</code>: ô <code>required</code> trống hoặc số <code>&lt; min</code> ⇒ <code>preventDefault()</code> (hủy gửi) và tô đỏ; ở đây hợp lệ vì ô Odometer <strong>không</strong> <code>required</code></td>
@@ -745,10 +762,10 @@ câu hỏi &quot;sao xóa bằng GET&quot;.</li>
 <tr>
 <td>30</td>
 <td>View</td>
-<td><code>bus-list.html:24-27</code>, <code>:52-86</code></td>
+<td><code>bus-list.html:24-27</code>, <code>:53-88</code></td>
 <td><code>th:if=&quot;${success}&quot;</code>, <code>th:each</code></td>
 <td><code>success</code>, <code>buses</code></td>
-<td>hiện khung xanh; mỗi xe một dòng, cột &quot;Chạy Từ Lần Bảo Trì Cuối&quot; gọi thẳng <code>bus.getKmSinceLastMaintenance()</code> (<code>:63</code>), cột cảnh báo gọi <code>bus.needsMaintenance()</code> (<code>:73-76</code>)</td>
+<td>hiện khung xanh; mỗi xe một dòng, cột &quot;Chạy Từ Lần Bảo Trì Cuối&quot; gọi thẳng <code>bus.getKmSinceLastMaintenance()</code> (<code>:64</code>), cột cảnh báo gọi <code>bus.needsMaintenance()</code> (<code>:74-77</code>)</td>
 <td>HTML</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -762,7 +779,7 @@ request (Bài 00b §4.5).</p>
 chính là mẫu roadmap §3 yêu cầu mọi controller mới phải theo (&quot;follow the <code>AdminBusController</code>
 pattern&quot;), đối lập với <code>AdminTripManagementController</code>.</p>
 <p><strong>(c) Code then chốt</strong></p>
-<p><code>…/service/BusService.java:116-199</code> (rút gọn):</p>
+<p><code>…/service/BusService.java:116-200</code> (rút gọn):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Transactional                                   // mở/đóng transaction bao cả method
 public void updateBus(Long id, Bus form) {       // id từ URL; form là object RỜI dựng từ ô form
     Bus existing = busRepository.findById(id)    // nạp bản ghi THẬT → entity managed
@@ -864,7 +881,7 @@ lọc bảo trì.</p>
 </thead><tbody><tr>
 <td>1</td>
 <td>Trình duyệt</td>
-<td><code>bus-list.html:81-84</code></td>
+<td><code>bus-list.html:83-86</code></td>
 <td>thẻ <code>&lt;a&gt;</code> &quot;Xóa&quot;</td>
 <td>—</td>
 <td><code>href</code> = <code>/admin/buses/delete/28</code>; <code>onclick=&quot;return confirm(...)&quot;</code></td>
@@ -904,7 +921,7 @@ lọc bảo trì.</p>
 <tr>
 <td>5</td>
 <td>Proxy</td>
-<td><code>BusService.java:235</code></td>
+<td><code>BusService.java:237</code></td>
 <td><code>@Transactional</code></td>
 <td>—</td>
 <td>mở transaction</td>
@@ -982,7 +999,7 @@ lọc bảo trì.</p>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
 </tbody></table></div>
-<p><strong>(c) Code then chốt</strong> — <code>…/service/BusService.java:235-262</code>:</p>
+<p><strong>(c) Code then chốt</strong> — <code>…/service/BusService.java:237-264</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Transactional
 public void deleteBus(Long id) {
     Bus bus = busRepository.findById(id).orElseThrow(...);
@@ -1137,14 +1154,14 @@ thành &quot;ghi đè&quot; (lỗi #16/#21, Bài 00b §3.2); (2) chỉ ở luồ
 </tr>
 </thead><tbody><tr>
 <td>Biển số, hãng, loại xe, trạng thái phải có</td>
-<td><code>required</code> (<code>bus-form.html:28-29, :34, :40, :51</code>) + JS <code>checkValidity()</code> <code>:96</code></td>
+<td><code>required</code> (<code>bus-form.html:28-29, :34, :40, :51</code>) + JS <code>checkValidity()</code> <code>:110</code></td>
 <td><strong>Không có</strong> — cố ý, javadoc <code>BusService.java:109-114</code></td>
 <td>Lọt: xe lưu được với biển số/hãng/loại rỗng. <strong>Chỉ một lớp</strong>, theo quyết định ghi ở #16 (i)</td>
 </tr>
 <tr>
 <td>Odometer, km bảo trì cuối không âm</td>
 <td><code>min=&quot;0&quot;</code> <code>:65</code>, <code>:70</code></td>
-<td><code>validate()</code> <code>BusService.java:219-224</code></td>
+<td><code>validate()</code> <code>BusService.java:220-225</code></td>
 <td>Bị chặn: &quot;Lỗi: Odometer không được âm!&quot;</td>
 </tr>
 <tr>
@@ -1173,8 +1190,8 @@ thành &quot;ghi đè&quot; (lỗi #16/#21, Bài 00b §3.2); (2) chỉ ở luồ
 </tr>
 <tr>
 <td>Không xóa xe có chuyến / có sự cố</td>
-<td>Nút Xóa <strong>luôn hiện</strong>; <code>confirm()</code> chỉ hỏi lại, không lọc (<code>bus-list.html:81-84</code>)</td>
-<td><code>deleteBus()</code> <code>:242-259</code></td>
+<td>Nút Xóa <strong>luôn hiện</strong>; <code>confirm()</code> chỉ hỏi lại, không lọc (<code>bus-list.html:83-86</code>)</td>
+<td><code>deleteBus()</code> <code>:244-261</code></td>
 <td>Bị chặn</td>
 </tr>
 <tr>
@@ -1339,7 +1356,7 @@ có cho luật quan trọng; lớp không-mời có thì tốt. Ở màn này, c
 <tr>
 <td><code>class=&quot;needs-validation&quot; novalidate</code> + JS</td>
 <td>Tắt thông báo mặc định của trình duyệt, tự kiểm và tô đỏ kiểu Bootstrap</td>
-<td><code>bus-form.html:23, :90-101</code></td>
+<td><code>bus-form.html:23, :104-115</code></td>
 <td>Trình duyệt tự hiện bong bóng lỗi mặc định</td>
 </tr>
 </tbody></table></div>
@@ -1364,7 +1381,7 @@ có cho luật quan trọng; lớp không-mời có thì tốt. Ở màn này, c
 </tr>
 <tr>
 <td>Cột &quot;Chạy Từ Lần Bảo Trì Cuối&quot;</td>
-<td><code>bus-list.html:63</code></td>
+<td><code>bus-list.html:64</code></td>
 <td>&quot;4000 / 5000 km&quot;</td>
 </tr>
 <tr>
@@ -1388,7 +1405,7 @@ bị đặt về 0 ⇒ km kể từ bảo trì = 0 − 4.000 = <strong>−4.000<
 chạm 4.500 (90%) thì xe phải chạy thêm 8.500 km — trên thực tế xe <strong>không bao giờ</strong> bị nhắc bảo trì.</p>
 <p><strong>Vì sao cấm ngưỡng = 0</strong> — <code>needsMaintenance()</code> thành <code>km &gt;= 0</code>. Kể cả ngay sau bảo dưỡng
 (km = 0) thì <code>0 &gt;= 0</code> vẫn đúng ⇒ xe bị coi là quá hạn <strong>vĩnh viễn</strong>, không thao tác nghiệp vụ nào
-gỡ được (javadoc <code>BusService.java:212-216</code>).</p>
+gỡ được (javadoc <code>BusService.java:213-217</code>).</p>
 <hr>
 <h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>
 <h3 id="9-1-cac-quyet-dinh-thiet-ke">9.1. Các quyết định thiết kế</h3>
@@ -1520,10 +1537,10 @@ form.</li>
 <li><code>docs/development/current_functional_spec.md:26</code> ghi <em>&quot;CRUD management of Bus Types&quot;</em> — <strong>không
 tìm thấy trong code</strong> controller/service nào tạo, sửa, xóa <code>BusType</code>.</li>
 <li><code>docs/development/Proj_functions_summary.md</code> §3 (bullet <code>deleteBus()</code>) chỉ nhắc guard chuyến,
-<strong>thiếu</strong> guard sự cố <code>BusService.java:256-259</code> (câu thiếu, không sai).</li>
+<strong>thiếu</strong> guard sự cố <code>BusService.java:258-261</code> (câu thiếu, không sai).</li>
 <li>Comment <code>BusService.java:130</code> và roadmap §9 ghi dòng FSM là <code>TripService:615/618</code> / <code>:618</code> — số
 dòng đã lệch; hiện là <code>TripService.java:678</code> và <code>:681</code>.</li>
-<li>Comment <code>BusService.java:240-241</code> nói chặn xóa &quot;để giữ lịch sử giao dịch/vé&quot; — hệ thống không có
+<li>Comment <code>BusService.java:242-243</code> nói chặn xóa &quot;để giữ lịch sử giao dịch/vé&quot; — hệ thống không có
 giao dịch hay vé thật (<code>ticketsSold</code> chỉ là một con số, Hidden Cost #3). Câu báo lỗi hiện cho
 người dùng thì không nhắc vé.</li>
 </ul>
@@ -1667,7 +1684,7 @@ theo kiểu đơn giản thì xe đó không bao giờ lưu được nữa, kể
 <p><strong>6. (Vì sao) Sao xóa xe lại bị chặn gần như luôn?</strong>
 Xóa là xóa cứng, mà URL kết nối DB đặt <code>foreign_key_checks=0</code> (<code>application.properties:19</code>) nên
 MySQL không ngăn bản ghi mồ côi. Service tự kiểm: xe đã từng có chuyến hoặc có sự cố thì từ chối
-(<code>BusService.java:242-259</code>). Dữ liệu lịch sử mô phỏng gắn mọi xe vào chuyến nên hầu như không xe nào
+(<code>BusService.java:244-261</code>). Dữ liệu lịch sử mô phỏng gắn mọi xe vào chuyến nên hầu như không xe nào
 xóa được (Hidden Cost #8) — đó là đúng thiết kế; xe cũ được cho &quot;nghỉ&quot; bằng <code>REPAIRING</code>.</p>
 <p><strong>7. (Vì sao) Sao xóa dùng GET, không phải POST?</strong>
 Đây là quy ước của các màn danh mục, có trong kịch bản test chính thức. Dự án không có đăng nhập và
@@ -1747,7 +1764,7 @@ cảnh báo gì? (b) Gán vào chuyến tuyến 100 km được không? (c) Sau 
 <li>Để service <strong>nạp bản ghi cũ</strong> theo id rồi chép từng field. <code>setId</code> rồi <code>save</code> sẽ là merge ghi đè
 mọi cột, ô trống thành null/0 — đúng lỗi #16 (comment <code>AdminBusController.java:62-63</code>).</li>
 <li>Được — <code>COMPLETED</code>/<code>CANCELLED</code> không thuộc <code>UNFINISHED_TRIP_STATUSES</code>.
-Test <code>update_toRepairingIsAllowedWhenOnlyTerminalTrips</code> (<code>BusServiceTest.java:192</code>).</li>
+Test <code>update_toRepairingIsAllowedWhenOnlyTerminalTrips</code> (<code>BusServiceTest.java:199</code>).</li>
 <li>Limousine 22: <strong>không</strong> (22 &lt; 40 là hạ loại, và 22 &lt; 30 ghế đang bán). Ghế ngồi 50: <strong>được</strong> —
 nâng loại không bao giờ bị guard này chặn.</li>
 <li>Không. Guard sự cố không lọc theo trạng thái (<code>IncidentRepository.existsByBusId</code>). Lý do (roadmap
@@ -1764,7 +1781,7 @@ phiên mở lúc render (Bài 00b §2.4, §4.5).</li>
 </ol>
 <p><strong>Bài tự trace</strong></p>
 <ul>
-<li><code>[JS]</code> <code>bus-form.html:93-98</code>: <code>checkValidity()</code> — các ô <code>required</code> đều có, 1000 và 2000 đều ≥ <code>min</code>
+<li><code>[JS]</code> <code>bus-form.html:107-112</code>: <code>checkValidity()</code> — các ô <code>required</code> đều có, 1000 và 2000 đều ≥ <code>min</code>
 0, ô ngưỡng rỗng hợp lệ (không <code>required</code>) ⇒ <strong>cho gửi</strong>.</li>
 <li>POST <code>/admin/buses/create</code> → Spring bind <code>new Bus()</code>: odometer 1000.0, lastMaintenanceOdometer
 2000.0, maintenanceThreshold <code>null</code>, <code>id = null</code>.</li>

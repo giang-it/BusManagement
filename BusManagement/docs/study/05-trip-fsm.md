@@ -91,7 +91,7 @@ nào trong luồng. `DC` = `DispatchController.java`, `ATM` = `AdminTripManageme
 | POST | `/admin/trips/approve` | `ATC.processManualApproval()` `:166` | màn Duyệt (Bài 09) | `approveTrip()` → `requirePendingApproval` (`TS:961`) → `changeStatusToActive` (`TS:1010`) | như trên |
 | POST | `/admin/trip-management/trips/create` | `ATM.createTrip()` `:136-193` | form Tạo (Bài 07) | controller đặt `ACTIVE` (`:161`) → `createManualTrip()` → `changeStatusToActive` (`TS:1054`) | chuyến **sinh ra** ở `ACTIVE` |
 | `@Scheduled` mỗi 10 s | — | `TS.scanAndSuggestExtraTrips()` `:76-78` | job nền (Bài 08) | `createExtraTrip()` đặt `PENDING_APPROVAL` (`TS:166`) | chuyến **sinh ra** ở `PENDING_APPROVAL` |
-| `CommandLineRunner` | profile `demo` / `backfill` | `DataInitializer` `:332`, `HistoricalDataBackfill` `:593` | lúc khởi động (Bài 13) | `setStatus()` thẳng — **cố ý đi vòng FSM** khi dựng dữ liệu | dữ liệu seed / lịch sử |
+| `CommandLineRunner` | profile `demo` / `backfill` | `DataInitializer` `:349`, `HistoricalDataBackfill` `:593` | lúc khởi động (Bài 13) | `setStatus()` thẳng — **cố ý đi vòng FSM** khi dựng dữ liệu | dữ liệu seed / lịch sử |
 
 ### 2.3. Sơ đồ toàn cảnh
 
@@ -541,7 +541,7 @@ mới**, không phải sửa lỗi.
 - **Sinh ra ở `PENDING_APPROVAL`** — job `@Scheduled(fixedRate = 10_000)` `TS:76-78` →
   `createExtraTrip()` đặt `PENDING_APPROVAL` (`TS:166`). Đây cũng là giá trị mặc định của field
   (`Trip.java:84`).
-- **Dữ liệu seed và lịch sử** — `DataInitializer:346` (profile `demo`) và `HistoricalDataBackfill:593`
+- **Dữ liệu seed và lịch sử** — `DataInitializer:349` (profile `demo`) và `HistoricalDataBackfill:593`
   (profile `backfill`) gọi `setStatus()` thẳng. Cố ý: dựng dữ liệu không đi qua service (roadmap §5
   Phase 5, "DataInitializer sets the precedent that seeding bypasses services"). Backfill tự cộng
   odometer cho chuyến `COMPLETED` nó tạo ra, **đúng như FSM** — nhưng cộng vào **cả hai** cột (§8.3).

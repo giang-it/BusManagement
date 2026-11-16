@@ -247,7 +247,7 @@ sử vận hành và doanh thu phải được giữ nguyên)!&quot;</em>.</p>
 </tr>
 <tr>
 <td>Seed</td>
-<td><code>…/config/DataInitializer.java:175-202</code>, <code>:249-262</code></td>
+<td><code>…/config/DataInitializer.java:175-202</code>, <code>:252-265</code></td>
 <td>10 tuyến mẫu, mỗi tuyến 2 bến (profile <code>demo</code>); 3 cặp hai chiều quanh Miền Đông (QĐ-19, QĐ-20)</td>
 </tr>
 </tbody></table></div>
@@ -1113,7 +1113,7 @@ khoá chính. Cả hai test sửa tuyến hiện có đều đi đúng ca &quot;
 </tbody></table></div>
 <p><strong>Thứ tự ghi quan trọng.</strong> <code>RouteStationId</code> cần <code>route.getId()</code> (<code>:167</code>), mà id chỉ có sau
 <code>INSERT routes</code>. Vì vậy phải <code>save(route)</code> trước rồi mới dựng điểm dừng bằng đối tượng <code>saved</code>
-(<code>:83-84</code>). Seed làm y hệt: <code>DataInitializer.java:256</code> lưu tuyến, <code>:258-259</code> mới nối bến.</p>
+(<code>:83-84</code>). Seed làm y hệt: <code>DataInitializer.java:259</code> lưu tuyến, <code>:261-262</code> mới nối bến.</p>
 <p><strong>(c) Code then chốt</strong> — <code>tpl/admin/route/route-form.html:119-147</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-javascript">function refresh() {
     const rows = stopList.querySelectorAll('.stop-row');           // mọi dòng bến hiện có
@@ -1386,7 +1386,7 @@ endpoint của bảng §2.2.</p>
 </tr>
 </tbody></table></div>
 <p>Tuyến có lớp chặn thật <strong>dày hơn</strong> bến xe (Bài 02 §6.1): bốn luật số và cấu trúc đều có ở cả hai
-lớp. Javadoc <code>BusService.java:204</code> gọi <code>RouteService.validateRoute()</code> là <strong>tiền lệ</strong> mà các
+lớp. Javadoc <code>BusService.java:205</code> gọi <code>RouteService.validateRoute()</code> là <strong>tiền lệ</strong> mà các
 service khác bắt chước.</p>
 <h3 id="6-2-bang-thay-doi-gi-trong-db">6.2. Bảng &quot;thay đổi gì trong DB&quot;</h3>
 <div class="table-wrap"><table><thead><tr>

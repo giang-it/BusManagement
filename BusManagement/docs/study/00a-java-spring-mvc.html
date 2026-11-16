@@ -694,7 +694,7 @@ JPA tự sinh ra một class cài đặt</strong> interface này (một &quot;pr
 <tr>
 <td>11</td>
 <td>View</td>
-<td><code>tpl/admin/bus/bus-list.html:52</code></td>
+<td><code>tpl/admin/bus/bus-list.html:53</code></td>
 <td><code>&lt;tr th:each=&quot;bus : ${buses}&quot;&gt;</code> — lặp qua đúng key <code>&quot;buses&quot;</code>, mỗi xe một dòng bảng</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -801,7 +801,7 @@ của dự án báo lỗi (không có <code>@ControllerAdvice</code> tập trung
 </thead><tbody><tr>
 <td>Xe, tài xế, bến, tuyến, sự cố</td>
 <td><strong>GET</strong> <code>/.../delete/{id}</code> qua thẻ <code>&lt;a href&gt;</code> + <code>confirm()</code> của JS</td>
-<td><code>AdminBusController.java:72</code> (<code>@GetMapping</code>), <code>bus-list.html:81-83</code></td>
+<td><code>AdminBusController.java:72</code> (<code>@GetMapping</code>), <code>bus-list.html:83-85</code></td>
 </tr>
 <tr>
 <td>Chuyến (xóa, hủy), duyệt/từ chối</td>
@@ -888,31 +888,31 @@ chỗ phải sửa nhiều file. Máy demo phải có internet thì giao diện 
 <td><code>th:text=&quot;${x}&quot;</code></td>
 <td>357</td>
 <td>In giá trị ra (tự chống chèn mã HTML)</td>
-<td><code>bus-list.html:53</code> in <code>bus.id</code></td>
+<td><code>bus-list.html:54</code> in <code>bus.id</code></td>
 </tr>
 <tr>
 <td><code>th:if</code> / <code>th:unless</code></td>
 <td>126 / 25</td>
 <td>Hiện khối nếu đúng / nếu sai</td>
-<td><code>bus-list.html:73-75</code> nhãn bảo trì</td>
+<td><code>bus-list.html:74-76</code> nhãn bảo trì</td>
 </tr>
 <tr>
 <td><code>th:each=&quot;bus : ${buses}&quot;</code></td>
 <td>47</td>
 <td>Lặp</td>
-<td><code>bus-list.html:52</code></td>
+<td><code>bus-list.html:53</code></td>
 </tr>
 <tr>
 <td><code>th:href=&quot;@{...}&quot;</code></td>
 <td>64</td>
 <td>Tạo link</td>
-<td><code>bus-list.html:79</code></td>
+<td><code>bus-list.html:81</code></td>
 </tr>
 <tr>
 <td><code>@{/admin/buses/edit/{id}(id=${bus.id})}</code></td>
 <td>—</td>
 <td>Link có biến đường dẫn</td>
-<td><code>bus-list.html:79</code></td>
+<td><code>bus-list.html:81</code></td>
 </tr>
 <tr>
 <td><code>th:action</code></td>
@@ -960,13 +960,13 @@ chỗ phải sửa nhiều file. Máy demo phải có internet thì giao diện 
 <td><code>#lists.isEmpty(...)</code> / <code>#lists.size</code></td>
 <td>33 / 13</td>
 <td>Tiện ích danh sách</td>
-<td><code>bus-list.html:87</code></td>
+<td><code>bus-list.html:89</code></td>
 </tr>
 <tr>
 <td><code>#numbers.formatDecimal(x, 1, 0)</code></td>
 <td>58</td>
 <td>Định dạng số</td>
-<td><code>bus-list.html:61</code></td>
+<td><code>bus-list.html:62</code></td>
 </tr>
 <tr>
 <td><code>#temporals.format(t, &#39;dd/MM/yyyy HH:mm&#39;)</code></td>
@@ -983,7 +983,7 @@ gửi tới <code>/edit/{id}</code>. <code>th:field=&quot;*{licensePlate}&quot;<
 <code>value=&quot;...&quot;</code> <span class="tag tag-spring">SPRING</span> — tên ô khớp tên field của <code>Bus</code>, nên phía controller <code>@ModelAttribute Bus</code>
 nhận đúng (§4.3).</p>
 <h3 id="6-3-template-goi-thang-method-cua-entity">6.3. Template gọi thẳng method của entity</h3>
-<p><span class="tag tag-code">CODE</span> <code>bus-list.html:63</code> gọi <code>bus.getKmSinceLastMaintenance()</code>, <code>:73</code> gọi <code>bus.needsMaintenance()</code>
+<p><span class="tag tag-code">CODE</span> <code>bus-list.html:64</code> gọi <code>bus.getKmSinceLastMaintenance()</code>, <code>:74</code> gọi <code>bus.needsMaintenance()</code>
 — đây là method nghiệp vụ viết trong entity <code>Bus.java</code>. Template chỉ <strong>hỏi</strong>, không tự tính lại
 ngưỡng bảo trì; luật nằm ở một chỗ duy nhất (entity).</p>
 <hr>
@@ -1037,7 +1037,7 @@ nghĩa là &quot;đợi kết quả về rồi mới chạy dòng tiếp theo tr
 <li><code>addEventListener(&#39;change&#39; | &#39;submit&#39; | &#39;DOMContentLoaded&#39;, hàm)</code> — &quot;khi chuyện X xảy ra thì chạy
 hàm này&quot;. <code>DOMContentLoaded</code> = trang vừa dựng xong.</li>
 <li><code>confirm(&#39;Bạn có chắc...&#39;)</code> — hộp hỏi Có/Không; <code>onclick=&quot;return confirm(...)&quot;</code> ở
-<code>bus-list.html:83</code>: bấm &quot;Không&quot; thì link không được mở.</li>
+<code>bus-list.html:85</code>: bấm &quot;Không&quot; thì link không được mở.</li>
 <li><strong>Kiểm tra trùng nhân sự trước khi gửi form</strong> — <span class="tag tag-code">CODE</span> <code>trip-create-form.html:704-716</code>: lúc
 submit, gọi <code>validateNoDriverConflict()</code> (<code>:721</code>); nếu một người vừa là tài xế chính vừa là phụ
 xe thì <code>e.preventDefault()</code> chặn gửi form và tô đỏ ô sai.</li>
@@ -1411,7 +1411,7 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>th:text</code> / <code>th:if</code> / <code>th:each</code></td>
 <td>In / điều kiện / lặp</td>
-<td><code>bus-list.html:52-75</code></td>
+<td><code>bus-list.html:53-76</code></td>
 </tr>
 <tr>
 <td><code>th:object</code> / <code>th:field</code></td>
@@ -1421,12 +1421,12 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>@{...}</code></td>
 <td>Cú pháp tạo URL</td>
-<td><code>bus-list.html:79</code></td>
+<td><code>bus-list.html:81</code></td>
 </tr>
 <tr>
 <td><code>#numbers</code> / <code>#temporals</code> / <code>#lists</code></td>
 <td>Tiện ích định dạng số / ngày / danh sách</td>
-<td><code>bus-list.html:61</code>, <code>:87</code></td>
+<td><code>bus-list.html:62</code>, <code>:89</code></td>
 </tr>
 <tr>
 <td>CDN</td>
