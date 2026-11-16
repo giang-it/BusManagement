@@ -256,12 +256,12 @@
 
 - **Mã TC:** TC_STA_001
 - **Tên Kịch Bản:** Hiển thị danh sách tất cả bến xe
-- **Điều kiện tiên quyết:** `DataInitializer` đã seed 7 bến xe (Hà Nội, Hải Phòng, Sài Gòn, Đà Lạt, Đà Nẵng, Huế, Cần Thơ)
+- **Điều kiện tiên quyết:** `DataInitializer` đã seed 8 bến xe (Hà Nội, Hải Phòng, Sài Gòn, Đà Lạt, Đà Nẵng, Huế, Cần Thơ, Vũng Tàu)
 - **Các bước thực hiện:**
   1. `GET /admin/stations`
 - **Kết quả mong đợi:**
   - HTTP 200, template `admin/station/station-list`
-  - Model attribute `stations` chứa đủ 7 bến xe
+  - Model attribute `stations` chứa đủ 8 bến xe
   - Mỗi bến xe hiển thị tên và địa chỉ
 
 ---
@@ -1750,7 +1750,7 @@
   - Tạo lại: 3 BusType (Limousine/22, Giường nằm/40, Ghế ngồi/50)
   - Tạo 30+ tài xế theo các nhóm A-G
   - Tạo xe với các trạng thái READY/REPAIRING/TRAVELING như đã định nghĩa
-  - Tạo 7 bến xe, 6 tuyến đường, các chuyến test TRIP1-TRIPX ở trạng thái ACTIVE
+  - Tạo 8 bến xe, 10 tuyến đường (trong đó 3 cặp hai chiều quanh Miền Đông: Cần Thơ, Đà Lạt, Vũng Tàu — cùng km, thời gian, loại xe), các chuyến test TRIP1-TRIPX ở trạng thái ACTIVE
   - Log: `"🤖 [AI Test Setup] Đang khởi tạo dữ liệu test..."`
 
 ---
@@ -2174,8 +2174,8 @@ Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
 - **Các bước thực hiện:** Trên bảng 7 ngày, xem các ô tô đỏ và các ô ngay dưới ngưỡng
 - **Kết quả mong đợi:**
   - Ô đỏ khi và chỉ khi nhu cầu ÷ ghế xe chuẩn **> 90%** — cùng ngưỡng `Trip.needsReinforcement()`; đúng 90% thì chưa đỏ
-  - Ô đỏ ghi "cần N chuyến" với N = ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉ ≥ 2; ô không đỏ không ghi
-  - Ví dụ: 57,6 khách / xe 40 chỗ → 144%, cần 2 chuyến; 53,8 khách / xe 22 chỗ → cần 3 chuyến
+  - Ô đỏ ghi "cần N chuyến" với N = max(2, ⌈nhu cầu ÷ ghế xe chuẩn⌉) (QĐ-18); ô không đỏ không ghi
+  - Ví dụ: 57,6 khách / xe 40 chỗ → 144%, cần 2 chuyến; 53,8 khách / xe 22 chỗ → cần 3 chuyến; 40 khách / xe 22 chỗ → cần 2 chuyến (công thức cũ trước QĐ-18 ra 3)
   - Cột "Xe chuẩn" là sức chứa loại xe phù hợp của tuyến; tuyến chưa có loại xe thì là sức chứa trung bình đội xe, có dấu `*`
 
 ### TC_FC_005 — Tự chấm điểm trên số vé, không so nhu cầu với số vé

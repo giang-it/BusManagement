@@ -3317,3 +3317,60 @@ ghi vào DB thật. Hai script GĐ3 (`forecast_research/gd3_check_old_history.sq
 Ghi thêm, không đánh số vì GĐ3 xoá dữ liệu đó: chạy `gd3_check_new_history.sql` trên dữ liệu cũ còn cho
 thấy ngày **02/08/2026** có 16 chuyến thường thay vì 15 và xe 16 chạy hai chuyến — đúng chỗ giao nhau của
 hai lần chạy bổ sung 04/08 và 11/09 của bộ sinh cũ.
+
+# Ghi khi lập kế hoạch đợt "cặp tuyến" (2026-11-16) — một lỗi #34, bảy mục đã có hướng xử lý; CHƯA SỬA
+
+Phát hiện trong các phiên thảo luận 10/11 → 16/11 (kế hoạch: `docs/development/route_pairs_progress.md`
+mục 3; quyết định: `route_pairs_decisions.md`). Trước khi ghi, đã grep cả `docs/reports/project_report.md`;
+không mục nào trùng. Mỗi mục qua phép thử ba ngả.
+
+## 34. Giờ lái của chuyến chạy qua nửa đêm chỉ được cộng vào ngày khởi hành
+
+- **Gốc:** `TripService.getDrivingHoursForDate()` (`TripService.java:752-773`) lấy các chuyến có
+  `departureTime` nằm trong ngày cần xét, rồi cộng **toàn bộ** giờ lái của chúng vào ngày đó
+  (`sumDrivingHours`). Phần giờ lái rơi sang ngày hôm sau không được cộng vào ngày nào cả.
+- **Phân loại (ba ngả):** **sai sót thật, phạm vi nhỏ.**
+  - Javadoc của chính hàm ghi *"Tính tổng số giờ lái xe của tài xế trong một ngày cụ thể"*.
+  - Không tài liệu nào (roadmap §9, spec) nói cách tính "cả chuyến vào ngày khởi hành" là chủ ý.
+  - Không lẫn với mức 8 giờ "theo chuyến" (per-trip share cap, roadmap §9), vốn là thiết kế có chủ ý.
+- **Bằng chứng (SQL chỉ đọc trên DB thật, 2026-11-16):** có **41** chuyến (không huỷ) lái qua nửa đêm.
+  - 37 chuyến là chuyến tăng cường của bộ sinh trên tuyến 2 (Miền Đông → Đà Lạt), khởi hành 18:30, tới 00:30. Mỗi chuyến có **0,5 giờ** rơi sang ngày sau.
+  - Chuyến #4 (tuyến 2, 16/07 21:53 → 17/07 03:53): **3,88 giờ** rơi sang ngày sau.
+  - Chuyến #14 (tuyến 6, 30 giờ): **17,48 giờ** rơi sang ngày sau.
+- **Hậu quả:** luật "≤ 8 giờ lái mỗi ngày" (tự phân công, `validateStaffForTrip`, dropdown chọn tài xế) đánh giá thấp giờ lái của ngày hôm sau.
+  - Với chuyến tăng cường Đà Lạt 18:30, tài xế có thể vượt 8 giờ lái của ngày hôm sau tối đa 0,5 giờ.
+  - Với tuyến 30 giờ thì sai lệch là hàng chục giờ.
+- **Chưa sửa.** Chuyến thường lệ của 3 cặp Sài Gòn (06/12/18, dài nhất 6 giờ) không có chuyến nào qua nửa
+  đêm. Chuyến tăng cường của job 10 giây (+30 phút) thì vẫn có thể dính. Kế hoạch hiện để việc sửa đi cùng
+  L1 khi làm cặp dài (QĐ-26, QĐ-27). Chủ dự án có thể quyết sửa riêng sớm hơn.
+
+## Mục đã có hướng xử lý trong kế hoạch (không đánh số)
+
+- **Mức 8 giờ dùng như "mỗi chuyến":** ⌈thời gian ÷ 8⌉ tài xế (`TripService.java:236`), min(phần chia, 8)
+  (`:497`).
+  - **Không phải lỗi:** roadmap §9 gọi đây là "per-trip share cap", thiết kế có chủ ý.
+  - Với tuyến 30 giờ, nó cho ra 4 tài xế cộng 1 phụ xe. Xem lại khi làm cặp dài (QĐ-27).
+- **Màn Đề xuất chỉ tính chi phí một chiều** (`RecommendationService.estimateCost`, `:407`):
+  - đây là công thức Phase 7 bước 3 đã duyệt;
+  - **quyết định hết hợp** vì QĐ-22 (lãi tính cả vòng);
+  - sửa ở CT7.
+- **Màn Đề xuất không trừ chuyến đã có trong khung.** Nó giả định mỗi khung có đúng một xe chuẩn
+  (`seatsBefore` bắt đầu bằng số ghế chuẩn). Thêm vào đó, chuyến tạo tay có `setExtraTrip(false)` và không
+  có chuyến gốc (`AdminTripManagementController.java:178`), nên job 10 giây vẫn thêm được một chuyến nữa.
+  Kết quả có thể là 3 xe cho 40 khách.
+  - Hiện chưa xảy ra trên DB thật, vì không có chuyến tương lai nào.
+  - Sửa ở CT7 và CT8 (QĐ-24 điểm 4, 6).
+- **Job 10 giây không bỏ qua chuyến tăng cường khi xét chuyến gốc** (`scanAndSuggestExtraTrips`, `:76`):
+  - một chuyến tăng cường đã mở bán và bán > 90% sẽ được thêm chuyến tăng cường của chính nó (+30 phút nữa);
+  - ví dụ 06:00 → 06:30 → **07:00**. Chuyến 07:00 rời khỏi khung giờ 06, nên vé của nó không còn được tính vào nhu cầu của khung 06:00;
+  - chưa xảy ra trên DB thật (đường đi có thật trong code);
+  - sửa ở CT8 (QĐ-24 điểm 6).
+- **Tài xế chỉ bị coi là bận ±30 phút quanh chuyến, và không có vị trí.** Một kíp vừa tới bến xa vẫn có thể
+  được giao chuyến xuất phát ở bến nhà ngay hôm sau. Sửa ở CT5 và CT9 (QĐ-23, QĐ-26).
+- **`ForecastService.tripsNeeded` chia cho 0,9 × ghế** (`:491`):
+  - không phải lỗi code;
+  - **quyết định hết hợp** (QĐ-16 G5-6, chốt khi chuyến thêm còn được coi là chở đầy);
+  - thay bằng QĐ-18 ở CT1.
+- **Hai chiều Mỹ Đình ↔ Niệm Nghĩa gợi ý hai loại xe khác nhau** (tuyến 1: Limousine 22, tuyến 4:
+  Giường nằm 40). Dữ liệu cấu hình, không phải lỗi code. Hai tuyến này nằm ngoài phạm vi sinh dữ liệu (QĐ-19),
+  nên chỉ ghi lại.

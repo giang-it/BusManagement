@@ -82,7 +82,7 @@ COMPLETED, CANCELLED → (terminal, không chuyển đi đâu nữa)
 - `createStation()`: **CHỈ tạo mới** — ném `IllegalArgumentException` nếu entity đã có id (tripwire khuôn `BusService.saveBus()`, lỗi #21: trước đây một hàm `save()` là upsert, POST tự chế mang id có sẵn sẽ ghi đè bến đó).
 - `updateStation(id, form)`: nạp bản ghi theo id từ URL rồi chép `stationName`/`address` (khuôn `updateBus`/`updateIncident`), không merge nguyên object form.
 - `deleteById()`: chặn xóa nếu station đang có `routeStations` (đang thuộc tuyến nào).
-- **`DataInitializer` CÓ seed `RouteStation`:** `createRoute()` (`DataInitializer:237`) gọi `linkRouteStation()` hai lần cho mỗi tuyến (`:244-245`, stopOrder 1 và 2), và cả 6 tuyến seed đều đi qua hàm đó. Lối ghi `routes` còn lại là `RouteService.createRoute()`/`updateRoute()`, nơi `validateRoute()` đòi tối thiểu 2 trạm — nên **không có đường nào tạo ra một tuyến không có trạm**, và điểm đi/đến luôn suy được từ `routeStations`.
+- **`DataInitializer` CÓ seed `RouteStation`:** `createRoute()` (`DataInitializer:249`) gọi `linkRouteStation()` hai lần cho mỗi tuyến (`:258-259`, stopOrder 1 và 2), và cả 10 tuyến seed đều đi qua hàm đó (6 tuyến cũ + 4 tuyến chiều ngược của 3 cặp quanh Miền Đông, thêm ngày 2026-11-16 ở CT2). Lối ghi `routes` còn lại là `RouteService.createRoute()`/`updateRoute()`, nơi `validateRoute()` đòi tối thiểu 2 trạm — nên **không có đường nào tạo ra một tuyến không có trạm**, và điểm đi/đến luôn suy được từ `routeStations`.
   *(Câu cũ ở đây nói `DataInitializer` "(tùy version) **không seed `RouteStation`**", "`route_stations` có thể trống" và "route vẫn dùng String tự do cho điểm đi/đến". Cả ba vế đều sai, và **sai từ trước khi file này vào repo**: seeding `RouteStation` cùng việc xóa hai field String được làm ở `a3b0e63` **2026-06-27**, còn file này vào repo ở `07af949` **2026-07-14** — muộn hơn 17 ngày. Cùng hình dạng với đính chính `project_report.md` 🟣 #3 ngày 2026-09-19 ("đã cũ nửa câu ngay từ lúc được đưa vào `docs/`"). Đã sửa 2026-09-22.)*
 
 ---
@@ -491,7 +491,7 @@ Một **khung** = một tuyến, một giờ khởi hành, một ngày; một **
 ### 16.3. Dự báo cái gì
 **Nhu cầu**: số khách muốn đi cả khung, không kẹp ở số ghế (QĐ-2). Tỉ lệ lấp đầy của mô hình cũ kẹp ở 100%, nên không thấy được nhu cầu vượt một xe: Tết làm nhu cầu gấp đôi cũng chỉ hiện ra là "100%".
 - **Cần tăng cường** khi nhu cầu > 90% số ghế **xe chuẩn** của tuyến. Đây đúng là ngưỡng `Trip.needsReinforcement()`, chỉ thay số vé thật bằng nhu cầu dự báo. Xe chuẩn là `Route.suitableBusType`; tuyến chưa có loại xe thì lấy sức chứa trung bình đội xe, như What-if.
-- **Số chuyến cần** = max(1, ⌈nhu cầu ÷ (0,9 × ghế xe chuẩn)⌉). Số này ≥ 2 đúng khi cần tăng cường, nên vẫn chỉ một định nghĩa "chuyến nóng".
+- **Số chuyến cần** = 1 nếu khung không nóng; max(2, ⌈nhu cầu ÷ ghế xe chuẩn⌉) nếu nóng (QĐ-18, 2026-11-16; trước đó chia cho 0,9 × ghế). Số này ≥ 2 đúng khi cần tăng cường, nên vẫn chỉ một định nghĩa "chuyến nóng".
 - **Recommendation và What-if đọc thẳng nhu cầu** (GĐ6, QĐ-17): mỗi khung cần (số chuyến cần − 1) chuyến thêm, và một chuyến thêm chở **khách tràn kỳ vọng** rơi vào ghế của nó, theo phân phối nhị thức âm mà mô hình học được (mục 18.4). Trường cầu nối `predictedOccupancy` của GĐ5 đã bỏ.
 
 ### 16.4. Mô hình
