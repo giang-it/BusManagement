@@ -534,4 +534,65 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        List<Trip> findScheduleForAvailability(@Param("statuses") Collection<TripStatus> statuses,
                      @Param("spanStart") LocalDateTime spanStart,
                      @Param("spanEnd") LocalDateTime spanEnd);
+
+       /**
+        * Route pairs CT5b (QĐ-23): chuyến gần nhất của một xe, ở các trạng thái cho trước,
+        * tới nơi KHÔNG MUỘN HƠN :t. Bến cuối của nó là nơi xe đang đứng lúc t
+        * (domain/LocationRule); không có chuyến nào thì xe ở bến nhà. Hai chuyến cùng
+        * giờ đến thì lấy id lớn hơn, cho tất định. Dùng bởi TripService (đường đọc DB) và
+        * TripService.buildAvailabilityContext (lượt gần nhất trước khoảng đã nạp).
+        */
+       java.util.Optional<Trip> findFirstByBusAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                     Bus bus, Collection<TripStatus> statuses, LocalDateTime t);
+
+       /**
+        * Cùng ý cho một người, hỏi RIÊNG từng vai trò trên xe — tài xế, phụ xe, tài xế phụ — vì ai
+        * đi trên xe cũng tới bến cuối cùng xe; TripService lấy chuyến muộn nhất của ba câu. KHÔNG
+        * gộp ba vai bằng OR (driver = ? OR assistant = ? OR ? MEMBER OF coDrivers) trong một câu:
+        * MySQL bỏ mọi index và quét cả bảng trips — đo trên DB thật 2026-11-17: 0,46 s một lần,
+        * so với ≈ 0,01 s cho cả ba câu tách, mỗi câu đi theo index khóa ngoại của vai đó.
+        */
+       java.util.Optional<Trip> findFirstByDriverAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                     Driver driver, Collection<TripStatus> statuses, LocalDateTime t);
+
+       /** Vai phụ xe của câu trên. */
+       java.util.Optional<Trip> findFirstByAssistantAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                     Driver assistant, Collection<TripStatus> statuses, LocalDateTime t);
+
+       /**
+        * Vai tài xế phụ của câu trên. JOIN (không fetch) để MySQL đi từ index user_id của
+        * trip_co_drivers; MEMBER OF thành subquery phụ thuộc, chạy lại cho từng dòng trips.
+        * Truyền PageRequest.of(0, 1) để lấy đúng một chuyến — nên dòng trùng không hề gì.
+        */
+       @Query("SELECT t FROM Trip t JOIN t.coDrivers cd WHERE cd = :driver AND t.status IN :statuses " +
+                     "AND t.arrivalTimeExpected <= :t ORDER BY t.arrivalTimeExpected DESC, t.id DESC")
+       List<Trip> findTripsAsCoDriverArrivingBy(@Param("driver") Driver driver,
+                     @Param("statuses") Collection<TripStatus> statuses, @Param("t") LocalDateTime t,
+                     org.springframework.data.domain.Pageable pageable);
+
+       /**
+        * Phía sau của cùng luật: chuyến SỚM NHẤT của một xe khởi hành từ :t trở đi — lượt kế tiếp
+        * đã cam kết. Chèn thêm một chuyến kết thúc trước nó thì chuyến đó phải tới đúng bến nó
+        * xuất phát (LocationRule.fits).
+        */
+       java.util.Optional<Trip> findFirstByBusAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                     Bus bus, Collection<TripStatus> statuses, LocalDateTime t);
+
+       /**
+        * Cùng ý cho một người, tách theo vai như ở phía trước (cùng lý do); TripService lấy
+        * chuyến sớm nhất của ba câu.
+        */
+       java.util.Optional<Trip> findFirstByDriverAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                     Driver driver, Collection<TripStatus> statuses, LocalDateTime t);
+
+       /** Vai phụ xe của câu trên. */
+       java.util.Optional<Trip> findFirstByAssistantAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                     Driver assistant, Collection<TripStatus> statuses, LocalDateTime t);
+
+       /** Vai tài xế phụ của câu trên. Truyền PageRequest.of(0, 1). */
+       @Query("SELECT t FROM Trip t JOIN t.coDrivers cd WHERE cd = :driver AND t.status IN :statuses " +
+                     "AND t.departureTime >= :t ORDER BY t.departureTime ASC, t.id ASC")
+       List<Trip> findTripsAsCoDriverDepartingFrom(@Param("driver") Driver driver,
+                     @Param("statuses") Collection<TripStatus> statuses, @Param("t") LocalDateTime t,
+                     org.springframework.data.domain.Pageable pageable);
 }

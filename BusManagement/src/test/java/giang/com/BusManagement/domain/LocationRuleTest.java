@@ -115,6 +115,40 @@ class LocationRuleTest {
                 () -> new Leg(MIEN_DONG, DA_LAT, at(20, 12, 0), at(20, 6, 0)));
     }
 
+    /**
+     * CT5b, phía sau của luật: xe đang ở Đà Lạt đã nhận chuyến Đà Lạt → Miền Đông 18:00. Chuyến Đà Lạt
+     * → Miền Đông 06:00 cùng ngày vừa phía trước (xe ở Đà Lạt) nhưng không vừa phía sau: nó đưa xe về
+     * Miền Đông, trong khi chuyến 18:00 lại xuất phát ở Đà Lạt. Chuyến Đà Lạt → Cần Thơ thì cũng sai.
+     */
+    @Test
+    void fits_needsTheRightStationNow_andTheNextCommittedLegToStartWhereThisOneEnds() {
+        List<Leg> legs = List.of(
+                new Leg(MIEN_DONG, DA_LAT, at(19, 18, 0), at(20, 0, 0)),
+                new Leg(DA_LAT, MIEN_DONG, at(20, 18, 0), at(21, 0, 0)));
+
+        assertFalse(LocationRule.fits(legs, MIEN_DONG, new Leg(DA_LAT, MIEN_DONG, at(20, 6, 0), at(20, 12, 0))),
+                "về Miền Đông lúc 12:00 rồi không xuất phát được ở Đà Lạt lúc 18:00");
+        assertTrue(LocationRule.fits(legs, MIEN_DONG, new Leg(DA_LAT, DA_LAT, at(20, 6, 0), at(20, 12, 0))),
+                "một lượt quay về đúng Đà Lạt thì vừa cả hai phía");
+        assertFalse(LocationRule.fits(legs, MIEN_DONG, new Leg(MIEN_DONG, DA_LAT, at(20, 6, 0), at(20, 12, 0))),
+                "lúc 06:00 xe đang ở Đà Lạt, không ở Miền Đông");
+        assertTrue(LocationRule.fits(legs, MIEN_DONG, new Leg(MIEN_DONG, CAN_THO, at(21, 6, 0), at(21, 9, 30))),
+                "sau lượt cuối, không còn lượt kế tiếp nào ràng buộc");
+        assertTrue(LocationRule.fits(List.of(), MIEN_DONG, new Leg(MIEN_DONG, VUNG_TAU, at(20, 6, 0), at(20, 8, 0))),
+                "chưa có lượt nào: chỉ cần đi từ bến nhà");
+    }
+
+    @Test
+    void firstLegDepartingFrom_isTheEarliestLegLeavingAtOrAfterTheGivenTime() {
+        List<Leg> legs = vungTauLoop();
+
+        assertEquals(legs.get(1), LocationRule.firstLegDepartingFrom(legs, at(20, 8, 1)));
+        assertEquals(legs.get(1), LocationRule.firstLegDepartingFrom(legs, legs.get(1).departure()),
+                "khởi hành đúng mốc vẫn tính");
+        assertNull(LocationRule.firstLegDepartingFrom(legs, at(25, 0, 0)));
+        assertNull(LocationRule.firstLegDepartingFrom(null, at(20, 0, 0)));
+    }
+
     // =====================================================================
 
     /** Chuyến 20/11 06:00 → 12:00 trên một tuyến đi qua các bến theo đúng thứ tự cho trước. */

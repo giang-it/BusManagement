@@ -479,7 +479,7 @@
             setStep(3);
 
             try {
-                const url = `/api/admin/trips/available-resources?departure=${encodeURIComponent(departure)}&arrival=${encodeURIComponent(arrival)}`;
+                const url = `/api/admin/trips/available-resources?departure=${encodeURIComponent(departure)}&arrival=${encodeURIComponent(arrival)}&routeId=${encodeURIComponent(routeSelect.value)}`;
 
                 const response = await fetch(url, {
                     signal: fetchAbortController.signal
@@ -542,14 +542,14 @@
             const routeOpt = routeSelect.options[routeSelect.selectedIndex];
             const preferredTypeId = routeOpt ? routeOpt.getAttribute('data-type') : null;
             const isPreferred = bus => !!preferredTypeId && String(bus.typeId) === preferredTypeId;
-            buses = [...buses].sort((a, b) => Number(isPreferred(b)) - Number(isPreferred(a)));
+            buses = [...buses].sort((a, b) => (Number(!b.note) - Number(!a.note)) || (Number(isPreferred(b)) - Number(isPreferred(a)))); // CT5b: xe đang ở bến đi trước, rồi xe đúng loại
 
             busSelect.innerHTML = '<option value="">-- Chọn xe --</option>';
             buses.forEach(bus => {
                 const opt = document.createElement('option');
                 opt.value = bus.id;
                 opt.textContent = `${bus.licensePlate} — ${bus.typeName} (${bus.capacity} ghế)${bus.brand ? ' | ' + bus.brand : ''}`
-                    + (isPreferred(bus) ? ' ★ đúng loại tuyến' : '');
+                    + (isPreferred(bus) ? ' ★ đúng loại tuyến' : '') + (bus.note ? ' — ⚠ ' + bus.note : '');
                 opt.setAttribute('data-capacity', bus.capacity);
                 busSelect.appendChild(opt);
             });
@@ -583,7 +583,7 @@
         function buildDriverOptions(drivers, placeholder, includeEmpty = true) {
             let html = includeEmpty ? `<option value="">${placeholder}</option>` : '';
             html += drivers.map(d =>
-                `<option value="${d.userId}">${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}</option>`
+                `<option value="${d.userId}">${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}${d.note ? ' — ⚠ ' + d.note : ''}</option>`
             ).join('');
             return html;
         }
@@ -650,7 +650,7 @@
 
             const options = availableDriversData.map(d =>
                 `<option value="${d.userId}"${preselectedId && String(d.userId) === String(preselectedId) ? ' selected' : ''}>
-            ${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}
+            ${d.fullName}${d.licenseNumber ? ' | ' + d.licenseNumber : ''}${d.note ? ' — ⚠ ' + d.note : ''}
          </option>`
             ).join('');
 

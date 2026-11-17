@@ -284,7 +284,7 @@ public class RecommendationService {
             capacity = capacityOf(bus);
             card.setBusCapacity(capacity > 0 ? capacity : null);
             driver = tripService.selectBestAvailableDriver(departure, arrival, durationHours,
-                    extra.requiredDrivers(), List.of(), false, availability);
+                    extra.requiredDrivers(), List.of(), false, availability, candidate.getRoute());
             if (driver != null) {
                 card.setDriverName(driverName(driver));
             }
@@ -302,14 +302,14 @@ public class RecommendationService {
 
         if (bus == null) {
             card.setStatus(RecommendationStatus.NO_RESOURCE);
-            card.setNote("Không có xe rảnh và chưa tới ngưỡng bảo dưỡng cho khung giờ này"
+            card.setNote("Không có xe rảnh, đang ở bến xuất phát và chưa tới ngưỡng bảo dưỡng cho khung giờ này"
                     + " — số khách tính với xe chuẩn " + series.getStandardSeats() + " chỗ");
             return card;
         }
         if (driver == null) {
             card.setStatus(RecommendationStatus.NO_RESOURCE);
             card.setNote("Có xe " + bus.getLicensePlate()
-                    + " nhưng không có tài xế nào hợp lệ và rảnh cho khung giờ này");
+                    + " nhưng không có tài xế nào hợp lệ, rảnh và đang ở bến xuất phát cho khung giờ này");
             return card;
         }
 

@@ -92,7 +92,11 @@ public class AdminTripController {
             // Phụ xe không trực tiếp lái xe nên dùng danh sách riêng, không áp ràng buộc
             // giờ lái tối đa 8h/ngày (xem TripService.getAvailableAssistantsForTrip)
             model.addAttribute("availableAssistants", tripService.getAvailableAssistantsForTrip(id));
-            model.addAttribute("approveDriversForJs", toDriverOptionsForJs(availableDrivers));
+            // Vị trí (route pairs CT5b, CM-5 cách B): vẫn mời mọi lựa chọn hợp lệ, ai ở bến khác có ghi chú
+            Map<Long, String> personNotes = tripService.personLocationNotes(trip);
+            model.addAttribute("busNotes", tripService.busLocationNotes(trip));
+            model.addAttribute("personNotes", personNotes);
+            model.addAttribute("approveDriversForJs", toDriverOptionsForJs(availableDrivers, personNotes));
         }
 
         return "admin/approve-form";
@@ -110,16 +114,17 @@ public class AdminTripController {
      * Cùng khuôn với driversForJs ở AdminTripManagementController.showEditTripForm()
      * — màn sửa chuyến làm đúng nhiệm vụ này từ đầu, approve-form chỉ bị sót.
      *
-     * Ba khoá dưới đây là đúng những gì JS đọc (approve-form.html); giữ nguyên tên
+     * Các khoá dưới đây (thêm "note" — vị trí, CT5b) là đúng những gì JS đọc (approve-form.html); giữ nguyên tên
      * khoá totalDrivingHours24h và giá trị thô của nó để dropdown tài xế phụ hiển
      * thị cùng số giờ với dropdown tài xế chính ngay phía trên.
      */
-    private List<Map<String, Object>> toDriverOptionsForJs(List<Driver> drivers) {
+    private List<Map<String, Object>> toDriverOptionsForJs(List<Driver> drivers, Map<Long, String> personNotes) {
         return drivers.stream().map(d -> {
             Map<String, Object> map = new HashMap<>();
             map.put("userId", d.getUserId());
             map.put("fullName", d.getUser() != null ? d.getUser().getFullName() : "ID: " + d.getUserId());
             map.put("totalDrivingHours24h", d.getTotalDrivingHours24h());
+            map.put("note", personNotes.get(d.getUserId())); // CT5b: ghi chú vị trí, null = ở bến đi
             return map;
         }).toList();
     }

@@ -289,8 +289,12 @@ public class AdminTripManagementController {
         model.addAttribute("savedCoDriverIds", savedCoDriverIds);
         model.addAttribute("routes", routeRepository.findAllWithStations());
         model.addAttribute("buses", availableBuses);
-        List<Driver> drivers = driverRepository.findAllWithUser();
+        List<Driver> drivers = tripService.withPeopleAtStartFirst(trip, driverRepository.findAllWithUser());
         model.addAttribute("drivers", drivers);
+        // Vị trí (route pairs CT5b, CM-5 cách B): ai đang ở bến đi lên đầu, ai ở bến khác có ghi chú
+        Map<Long, String> personNotes = tripService.personLocationNotes(trip);
+        model.addAttribute("busNotes", tripService.busLocationNotes(trip));
+        model.addAttribute("personNotes", personNotes);
         // Select trạng thái chỉ MỜI những đích mà FSM sẽ nhận (kèm chính trạng thái
         // hiện tại). Trước đây liệt kê đủ TripStatus.values() nên một chuyến ACTIVE
         // được mời cả COMPLETED/PENDING_APPROVAL rồi bị canTransition() từ chối
@@ -301,6 +305,7 @@ public class AdminTripManagementController {
             Map<String, Object> map = new HashMap<>();
             map.put("userId", d.getUserId());
             map.put("fullName", d.getUser() != null ? d.getUser().getFullName() : "ID: " + d.getUserId());
+            map.put("note", personNotes.get(d.getUserId())); // CT5b: ghi chú vị trí, null = ở bến đi
             return map;
         }).toList();
 

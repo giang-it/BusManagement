@@ -47,7 +47,8 @@ public class TripRestController {
     @GetMapping("/available-resources")
     public ResponseEntity<Map<String, Object>> getAvailableResources(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departure,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival,
+            @RequestParam(required = false) Long routeId) { // CT5b: tuyến đã chọn — chỉ để xếp và ghi chú vị trí
 
         if (arrival.isBefore(departure) || arrival.isEqual(departure)) {
             return ResponseEntity.badRequest().body(
@@ -55,26 +56,27 @@ public class TripRestController {
         }
 
         // Lấy xe rảnh (trả về AvailableBusDto để frontend dùng data-capacity)
+        giang.com.BusManagement.domain.Route route = tripService.routeForLocation(routeId); // CT5b: để xét vị trí
         List<Map<String, Object>> buses = tripService
-                .getAvailableBusesForTimeRange(departure, arrival)
+                .getAvailableBusesForTimeRange(departure, arrival, route)
                 .stream()
-                .map(this::toBusDto)
+                .map(bus -> toBusDto(bus, tripService.busLocationNote(bus, route, departure, arrival)))
                 .toList();
 
         // Lấy tài xế rảnh (dropdown Tài xế chính + Tài xế phụ — có trần 8h/ngày)
         List<Map<String, Object>> drivers = tripService
-                .getAvailableDriversForTimeRange(departure, arrival)
+                .getAvailableDriversForTimeRange(departure, arrival, route)
                 .stream()
-                .map(this::toDriverDto)
+                .map(d -> toDriverDto(d, tripService.personLocationNote(d, route, departure, arrival)))
                 .toList();
 
         // Lấy phụ xe khả dụng — danh sách RIÊNG, không áp trần giờ lái vì phụ xe
         // không cầm lái (xem TripService.getAvailableAssistantsForTimeRange).
         // Dùng chung một danh sách cho cả hai vai trò chính là lỗi #13.
         List<Map<String, Object>> assistants = tripService
-                .getAvailableAssistantsForTimeRange(departure, arrival)
+                .getAvailableAssistantsForTimeRange(departure, arrival, route)
                 .stream()
-                .map(this::toDriverDto)
+                .map(d -> toDriverDto(d, tripService.personLocationNote(d, route, departure, arrival)))
                 .toList();
 
         Map<String, Object> response = new HashMap<>();
@@ -91,7 +93,7 @@ public class TripRestController {
      * Chuyển Bus entity thành Map đơn giản để serialize thành JSON.
      * Bao gồm 'capacity' để frontend điền totalSeats tự động khi chọn xe.
      */
-    private Map<String, Object> toBusDto(Bus bus) {
+    private Map<String, Object> toBusDto(Bus bus, String locationNote) {
         Map<String, Object> dto = new HashMap<>();
         dto.put("id", bus.getId());
         dto.put("licensePlate", bus.getLicensePlate());
@@ -100,13 +102,14 @@ public class TripRestController {
         dto.put("typeName", bus.getBusType() != null ? bus.getBusType().getTypeName() : "Không rõ");
         dto.put("capacity", bus.getBusType() != null ? bus.getBusType().getCapacity() : 0);
         dto.put("brand", bus.getBrand());
+        dto.put("note", locationNote); // CT5b: null = đang ở bến đi; khác null = "đang ở …"
         return dto;
     }
 
     /**
      * Chuyển Driver entity thành Map đơn giản để serialize thành JSON.
      */
-    private Map<String, Object> toDriverDto(Driver driver) {
+    private Map<String, Object> toDriverDto(Driver driver, String locationNote) {
         Map<String, Object> dto = new HashMap<>();
         dto.put("userId", driver.getUserId());
         dto.put("fullName", driver.getUser() != null
@@ -114,6 +117,7 @@ public class TripRestController {
                 : "Tài xế #" + driver.getUserId());
         dto.put("licenseNumber", driver.getLicenseNumber());
         dto.put("experienceYears", driver.getExperienceYears());
+        dto.put("note", locationNote); // CT5b: như ở toBusDto
         return dto;
     }
 }

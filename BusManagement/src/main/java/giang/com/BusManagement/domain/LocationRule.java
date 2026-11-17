@@ -114,4 +114,38 @@ public final class LocationRule {
         }
         return fromStationId.equals(lastLeg.toStationId()) && !lastLeg.arrival().plus(rest).isAfter(departure);
     }
+
+    /** Lượt sớm nhất khởi hành KHÔNG SỚM HƠN t (lượt kế tiếp sau một mốc), hoặc null. */
+    public static Leg firstLegDepartingFrom(Collection<Leg> legs, LocalDateTime t) {
+        Objects.requireNonNull(t, "t");
+        if (legs == null) {
+            return null;
+        }
+        return legs.stream()
+                .filter(Objects::nonNull)
+                .filter(leg -> !leg.departure().isBefore(t))
+                .min(Comparator.comparing(Leg::departure))
+                .orElse(null);
+    }
+
+    /**
+     * Route pairs CT5b: chèn lượt {@code planned} vào lịch của một xe hay một người mà chuỗi vị
+     * trí vẫn liền ở CẢ HAI phía — lúc khởi hành họ đứng ở bến đi của nó (stationAt), và lượt kế
+     * tiếp đã cam kết, nếu có, khởi hành từ bến đến của nó. Chỉ xét phía trước là chưa đủ khi các
+     * lượt được xếp không theo thứ tự thời gian: màn Đề xuất xếp thẻ theo lãi, nên một thẻ 06:00
+     * có thể được xét SAU thẻ 18:00 cùng ngày của cùng một xe.
+     *
+     * Không xét thời gian nghỉ hay trùng giờ — bên gọi lo (TripService dùng cửa sổ "bận").
+     *
+     * @param legs các lượt đã cam kết của họ (ít nhất: lượt gần nhất tới nơi trước giờ đi, và lượt
+     *             sớm nhất khởi hành từ giờ đến trở đi)
+     */
+    public static boolean fits(Collection<Leg> legs, Long homeStationId, Leg planned) {
+        Objects.requireNonNull(planned, "planned");
+        if (!planned.fromStationId().equals(stationAt(legs, homeStationId, planned.departure()))) {
+            return false;
+        }
+        Leg next = firstLegDepartingFrom(legs, planned.arrival());
+        return next == null || next.fromStationId().equals(planned.toStationId());
+    }
 }

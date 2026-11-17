@@ -229,7 +229,7 @@ public class TripService {
         Bus bus = findBestAvailableBus(trip, departure, arrival);
         if (bus == null) {
             return AutoAssignResult.failure(
-                    "Không có xe nào sẵn sàng / không bận / chưa tới ngưỡng bảo trì trong khung giờ này");
+                    "Không có xe nào sẵn sàng / không bận / chưa tới ngưỡng bảo trì / đang ở bến xuất phát trong khung giờ này");
         }
 
         // Tính toán số tài xế cần thiết
@@ -242,10 +242,10 @@ public class TripService {
 
         // Bước 2: Tìm tài xế chính
         Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                assignedStaff, false);
+                assignedStaff, false, trip.getRoute());
         if (driver == null) {
             return AutoAssignResult.failure(
-                    "Không có tài xế chính hợp lệ (cần bằng còn hạn, rảnh, và đủ định mức ngày)");
+                    "Không có tài xế chính hợp lệ (cần bằng còn hạn, rảnh, đủ định mức ngày, ở bến xuất phát)");
         }
         assignedStaff.add(driver);
 
@@ -254,7 +254,7 @@ public class TripService {
         java.util.List<Driver> coDrivers = new java.util.ArrayList<>();
         for (int i = 1; i < requiredDrivers; i++) {
             Driver coDriver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                    assignedStaff, false);
+                    assignedStaff, false, trip.getRoute());
             if (coDriver == null) {
                 return AutoAssignResult.failure(
                         "Không tìm đủ số lượng tài xế phụ hợp lệ cho chuyến dài " + Math.round(tripDurationHours)
@@ -270,7 +270,7 @@ public class TripService {
         // truyền isAssistantRole=true để bỏ qua điều kiện đó, chỉ còn kiểm tra bằng
         // lái còn hạn + không trùng lịch (không thể có mặt ở 2 chuyến cùng lúc).
         Driver assistant = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                assignedStaff, true);
+                assignedStaff, true, trip.getRoute());
         if (assistant == null && tripDurationHours > 8.0) {
             return AutoAssignResult.failure(
                     "Không tìm thấy phụ xe hợp lệ (bắt buộc đối với chuyến xe dài trên 8 tiếng)");
@@ -324,7 +324,7 @@ public class TripService {
         double tripDistance = trip.getRoute().getDistanceKm() != null ? trip.getRoute().getDistanceKm() : 0.0;
 
         return candidates.stream()
-                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null, ctx))
+                .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null, ctx) && busFits(bus, trip.getRoute(), departure, arrival, ctx))
                 .filter(bus -> !bus.needsMaintenance())
                 .filter(bus -> !bus.isNearMaintenance(tripDistance))
                 .min(preferredTypeThenLeastWorn(preferredType))
@@ -459,9 +459,9 @@ public class TripService {
      */
     private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
             double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
-            boolean isAssistantRole) {
+            boolean isAssistantRole, Route route) {
         return findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount,
-                excludeDrivers, isAssistantRole, null);
+                excludeDrivers, isAssistantRole, null, route);
     }
 
     /**
@@ -471,7 +471,7 @@ public class TripService {
      */
     private Driver findBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
             double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
-            boolean isAssistantRole, AvailabilityContext ctx) {
+            boolean isAssistantRole, AvailabilityContext ctx, Route route) {
         // Cửa sổ kiểm tra = thêm thời gian nghỉ bắt buộc ở cả hai đầu
         LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
         LocalDateTime windowEnd = arrival.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
@@ -496,7 +496,7 @@ public class TripService {
                 // XẾP TRONG NGÀY với lượng giờ chia sẻ thực tế).
                 .filter(d -> isAssistantRole || getDrivingHoursForDate(d, departure, null, ctx) + effectiveHours <= 8.0)
                 // Ràng buộc: không đang bận (cả vai trò tài xế lẫn phụ xe)
-                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null, ctx))
+                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null, ctx) && personFits(d, route, departure, arrival, ctx))
                 .collect(Collectors.toList());
 
         // Ưu tiên 1: Bằng lái còn hạn trên 7 ngày
@@ -546,9 +546,9 @@ public class TripService {
     /** Cặp đôi với {@link #selectBestAvailableBus} ở trên, cùng mục đích và lý do. */
     public Driver selectBestAvailableDriver(LocalDateTime departure, LocalDateTime arrival,
             double tripDurationHours, int totalDriversCount, java.util.Collection<Driver> excludeDrivers,
-            boolean isAssistantRole, AvailabilityContext ctx) {
+            boolean isAssistantRole, AvailabilityContext ctx, Route route) {
         return findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount,
-                excludeDrivers, isAssistantRole, ctx);
+                excludeDrivers, isAssistantRole, ctx, route);
     }
 
     /**
@@ -568,7 +568,7 @@ public class TripService {
         List<Trip> trips = tripRepository.findScheduleForAvailability(
                 List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.COMPLETED),
                 spanStart, spanEnd);
-        return new AvailabilityContext(trips);
+        return withLocations(trips, spanStart, spanEnd);
     }
 
     // Quản lý Finite State Machine (FSM)
@@ -1501,7 +1501,7 @@ public class TripService {
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, tripId))
                 .filter(bus -> !bus.needsMaintenance())
                 .filter(bus -> !bus.isNearMaintenance(tripDistance))
-                .sorted(preferredTypeThenLeastWorn(preferredType))
+                .sorted(fittingBusesFirst(trip).thenComparing(preferredTypeThenLeastWorn(preferredType)))
                 .collect(Collectors.toList());
     }
 
@@ -1532,7 +1532,7 @@ public class TripService {
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> getDrivingHoursForDate(d, departure, tripId) + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
-                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
+                .sorted(fittingPeopleFirst(trip).thenComparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
                 .collect(Collectors.toList());
     }
 
@@ -1560,7 +1560,7 @@ public class TripService {
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
-                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
+                .sorted(fittingPeopleFirst(trip).thenComparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
                 .collect(Collectors.toList());
     }
 
@@ -1931,5 +1931,310 @@ public class TripService {
         if (trip.getSaleOpenedAt() == null) {
             trip.setSaleOpenedAt(LocalDateTime.now());
         }
+    }
+
+    // =========================================================================
+    // VỊ TRÍ XE VÀ NGƯỜI — route pairs CT5b (QĐ-23, CM-5 cách B)
+    // =========================================================================
+    //
+    // Luật vị trí viết MỘT lần ở domain/LocationRule: lúc t, xe (hay người) đứng ở bến cuối
+    // của chuyến gần nhất chưa hủy có giờ đến ≤ t; chưa có chuyến nào thì ở bến nhà; chưa có
+    // bến nhà và chưa chạy chuyến nào thì "không biết ở đâu". Nhận thêm một chuyến thì chuỗi
+    // phải liền ở CẢ HAI phía (LocationRule.fits): lúc khởi hành họ đứng ở bến đi, và chuyến kế
+    // tiếp đã cam kết (nếu có) khởi hành từ bến đến của chuyến này. Phần dưới chỉ cấp các chuyến
+    // cho luật đó — đọc DB, hoặc đọc AvailabilityContext — rồi áp nó theo CM-5 cách B:
+    //   - MÁY chọn (findBestAvailableBus / findBestAvailableDriver: job 10 giây, màn Đề xuất)
+    //     là CỨNG: chỉ xét xe và người mà chuyến này vừa chuỗi của họ;
+    //   - NGƯỜI chọn (ô chọn ở các màn Duyệt, Sửa, Tạo) là MỀM: vẫn mời mọi lựa chọn hợp lệ,
+    //     ai vừa chuỗi xếp lên đầu, những người khác kèm ghi chú vì sao;
+    //   - validateBusForTrip / validateStaffForTrip KHÔNG chặn theo vị trí.
+    // Thời gian nghỉ giữa hai chuyến đã do cửa sổ "bận" lo (BUS_PREP_BUFFER_HOURS,
+    // MIN_REST_BETWEEN_TRIPS_MINUTES), nên ở đây chỉ so BẾN. Tuyến chưa có bến — chỉ gặp ở dữ
+    // liệu test, vì RouteService bắt buộc ≥ 2 bến — thì không biết bến: không xét vị trí.
+    // Đường DB và đường AvailabilityContext cho cùng kết quả (TripServiceLocationTest).
+
+    /** Mọi trạng thái trừ CANCELLED: đúng tập buildAvailabilityContext nạp; LocationRule.legOf bỏ chuyến hủy. */
+    private static final List<TripStatus> LOCATION_STATUSES = List.of(TripStatus.PENDING_APPROVAL,
+            TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.COMPLETED);
+
+    /** Chỉ để ghi tên bến vào ghi chú của ô chọn. */
+    private final StationRepository stationRepository;
+
+    /** Form Tạo gửi id tuyến đã chọn (TripRestController) — để biết hai đầu của chuyến định tạo. */
+    private final RouteRepository routeRepository;
+
+    /** Bến xuất phát của chuyến (id); null khi chuyến hay tuyến chưa có bến. */
+    public static Long departureStationOf(Trip trip) {
+        if (trip == null || trip.getRoute() == null) {
+            return null;
+        }
+        return idOf(trip.getRoute().getDepartureStation());
+    }
+
+    private static Long idOf(Station station) {
+        return station != null ? station.getId() : null;
+    }
+
+    /** Lượt định chạy trên tuyến route; null khi tuyến chưa có bến (khi đó không xét vị trí). */
+    private static LocationRule.Leg plannedLeg(Route route, LocalDateTime departure, LocalDateTime arrival) {
+        if (route == null || departure == null || arrival == null || arrival.isBefore(departure)) {
+            return null;
+        }
+        Long from = idOf(route.getDepartureStation());
+        Long to = idOf(route.getDestinationStation());
+        return from == null || to == null ? null : new LocationRule.Leg(from, to, departure, arrival);
+    }
+
+    /** Giờ đến dùng cho vị trí: như các ô chọn khác, chuyến thiếu giờ đến coi như chạy 5 giờ. */
+    private static LocalDateTime arrivalOf(Trip trip) {
+        return trip.getArrivalTimeExpected() != null ? trip.getArrivalTimeExpected()
+                : trip.getDepartureTime().plusHours(5);
+    }
+
+    /**
+     * Các chuyến đã cam kết của xe quanh lượt [departure, arrival]: chuyến gần nhất tới nơi
+     * ≤ departure và chuyến sớm nhất khởi hành ≥ arrival — đủ cho LocationRule.fits. ctx == null
+     * → hỏi DB; ctx != null → lượt trước / sau khoảng đã nạp cùng mọi chuyến của xe trong context.
+     */
+    private java.util.List<LocationRule.Leg> busLegsAround(Bus bus, LocalDateTime departure,
+            LocalDateTime arrival, AvailabilityContext ctx) {
+        java.util.List<LocationRule.Leg> legs = new java.util.ArrayList<>();
+        if (ctx == null) {
+            tripRepository.findFirstByBusAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                    bus, LOCATION_STATUSES, departure).map(LocationRule::legOf).ifPresent(legs::add);
+            tripRepository.findFirstByBusAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                    bus, LOCATION_STATUSES, arrival).map(LocationRule::legOf).ifPresent(legs::add);
+            return legs;
+        }
+        legs.add(ctx.busLegBefore(bus.getId()));
+        legs.add(ctx.busLegAfter(bus.getId()));
+        for (Trip trip : ctx.trips()) {
+            if (LOCATION_STATUSES.contains(trip.getStatus()) && trip.getBus() != null
+                    && bus.getId().equals(trip.getBus().getId())) {
+                legs.add(LocationRule.legOf(trip));
+            }
+        }
+        return legs;
+    }
+
+    /** Cùng ý cho một người — tài xế, phụ xe hay tài xế phụ: ai đi trên xe cũng tới bến cuối cùng xe. */
+    private java.util.List<LocationRule.Leg> personLegsAround(Driver person, LocalDateTime departure,
+            LocalDateTime arrival, AvailabilityContext ctx) {
+        java.util.List<LocationRule.Leg> legs = new java.util.ArrayList<>();
+        if (ctx == null) {
+            personTripArrivingBy(person, departure).map(LocationRule::legOf).ifPresent(legs::add);
+            personTripDepartingFrom(person, arrival).map(LocationRule::legOf).ifPresent(legs::add);
+            return legs;
+        }
+        legs.add(ctx.personLegBefore(person.getUserId()));
+        legs.add(ctx.personLegAfter(person.getUserId()));
+        for (Trip trip : ctx.trips()) {
+            if (LOCATION_STATUSES.contains(trip.getStatus()) && tripInvolvesDriver(trip, person)) {
+                legs.add(LocationRule.legOf(trip));
+            }
+        }
+        return legs;
+    }
+
+    /**
+     * Chuyến gần nhất của một người tới nơi ≤ t, ở bất kỳ vai nào trên xe. TripRepository hỏi riêng
+     * từng vai (một câu OR quét cả bảng trips); ở đây lấy chuyến muộn nhất của ba câu — giờ đến,
+     * rồi id lớn hơn, đúng thứ tự mỗi câu tự xếp — nên ra đúng chuyến mà một câu gộp sẽ ra.
+     */
+    private java.util.Optional<Trip> personTripArrivingBy(Driver person, LocalDateTime t) {
+        return java.util.stream.Stream.of(
+                tripRepository.findFirstByDriverAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                        person, LOCATION_STATUSES, t),
+                tripRepository.findFirstByAssistantAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                        person, LOCATION_STATUSES, t),
+                tripRepository.findTripsAsCoDriverArrivingBy(person, LOCATION_STATUSES, t,
+                        org.springframework.data.domain.PageRequest.of(0, 1)).stream().findFirst())
+                .flatMap(java.util.Optional::stream)
+                .max(Comparator.comparing(Trip::getArrivalTimeExpected).thenComparing(Trip::getId));
+    }
+
+    /** Phía sau: chuyến sớm nhất của một người khởi hành ≥ t, ở bất kỳ vai nào — giờ đi, rồi id nhỏ hơn. */
+    private java.util.Optional<Trip> personTripDepartingFrom(Driver person, LocalDateTime t) {
+        return java.util.stream.Stream.of(
+                tripRepository.findFirstByDriverAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                        person, LOCATION_STATUSES, t),
+                tripRepository.findFirstByAssistantAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                        person, LOCATION_STATUSES, t),
+                tripRepository.findTripsAsCoDriverDepartingFrom(person, LOCATION_STATUSES, t,
+                        org.springframework.data.domain.PageRequest.of(0, 1)).stream().findFirst())
+                .flatMap(java.util.Optional::stream)
+                .min(Comparator.comparing(Trip::getDepartureTime).thenComparing(Trip::getId));
+    }
+
+    /** Bến mà xe đang đứng lúc t; null = không biết. */
+    Long busStationAt(Bus bus, LocalDateTime t, AvailabilityContext ctx) {
+        return LocationRule.stationAt(busLegsAround(bus, t, t, ctx), idOf(bus.getHomeStation()), t);
+    }
+
+    /** Bến mà một người đang đứng lúc t; null = không biết. */
+    Long personStationAt(Driver person, LocalDateTime t, AvailabilityContext ctx) {
+        return LocationRule.stationAt(personLegsAround(person, t, t, ctx), idOf(person.getHomeStation()), t);
+    }
+
+    /** Máy chọn, CỨNG: chuyến [departure, arrival] trên tuyến route vừa chuỗi vị trí của xe. Tuyến chưa có bến → không xét. */
+    private boolean busFits(Bus bus, Route route, LocalDateTime departure, LocalDateTime arrival,
+            AvailabilityContext ctx) {
+        LocationRule.Leg planned = plannedLeg(route, departure, arrival);
+        return planned == null || LocationRule.fits(busLegsAround(bus, departure, arrival, ctx),
+                idOf(bus.getHomeStation()), planned);
+    }
+
+    /** Cùng ý cho một người. */
+    private boolean personFits(Driver person, Route route, LocalDateTime departure, LocalDateTime arrival,
+            AvailabilityContext ctx) {
+        LocationRule.Leg planned = plannedLeg(route, departure, arrival);
+        return planned == null || LocationRule.fits(personLegsAround(person, departure, arrival, ctx),
+                idOf(person.getHomeStation()), planned);
+    }
+
+    /** Người chọn, MỀM: xe vừa chuỗi lên đầu; phần còn lại giữ thứ tự cũ (sort ổn định). */
+    private Comparator<Bus> fittingBusesFirst(Trip trip) {
+        LocalDateTime arrival = arrivalOf(trip);
+        return standingFirst(bus -> busFits(bus, trip.getRoute(), trip.getDepartureTime(), arrival, null));
+    }
+
+    /** Cùng ý cho ô chọn tài xế, tài xế phụ, phụ xe. */
+    private Comparator<Driver> fittingPeopleFirst(Trip trip) {
+        LocalDateTime arrival = arrivalOf(trip);
+        return standingFirst(person -> personFits(person, trip.getRoute(), trip.getDepartureTime(), arrival, null));
+    }
+
+    /**
+     * Cho form Sửa, nơi ô chọn tài xế liệt kê MỌI tài xế (không qua getAvailable*): bản sao đã
+     * xếp người vừa chuỗi lên đầu, phần còn lại giữ nguyên thứ tự.
+     */
+    public List<Driver> withPeopleAtStartFirst(Trip trip, java.util.Collection<Driver> people) {
+        List<Driver> sorted = new java.util.ArrayList<>(people);
+        sorted.sort(fittingPeopleFirst(trip));
+        return sorted;
+    }
+
+    /** "Vừa chuỗi" lên trước. Nhớ kết quả của từng phần tử để phép sắp xếp không hỏi DB lặp lại. */
+    private static <T> Comparator<T> standingFirst(java.util.function.Predicate<T> fits) {
+        java.util.Map<T, Boolean> memo = new java.util.IdentityHashMap<>();
+        return Comparator.comparing((T item) -> !memo.computeIfAbsent(item, fits::test));
+    }
+
+    /**
+     * Ghi chú vị trí cho ô chọn thủ công (CM-5 cách B): id xe → lý do xe không vừa chuỗi —
+     * "đang ở &lt;bến&gt;", "chưa rõ đang ở đâu …" hay "chuyến kế tiếp đi từ &lt;bến&gt;". Xe vừa
+     * chuỗi không có ghi chú. Tuyến chưa có bến → rỗng.
+     */
+    public java.util.Map<Long, String> busLocationNotes(Trip trip) {
+        java.util.Map<Long, String> notes = new java.util.HashMap<>();
+        LocalDateTime arrival = arrivalOf(trip);
+        for (Bus bus : busRepository.findAll()) {
+            String note = busLocationNote(bus, trip.getRoute(), trip.getDepartureTime(), arrival);
+            if (note != null) {
+                notes.put(bus.getId(), note);
+            }
+        }
+        return notes;
+    }
+
+    /** Cùng ý, theo userId, cho mọi tài xế. */
+    public java.util.Map<Long, String> personLocationNotes(Trip trip) {
+        java.util.Map<Long, String> notes = new java.util.HashMap<>();
+        LocalDateTime arrival = arrivalOf(trip);
+        for (Driver person : driverRepository.findAll()) {
+            String note = personLocationNote(person, trip.getRoute(), trip.getDepartureTime(), arrival);
+            if (note != null) {
+                notes.put(person.getUserId(), note);
+            }
+        }
+        return notes;
+    }
+
+    /** Ghi chú cho một xe; null khi chuyến vừa chuỗi của xe, hoặc tuyến chưa có bến. */
+    public String busLocationNote(Bus bus, Route route, LocalDateTime departure, LocalDateTime arrival) {
+        LocationRule.Leg planned = plannedLeg(route, departure, arrival);
+        return planned == null ? null
+                : whyNot(busLegsAround(bus, departure, arrival, null), idOf(bus.getHomeStation()), planned);
+    }
+
+    /** Cùng ý cho một người. */
+    public String personLocationNote(Driver person, Route route, LocalDateTime departure, LocalDateTime arrival) {
+        LocationRule.Leg planned = plannedLeg(route, departure, arrival);
+        return planned == null ? null
+                : whyNot(personLegsAround(person, departure, arrival, null), idOf(person.getHomeStation()), planned);
+    }
+
+    /** Vì sao lượt planned không vừa chuỗi: hai phía của LocationRule.fits, nói bằng tên bến. */
+    private String whyNot(java.util.List<LocationRule.Leg> legs, Long home, LocationRule.Leg planned) {
+        Long at = LocationRule.stationAt(legs, home, planned.departure());
+        if (!planned.fromStationId().equals(at)) {
+            return at == null ? "chưa rõ đang ở đâu (chưa có bến nhà)" : "đang ở " + stationName(at);
+        }
+        LocationRule.Leg next = LocationRule.firstLegDepartingFrom(legs, planned.arrival());
+        if (next != null && !next.fromStationId().equals(planned.toStationId())) {
+            return "chuyến kế tiếp đi từ " + stationName(next.fromStationId());
+        }
+        return null;
+    }
+
+    private String stationName(Long stationId) {
+        return stationRepository.findById(stationId).map(Station::getStationName).orElse("bến #" + stationId);
+    }
+
+    /** Tuyến cho form Tạo (TripRestController); null khi chưa chọn hay không có. */
+    public Route routeForLocation(Long routeId) {
+        return routeId == null ? null : routeRepository.findByIdWithStations(routeId).orElse(null);
+    }
+
+    /**
+     * Bản cho form Tạo (CT5b): đúng danh sách của getAvailableBusesForTimeRange(departure, arrival),
+     * nhưng xe vừa chuỗi với chuyến định tạo trên tuyến route lên đầu. route == null (form chưa
+     * chọn tuyến) → giữ nguyên thứ tự.
+     */
+    public List<Bus> getAvailableBusesForTimeRange(LocalDateTime departure, LocalDateTime arrival, Route route) {
+        List<Bus> buses = new java.util.ArrayList<>(getAvailableBusesForTimeRange(departure, arrival));
+        buses.sort(standingFirst(bus -> busFits(bus, route, departure, arrival, null)));
+        return buses;
+    }
+
+    /** Cùng ý cho ô chọn tài xế chính / tài xế phụ của form Tạo. */
+    public List<Driver> getAvailableDriversForTimeRange(LocalDateTime departure, LocalDateTime arrival, Route route) {
+        List<Driver> drivers = new java.util.ArrayList<>(getAvailableDriversForTimeRange(departure, arrival));
+        drivers.sort(standingFirst(person -> personFits(person, route, departure, arrival, null)));
+        return drivers;
+    }
+
+    /** Cùng ý cho ô chọn phụ xe của form Tạo. */
+    public List<Driver> getAvailableAssistantsForTimeRange(LocalDateTime departure, LocalDateTime arrival,
+            Route route) {
+        List<Driver> assistants = new java.util.ArrayList<>(getAvailableAssistantsForTimeRange(departure, arrival));
+        assistants.sort(standingFirst(person -> personFits(person, route, departure, arrival, null)));
+        return assistants;
+    }
+
+    /**
+     * Nạp cho AvailabilityContext, với MỖI xe và MỖI người, chuyến gần nhất tới nơi ≤ spanStart và
+     * chuyến sớm nhất khởi hành ≥ spanEnd — hai lượt nằm ngoài các chuyến đã nạp.
+     */
+    private AvailabilityContext withLocations(List<Trip> trips, LocalDateTime spanStart, LocalDateTime spanEnd) {
+        java.util.Map<Long, LocationRule.Leg> busBefore = new java.util.HashMap<>();
+        java.util.Map<Long, LocationRule.Leg> busAfter = new java.util.HashMap<>();
+        for (Bus bus : busRepository.findAll()) {
+            tripRepository.findFirstByBusAndStatusInAndArrivalTimeExpectedLessThanEqualOrderByArrivalTimeExpectedDescIdDesc(
+                    bus, LOCATION_STATUSES, spanStart).map(LocationRule::legOf)
+                    .ifPresent(leg -> busBefore.put(bus.getId(), leg));
+            tripRepository.findFirstByBusAndStatusInAndDepartureTimeGreaterThanEqualOrderByDepartureTimeAscIdAsc(
+                    bus, LOCATION_STATUSES, spanEnd).map(LocationRule::legOf)
+                    .ifPresent(leg -> busAfter.put(bus.getId(), leg));
+        }
+        java.util.Map<Long, LocationRule.Leg> personBefore = new java.util.HashMap<>();
+        java.util.Map<Long, LocationRule.Leg> personAfter = new java.util.HashMap<>();
+        for (Driver person : driverRepository.findAll()) {
+            personTripArrivingBy(person, spanStart).map(LocationRule::legOf)
+                    .ifPresent(leg -> personBefore.put(person.getUserId(), leg));
+            personTripDepartingFrom(person, spanEnd).map(LocationRule::legOf)
+                    .ifPresent(leg -> personAfter.put(person.getUserId(), leg));
+        }
+        return new AvailabilityContext(trips, busBefore, personBefore, busAfter, personAfter);
     }
 }

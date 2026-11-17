@@ -86,7 +86,7 @@
                                 <option th:each="bus : ${buses}" th:value="${bus.id}"
                                     th:text="${bus.licensePlate
                                             + (bus.busType != null ? ' (' + bus.busType.typeName + ' · ' + bus.busType.capacity + ' chỗ)' : ' (Không rõ loại)')
-                                            + (preferredType != null and bus.busType != null and bus.busType.id == preferredType.id ? ' ★ đúng loại tuyến' : '')}"
+                                            + (preferredType != null and bus.busType != null and bus.busType.id == preferredType.id ? ' ★ đúng loại tuyến' : '') + (busNotes[bus.id] != null ? ' — ⚠ ' + busNotes[bus.id] : '')}"
                                     th:selected="${bus.id == trip.bus?.id}">
                                 </option>
                             </select>
@@ -103,7 +103,7 @@
                             <select id="mainDriverSelect" name="driverId" class="form-select" required>
                                 <option value="">-- Chọn tài xế --</option>
                                 <option th:each="driver : ${drivers}" th:value="${driver.userId}"
-                                    th:text="${driver.user?.fullName}"
+                                    th:text="${driver.user?.fullName + (personNotes[driver.userId] != null ? ' — ⚠ ' + personNotes[driver.userId] : '')}"
                                     th:selected="${driver.userId == trip.driver?.userId}">
                                 </option>
                             </select>
@@ -116,7 +116,7 @@
                             <select id="assistantSelect" name="assistantId" class="form-select">
                                 <option value="">-- Không có --</option>
                                 <option th:each="driver : ${drivers}" th:value="${driver.userId}"
-                                    th:text="${driver.user?.fullName}"
+                                    th:text="${driver.user?.fullName + (personNotes[driver.userId] != null ? ' — ⚠ ' + personNotes[driver.userId] : '')}"
                                     th:selected="${driver.userId == trip.assistant?.userId}">
                                 </option>
                             </select>
@@ -298,7 +298,7 @@
                 // === ĐÃ SỬA TẠI ĐÂY: Đọc trực tiếp từ d.fullName gửi từ Controller ===
                 const name = d.fullName ? d.fullName : ('ID:' + d.userId);
                 const sel = preselectedId && String(d.userId) === String(preselectedId) ? ' selected' : '';
-                options += `<option value="${d.userId}"${sel}>${name}</option>`;
+                options += `<option value="${d.userId}"${sel}>${name}${d.note ? ' — ⚠ ' + d.note : ''}</option>`;
             });
 
             const div = document.createElement('div');

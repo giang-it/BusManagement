@@ -247,7 +247,7 @@
                                         + ' | ' + bus.brand
                                         + ' | ' + (bus.busType != null ? bus.busType.typeName + ' (' + bus.busType.capacity + ' chỗ)' : 'N/A')
                                         + ' | ' + #numbers.formatDecimal(bus.kmSinceLastMaintenance, 0, 'COMMA', 0, 'POINT') + ' km'
-                                        + (preferredType != null and bus.busType != null and bus.busType.id == preferredType.id ? ' ★ đúng loại tuyến' : '')}">
+                                        + (preferredType != null and bus.busType != null and bus.busType.id == preferredType.id ? ' ★ đúng loại tuyến' : '') + (busNotes[bus.id] != null ? ' — ⚠ ' + busNotes[bus.id] : '')}">
                             </option>
                         </select>
                         <div class="form-text" th:if="${trip.route.suitableBusType != null}">
@@ -273,7 +273,7 @@
                             <option value="">-- Chọn tài xế --</option>
                             <option th:each="d : ${availableDrivers}" th:value="${d.userId}" th:text="${d.user.fullName
                                         + ' | Bằng: ' + d.licenseNumber
-                                        + ' | Đã lái: ' + d.totalDrivingHours24h + 'h hôm nay'}">
+                                        + ' | Đã lái: ' + d.totalDrivingHours24h + 'h hôm nay' + (personNotes[d.userId] != null ? ' — ⚠ ' + personNotes[d.userId] : '')}">
                             </option>
                         </select>
                         <div th:if="${#lists.isEmpty(availableDrivers)}" class="text-danger mt-1">
@@ -312,7 +312,7 @@
                             <option value="">-- Không có phụ xe --</option>
                             <option th:each="d : ${availableAssistants}" th:value="${d.userId}" th:text="${d.user.fullName
                                         + ' | Bằng: ' + d.licenseNumber
-                                        + ' | Đã làm: ' + d.totalDrivingHours24h + 'h hôm nay'}">
+                                        + ' | Đã làm: ' + d.totalDrivingHours24h + 'h hôm nay' + (personNotes[d.userId] != null ? ' — ⚠ ' + personNotes[d.userId] : '')}">
                             </option>
                         </select>
                     </div>
@@ -399,7 +399,7 @@
                 const name = d.fullName ? d.fullName : ('ID:' + d.userId);
                 const hours = d.totalDrivingHours24h !== undefined ? d.totalDrivingHours24h : 0;
                 const sel = preselectedId && String(d.userId) === String(preselectedId) ? ' selected' : '';
-                options += `<option value="${d.userId}"${sel}>${name} | Đã lái: ${hours}h</option>`;
+                options += `<option value="${d.userId}"${sel}>${name} | Đã lái: ${hours}h${d.note ? ' — ⚠ ' + d.note : ''}</option>`;
             });
 
             const div = document.createElement('div');

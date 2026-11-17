@@ -1,10 +1,13 @@
 package giang.com.BusManagement.service;
 
+import giang.com.BusManagement.domain.LocationRule;
 import giang.com.BusManagement.domain.Trip;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * PHASE 7 (bước 2) — NGUỒN DỮ LIỆU đã preload cho việc chọn tài nguyên trong bộ
@@ -52,5 +55,60 @@ public final class AvailabilityContext {
      */
     public void reserve(Trip trip) {
         trips.add(trip);
+    }
+
+    // ── Vị trí (route pairs CT5b, QĐ-23) ─────────────────────────────────────────
+    // Các chuyến ở trên chỉ là những chuyến GIAO với khoảng đã nạp. Luật vị trí
+    // (LocationRule.fits) còn cần hai lượt nằm ngoài khoảng: lượt gần nhất tới nơi
+    // TRƯỚC đầu khoảng (một xe dự phòng có thể đứng yên ở bến từ nhiều tuần trước), và
+    // lượt sớm nhất khởi hành SAU cuối khoảng (chuyến đã lên lịch xa hơn). Với hai lượt
+    // đó, xét trên context cho đúng câu trả lời như hỏi DB, cho mọi chuyến kết thúc
+    // trong khoảng. buildAvailabilityContext nạp sẵn chúng cho từng xe, từng người.
+
+    private final Map<Long, LocationRule.Leg> busLegBefore = new HashMap<>();
+    private final Map<Long, LocationRule.Leg> personLegBefore = new HashMap<>();
+    private final Map<Long, LocationRule.Leg> busLegAfter = new HashMap<>();
+    private final Map<Long, LocationRule.Leg> personLegAfter = new HashMap<>();
+
+    /**
+     * @param busBefore    lượt gần nhất tới nơi không muộn hơn đầu khoảng, theo id xe
+     * @param personBefore như trên, theo userId của tài xế / phụ xe
+     * @param busAfter     lượt sớm nhất khởi hành từ cuối khoảng trở đi, theo id xe
+     * @param personAfter  như trên, theo userId
+     */
+    public AvailabilityContext(List<Trip> trips, Map<Long, LocationRule.Leg> busBefore,
+            Map<Long, LocationRule.Leg> personBefore, Map<Long, LocationRule.Leg> busAfter,
+            Map<Long, LocationRule.Leg> personAfter) {
+        this(trips);
+        putAll(busLegBefore, busBefore);
+        putAll(personLegBefore, personBefore);
+        putAll(busLegAfter, busAfter);
+        putAll(personLegAfter, personAfter);
+    }
+
+    private static void putAll(Map<Long, LocationRule.Leg> target, Map<Long, LocationRule.Leg> source) {
+        if (source != null) {
+            target.putAll(source);
+        }
+    }
+
+    /** Lượt gần nhất của xe trước khoảng đã nạp; null nếu không có (hay context dựng không kèm vị trí). */
+    public LocationRule.Leg busLegBefore(Long busId) {
+        return busLegBefore.get(busId);
+    }
+
+    /** Cùng ý cho một người (theo userId). */
+    public LocationRule.Leg personLegBefore(Long userId) {
+        return personLegBefore.get(userId);
+    }
+
+    /** Lượt sớm nhất của xe sau khoảng đã nạp; null nếu không có. */
+    public LocationRule.Leg busLegAfter(Long busId) {
+        return busLegAfter.get(busId);
+    }
+
+    /** Cùng ý cho một người (theo userId). */
+    public LocationRule.Leg personLegAfter(Long userId) {
+        return personLegAfter.get(userId);
     }
 }
