@@ -422,7 +422,7 @@ tài xế lẫn màn tài khoản cùng gọi; màn tài khoản <strong>không<
 <li><strong>Bến nhà là bắt buộc</strong> (QĐ-23, CM-12; thêm ở CT5a ngày 2026-11-17):<ul>
 <li>Form có ô &quot;Bến Nhà&quot; (<code>required</code>). <code>DriverService</code> cũng từ chối khi trống; ở lối tạo, kiểm <strong>trước mọi lần ghi</strong>, nên thiếu bến nhà thì không sinh ra cả tài khoản.</li>
 <li>Vị trí của tài xế = bến cuối của chuyến gần nhất; chưa chạy thì là bến nhà (<code>domain/LocationRule</code>).</li>
-<li>Hiện mới <strong>lưu</strong>. Việc máy chỉ chọn tài xế đang ở bến xuất phát được bật ở CT5b.</li>
+<li>Từ CT5b (2026-11-17) vị trí được <strong>dùng</strong>, cho mọi vai trên xe (tài xế, phụ xe, tài xế phụ). Máy chỉ chọn người đang ở bến xuất phát và có chuyến kế tiếp đi từ bến tới (<code>TripService.java:499</code>). Ô chọn tay vẫn mời mọi người hợp lệ, người đúng bến lên đầu, người khác ghi &quot;⚠ đang ở …&quot;. Validator không chặn theo vị trí.</li>
 <li>Trên DB thật, cả 36 tài xế có bến nhà Miền Đông.</li>
 </ul>
 </li>

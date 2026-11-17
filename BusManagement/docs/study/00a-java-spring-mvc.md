@@ -555,21 +555,25 @@ chuyến.
 
 ### 5.2. Ví dụ: `GET /api/admin/trips/available-resources`
 
-[CODE] `…/controller/admin/TripRestController.java:47-86` (rút gọn):
+[CODE] `…/controller/admin/TripRestController.java:47-88` (rút gọn):
 
 ```java
 @GetMapping("/available-resources")
 public ResponseEntity<Map<String, Object>> getAvailableResources(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departure,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival) {
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival,
+        @RequestParam(required = false) Long routeId) {               // tuyến đã chọn — chỉ để xét vị trí (CT5b)
 
     if (arrival.isBefore(departure) || arrival.isEqual(departure)) {
         return ResponseEntity.badRequest().body(                       // HTTP 400 + JSON báo lỗi
                 Map.of("error", "Thời gian đến phải sau thời gian khởi hành"));
     }
+    Route route = tripService.routeForLocation(routeId);
     List<Map<String, Object>> buses = tripService
-            .getAvailableBusesForTimeRange(departure, arrival)
-            .stream().map(this::toBusDto).toList();                    // mỗi Bus → một Map phẳng
+            .getAvailableBusesForTimeRange(departure, arrival, route)  // xe vừa chuỗi vị trí lên đầu
+            .stream()
+            .map(bus -> toBusDto(bus, tripService.busLocationNote(bus, route, departure, arrival)))
+            .toList();                                                 // mỗi Bus → một Map phẳng
     ... // drivers, assistants tương tự
     Map<String, Object> response = new HashMap<>();
     response.put("buses", buses);
@@ -585,15 +589,16 @@ public ResponseEntity<Map<String, Object>> getAvailableResources(
   object JSON, một `List` trở thành mảng:
 
 ```json
-{ "buses": [ { "id": 3, "licensePlate": "...", "typeId": 1, "typeName": "Limousine", "capacity": 22, "brand": "..." } ],
-  "drivers": [ { "userId": 5, "fullName": "...", "licenseNumber": "...", "experienceYears": 5 } ],
+{ "buses": [ { "id": 3, "licensePlate": "...", "typeId": 1, "typeName": "Limousine", "capacity": 22, "brand": "...",
+               "note": "đang ở Bến xe Miền Đông" } ],
+  "drivers": [ { "userId": 5, "fullName": "...", "licenseNumber": "...", "experienceYears": 5, "note": null } ],
   "assistants": [ ... ] }
 ```
 
 ### 5.3. Vì sao tự dựng `Map` phẳng thay vì trả thẳng entity
 
-`toBusDto` (`TripRestController.java:94`) và `toDriverDto` (`:109`) chép **vài** field ra một `Map`.
-Lý do [SUY LUẬN, khớp với javadoc `AdminTripController.java:105` cho trường hợp tương tự bên
+`toBusDto` (`TripRestController.java:96`) và `toDriverDto` (`:112`) chép **vài** field ra một `Map`.
+Lý do [SUY LUẬN, khớp với javadoc `AdminTripController.java:109` cho trường hợp tương tự bên
 Thymeleaf]:
 
 1. Entity có quan hệ hai chiều (`Driver.user` ↔ `User.driver`). Serialize thẳng có thể đi vòng
@@ -895,7 +900,7 @@ Test canh quy ước này: `src/test/.../domain/EntityEqualsHashCodeCycleTest.ja
 | View name / `redirect:` | Tên template / bảo trình duyệt chuyển URL | `AdminBusController.java:22`, `:41` |
 | Flash attribute | Thông báo sống qua một lần chuyển trang | `AdminBusController.java:37` |
 | PRG | POST xong thì redirect sang GET | `AdminBusController.java:33-42` |
-| `ResponseEntity` | Phong bì: mã HTTP + nội dung | `TripRestController.java:53`, `:85` |
+| `ResponseEntity` | Phong bì: mã HTTP + nội dung | `TripRestController.java:54`, `:87` |
 | Jackson / JSON | Thư viện đổi object ↔ JSON / định dạng dữ liệu cho JS | [SPRING] |
 | Thymeleaf | Bộ trộn khuôn HTML với dữ liệu, chạy ở server | 27 template |
 | `th:text` / `th:if` / `th:each` | In / điều kiện / lặp | `bus-list.html:53-76` |

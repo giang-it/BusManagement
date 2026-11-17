@@ -1272,7 +1272,7 @@ proxy) mới mở được transaction, và transaction đó còn giữ phiên m
 <li>Nó chỉ kiểm hàm tính toán thuần <code>WhatIfSimulationService.coverableSlots()</code> — một method <code>static</code>
 package-private, không cần bean, không cần DB.</li>
 <li><code>updateTrip()</code> nạp chuyến, <code>editRefusalReason()</code> cho qua (<code>ACTIVE</code> sửa được). Pre-check ở
-<code>AdminTripManagementController.java:389</code>: <code>allowedTransitionsFrom(ACTIVE)</code> = <code>[ACTIVE, DEPARTED, CANCELLED]</code>, không chứa <code>COMPLETED</code> ⇒ flash <code>error</code> &quot;Không thể đổi trạng thái chuyến #50 từ
+<code>AdminTripManagementController.java:394</code>: <code>allowedTransitionsFrom(ACTIVE)</code> = <code>[ACTIVE, DEPARTED, CANCELLED]</code>, không chứa <code>COMPLETED</code> ⇒ flash <code>error</code> &quot;Không thể đổi trạng thái chuyến #50 từ
 [ACTIVE] sang [COMPLETED] — chưa có thay đổi nào được lưu. Các đích hợp lệ: [...]&quot; và redirect về
 form sửa. <strong>Chưa transaction nào được mở</strong> (chưa gọi service). Giá vé mới <strong>không</strong> được lưu.
 (Bình thường select trạng thái đã không liệt kê <code>COMPLETED</code> — đây là lớp không-mời; pre-check là

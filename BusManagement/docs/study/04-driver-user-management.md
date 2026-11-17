@@ -172,7 +172,7 @@ erDiagram
 6. **Bến nhà là bắt buộc** (QĐ-23, CM-12; thêm ở CT5a ngày 2026-11-17):
    - Form có ô "Bến Nhà" (`required`). `DriverService` cũng từ chối khi trống; ở lối tạo, kiểm **trước mọi lần ghi**, nên thiếu bến nhà thì không sinh ra cả tài khoản.
    - Vị trí của tài xế = bến cuối của chuyến gần nhất; chưa chạy thì là bến nhà (`domain/LocationRule`).
-   - Hiện mới **lưu**. Việc máy chỉ chọn tài xế đang ở bến xuất phát được bật ở CT5b.
+   - Từ CT5b (2026-11-17) vị trí được **dùng**, cho mọi vai trên xe (tài xế, phụ xe, tài xế phụ). Máy chỉ chọn người đang ở bến xuất phát và có chuyến kế tiếp đi từ bến tới (`TripService.java:499`). Ô chọn tay vẫn mời mọi người hợp lệ, người đúng bến lên đầu, người khác ghi "⚠ đang ở …". Validator không chặn theo vị trí.
    - Trên DB thật, cả 36 tài xế có bến nhà Miền Đông.
 
 ---

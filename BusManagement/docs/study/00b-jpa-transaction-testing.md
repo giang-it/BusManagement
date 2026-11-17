@@ -913,7 +913,7 @@ trip.setDriver(driver);
 8. Nó chỉ kiểm hàm tính toán thuần `WhatIfSimulationService.coverableSlots()` — một method `static`
    package-private, không cần bean, không cần DB.
 9. `updateTrip()` nạp chuyến, `editRefusalReason()` cho qua (`ACTIVE` sửa được). Pre-check ở
-   `AdminTripManagementController.java:389`: `allowedTransitionsFrom(ACTIVE)` = `[ACTIVE, DEPARTED,
+   `AdminTripManagementController.java:394`: `allowedTransitionsFrom(ACTIVE)` = `[ACTIVE, DEPARTED,
    CANCELLED]`, không chứa `COMPLETED` ⇒ flash `error` "Không thể đổi trạng thái chuyến #50 từ
    [ACTIVE] sang [COMPLETED] — chưa có thay đổi nào được lưu. Các đích hợp lệ: [...]" và redirect về
    form sửa. **Chưa transaction nào được mở** (chưa gọi service). Giá vé mới **không** được lưu.

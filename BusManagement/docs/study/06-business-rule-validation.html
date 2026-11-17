@@ -222,7 +222,7 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 </tr>
 <tr>
 <td>Lớp &quot;không-mời&quot;</td>
-<td><code>TS:1483-1685</code> (dropdown), <code>:308-332</code> + <code>:472-523</code> (AI), <code>TripRestController.java:47-86</code> (API form Tạo)</td>
+<td><code>TS:1483-1685</code> (dropdown), <code>:308-332</code> + <code>:472-523</code> (AI), <code>TripRestController.java:47-88</code> (API form Tạo)</td>
 <td>Lọc trước những gì validator sẽ từ chối</td>
 </tr>
 <tr>
@@ -1193,6 +1193,12 @@ mời rồi bị từ chối lúc lưu.</p>
 <td>Giữ — lỗi #13 đã sửa (trước đó mời <strong>hẹp</strong> hơn)</td>
 </tr>
 <tr>
+<td>Xe / người đang ở bến xuất phát, và chuyến kế tiếp đi từ bến tới (QĐ-23, CT5b)</td>
+<td>AI <strong>lọc cứng</strong> (<code>TS:327</code>, <code>:499</code>; luật <code>LocationRule.fits</code>); dropdown Duyệt/Sửa/Tạo <strong>mời tất cả</strong>, đúng bến xếp đầu (<code>TS:1504</code>, <code>:1535</code>, <code>:1563</code>), người/xe khác kèm &quot;⚠ đang ở …&quot;</td>
+<td><strong>Không có</strong> — cố ý (CM-5 cách B)</td>
+<td>Giữ — dropdown mời đúng bằng validator, AI hẹp hơn</td>
+</tr>
+<tr>
 <td>Giờ đến bắt buộc, ghế ≥ 1, giá ≥ 0</td>
 <td>chỉ <code>required</code>/<code>min</code> của HTML</td>
 <td><strong>Không có</strong> ở service</td>
@@ -1590,6 +1596,24 @@ bệnh: &quot;đã quá hạn&quot; khác &quot;sẽ sắp quá hạn&quot;.</p>
 <td>Cùng khuôn <code>confirmAutoAssignedTrip()</code></td>
 <td>roadmap §9</td>
 </tr>
+<tr>
+<td>Vị trí: <strong>cứng cho máy, mềm cho người</strong>, validator không chặn</td>
+<td>Máy giao xe đang ở bến khác mà không ai xem lại; còn Admin vẫn điều được xe rỗng có chủ ý</td>
+<td>Chặn ở validator thì Admin không điều xe rỗng được, và các chuyến đã có mà lệch chuỗi sẽ thành không sửa được</td>
+<td>CM-5 cách B, QĐ-23 (2026-11-17)</td>
+</tr>
+<tr>
+<td>Luật vị trí xét <strong>hai phía</strong>: đứng ở bến đi, và chuyến kế tiếp đã nhận đi từ bến tới</td>
+<td>Màn Đề xuất (xếp thẻ theo lãi, không theo giờ) giao một xe cả Đà Lạt 06:00 lẫn Đà Lạt 18:00 cùng ngày</td>
+<td>Chỉ xét phía trước là đủ khi chuyến được xếp theo giờ; Đề xuất và Admin thì không</td>
+<td><code>verify</code> CT5b trên DB thật; test <code>twoCardsOutOfTimeOrder…</code></td>
+</tr>
+<tr>
+<td>Vị trí của người: hỏi <strong>riêng từng vai</strong> rồi lấy chuyến muộn nhất</td>
+<td>Một câu <code>driver = ? OR assistant = ? OR ? MEMBER OF coDrivers</code> quét cả bảng <code>trips</code>: 0,46 s một lần, API form Tạo hơn 2 phút</td>
+<td>Gộp <code>OR</code> ngắn hơn nhưng MySQL bỏ mọi index</td>
+<td>đo trên DB thật 2026-11-17</td>
+</tr>
 </tbody></table></div>
 <h3 id="9-2-bug-that-da-tung-xay-ra-o-chuc-nang-nay">9.2. Bug thật đã từng xảy ra ở chức năng này</h3>
 <p><strong>Lỗi #1 — bằng lái xét theo hôm nay (2026-07-20).</strong> <code>Driver.isLicenseValid()</code> so với
@@ -1720,6 +1744,10 @@ hành (đã nêu ở Bài 05).</li>
 <tr>
 <td><code>TripServiceAvailabilityContextTest</code> (4 test)</td>
 <td>Nhánh nạp sẵn (Phase 7) cho <strong>cùng</strong> kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày; và (GĐ6) một chuyến giữ chỗ được chính các luật đó nhìn thấy, chỉ trong bộ nhớ</td>
+</tr>
+<tr>
+<td><code>TripServiceLocationTest</code> (14 test) và <code>LocationRuleTest</code> (8 test)</td>
+<td>Vị trí (CT5b): máy chỉ chọn xe/người đúng bến; hai phía của luật; thẻ xét ngược giờ không giao một xe hai lần; nhánh nạp sẵn = nhánh SQL; mọi vai trên xe; dropdown mời đủ, đúng bến lên đầu, có ghi chú; validator không chặn</td>
 </tr>
 </tbody></table></div>
 <p><strong>Chưa có test tự động</strong> cho: luật đủ <code>ceil(h/8)</code> tài xế và luật trùng vai (grep <code>src/test</code> không thấy

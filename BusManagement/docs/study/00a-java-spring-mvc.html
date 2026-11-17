@@ -826,19 +826,23 @@ Dùng khi người gọi là <strong>JavaScript</strong> chứ không phải ng�
 <p>Dự án có đúng <strong>một</strong> REST controller: <code>TripRestController</code> (<code>/api/admin/trips</code>), phục vụ form tạo
 chuyến.</p>
 <h3 id="5-2-vi-du-get-api-admin-trips-available-resources">5.2. Ví dụ: <code>GET /api/admin/trips/available-resources</code></h3>
-<p><span class="tag tag-code">CODE</span> <code>…/controller/admin/TripRestController.java:47-86</code> (rút gọn):</p>
+<p><span class="tag tag-code">CODE</span> <code>…/controller/admin/TripRestController.java:47-88</code> (rút gọn):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@GetMapping("/available-resources")
 public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getAvailableResources(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime departure,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival) {
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime arrival,
+        @RequestParam(required = false) Long routeId) {               // tuyến đã chọn — chỉ để xét vị trí (CT5b)
 
     if (arrival.isBefore(departure) || arrival.isEqual(departure)) {
         return ResponseEntity.badRequest().body(                       // HTTP 400 + JSON báo lỗi
                 Map.of("error", "Thời gian đến phải sau thời gian khởi hành"));
     }
+    Route route = tripService.routeForLocation(routeId);
     List&lt;Map&lt;String, Object&gt;&gt; buses = tripService
-            .getAvailableBusesForTimeRange(departure, arrival)
-            .stream().map(this::toBusDto).toList();                    // mỗi Bus → một Map phẳng
+            .getAvailableBusesForTimeRange(departure, arrival, route)  // xe vừa chuỗi vị trí lên đầu
+            .stream()
+            .map(bus -&gt; toBusDto(bus, tripService.busLocationNote(bus, route, departure, arrival)))
+            .toList();                                                 // mỗi Bus → một Map phẳng
     ... // drivers, assistants tương tự
     Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();
     response.put("buses", buses);
@@ -852,12 +856,13 @@ public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getAvailableResources(
 <li><strong>Jackson</strong> là thư viện Spring dùng để biến object Java thành JSON <span class="tag tag-spring">SPRING</span>. Một <code>Map</code> trở thành
 object JSON, một <code>List</code> trở thành mảng:</li>
 </ul>
-<div class="code-wrap"><pre class="code"><code class="language-json">{ "buses": [ { "id": 3, "licensePlate": "...", "typeId": 1, "typeName": "Limousine", "capacity": 22, "brand": "..." } ],
-  "drivers": [ { "userId": 5, "fullName": "...", "licenseNumber": "...", "experienceYears": 5 } ],
+<div class="code-wrap"><pre class="code"><code class="language-json">{ "buses": [ { "id": 3, "licensePlate": "...", "typeId": 1, "typeName": "Limousine", "capacity": 22, "brand": "...",
+               "note": "đang ở Bến xe Miền Đông" } ],
+  "drivers": [ { "userId": 5, "fullName": "...", "licenseNumber": "...", "experienceYears": 5, "note": null } ],
   "assistants": [ ... ] }</code></pre></div>
 <h3 id="5-3-vi-sao-tu-dung-map-phang-thay-vi-tra-thang-entity">5.3. Vì sao tự dựng <code>Map</code> phẳng thay vì trả thẳng entity</h3>
-<p><code>toBusDto</code> (<code>TripRestController.java:94</code>) và <code>toDriverDto</code> (<code>:109</code>) chép <strong>vài</strong> field ra một <code>Map</code>.
-Lý do [SUY LUẬN, khớp với javadoc <code>AdminTripController.java:105</code> cho trường hợp tương tự bên
+<p><code>toBusDto</code> (<code>TripRestController.java:96</code>) và <code>toDriverDto</code> (<code>:112</code>) chép <strong>vài</strong> field ra một <code>Map</code>.
+Lý do [SUY LUẬN, khớp với javadoc <code>AdminTripController.java:109</code> cho trường hợp tương tự bên
 Thymeleaf]:</p>
 <ol>
 <li>Entity có quan hệ hai chiều (<code>Driver.user</code> ↔ <code>User.driver</code>). Serialize thẳng có thể đi vòng
@@ -1396,7 +1401,7 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>ResponseEntity</code></td>
 <td>Phong bì: mã HTTP + nội dung</td>
-<td><code>TripRestController.java:53</code>, <code>:85</code></td>
+<td><code>TripRestController.java:54</code>, <code>:87</code></td>
 </tr>
 <tr>
 <td>Jackson / JSON</td>

@@ -237,7 +237,7 @@ sang bảo trì thay vì xóa.</p>
 <tr>
 <td>Luật thuần</td>
 <td><code>…/domain/LocationRule.java</code></td>
-<td>Xe đang ở bến nào, đã xuất phát được chưa (QĐ-23). Chưa gắn vào việc chọn xe — bật ở CT5b</td>
+<td>Xe đang ở bến nào, nhận thêm chuyến có vừa chuỗi không (QĐ-23). Từ CT5b gắn vào việc chọn xe (<code>TripService.java:1937</code>)</td>
 </tr>
 <tr>
 <td>Entity</td>
@@ -398,7 +398,7 @@ tắt kiểm tra khóa ngoại, service là lớp chặn duy nhất.</li>
 <li><strong>Bến nhà là bắt buộc</strong> (QĐ-23, CM-12; thêm ở CT5a ngày 2026-11-17):<ul>
 <li>Form có ô &quot;Bến Nhà&quot; (<code>required</code>). <code>validate()</code> cũng từ chối khi trống, cả lúc tạo lẫn lúc sửa.</li>
 <li>Vị trí của xe = bến cuối của chuyến gần nhất; chưa chạy chuyến nào thì là bến nhà (<code>LocationRule</code>).</li>
-<li>Hiện mới <strong>lưu</strong>. Việc máy chỉ chọn xe đang đứng ở bến xuất phát được bật ở CT5b.</li>
+<li>Từ CT5b (2026-11-17) vị trí được <strong>dùng</strong>. Máy (job 10 giây, màn Đề xuất) chỉ chọn xe đang đứng ở bến xuất phát và có chuyến kế tiếp đi từ bến tới (<code>TripService.java:327</code>). Ô chọn tay (Duyệt, Sửa, Tạo) vẫn mời mọi xe hợp lệ, xe đúng bến lên đầu, xe khác ghi &quot;⚠ đang ở …&quot;. Validator không chặn theo vị trí.</li>
 <li>Trên DB thật, cả 20 xe có bến nhà Miền Đông.</li>
 </ul>
 </li>

@@ -64,7 +64,7 @@ hủy: Lỗi luồng vận hành: Không thể chuyển trạng thái chuyến x
 | Service | `TS:1451-1455` `rejectTrip()` | Từ chối chuyến đề xuất = `updateTripStatus(id, CANCELLED)` |
 | Controller | `…/controller/admin/DispatchController.java` | Lối vào chính của `DEPARTED`/`COMPLETED`; allow-list `BOARD_ACTIONS` (`:59-60`) |
 | Controller | `…/controller/admin/AdminTripManagementController.java` | Hủy (`:470-482`), Sửa đổi trạng thái (`:355-460`), quyết định nút Hủy (`:96-117`) |
-| Controller | `…/controller/admin/AdminTripController.java:210-220` | Từ chối chuyến đề xuất |
+| Controller | `…/controller/admin/AdminTripController.java:215-225` | Từ chối chuyến đề xuất |
 | Template | `tpl/admin/dispatch-board.html` | Nút Xuất phát (`:79-84`, `:199-204`), Hủy (`:85-91`, `:205-211`), Hoàn thành (`:144-149`) |
 | Template | `tpl/admin/trip-list.html:474-482`; `trip-edit-form.html:201-204` | Nút Hủy; select trạng thái |
 | Template | `tpl/admin/pending-trips.html:144-147`; `approve-form.html:199-204`, `:336-337` | Nút Từ chối |

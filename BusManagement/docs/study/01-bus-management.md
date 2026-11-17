@@ -61,7 +61,7 @@ sang bảo trì thay vì xóa.
 | Repository (mượn) | `…/repository/TripRepository.java:233, :350, :367-369` | Ba câu hỏi về chuyến của xe, phục vụ các guard |
 | Repository (mượn) | `…/repository/IncidentRepository.java:56` | "Xe có bản ghi sự cố nào không" — guard xóa |
 | Entity | `…/domain/Bus.java` | Bảng `buses` + 3 method nghiệp vụ về bảo trì; **bến nhà** `homeStation` (cột `home_station_id`, CT5a) đặt ở cuối lớp |
-| Luật thuần | `…/domain/LocationRule.java` | Xe đang ở bến nào, đã xuất phát được chưa (QĐ-23). Chưa gắn vào việc chọn xe — bật ở CT5b |
+| Luật thuần | `…/domain/LocationRule.java` | Xe đang ở bến nào, nhận thêm chuyến có vừa chuỗi không (QĐ-23). Từ CT5b gắn vào việc chọn xe (`TripService.java:1937`) |
 | Entity | `…/domain/BusType.java` | Bảng `bus_types`: tên loại + số ghế |
 | Enum | `…/domain/BusStatus.java` | `READY`, `TRAVELING`, `REPAIRING` |
 | Test | `test/service/BusServiceTest.java` | 21 test ghim tạo/sửa, ba con số bảo trì, hai guard, bến nhà bắt buộc |
@@ -165,7 +165,7 @@ stateDiagram-v2
 6. **Bến nhà là bắt buộc** (QĐ-23, CM-12; thêm ở CT5a ngày 2026-11-17):
    - Form có ô "Bến Nhà" (`required`). `validate()` cũng từ chối khi trống, cả lúc tạo lẫn lúc sửa.
    - Vị trí của xe = bến cuối của chuyến gần nhất; chưa chạy chuyến nào thì là bến nhà (`LocationRule`).
-   - Hiện mới **lưu**. Việc máy chỉ chọn xe đang đứng ở bến xuất phát được bật ở CT5b.
+   - Từ CT5b (2026-11-17) vị trí được **dùng**. Máy (job 10 giây, màn Đề xuất) chỉ chọn xe đang đứng ở bến xuất phát và có chuyến kế tiếp đi từ bến tới (`TripService.java:327`). Ô chọn tay (Duyệt, Sửa, Tạo) vẫn mời mọi xe hợp lệ, xe đúng bến lên đầu, xe khác ghi "⚠ đang ở …". Validator không chặn theo vị trí.
    - Trên DB thật, cả 20 xe có bến nhà Miền Đông.
 
 ---

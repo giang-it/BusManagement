@@ -57,7 +57,7 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 | Service — hằng số | `TS:33` `MIN_REST_BETWEEN_TRIPS_MINUTES = 30`; `:39` `BUS_PREP_BUFFER_HOURS = 1` | Đệm 30 phút cho người, 1 giờ cho xe |
 | Repository | `TR:131-142`, `:150-160`, `:171-179`, `:186-197`; `:393` | 3 câu "có trùng lịch không", 1 câu "chuyến của tài xế trong ngày", 1 câu "xe có chuyến DEPARTED không" |
 | Entity | `…/domain/Bus.java:42-76`; `…/domain/Driver.java:47-61` | `getKmSinceLastMaintenance()`, `needsMaintenance()`, `isNearMaintenance(km)`; `isLicenseValid(LocalDate)` |
-| Lớp "không-mời" | `TS:1483-1685` (dropdown), `:308-332` + `:472-523` (AI), `TripRestController.java:47-86` (API form Tạo) | Lọc trước những gì validator sẽ từ chối |
+| Lớp "không-mời" | `TS:1483-1685` (dropdown), `:308-332` + `:472-523` (AI), `TripRestController.java:47-88` (API form Tạo) | Lọc trước những gì validator sẽ từ chối |
 | Người gọi (throw) | `TS:929-930`, `:1007-1008`, `:1051-1052`, `:1076-1077` | `confirmAutoAssignedTrip`, `approveTrip`, `createManualTrip`, `updateManualTrip` |
 | Người gọi (dry-run) | `…/service/RecommendationService.java:317-333` | Cổng xác nhận cuối của thẻ gợi ý |
 | Test | `test/service/TripServiceValidationDryRunTest.java` (12), `TripServiceSeatCapacityTest` (9), `TripServiceDriverShareTest` (9), `TripServiceAssistantAvailabilityTest` (4), `TripServiceAvailabilityContextTest` (4) | §9.4 |
@@ -493,6 +493,7 @@ mời rồi bị từ chối lúc lưu.
 | Người không trùng lịch ±30' ở mọi vai | `isDriverBusyInWindow` trong mọi bộ lọc | `TS:1311-1314`, `:1335-1338`, `:1362-1365` | Giữ |
 | Tài xế ≤ 8h/ngày | dropdown dùng `driverShareHours()` — phần chia ở **số người tối thiểu** (`TS:1718-1721`); AI chia cho số người nó định gán | `TS:1316-1321`, `:1340-1345` | Giữ — lỗi #12 đã sửa; test quét 9 thời lượng × 6 mức nhân sự |
 | Phụ xe **không** chịu luật 8h | danh sách phụ xe riêng, không lọc giờ (`TS:1549-1565`, `:1675-1685`) | validator không kiểm giờ phụ xe | Giữ — lỗi #13 đã sửa (trước đó mời **hẹp** hơn) |
+| Xe / người đang ở bến xuất phát, và chuyến kế tiếp đi từ bến tới (QĐ-23, CT5b) | AI **lọc cứng** (`TS:327`, `:499`; luật `LocationRule.fits`); dropdown Duyệt/Sửa/Tạo **mời tất cả**, đúng bến xếp đầu (`TS:1504`, `:1535`, `:1563`), người/xe khác kèm "⚠ đang ở …" | **Không có** — cố ý (CM-5 cách B) | Giữ — dropdown mời đúng bằng validator, AI hẹp hơn |
 | Giờ đến bắt buộc, ghế ≥ 1, giá ≥ 0 | chỉ `required`/`min` của HTML | **Không có** ở service | Lỗi #28 (chưa sửa) — §9.3 |
 | Giờ khởi hành không ở quá khứ | — | **Không có** | Sổ lỗi ghi là "cần ruling" (2026-09-24) |
 
@@ -618,6 +619,9 @@ bệnh: "đã quá hạn" khác "sẽ sắp quá hạn".
 | Luật sức chứa ở **validator** | Bán ghế không tồn tại | Một chỗ duy nhất phủ cả 5 lối (tạo, sửa, 2 lối duyệt, dry-run) | lỗi #22 |
 | Không validate trong `updateTripStatus` (FSM) | Trộn hai trách nhiệm; NPE khi chuyến chưa có xe | — | lỗi #10 (Bài 05) |
 | Recommendation xác nhận lại bằng validator dù bộ chọn đã lọc | Thẻ gợi ý cũ vài giờ vẫn hiện "đủ điều kiện" | Cùng khuôn `confirmAutoAssignedTrip()` | roadmap §9 |
+| Vị trí: **cứng cho máy, mềm cho người**, validator không chặn | Máy giao xe đang ở bến khác mà không ai xem lại; còn Admin vẫn điều được xe rỗng có chủ ý | Chặn ở validator thì Admin không điều xe rỗng được, và các chuyến đã có mà lệch chuỗi sẽ thành không sửa được | CM-5 cách B, QĐ-23 (2026-11-17) |
+| Luật vị trí xét **hai phía**: đứng ở bến đi, và chuyến kế tiếp đã nhận đi từ bến tới | Màn Đề xuất (xếp thẻ theo lãi, không theo giờ) giao một xe cả Đà Lạt 06:00 lẫn Đà Lạt 18:00 cùng ngày | Chỉ xét phía trước là đủ khi chuyến được xếp theo giờ; Đề xuất và Admin thì không | `verify` CT5b trên DB thật; test `twoCardsOutOfTimeOrder…` |
+| Vị trí của người: hỏi **riêng từng vai** rồi lấy chuyến muộn nhất | Một câu `driver = ? OR assistant = ? OR ? MEMBER OF coDrivers` quét cả bảng `trips`: 0,46 s một lần, API form Tạo hơn 2 phút | Gộp `OR` ngắn hơn nhưng MySQL bỏ mọi index | đo trên DB thật 2026-11-17 |
 
 ### 9.2. Bug thật đã từng xảy ra ở chức năng này
 
@@ -710,6 +714,7 @@ màn Duyệt đánh ★ cho xe mà #22 chắc chắn từ chối, vì số ghế
 | `TripServiceDriverShareTest` (9 test, JUnit thuần) | Bảng phần chia §8.1; biên 8h vẫn 1 người; tuyến 9h lệch 3,5h (21 → 25 người); bất biến một chiều; phần chia ≤ 8h |
 | `TripServiceAssistantAvailabilityTest` (4 test) | Người trượt luật 8h vắng ở danh sách tài xế nhưng có ở danh sách phụ xe; phụ xe vẫn bị loại khi khoá / hết bằng / trùng lịch; validator nhận đúng người đó |
 | `TripServiceAvailabilityContextTest` (4 test) | Nhánh nạp sẵn (Phase 7) cho **cùng** kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày; và (GĐ6) một chuyến giữ chỗ được chính các luật đó nhìn thấy, chỉ trong bộ nhớ |
+| `TripServiceLocationTest` (14 test) và `LocationRuleTest` (8 test) | Vị trí (CT5b): máy chỉ chọn xe/người đúng bến; hai phía của luật; thẻ xét ngược giờ không giao một xe hai lần; nhánh nạp sẵn = nhánh SQL; mọi vai trên xe; dropdown mời đủ, đúng bến lên đầu, có ghi chú; validator không chặn |
 
 **Chưa có test tự động** cho: luật đủ `ceil(h/8)` tài xế và luật trùng vai (grep `src/test` không thấy
 "yêu cầu ít nhất" hay "Nhân sự trùng lặp"), luật 8h **qua validator** cho tài xế chính và tài xế phụ
