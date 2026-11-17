@@ -93,7 +93,7 @@
   - tăng trưởng, trôi ngẫu nhiên, nhảy bậc;
   - mùa;
   - lễ theo chiều;
-  - bão và huỷ chuyến;
+  - bão và huỷ chuyến — **vẫn 6% và vẫn rút theo từng chiều, kể cả khi xe chạy vòng** (CM-16, chốt 2026-11-17). Hệ quả đo ở CT3: khung chiều về không có xe khi chuyến chiều đi đưa xe lên bị hủy, và xe về rỗng khi chuyến thường ở bến xa bị hủy;
   - nhiễu nhị thức âm;
   - vé bị chặn bởi số ghế.
 
@@ -122,6 +122,13 @@
   - **Lý do:** lịch sử là "nhà xe trong quá khứ", chưa có luật giữ–về. Chính lịch sử "về ngay" này là **mốc để so** với QĐ-25 ở CT9 (số lượt chạy rỗng, số xe, tiền lãi).
   - **Không chọn H2** (áp luật giữ–về vào lịch sử): vòng lặp, vì luật cần dự báo mà dự báo học từ lịch sử; và làm mất mốc so sánh.
   - **Không chọn H3** (xe "bay" về như bộ sinh cũ): trái (c) và QĐ-23.
+- **Cách hiểu khi cài ở CT3 (2026-11-17), chủ dự án chưa duyệt từng điểm:**
+  - Chọn xe, tài xế cho chuyến thường: ở đúng bến, đủ nghỉ, đúng loại xe trước, **ai chờ lâu nhất đi trước**.
+  - "Xe rảnh" cho chuyến tăng cường = xe đang đứng ở **bến nhà** của nó, chưa có lượt. Xe của lịch thường lệ đang ở bến xa không bị lấy đi, vì lấy đi thì chuyến thường kế tiếp ở đó thiếu xe.
+  - Xe gửi lên trước đi cùng chuyến chiều đi **muộn nhất còn kịp**; mỗi khung tối đa 3 chuyến thêm (phút 30/40/50).
+  - **Chuyến thường ở bến xa bị hủy thì xe và tài xế cũng về ngay**, như xe tăng cường. Lên n xe mà chỉ về n − 1 thì một xe phải về rỗng. Không có luật này, đội xe trôi dần ra bến xa (test đo được).
+  - Chuyến có sẵn của chủ dự án giữ xe và người cả ngày (#33), nhưng **không đổi vị trí** của ai: 19 chuyến đó là chuyến thử tay, và tự chúng không nối nhau.
+  - Chạy bổ sung đọc vị trí từ DB. Chỉ lượt tăng cường vắt qua ranh giới có thể lệch so với chạy liền.
 
 ### QĐ-22. Mức làm M2, thước đo "tối ưu", lãi cả vòng (chốt 2026-11-16)
 
@@ -248,6 +255,7 @@
 | CM-13 | **ĐÃ CHỐT 2026-11-16: có (đã làm ở CT2).** Seed vốn đã có Ghế ngồi 50; chỉ đổi loại xe 2 tuyến, thêm bến Vũng Tàu và 4 tuyến chiều ngược; giữ 6 tuyến cũ. Dữ liệu mẫu (`DataInitializer`) có đổi theo DB thật không? | Có: thêm bến Vũng Tàu, loại Ghế ngồi 50, 3 cặp Sài Gòn với loại xe theo QĐ-20 | CT2 |
 | CM-14 | Chuyến thường lệ tương lai: tạo bằng nút hay bằng job đêm? Trạng thái gì? | Nút cho Admin ở CT6, nối vào job đêm ở CT8. Trạng thái `ACTIVE` (vì lịch thường lệ đã được chủ dự án chốt), vẫn đi qua cổng validate | CT6 |
 | CM-15 | Chuyến tự tạo khởi hành đúng giờ khung hay +30 phút? | Đúng giờ khung, như thẻ Đề xuất | CT8 |
+| CM-16 | **ĐÃ CHỐT 2026-11-17: giữ 6% (ghi ở QĐ-21).** Bão và 6% hủy ngẫu nhiên vẫn rút theo **từng chiều** (giữ từ QĐ-10). Với xe chạy vòng, tổng duyệt CT3 cho thấy 791 khung chiều về không có xe (chuyến chiều đi đưa xe lên đã bị hủy) và 736 lượt về rỗng (chuyến thường ở bến xa bị hủy). Giữ nguyên hay đổi? | **Giữ 6%**, như QĐ-21 đã chốt ("giữ bão và huỷ chuyến"). Bộ dự báo chỉ đọc chuyến COMPLETED, nên khung thiếu xe cũng như khung bị hủy. Có thể cân nhắc cho **bão đóng cả cặp** (cùng một con đường), nhưng phần do bão rất nhỏ so với 6% hủy | Trước CT4 |
 
 ---
 
@@ -289,3 +297,7 @@
   - CT5a đã cài: cột bến nhà trên xe và tài xế (bắt buộc ở form và service); luật `domain/LocationRule`, chưa bật vào việc chọn xe.
   - DB thật: cả 20 xe và 36 tài xế có bến nhà Miền Đông.
   - Không có quyết định mới ngoài hai mục trên.
+- **2026-11-17 (CT3):** cài QĐ-21 (a)–(d), tổng duyệt trên bản sao.
+  - Ghi "cách hiểu khi cài" vào QĐ-21.
+  - Mở **CM-16**: bão và hủy vẫn theo từng chiều trong lịch sử vòng xe.
+- **2026-11-17 (CT3, sau):** chủ dự án chốt *"chốt CM-16 giữ 6%"*. Bão và hủy giữ nguyên như QĐ-10, ghi vào QĐ-21. Code không đổi. Sau báo cáo CT3, chủ dự án bảo *"kiểm tra lại rồi commit và push"*, nên code được commit cùng các "cách hiểu khi cài" như đã ghi ở QĐ-21.

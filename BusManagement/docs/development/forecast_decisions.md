@@ -279,6 +279,13 @@ Thứ tự thực hiện (mục 3) đi kèm các quyết định này.
 
 ### QĐ-10. Bộ sinh dữ liệu mới (chốt 2026-10-21 khi thảo luận GĐ2, G2-1…G2-6; đóng M-7, M-8, M-13)
 
+> **Thay một phần bởi QĐ-21** (`route_pairs_decisions.md`; cài ở CT3 ngày 2026-11-17, chưa chạy trên DB thật):
+> - bộ sinh nhận danh sách tuyến `backfill.route-ids` (3 cặp quanh Miền Đông), không còn lấy mọi tuyến ≤ 8h;
+> - hai chiều của một cặp chung mức tuyến, độ trôi, nhảy bậc, độ lớn lễ; khách dư đợt về = r × đợt đi;
+> - **bỏ bất biến "mỗi xe, mỗi tài xế tối đa 1 chuyến/ngày"**: xe và tài xế chạy vòng, có vị trí, nghỉ ≥ 1 giờ / 30 phút, tài xế ≤ 8 giờ mỗi ngày lịch; chuyến tăng cường "về ngay".
+>
+> Phần còn lại dưới đây (khoảng thời gian, xe chuẩn, hình dạng, bão, hủy 6%, nhu cầu thật) vẫn giữ.
+
 Chủ dự án duyệt toàn bộ đề xuất GĐ2: *"oke. tôi duyệt tất cả"*.
 
 - **Khoảng thời gian (G2-1).** Từ **01/01/2023** tới hôm qua, tức có 4 lần Tết (2023–2026).
@@ -563,3 +570,4 @@ Các nguyên tắc kiến trúc ở roadmap §3 vẫn giữ nguyên:
 | 2026-10-23 (GĐ6) | Thảo luận GĐ6 (mở 2026-10-22), giải thích lại từng điểm kèm ví dụ và ưu nhược; chủ dự án duyệt G6-1…G6-7: thêm QĐ-17 và dòng của nó ở mục 1; đóng M-14. QĐ-16: ghi cầu nối G5-1 đã bỏ. QĐ-17: thêm "Đã cài" kèm số đo |
 | 2026-10-23 (GĐ7) | Không có quyết định mới. Ghi chú thêm vào M-12 và M-16; phụ lục so với LightGBM và Prophet ở `forecast_discussion.md` §17 (QĐ-6: chỉ bằng Python, ngoài app) |
 | 2026-11-16 | Đợt mới "cặp tuyến và điều độ theo dự báo" ghi quyết định ở `route_pairs_decisions.md` (QĐ-18…QĐ-27, số nối tiếp file này). QĐ-16 G5-6: phần mẫu số thay bằng QĐ-18, đã cài ở CT1 |
+| 2026-11-17 (CT3) | QĐ-10: thêm ghi chú đầu mục — phần bị QĐ-21 thay (danh sách tuyến, chung mức theo cặp, bỏ "1 chuyến/ngày" vì xe chạy vòng). Không có quyết định mới |

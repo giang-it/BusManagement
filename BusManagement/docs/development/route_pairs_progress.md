@@ -7,7 +7,7 @@
 > - thêm một dòng vào mục 5 (nhật ký).
 >
 > Tài liệu liên quan:
-> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-15).
+> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-16).
 > - Đợt trước (dự báo): [`forecast_progress.md`](forecast_progress.md), [`forecast_decisions.md`](forecast_decisions.md).
 > - `THESIS_ROADMAP.md` vẫn là tracker chung của cả dự án. §7 trỏ về file này, §8 ghi một mục ngắn cho mỗi phiên.
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 1. Trạng thái hiện tại (cập nhật 2026-11-16)
+## 1. Trạng thái hiện tại (cập nhật 2026-11-17)
 
 - **Mục tiêu của đợt** (theo ý thầy hướng dẫn):
   - màn dự báo gọn lại, chỉ còn 3 cặp tuyến hai chiều quanh Bến xe Miền Đông;
@@ -57,7 +57,18 @@
   Chi tiết ở mục 4.
 - **CT5a đã commit và push:** `4c3ce51` (code + test), `d39c17e` (bài học), và commit `docs:` ngay sau đó.
   - Trước khi commit đã kiểm lại một lượt trên app thật: 16 trang trả 200; việc chọn xe giống hệt mốc; danh sách và form đúng; log sạch.
-- **Việc tiếp theo:** CT3 (bộ sinh mới, chạy trên bản sao). CM-2 và CM-3 đã chốt.
+- **CT3 xong trên bản sao ngày 2026-11-17, đã commit và push** (chủ dự án: *"hãy làm CT03 đi"*, rồi *"chốt CM-16 giữ 6%, kiểm tra lại rồi commit và push"*):
+  - bộ sinh mới: danh sách tuyến `backfill.route-ids`, chung mức theo cặp, khách về = r × khách đi, xe và tài xế chạy vòng, xe tăng cường "về ngay", gửi xe lên trước cho đợt về;
+  - tổng duyệt trên bản sao `busmanagement_ct3`: PART A → B → bộ sinh → C, mọi cột vi phạm = 0; DB thật giống hệt trước và sau;
+  - màn Dự báo trên bản sao: 18 chuỗi; tự chấm 16,5% (SN4 17,9%);
+  - test 243/243.
+
+  Chi tiết và số đo ở mục 4, CT3.
+  - CM-16 chốt: giữ 6% hủy và bão theo từng chiều.
+  - Kiểm lại trước khi commit: test 243/243; PART C chạy lại trên bản sao vẫn 0 vi phạm; `verify` trên app thật (profile mặc định): 16 trang trả 200, log sạch, bộ sinh không chạy, DB thật giống hệt.
+  - Commit `7cb8fb4` (code + test), `9bb463f` (bài học), và commit `docs:` ngay sau đó; đã push.
+- **CT3 mới chỉ sinh dữ liệu trên bản sao.** DB thật vẫn giữ lịch sử GĐ3.
+- **Việc tiếp theo:** CT4, áp bộ sinh mới vào DB thật: sao lưu → PART A → PART B → bộ sinh → PART C. Chỉ làm khi chủ dự án xác nhận lần cuối.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -81,7 +92,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT1 | Công thức số chuyến: max(2, ⌈nhu cầu ÷ ghế⌉) | QĐ-18 | CT0 (CM-1) | không | ĐÃ COMMIT `963aa71`, `ed38ce6`, đã push | 2026-11-16 → 17 |
 | CT2 | Cấu hình tuyến và loại xe; dữ liệu mẫu | QĐ-19, QĐ-20 | CT0 | **có** (loại xe tuyến 10, 11) | ĐÃ COMMIT `bbedfd8`, `ed38ce6`, đã push | 2026-11-16 → 17 |
 | CT5a | Định nghĩa vị trí (luật dùng chung cho bộ sinh và app), bến nhà xe và tài xế; **chưa bật** vào việc chọn xe | QĐ-23 | CT2 | **có** (bến nhà) | ĐÃ COMMIT `4c3ce51`, `d39c17e` + commit `docs:` sau đó, đã push | 2026-11-17 |
-| CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | CHƯA BẮT ĐẦU | |
+| CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | XONG trên bản sao; ĐÃ COMMIT `7cb8fb4`, `9bb463f` + commit `docs:` sau đó, đã push | 2026-11-17 |
 | CT4 | Thay lịch sử trên DB thật | QĐ-21 | CT3 đã commit | **có** | CHƯA BẮT ĐẦU | |
 | CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | CHƯA BẮT ĐẦU | |
 | CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | CHƯA BẮT ĐẦU | |
@@ -338,36 +349,51 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Cần trước:** CT2, CT5a. **Đã chốt 2026-11-17:** CM-2 (H1 "về ngay", QĐ-21 (d)), CM-3 (tâm 100%, QĐ-21 (b)). Bến nhà và luật vị trí lấy từ CT5a.
 
-- [ ] **Danh sách tuyến:** thêm thuộc tính kiểu `backfill.route-ids` thay cho việc lọc ≤ 480 phút ở `eligibleRoutes()`. Vẫn từ chối tuyến > 8 giờ.
-- [ ] **`HistorySimulation`, chung mức theo cặp:** các luồng `LEVEL`, `WALK`, `JUMP`, `JITTER` rút theo khoá cặp. Hình dạng theo chiều (`WEEK`, `addTet`, `addSmallHoliday`) giữ riêng.
-- [ ] **Khách về sau lễ:** chuẩn hoá đợt về sao cho tổng phần tăng thêm = tổng phần tăng thêm đợt đi × r, với r đều trong [0,85; 1,15]. Dùng **luồng ngẫu nhiên mới**, để không xê dịch số của các luồng cũ.
-- [ ] **`HistoricalDataBackfill.planDay`, xe chạy vòng:**
-  - theo dõi vị trí và giờ rảnh của từng xe, từng tài xế;
-  - xếp chuyến theo giờ đi;
-  - chọn xe đang ở đúng bến, đã nghỉ ≥ 1 giờ, ưu tiên đúng loại;
-  - chọn tài xế ở đúng bến, đã nghỉ ≥ 30 phút, lái ≤ 8 giờ trong ngày lịch;
-  - khung thiếu xe vẫn bỏ trống và được đếm;
-  - chuyến tăng cường lấy từ xe rảnh tại bến;
-  - xe tăng cường "về ngay" theo QĐ-21 (d): đi cùng chuyến thường lệ chiều về sớm nhất mà xe và tài xế kịp, chở khách tràn của khung đó (thường 0 vé). Cần xe ở bến xa thì gửi xe từ bến nhà lên trước theo cách tương tự;
-  - ngày đầu lịch sử, mọi xe và tài xế ở **bến nhà đọc từ DB** (CT5a);
-  - mọi phép "xe hay tài xế đang ở đâu, chạy tiếp được chưa" gọi **luật vị trí của CT5a**, không viết lại.
-- [ ] **Chuyến có sẵn của chủ dự án** (#33): vẫn giữ xe và người của chuyến đó trong ngày nó chạy. Chốt cách cập nhật vị trí sau các chuyến ấy (chúng nằm trên tuyến ngoài phạm vi).
-- [ ] Viết lại chú thích đầu hai lớp cho đúng bất biến mới.
-- [ ] **Test:**
-  - `HistorySimulationTest`: chung mức theo cặp, r trong khoảng, tính tất định;
-  - `HistoricalDataBackfillPlanTest`: vị trí liên tục, ≤ 8 giờ/ngày, nghỉ ≥ 1 giờ / 30 phút, không trùng lịch;
-  - `HistoricalDataBackfillGenerateTest`.
-- [ ] **Script** (thư mục mới `docs/development/route_pairs_research/`):
-  - PART A: đếm dữ liệu sắp xoá;
-  - PART B: xoá lịch sử bộ sinh GĐ3. Xoá chuyến tăng cường trước, vì chúng tham chiếu `original_trip_id`. Trừ km khỏi **cả** `odometer` lẫn `last_maintenance_odometer`, như QĐ-14;
-  - PART C: kiểm các bất biến mới, kể cả vị trí liên tục.
-- [ ] **Tổng duyệt trên bản sao:** làm mới `busmanagement_gd2` (hoặc tạo bản sao mới) từ một bản sao lưu mới, rồi chạy A → B → bộ sinh → C. Xuất file nhu cầu thật.
-- [ ] **Đo trên bản sao:**
-  - tự chấm của màn Dự báo (mốc hiện tại 16,06%);
-  - số khung nóng, tỉ lệ khung bán hết, số khung thiếu xe, số chuyến tăng cường;
-  - màn Dự báo chỉ còn 18 chuỗi (6 tuyến × 3 giờ).
-- [ ] `mvnw test`.
-- [ ] Tài liệu: ghi chú ở `forecast_decisions.md` QĐ-10 (phần bị thay), README của thư mục script mới.
+- [x] **Danh sách tuyến** (2026-11-17): thuộc tính `backfill.route-ids`, mặc định `2,12,5,13,10,11`, thay cho việc lọc ≤ 480 phút. Bộ sinh DỪNG nếu một tuyến không có trong DB, dài quá 8 giờ, thiếu bến, hoặc không khớp **đúng một** chiều ngược trong danh sách (theo đề xuất CM-6).
+- [x] **`HistorySimulation`, chung mức theo cặp:** `LEVEL`, `WALK`, `JUMP`, `JITTER` rút theo khoá cặp (`RouteProfile.pairKey()` = id nhỏ hơn của hai chiều). Mùa, thứ, hình dạng lễ, bão, hủy, nhiễu, ý định tăng cường vẫn theo từng chiều.
+- [x] **Khách về sau lễ:** với mỗi (cặp, dịp lễ, năm), biên độ đợt về được giải bằng chia đôi khoảng sao cho tổng khách dư đợt về = r × tổng khách dư đợt đi; r đều trong [0,85; 1,15], luồng mới `RETURN = 11`. Mô phỏng chạy tới hết năm sau (`horizonEnd`) để luôn thấy trọn một đợt lễ, nên chạy bổ sung ra đúng cùng con số.
+- [x] **Xe chạy vòng** — lớp mới `HistoricalDataBackfill.Dispatcher`, giữ trạng thái qua các ngày:
+  - xếp theo giờ đi; cùng giờ thì xáo theo ngày như cũ;
+  - chuyến thường: xe ở đúng bến, nghỉ ≥ 1 giờ, đúng loại trước, **chờ lâu nhất đi trước**; tài xế ở đúng bến, nghỉ ≥ 30 phút, lái ≤ 8 giờ trong **mỗi ngày lịch** (chuyến qua đêm tách tại 00:00, `minutesByDay`);
+  - khung không có xe hay tài xế hợp lệ thì bỏ trống và được đếm;
+  - xe rảnh cho chuyến thêm = xe **đang ở bến nhà**, chưa có lượt; xe lớn nhất trước. Xe của lịch thường lệ đang ở bến xa không bị lấy đi;
+  - "về ngay" (QĐ-21 (d)): xe tăng cường về ở chuyến chiều về sớm nhất mà xe và tài xế kịp; không tìm được lượt về (3 ngày) thì không chạy chuyến thêm đó;
+  - gửi xe lên trước: nhu cầu thêm xe ở chiều về (hôm nay và ngày mai) được chia cho chuyến chiều đi **muộn nhất còn kịp**, mỗi khung tối đa 3 chuyến thêm;
+  - **thêm so với kế hoạch:** chuyến thường ở bến xa bị hủy thì xe và tài xế đứng yên rồi cũng về ngay. Thiếu luật này thì mỗi lần hủy để dư một xe ở bến xa và đội xe trôi dần ra bến xa (test `busesParkedAtFarEnds_doNotDriftOverTheYears` bắt được);
+  - ngày đầu: mọi người ở bến nhà đọc từ DB; mọi phép "đang ở đâu, chạy tiếp được chưa" gọi `LocationRule.canDepart`.
+- [x] **Chuyến có sẵn của chủ dự án** (#33): vẫn giữ xe và người trong mọi ngày chúng chạm tới. **Cách hiểu khi cài (chưa chốt):** chúng nằm ngoài vòng xe của bộ sinh, chỉ chặn, không đổi vị trí của ai. Lý do: 19 chuyến này là chuyến thử tay, tự chúng đã không nối nhau (ví dụ xe 2 chạy Miền Đông → Đà Lạt ngày 16/7 rồi Mỹ Đình → Niệm Nghĩa ngày 19/7).
+- [x] **Chạy bổ sung:** chỉ nối tiếp; ngày đã sinh phải liền một mạch từ EPOCH, không thì DỪNG. `Dispatcher.resume` đọc lượt cuối của từng xe, tài xế và giờ lái vắt qua ngày đầu từ chính các chuyến đã ghi. Chỗ có thể lệch so với chạy liền: lượt tăng cường vắt qua ranh giới (xe ở bến xa về ở chuyến sớm nhất).
+- [x] Viết lại chú thích đầu `HistoricalDataBackfill` và thêm mục "cặp tuyến" vào chú thích đầu `HistorySimulation`.
+- [x] **Test:**
+  - `HistorySimulationTest` 10 (thêm 3): tất định cho cặp, chung mức theo cặp, r = tỉ lệ khách dư về/đi và tâm 100%;
+  - `HistoricalDataBackfillPlanTest` 14, viết lại trên 3 cặp và đội xe như DB thật, 1.389 ngày: vị trí liên tục và nghỉ đủ cho xe và tài xế, ≤ 8 giờ/ngày lịch, bằng lái, vé ≤ ghế, khung chiều đi không thiếu xe, chiều về chỉ thiếu khi chuyến đưa xe lên bị hủy, xe tăng cường về ngay, đợt về có xe gửi lên trước, số xe ở bến xa không trôi, #33;
+  - `HistoricalDataBackfillGenerateTest` 11 (thêm 4): vòng xe trên DB test, chạy bổ sung nối tiếp, từ chối ngày đứt quãng, tuyến thiếu chiều ngược, tuyến có hai chiều ngược, xe thiếu bến nhà.
+- [x] **Script** trong `docs/development/route_pairs_research/` (README có cách chạy): PART A `ct3_check_old_history.sql`, PART B `ct3_delete_old_history.sql`, PART C `ct3_check_new_history.sql`.
+- [x] **Tổng duyệt trên bản sao** `busmanagement_ct3` (tạo mới từ dump DB thật sáng 2026-11-17; `busmanagement_gd2` để yên vì G3-7):
+  - bản sao giống hệt DB thật (số dòng, MD5 `trips`, `buses`, `drivers`, `routes`);
+  - PART A đúng số kỳ vọng: 21.192 chuyến GĐ3 (342 thêm), không gì trỏ vào, 3.252.020 km cần trừ;
+  - PART B: lần đầu dừng ở lỗi MySQL 1137 (bảng tạm đọc hai lần trong một câu) **trước mọi lệnh ghi**; sửa script rồi chạy lại: còn 19 chuyến, odometer 3.270.405 → 18.385, km từ lần bảo dưỡng 18.355 trước và sau;
+  - bộ sinh (JVM thứ hai cổng 8098, 10 kết nối, tất cả vào `busmanagement_ct3`): 1.416 ngày, 26.670 chuyến, file nhu cầu thật 25.488 khung;
+  - PART C: **mọi cột vi phạm = 0**;
+  - DB thật giống hệt trước và sau.
+- [x] **Số đo trên bản sao** (GĐ3 trên DB thật để so, trong ngoặc):
+  - tự chấm màn Dự báo 8 tuần: **16,5%**, SN4 sạch 17,9% (16,06% / 17,54%). Tết 2026: 17,8%, SN4 39,6% (19,83% / 35,92%);
+  - màn Dự báo **18 chuỗi** (6 tuyến × 3 giờ), bỏ qua 4 nhóm thiếu dữ liệu (tuyến chỉ còn chuyến tay của chủ dự án); 25 ô cần tăng cường trong 7 ngày tới;
+  - khung bán hết: 14,5% (20,9%);
+  - khung thiếu xe: 791, **toàn bộ ở chiều về** (tuyến 5: 244, 11: 269, 12: 278) — chuyến chiều đi đưa xe lên đã bị hủy. Bộ dự báo chỉ đọc chuyến COMPLETED nên khung này cũng như khung bị hủy;
+  - chuyến tăng cường: 1.973 (342), trong đó 1.429 chuyến 0 vé. Chia ra: lượt đi của chuyến thêm 612 (369 không vé), lượt về của chuyến thêm 612 (427), về vì chuyến thường ở bến xa bị hủy 736 (623), khác 13;
+  - tổng nhu cầu hai chiều mỗi cặp lệch nhau dưới 1,1% (Vũng Tàu 55.713 / 56.243; Đà Lạt 136.670 / 138.447; Cần Thơ 166.163 / 167.999);
+  - tài xế: 5.426 ngày-người chạy từ 2 chuyến trở lên; nhiều nhất 440 phút một ngày;
+  - cuối lịch sử: 16 xe ở Miền Đông, 3 ở Đà Lạt, 1 ở Cần Thơ.
+- [x] `mvnw test` 243/243.
+- [x] **CM-16 chốt 2026-11-17: giữ 6%** (bão và hủy vẫn theo từng chiều). Ghi ở QĐ-21.
+- [x] **Kiểm lại trước khi commit:**
+  - test 243/243;
+  - PART C chạy lại trên bản sao: 18/18 cột vi phạm = 0;
+  - `verify` trên app thật (profile mặc định, PID 19752): 16 trang trả 200, log sạch, 0 dòng `[Backfill]`; màn Dự báo vẫn là dữ liệu GĐ3 (15 chuỗi, tới 21/10/2026, tự chấm 16,1%);
+  - DB thật giống hệt ảnh chụp đầu CT3.
+- [x] **Commit** (không trailer Co-Authored-By): `7cb8fb4` (`feat(backfill):` code + test), `9bb463f` (`docs(study):` bài học), rồi commit `docs:`. Đã push.
+- [x] Tài liệu: ghi chú QĐ-10 ở `forecast_decisions.md`, README thư mục script, `setup_guide.md` §4.3, spec, tóm tắt chức năng, roadmap, bài học trỏ lại dòng.
 
 **Xong khi:** bản sao có lịch sử mới, PART C báo 0 vi phạm, các số đo được ghi lại, test xanh. Code commit khi chủ dự án bảo, vì CT4 cần code đã commit.
 
@@ -511,6 +537,8 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-17 | `d7e11adb` | *"oke, hãy commit và push đi"* | `verify` lại trước khi commit (11 trang 200). Commit `963aa71` (CT1), `bbedfd8` (CT2), `ed38ce6` (bài học), rồi commit `docs:`; push lên `origin/temp` |
 | 2026-11-17 (sau) | `d7e11adb` | Giải thích CM-2, CM-3. Chủ dự án hỏi *"sao k thêm vị trí rồi làm bộ sinh"*; đo trên DB thật: 11/20 xe sẽ "kẹt" ở bến ngoài 3 cặp | Chốt CM-2, CM-3; tách CT5 thành CT5a / CT5b. Chỉ sửa tài liệu, chưa commit |
 | 2026-11-17 (CT5a) | `d7e11adb` | *"chốt CM-5 cách B, CM-12 cách (a). xong thì hãy kiểm tra lại 1 lần nữa, ổn và ok thì commit và push"* | CT5a: luật vị trí, bến nhà (code, form, danh sách), test (thử làm hỏng ok), sao lưu + đặt bến nhà trên DB thật, `verify` chỉ đọc (chọn xe giống hệt) và có ghi (bản sao), tài liệu + trỏ lại 78 trích dẫn. Kiểm lại lần cuối (test 230/230, 16 trang 200, chọn xe giống hệt), rồi commit `4c3ce51`, `d39c17e`, commit `docs:` và push |
+| 2026-11-17 (CT3) | `d7e11adb` | *"hãy làm CT03 đi"* | CT3: mô phỏng theo cặp + r; bộ xếp xe chạy vòng (`Dispatcher`); test 243/243; script PART A/B/C; tổng duyệt trên bản sao `busmanagement_ct3` (PART C 0 vi phạm, DB thật không đổi); số đo ghi ở CT3 |
+| 2026-11-17 (CT3, sau) | `d7e11adb` | *"cái này mới là sinh dữ liệu trên bản sau, CT04 mới áp dụng vô dữ liệu thật dk. chốt CM-16 giữ 6%, kiểm tra lại rồi commit và push"* | Xác nhận: CT3 chỉ chạy trên bản sao, CT4 mới áp vào DB thật. Chốt CM-16 (giữ 6%). Kiểm lại: test 243/243, PART C 0 vi phạm, `verify` 16 trang 200, DB thật giống hệt. Commit `7cb8fb4`, `9bb463f`, commit `docs:` và push |
 
 ---
 
