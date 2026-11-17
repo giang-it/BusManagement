@@ -773,7 +773,7 @@ viết số có dấu gạch dưới cho dễ đọc (Java 7+), bằng `10000`. 
   [CODE] `…/config/DataInitializer.java:26-29`: `@Component @Profile("demo") ... implements
   CommandLineRunner`. **`CommandLineRunner`** = "chạy method `run()` một lần ngay sau khi ứng dụng
   khởi động xong" [SPRING]. `DataInitializer.run()` gọi `deleteAll()` mọi bảng rồi nạp dữ liệu mẫu.
-  Tương tự `HistoricalDataBackfill` (`:114-118`) với `@Profile("backfill")` sinh dữ liệu lịch sử
+  Tương tự `HistoricalDataBackfill` (`:150-154`) với `@Profile("backfill")` sinh dữ liệu lịch sử
   mô phỏng từ 01/01/2023 tới hôm qua.
 
 | Cách chạy | Profile | Hệ quả |

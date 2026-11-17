@@ -1082,7 +1082,7 @@ ghi đè <code>ddl-auto=create-drop</code> (<code>:19</code>) — <strong>xóa v
 <li><strong><code>@Profile(&quot;demo&quot;)</code></strong> trên một bean = bean đó chỉ tồn tại khi profile <code>demo</code> được bật.
 <span class="tag tag-code">CODE</span> <code>…/config/DataInitializer.java:26-29</code>: <code>@Component @Profile(&quot;demo&quot;) ... implements CommandLineRunner</code>. <strong><code>CommandLineRunner</code></strong> = &quot;chạy method <code>run()</code> một lần ngay sau khi ứng dụng
 khởi động xong&quot; <span class="tag tag-spring">SPRING</span>. <code>DataInitializer.run()</code> gọi <code>deleteAll()</code> mọi bảng rồi nạp dữ liệu mẫu.
-Tương tự <code>HistoricalDataBackfill</code> (<code>:114-118</code>) với <code>@Profile(&quot;backfill&quot;)</code> sinh dữ liệu lịch sử
+Tương tự <code>HistoricalDataBackfill</code> (<code>:150-154</code>) với <code>@Profile(&quot;backfill&quot;)</code> sinh dữ liệu lịch sử
 mô phỏng từ 01/01/2023 tới hôm qua.</li>
 </ul>
 <div class="table-wrap"><table><thead><tr>

@@ -673,7 +673,7 @@ hết hạn là sự kiện thật phải ghi được. Nếu làm, hình dạng
   - Giờ lái trong ngày: `totalDrivingHours24h` cộng vào khi xét **hôm nay** (`TripService.java:827-831`).
   - Gợi ý tài xế (Bài 15): `DriverRecommendationService.java:85-93`.
   - Dashboard (Bài 12): `DashboardService.java:239`, `DriverRepository.java:20-34`.
-  - Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (`HistoricalDataBackfill.java:217`).
+  - Lịch sử mô phỏng (Bài 13): backfill chỉ dùng tài xế đang hoạt động (`HistoricalDataBackfill.java:289`).
 - **Màn này bị ảnh hưởng bởi:** chuyến (quyết định có khoá / xoá được không); sự cố (Bài 11 — chặn xoá).
 
 ---

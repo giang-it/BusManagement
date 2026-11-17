@@ -541,7 +541,7 @@ mới**, không phải sửa lỗi.
 - **Sinh ra ở `PENDING_APPROVAL`** — job `@Scheduled(fixedRate = 10_000)` `TS:76-78` →
   `createExtraTrip()` đặt `PENDING_APPROVAL` (`TS:166`). Đây cũng là giá trị mặc định của field
   (`Trip.java:84`).
-- **Dữ liệu seed và lịch sử** — `DataInitializer:349` (profile `demo`) và `HistoricalDataBackfill:593`
+- **Dữ liệu seed và lịch sử** — `DataInitializer:349` (profile `demo`) và `HistoricalDataBackfill:1345`
   (profile `backfill`) gọi `setStatus()` thẳng. Cố ý: dựng dữ liệu không đi qua service (roadmap §5
   Phase 5, "DataInitializer sets the precedent that seeding bypasses services"). Backfill tự cộng
   odometer cho chuyến `COMPLETED` nó tạo ra, **đúng như FSM** — nhưng cộng vào **cả hai** cột (§8.3).
@@ -640,7 +640,7 @@ Trước chuyến, `kmSinceLastMaintenance = 4200`. Tuyến 120 km.
 | Ai cộng | `odometer` | `lastMaintenanceOdometer` | kmSince | Ý nghĩa |
 |---|---|---|---|---|
 | FSM (`TS:688`) | 10 120 | 6000 | **4120** | Chuyến **mới** chạy thật ⇒ tiến gần tới bảo trì |
-| Backfill (`HistoricalDataBackfill:631-632`) | 10 120 | 6120 | **4000** | Chuyến **quá khứ** mô phỏng ⇒ không được làm xe "đến hạn bảo trì" giả |
+| Backfill (`HistoricalDataBackfill:1383-1384`) | 10 120 | 6120 | **4000** | Chuyến **quá khứ** mô phỏng ⇒ không được làm xe "đến hạn bảo trì" giả |
 
 Roadmap §8 (2026-07-20, "Odometer sync") giải thích: dời **cả hai** cột cùng một lượng thì kmSince
 không đổi *"by arithmetic, not by luck"* — lịch sử mô phỏng làm tăng tổng km (cho màn Đề Xuất Thay Xe)

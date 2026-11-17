@@ -703,7 +703,7 @@ thống tự gợi ý dựa trên quãng đường"* trong khi thân hàm luôn 
 6. **Không giới hạn trên cho phút**, mà phút quyết định số tài xế bắt buộc (§8.3). `current_bugs_found.md`
    (mục #12) ghi *"ngòi nổ nằm trong tay Admin"*: thêm một tuyến 9 giờ là đủ làm lệch
    dropdown tài xế với validator. Lịch sử mô phỏng chỉ dùng tuyến ≤ 8 giờ
-   (`HistoricalDataBackfill.java:137`, `:498-499`).
+   (`HistoricalDataBackfill.java:180`, `:1196-1197`).
 7. **Chuyến đã xoá mềm không chặn được việc xoá tuyến.** `existsByRouteId` đi qua `@SQLRestriction`
    nên không thấy chuyến `is_deleted = true`. Sổ lỗi đã xét và **RÚT** mục này (bán kính đo được = 0,
    cùng loại ghi chú soft-delete mà roadmap §9 chấp nhận) — nói được khi bị hỏi, không trình bày như

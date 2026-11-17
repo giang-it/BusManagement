@@ -1203,7 +1203,7 @@ có trạng thái nguồn để kiểm.</li>
 <li><strong>Sinh ra ở <code>PENDING_APPROVAL</code></strong> — job <code>@Scheduled(fixedRate = 10_000)</code> <code>TS:76-78</code> →
 <code>createExtraTrip()</code> đặt <code>PENDING_APPROVAL</code> (<code>TS:166</code>). Đây cũng là giá trị mặc định của field
 (<code>Trip.java:84</code>).</li>
-<li><strong>Dữ liệu seed và lịch sử</strong> — <code>DataInitializer:349</code> (profile <code>demo</code>) và <code>HistoricalDataBackfill:593</code>
+<li><strong>Dữ liệu seed và lịch sử</strong> — <code>DataInitializer:349</code> (profile <code>demo</code>) và <code>HistoricalDataBackfill:1345</code>
 (profile <code>backfill</code>) gọi <code>setStatus()</code> thẳng. Cố ý: dựng dữ liệu không đi qua service (roadmap §5
 Phase 5, &quot;DataInitializer sets the precedent that seeding bypasses services&quot;). Backfill tự cộng
 odometer cho chuyến <code>COMPLETED</code> nó tạo ra, <strong>đúng như FSM</strong> — nhưng cộng vào <strong>cả hai</strong> cột (§8.3).</li>
@@ -1484,7 +1484,7 @@ Trước chuyến, <code>kmSinceLastMaintenance = 4200</code>. Tuyến 120 km.</
 <td>Chuyến <strong>mới</strong> chạy thật ⇒ tiến gần tới bảo trì</td>
 </tr>
 <tr>
-<td>Backfill (<code>HistoricalDataBackfill:631-632</code>)</td>
+<td>Backfill (<code>HistoricalDataBackfill:1383-1384</code>)</td>
 <td>10 120</td>
 <td>6120</td>
 <td><strong>4000</strong></td>
