@@ -170,6 +170,15 @@
   - Xe hay người chưa có bến nhà và chưa chạy chuyến nào thì coi là "không biết ở đâu": máy không chọn.
   - Không chọn (b), một cấu hình chung: mọi xe sẽ cùng một bến nhà. Không chọn (c), suy từ chuyến đầu: xe mới chưa có chuyến thì không biết ở đâu.
 - **Luật vị trí viết ở đúng một chỗ:** `domain/LocationRule`, hàm thuần, CT5a. Vị trí lúc t = bến cuối của chuyến gần nhất (không huỷ) có giờ đến ≤ t; chưa có chuyến thì là bến nhà. Bộ sinh (CT3), script kiểm và app (CT5b) cùng gọi.
+- **Cách cài ở CT5b (2026-11-17), đúng CM-5 cách B:**
+  - **Hai phía** (`LocationRule.fits`). Nhận thêm một chuyến thì lúc khởi hành xe/người phải đứng ở bến đi, **và** chuyến kế tiếp đã cam kết, nếu có, phải xuất phát từ bến đến.
+    - Phía sau được thêm khi `verify` trên DB thật thấy màn Đề xuất giao xe 29A-001.04 cả chuyến Đà Lạt 06:00 lẫn 18:00 ngày 22/11. Thẻ được xét theo lãi, không theo giờ, nên chỉ xét phía trước là không đủ.
+    - Đây là cách hiểu khi cài, nằm trong chữ "đang ở bến xuất phát" của QĐ-23, không phải quyết định mới.
+  - **Máy:** `findBestAvailableBus` / `findBestAvailableDriver`, ở cả bản hỏi DB lẫn bản `AvailabilityContext`. Context nạp sẵn lượt gần nhất **trước** và lượt sớm nhất **sau** khoảng đã nạp, cho từng xe và từng người.
+  - **Người:** dropdown Duyệt, Sửa, Tạo xếp ai vừa chuỗi lên đầu; những người khác ghi "⚠ đang ở …" hay "chuyến kế tiếp đi từ …". Form Tạo gửi `routeId` cho API.
+  - **Không chặn:** validator không kiểm vị trí.
+  - **Mọi vai trên xe:** vị trí của một người tính theo chuyến muộn nhất ở bất kỳ vai nào. DB được hỏi riêng từng vai, vì một câu `OR` quét cả bảng (0,46 s một lần).
+  - **Tuyến chưa có bến** (chỉ có trong dữ liệu test) thì không lọc. Thời gian nghỉ vẫn do cửa sổ "bận" sẵn có lo.
 
 ### QĐ-24. Dự báo tự tạo chuyến chờ duyệt (chốt 2026-11-16)
 
@@ -308,3 +317,4 @@
 - **2026-11-17 (CT4):** chủ dự án giao 5 bước của CT4 và sửa bước PART B: *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN lịch sử GĐ3"*.
   - Ghi thành sửa đổi của QĐ-21: lưu trữ bằng xoá mềm thay cho xoá, có script mở lại.
   - Đã làm trên DB thật. Không có quyết định mới nào khác.
+- **2026-11-17 (CT5b):** cài QĐ-23 vào việc chọn xe và tài xế theo CM-5 cách B; ghi "cách cài ở CT5b" vào QĐ-23 (luật hai phía, mọi vai, hỏi DB theo từng vai). Không có quyết định mới. Phát hiện lỗi #35 (hai câu kiểm lịch có sẵn quét cả bảng); ghi ở `current_bugs_found.md`, chưa sửa.

@@ -3344,6 +3344,29 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
   đêm. Chuyến tăng cường của job 10 giây (+30 phút) thì vẫn có thể dính. Kế hoạch hiện để việc sửa đi cùng
   L1 khi làm cặp dài (QĐ-26, QĐ-27). Chủ dự án có thể quyết sửa riêng sớm hơn.
 
+## 35. Hai câu kiểm lịch tài xế gộp vai bằng `OR` qua bảng nối — quét cả bảng `trips`; form Tạo và màn Duyệt thủ công mất 23–28 giây
+
+- **Gốc:** hai câu JPQL trong `TripRepository` gộp các vai bằng `OR` trải qua bảng nối `trip_co_drivers`:
+  - `existsOverlappingTripForDriver` (`TripRepository.java:131-142`): `LEFT JOIN t.coDrivers cd WHERE (t.driver = :driver OR cd = :driver)`, dùng cho cửa sổ bận (`TripService.java:721`);
+  - `findTripsForDriverOnDate` (`:186-197`): `LEFT JOIN FETCH t.coDrivers cd WHERE (t.driver = :driver OR cd = :driver OR t.assistant = :driver)`, dùng cho giờ lái trong ngày (`TripService.java:761`).
+  - MySQL không dùng được index nào cho một `OR` trải qua hai bảng, nên mỗi lần gọi đọc cả bảng `trips`. Từ CT4, bảng có 47.881 dòng, gồm 21.192 dòng GĐ3 đã xoá mềm; `@SQLRestriction` chỉ lọc chúng **sau khi** đọc.
+- **Phân loại (ba ngả):** **sai sót thật, về hiệu năng.** Kết quả đúng; không quyết định nào chọn cách viết này. CT4 làm bảng dày gấp đôi nên lộ rõ.
+- **Bằng chứng** (`performance_schema`, 2026-11-17, đo khi `verify` CT5b):
+  - API form Tạo (`/api/admin/trips/available-resources`, **không** gửi tuyến, nên không có câu vị trí nào), trên DB thật: **23,2 s**.
+    - `findTripsForDriverOnDate`: 151 lần × 122 ms = 18,4 s, đọc 7,2 triệu dòng;
+    - `existsOverlappingTripForDriver`: 62 lần × 63 ms = 3,9 s.
+  - Màn Duyệt MANUAL trên bản sao (chuyến #51358): **28,4 s**, hai câu này chiếm 23,1 s, câu vị trí của CT5b 2,7 s.
+  - Đối chứng: `existsOverlappingTripForAssistant` (một vai, đi theo index `assistant_id`) cùng lúc chỉ 0,8 ms một lần.
+- **Hậu quả:**
+  - Admin chờ khoảng 25 giây mỗi lần mở màn Duyệt thủ công, và mỗi lần form Tạo gọi lại API (đổi giờ hay tuyến).
+  - Job 10 giây cũng chậm theo: một chuyến tăng cường có phân công mất khoảng 28 giây mới hiện trên bản sao.
+  - Màn Đề xuất dùng `AvailabilityContext` (nạp sẵn) nên không dính.
+- **Hướng sửa (chưa làm):** đúng cách CT5b đã sửa câu vị trí.
+  - Tách mỗi câu theo vai: tài xế, phụ xe, và tài xế phụ qua `JOIN` thường. Gộp ở `TripService`: "bận" = OR của ba câu; danh sách = hợp, bỏ trùng theo id.
+  - Giữ nguyên ngữ nghĩa, kèm test tương đương (`TripServiceAvailabilityContextTest` đã so hai đường).
+  - Thêm index (vd `(driver_id, departure_time)`) là đổi schema, chủ dự án quyết.
+- **Không sửa trong CT5b:** hai câu nằm ngoài phạm vi, và được validator, cửa sổ bận lẫn giờ lái của mọi màn dùng chung.
+
 ## Mục đã có hướng xử lý trong kế hoạch (không đánh số)
 
 - **Mức 8 giờ dùng như "mỗi chuyến":** ⌈thời gian ÷ 8⌉ tài xế (`TripService.java:236`), min(phần chia, 8)
@@ -3367,6 +3390,7 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
   - sửa ở CT8 (QĐ-24 điểm 6).
 - **Tài xế chỉ bị coi là bận ±30 phút quanh chuyến, và không có vị trí.** Một kíp vừa tới bến xa vẫn có thể
   được giao chuyến xuất phát ở bến nhà ngay hôm sau. Sửa ở CT5 và CT9 (QĐ-23, QĐ-26).
+  - **Phần vị trí đã sửa ở CT5b (2026-11-17, commit `5f52879`):** máy chỉ chọn người đang ở bến xuất phát, dropdown xếp họ lên đầu. Phần "kíp ở lại cùng xe" và tiền chờ vẫn để CT9.
 - **`ForecastService.tripsNeeded` chia cho 0,9 × ghế** (`:491`):
   - không phải lỗi code;
   - **quyết định hết hợp** (QĐ-16 G5-6, chốt khi chuyến thêm còn được coi là chở đầy);

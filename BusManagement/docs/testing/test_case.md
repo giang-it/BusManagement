@@ -271,7 +271,7 @@
 - **Kết quả mong đợi:**
   - `flash[success]` = `"Cập nhật thông tin xe thành công!"`; cột "Bến Nhà" ở danh sách hiện "Bến xe Đà Lạt"
   - DB: `buses.home_station_id = 4`; các cột khác không đổi
-  - Việc chọn xe (Đề xuất, tự phân công, dropdown) **chưa** đọc bến nhà ở CT5a — bật ở CT5b
+  - Ở CT5a việc chọn xe chưa đọc bến nhà. Từ CT5b (2026-11-17) nó đọc vị trí, mà vị trí rơi về bến nhà khi xe chưa chạy chuyến nào — xem `TC_AI_019`, `TC_AI_020`, `TC_APR_017`
 - **Đã chạy:** 2026-11-17 trên bản sao (`busmanagement_test`): flash và DB đúng như trên. Cột "Bến Nhà" của danh sách mới được kiểm trên DB thật (20 xe hiện "Bến xe Miền Đông"), chưa kiểm sau khi đổi. Khoá thêm bằng `BusServiceTest.update_changesHomeStation`
 
 ---
@@ -1427,6 +1427,39 @@
 
 ---
 
+### TC_AI_019 — Vị trí: máy chỉ giao xe và kíp đang ở bến xuất phát (QĐ-23, CT5b)
+
+- **Mã TC:** TC_AI_019
+- **Tên Kịch Bản:** Job 10 giây tạo chuyến tăng cường từ Miền Đông và giao xe, người đang đứng ở Miền Đông
+- **Điều kiện tiên quyết:** bản sao của DB thật. Xe 29A-001.01 + tài xế #2 có hai chuyến `ACTIVE` ngày 21/11: tuyến 10 (Miền Đông → Vũng Tàu) 06:00–08:00 và tuyến 11 (Vũng Tàu → Miền Đông) 12:00–14:00, tạo qua form. Các xe Limousine khác đang ở Miền Đông; 11A-111.11 ít km nhất (0 km)
+- **Các bước thực hiện:**
+  1. Đặt chuyến tuyến 10 thành 21/22 vé (≥ 95%, bỏ qua cổng 48 giờ)
+  2. Chờ job 10 giây
+- **Kết quả mong đợi:**
+  - Chuyến tăng cường 06:30 `PENDING_APPROVAL`, xe **11A-111.11** (đúng loại, ít km nhất, đang ở Miền Đông); tài xế và phụ xe đều đang ở Miền Đông
+  - Xe 29A-001.01 không được chọn (bận ±1 giờ)
+- **Đã chạy:** 2026-11-17 trên bản sao (`busmanagement_test`, cổng 8098): chuyến #51359, xe 11A-111.11, tài xế #3, phụ xe #5 — đúng như trên. Khoá thêm bằng `TripServiceLocationTest.theMachinePicksOnlyABusStandingAtTheStart_notTheLeastWornOne` và `…_inEveryRole`
+
+---
+
+### TC_AI_020 — Vị trí: không ai ở bến xuất phát thì chuyến tăng cường không có xe; xe vừa tới thì được giao (QĐ-23, CT5b)
+
+- **Mã TC:** TC_AI_020
+- **Tên Kịch Bản:** Chuyến tăng cường xuất phát ở Vũng Tàu, nơi lúc đầu chỉ có xe đang bận
+- **Điều kiện tiên quyết:** như TC_AI_019, **trước** bước 1 của nó (chưa có chuyến tăng cường nào)
+- **Các bước thực hiện:**
+  1. Đặt chuyến tuyến 11 (12:00) thành 21/22 vé, chờ job
+  2. Làm TC_AI_019 (chuyến tăng cường 06:30 đưa 11A-111.11 và kíp lên Vũng Tàu lúc 08:30)
+  3. Từ chối chuyến tăng cường 12:30 của bước 1 (`POST /admin/trips/reject/{id}`), chờ job tạo lại
+  4. Xác nhận 1-click chuyến mới (`POST /admin/trips/confirm`)
+- **Kết quả mong đợi:**
+  - Bước 1: chuyến tăng cường 12:30 `PENDING_APPROVAL` **không có xe, không có tài xế** — ở Vũng Tàu chỉ có 29A-001.01, mà xe đó bận chuyến 12:00
+  - Bước 3: chuyến tăng cường mới 12:30 có xe **11A-111.11** và đúng kíp vừa lên Vũng Tàu
+  - Bước 4: `"✅ Chuyến tăng cường #… đã được kích hoạt thành công!"`, chuyến `ACTIVE`, 22 ghế — validator nhận chuyến do máy xếp
+- **Đã chạy:** 2026-11-17 trên bản sao: #51358 không xe → từ chối → #51360 xe 11A-111.11, tài xế #5, phụ xe #3 → `ACTIVE`. Khoá thêm bằng `TripServiceLocationTest.aBusWhoseLocationIsUnknown_isNeverPicked_andNoBusAtTheStartMeansNoPick` và `aReservedCardMovesTheBusWithinTheContext`
+
+---
+
 <a name="module-5"></a>
 ## MODULE 5: QUY TRÌNH PHÊ DUYỆT CỦA ADMIN (Admin Approval Flow)
 **Controller:** `AdminTripController` — `@RequestMapping("/admin/trips")`  
@@ -1700,6 +1733,22 @@
   - Bước 3: `totalSeats = 50` (bằng sức chứa, không phải "giữ số cũ nếu vừa")
   - Đối trọng: xe chưa gán loại → giữ nguyên số ghế; xe có sức chứa < số vé đã bán → ⛔ *"… chỉ có N chỗ nhưng chuyến đã bán M vé"*, chuyến vẫn `PENDING_APPROVAL`
 - **Tự động hoá:** `TripServiceSeatCapacityTest` (3 test `manualApproval_*`). Đã kiểm trên clone 2026-09-24: chuyến 8 (26 ghế tạm) duyệt bằng xe 20 (Limousine) → `ACTIVE`, **22** ghế
+---
+
+### TC_APR_017 — MANUAL MODE: vị trí là GỢI Ý — dropdown mời đủ, đúng bến lên đầu, có ghi chú (QĐ-23, CM-5 cách B, CT5b)
+
+- **Mã TC:** TC_APR_017
+- **Tên Kịch Bản:** Duyệt thủ công một chuyến tăng cường xuất phát ở bến không có xe rảnh
+- **Điều kiện tiên quyết:** chuyến tăng cường 12:30 Vũng Tàu → Miền Đông không xe của TC_AI_020 bước 1
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/approve/{id}` — đọc ba ô chọn xe, tài xế, phụ xe
+  2. Làm TC_AI_019 (một xe và kíp lên Vũng Tàu lúc 08:30), rồi mở lại trang
+- **Kết quả mong đợi:**
+  - Bước 1: vẫn mời **mọi** xe và người hợp lệ (10 xe, 30 người trên bản sao); ai cũng có ghi chú *"⚠ đang ở Bến xe Miền Đông"* (hay bến khác); xe đang bận không được mời
+  - Bước 2: 11A-111.11 và hai người vừa lên Vũng Tàu **đứng đầu**, không ghi chú; những người khác vẫn được mời, kèm ghi chú
+  - Lưu bằng một xe ở bến khác vẫn qua — validator không kiểm vị trí (`TripServiceLocationTest.theValidatorDoesNotBlockByLocation`)
+- **Đã chạy:** 2026-11-17 trên bản sao: bước 1 — 10 xe / 30 người, 10 / 30 ghi chú; bước 2 — 11A-111.11 đầu, 9 / 28 ghi chú. Form Sửa (chuyến 2535) và API form Tạo (6 tuyến) đối chiếu với vị trí tính bằng SQL trên DB thật: 0 chỗ lệch. Khoá thêm bằng `TripServiceLocationTest.theDropdownsOfferEveryValidChoice_standingFirst_withANoteForTheOthers` và `theCreateFormListsKeepEveryChoice_andPutTheStartStationFirst`
+
 ---
 
 <a name="module-6"></a>
@@ -2526,11 +2575,11 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 | Module 1 — Bus Management | 13 | 5 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
 | Module 3 — Trip FSM & CRUD | 25 | 6 | 19 |
-| Module 4 — AI Scheduler | 18 | 5 | 13 |
-| Module 5 — Admin Approval | 13 | 6 | 7 |
+| Module 4 — AI Scheduler | 20 | 6 | 14 |
+| Module 5 — Admin Approval | 14 | 7 | 7 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **101** | **39** | **62** |
+| **TỔNG** | **104** | **41** | **63** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2539,7 +2588,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

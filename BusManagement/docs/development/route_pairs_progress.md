@@ -73,7 +73,15 @@
   - `verify`: 16 trang 200, màn Dự báo 18 chuỗi.
 
   Chi tiết ở mục 4, CT4.
-- **Việc tiếp theo:** chủ dự án xem và bảo commit (chỉ có tài liệu và script, code không đổi). Sau đó tới CT5b (bật vị trí vào việc chọn xe, tài xế). G3-7: xoá các bản sao cũ khi chủ dự án đồng ý.
+- **Tài liệu CT4 đã commit** `6b6ecf8` ngày 2026-11-17 (chủ dự án chỉ bảo "commit"), push cùng CT5b.
+- **CT5b xong ngày 2026-11-17, đã commit và push** (bắt đầu ở phiên `d7e11adb`, dừng giữa chừng theo lời chủ dự án, làm tiếp ở phiên `8bf87e0f`; chủ dự án: *"tôi hiểu rồi, commit và push đi"*). Commit `5f52879` (code + test), `345c8be` (bài học), và commit `docs:` ngay sau đó:
+  - máy (job 10 giây, màn Đề xuất) chỉ chọn xe và người vừa chuỗi vị trí, xét hai phía; dropdown Duyệt/Sửa/Tạo mời đủ, đúng bến lên đầu, có ghi chú; validator không chặn;
+  - sửa câu vị trí của người chậm (0,46 s một lần → ≈ 0,01 s, tách theo vai);
+  - test 259/259; thử làm hỏng 4 chỗ thì đúng 2 test mới đỏ;
+  - `verify` trên DB thật (chỉ đọc) và trên bản sao (ghi); DB thật giống hệt trước và sau.
+
+  Chi tiết ở mục 4, CT5b. Phát hiện lỗi #35 (có sẵn, không thuộc CT5b): form Tạo và màn Duyệt thủ công mất 23–28 giây.
+- **Việc tiếp theo:** sửa lỗi #35 (chủ dự án bảo ngày 2026-11-17: *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"*), rồi tới CT6. G3-7: xoá các bản sao cũ khi chủ dự án đồng ý.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -98,8 +106,8 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT2 | Cấu hình tuyến và loại xe; dữ liệu mẫu | QĐ-19, QĐ-20 | CT0 | **có** (loại xe tuyến 10, 11) | ĐÃ COMMIT `bbedfd8`, `ed38ce6`, đã push | 2026-11-16 → 17 |
 | CT5a | Định nghĩa vị trí (luật dùng chung cho bộ sinh và app), bến nhà xe và tài xế; **chưa bật** vào việc chọn xe | QĐ-23 | CT2 | **có** (bến nhà) | ĐÃ COMMIT `4c3ce51`, `d39c17e` + commit `docs:` sau đó, đã push | 2026-11-17 |
 | CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | XONG trên bản sao; ĐÃ COMMIT `7cb8fb4`, `9bb463f` + commit `docs:` sau đó, đã push | 2026-11-17 |
-| CT4 | Thay lịch sử trên DB thật (lịch sử GĐ3 được lưu trữ, không xoá) | QĐ-21 | CT3 đã commit | **có** | XONG trên DB thật, **chưa commit** tài liệu | 2026-11-17 |
-| CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | CHƯA BẮT ĐẦU | |
+| CT4 | Thay lịch sử trên DB thật (lịch sử GĐ3 được lưu trữ, không xoá) | QĐ-21 | CT3 đã commit | **có** | XONG trên DB thật; tài liệu ĐÃ COMMIT `6b6ecf8`, đã push | 2026-11-17 |
+| CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | ĐÃ COMMIT `5f52879`, `345c8be` + commit `docs:` sau đó, đã push | 2026-11-17 |
 | CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | CHƯA BẮT ĐẦU | |
 | CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | CHƯA BẮT ĐẦU | |
 | CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7 | **có** (chuyến chờ duyệt) | CHƯA BẮT ĐẦU | |
@@ -443,13 +451,60 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Cần trước:** CT4 (lịch sử mới, vị trí có nghĩa). Bến nhà, luật vị trí, CM-5 và CM-12 đã có từ CT5a.
 
-- [ ] **AI:** thêm bộ lọc "đang ở bến xuất phát" vào `findBestAvailableBus` và `findBestAvailableDriver`, ở cả bản truy vấn DB lẫn bản dùng `AvailabilityContext`.
-  - Nạp sẵn chuyến gần nhất của mỗi xe trước khoảng thời gian xét.
-  - Có test chứng minh hai bản cho cùng kết quả.
-- [ ] **Luồng thủ công** (dropdown Duyệt / Sửa / Tạo): làm theo CM-5 (đề xuất: xe cùng bến lên đầu, kèm ghi chú). `validateBusForTrip` giữ nguyên, trừ khi CM-5 chọn áp cứng.
-- [ ] **Test:** test mới cho vị trí; `TripServiceAvailabilityContextTest`; các test chọn xe hiện có. Chạy `mvnw test`.
-- [ ] `verify`.
-- [ ] **Tài liệu:** spec, summary, `database_schema.md`, bài 06 (luật nghiệp vụ), `test_case.md`.
+- [x] **AI:** bộ lọc vị trí trong `findBestAvailableBus` (`TripService.java:327`) và `findBestAvailableDriver` (`:499`), ở cả bản hỏi DB lẫn bản `AvailabilityContext`. 2026-11-17.
+  - Luật **hai phía**, `LocationRule.fits`: lúc khởi hành đứng ở bến đi, **và** chuyến kế tiếp đã nhận đi từ bến đến.
+    - Phía sau được thêm khi `verify` thấy màn Đề xuất giao xe 29A-001.04 cả Đà Lạt 06:00 lẫn 18:00 ngày 22/11, vì thẻ được xét theo lãi.
+    - Ghi ở QĐ-23, "cách cài ở CT5b".
+  - `AvailabilityContext` có thêm 4 bảng lượt (trước / sau khoảng đã nạp, cho xe và cho người). `buildAvailabilityContext` nạp chúng qua `withLocations` (`TripService.java:571`).
+  - Phần vị trí nằm ở mục mới cuối `TripService` ("VỊ TRÍ XE VÀ NGƯỜI", `:1937`). Các dòng 1–1934 chỉ sửa tại chỗ, nên không trích dẫn nào của bài học bị lệch.
+  - **Câu vị trí của người, sửa 2026-11-17 (phiên `8bf87e0f`):**
+    - Bản đầu gộp ba vai bằng `driver = ? OR assistant = ? OR ? MEMBER OF coDrivers`. MySQL quét cả bảng (`type=ALL`, 47.709 dòng): 0,46 s một lần, API form Tạo hơn 2 phút.
+    - Nay mỗi chiều hỏi ba câu theo vai: hai câu dẫn xuất `findFirstByDriverAnd…` / `findFirstByAssistantAnd…`, và một câu JPQL `JOIN t.coDrivers cd WHERE cd = :driver`. `personTripArrivingBy` / `personTripDepartingFrom` lấy chuyến muộn nhất / sớm nhất (giờ, rồi id), nên ra đúng chuyến mà câu gộp sẽ ra.
+    - Ba câu cộng lại ≈ 0,012 s.
+- [x] **Luồng thủ công** (CM-5 cách B), 2026-11-17:
+  - dropdown Duyệt / Sửa xếp ai vừa chuỗi lên đầu (`TripService.java:1504`, `:1535`, `:1563`, `withPeopleAtStartFirst`);
+  - ghi chú `busLocationNotes` / `personLocationNotes`: "đang ở …", "chưa rõ đang ở đâu …", "chuyến kế tiếp đi từ …";
+  - form Tạo gửi `routeId` cho `/api/admin/trips/available-resources`; JSON có thêm khoá `note`;
+  - `validateBusForTrip` / `validateStaffForTrip` không đổi.
+- [x] **Test:**
+  - `TripServiceLocationTest` 14 test, mới. 2 test "mọi vai trên xe" thêm ở phiên `8bf87e0f`.
+  - `LocationRuleTest` 8 (+2).
+  - `TripServiceAvailabilityContextTest` và các test chọn xe cũ vẫn xanh.
+  - `mvnw test` **259/259**.
+  - **Thử làm hỏng:** bỏ câu tài xế phụ phía trước, bỏ câu phụ xe phía sau, đổi "muộn nhất" thành "sớm nhất", bỏ câu tài xế phụ phía sau. Lần nào cũng đúng 2 test mới đỏ. Đã khôi phục, khớp từng byte.
+- [x] **`verify` trên DB thật** (profile mặc định, chỉ đọc, PID 28688), 2026-11-17:
+  - 19 trang trả 200, log sạch. DB giống hệt trước và sau (47.881 dòng `trips`, MD5 `85b6136f…`).
+  - **Màn Đề xuất:** 25 thẻ, 19 đủ điều kiện, 6 thiếu tài nguyên (5 Đà Lạt → Miền Đông, 1 Cần Thơ → Miền Đông).
+    - Bộ kiểm độc lập lấy vị trí xuất phát từ SQL, rồi đi theo từng xe, từng người: **0 vi phạm** chuỗi, 0 chồng giờ.
+    - Thẻ thiếu xe là đúng luật. Ở Đà Lạt chỉ có 29A-001.04 `READY`; xe 15, 19 đang `TRAVELING`. Ở Cần Thơ chỉ có xe 7, đang `TRAVELING`.
+  - **Form Sửa chuyến 2535:** ghi chú của 11 xe, 36 tài xế, 36 phụ xe khớp vị trí tính bằng SQL tại giờ khởi hành của chuyến: 0 chỗ lệch.
+  - **API form Tạo, 6 tuyến:** vẫn mời đủ 11 xe, ai vừa chuỗi luôn đứng trước.
+    - Tuyến 12: chỉ 29A-001.04, đứng đầu.
+    - Tuyến 11: không ai vừa.
+    - Không gửi tuyến: không ghi chú, thứ tự như cũ.
+  - **Thời gian API:** khoảng 28 s. Phần CT5b chỉ ≈ 3 s; trước khi sửa câu vị trí, phần này ≈ 114 s. 23 s còn lại là hai câu có sẵn, ghi thành **lỗi #35**.
+- [x] **`verify` có ghi trên bản sao** (`busmanagement_test`, cổng 8098, PID 29488; 10 kết nối vào bản sao, 0 vào DB thật), 2026-11-17:
+  - Xe 29A-001.01 + tài xế #2 chạy vòng tạo qua form: tuyến 10 lúc 06:00, tuyến 11 lúc 12:00, ngày 21/11.
+  - Chuyến tuyến 11 nóng → tăng cường #51358 **không xe** (ở Vũng Tàu chỉ có xe đang bận). Màn Duyệt mời đủ 10 xe / 30 người, ai cũng có ghi chú.
+  - Chuyến tuyến 10 nóng → #51359 được giao **11A-111.11** (Limousine 0 km ở Miền Đông) và kíp #3/#5 ở Miền Đông. Mở lại màn Duyệt của #51358: 11A-111.11 và kíp đó lên đầu, không ghi chú.
+  - Từ chối #51358 → job tạo lại #51360 với **11A-111.11 + kíp #5/#3**, tức một vòng đi–về đúng chuỗi. Xác nhận 1-click → `ACTIVE`.
+  - Ghi thành `TC_AI_019`, `TC_AI_020`, `TC_APR_017`.
+- [x] **Tài liệu**, 2026-11-17:
+  - spec (bến nhà xe và tài xế; mục mới "Location in bus and driver selection"; giới hạn của màn Đề xuất);
+  - summary (§3, §7.6, §7.7);
+  - bài 00a, 01, 04, 06 (§6.1, §9.1, §9.4), dựng lại HTML;
+  - `test_case.md` (3 TC, bảng thống kê);
+  - QĐ-23 "cách cài ở CT5b";
+  - sổ lỗi (#35; mục "tài xế không có vị trí");
+  - roadmap §7, §8.
+  - `database_schema.md` không đổi: CT5b không thêm cột hay index.
+- **Đầu vào cho CT7, đo ở `verify`:** màn Đề xuất xét thẻ một lượt theo lãi.
+  - Xe 29A-001.02 lên Đà Lạt ở thẻ lãi thấp nhất (#25, 19/11 06:00), nên không giúp được 4 thẻ Đà Lạt → Miền Đông đã xét trước nó.
+  - Kết quả nhất quán nhưng chưa tối ưu. Kế hoạch theo vòng (M2) phải xếp cả hai chiều cùng lúc.
+- [x] **Commit**, 2026-11-17 (chủ dự án: *"tôi hiểu rồi, commit và push đi"*):
+  - trước khi commit chạy lại `verify` ngắn trên DB thật (PID 18364): 5 trang 200, API tuyến 12 vẫn đưa 29A-001.04 lên đầu, log sạch;
+  - commit `5f52879` (`feat(location):` code + test), `345c8be` (`docs(study):` bài học), rồi commit `docs:`; không trailer Co-Authored-By;
+  - push lên `origin/temp`, cùng `6b6ecf8`.
 
 **Lưu ý:** roadmap §3 yêu cầu sửa `TripService` ít nhất có thể. Vị trí là một bộ lọc mới chen vào dòng ứng viên sẵn có, đúng mẫu "luật và khả dụng đan xen". Không dựng thêm tầng service song song.
 
@@ -562,6 +617,10 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-17 (CT3) | `d7e11adb` | *"hãy làm CT03 đi"* | CT3: mô phỏng theo cặp + r; bộ xếp xe chạy vòng (`Dispatcher`); test 243/243; script PART A/B/C; tổng duyệt trên bản sao `busmanagement_ct3` (PART C 0 vi phạm, DB thật không đổi); số đo ghi ở CT3 |
 | 2026-11-17 (CT3, sau) | `d7e11adb` | *"cái này mới là sinh dữ liệu trên bản sau, CT04 mới áp dụng vô dữ liệu thật dk. chốt CM-16 giữ 6%, kiểm tra lại rồi commit và push"* | Xác nhận: CT3 chỉ chạy trên bản sao, CT4 mới áp vào DB thật. Chốt CM-16 (giữ 6%). Kiểm lại: test 243/243, PART C 0 vi phạm, `verify` 16 trang 200, DB thật giống hệt. Commit `7cb8fb4`, `9bb463f`, commit `docs:` và push |
 | 2026-11-17 (CT4) | `d7e11adb` | 5 bước CT4, PART B *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN lịch sử GĐ3 và trừ km khỏi odometer"* | Sao lưu (khôi phục thử ok) + bản riêng các dòng GĐ3. Script lưu trữ (xoá mềm) và script mở lại, tổng duyệt trên `busmanagement_test`. DB thật: PART A đúng số, lưu trữ 21.192 dòng (không xoá), bộ sinh 26.670 chuyến giống hệt tổng duyệt, PART C 0 vi phạm, `verify` 16 trang 200, Dự báo 18 chuỗi. Chưa commit |
+| 2026-11-17 (CT4, sau) | `d7e11adb` | *"commit"* | Commit `6b6ecf8` (tài liệu CT4). Không push — chủ dự án không bảo |
+| 2026-11-17 (CT5b) | `d7e11adb` | Bắt đầu CT5b; *"hãy dừng lại để phiên sau tiếp tục làm"* | Code + test vị trí; `verify` thấy lỗi giao một xe hai lần (thêm phía sau của luật) và câu vị trí của người chậm (API form Tạo > 2 phút). Dừng giữa chừng, chưa commit |
+| 2026-11-17 (CT5b, tiếp) | `8bf87e0f` | *"sửa truy vấn chậm đi, sau đó hãy kt lại, đảm bảo CT5b đã hoàn thành và test lại app"* | Tách câu vị trí theo vai (+2 test, thử làm hỏng ok); test 259/259; `verify` DB thật (19 trang 200, Đề xuất 25 thẻ / 0 vi phạm, form Sửa và API khớp SQL) và bản sao (job, Duyệt, từ chối, xác nhận); tài liệu; lỗi #35. Chưa commit |
+| 2026-11-17 (CT5b, commit) | `8bf87e0f` | *"tôi hiểu rồi, commit và push đi, sau đó sửa #35"* | `verify` ngắn trước commit; commit `5f52879`, `345c8be`, commit `docs:`; push cùng `6b6ecf8` |
 
 ---
 
