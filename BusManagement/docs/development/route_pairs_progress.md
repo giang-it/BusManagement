@@ -67,8 +67,13 @@
   - CM-16 chốt: giữ 6% hủy và bão theo từng chiều.
   - Kiểm lại trước khi commit: test 243/243; PART C chạy lại trên bản sao vẫn 0 vi phạm; `verify` trên app thật (profile mặc định): 16 trang trả 200, log sạch, bộ sinh không chạy, DB thật giống hệt.
   - Commit `7cb8fb4` (code + test), `9bb463f` (bài học), và commit `docs:` ngay sau đó; đã push.
-- **CT3 mới chỉ sinh dữ liệu trên bản sao.** DB thật vẫn giữ lịch sử GĐ3.
-- **Việc tiếp theo:** CT4, áp bộ sinh mới vào DB thật: sao lưu → PART A → PART B → bộ sinh → PART C. Chỉ làm khi chủ dự án xác nhận lần cuối.
+- **CT4 xong trên DB thật ngày 2026-11-17, chưa commit** (chủ dự án giao 5 bước, PART B *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN"*):
+  - sao lưu (đã khôi phục thử) → PART A → lưu trữ lịch sử GĐ3 bằng xoá mềm (không xoá dòng nào) → bộ sinh → PART C 0 vi phạm;
+  - DB thật giống hệt bản tổng duyệt tới từng chuyến;
+  - `verify`: 16 trang 200, màn Dự báo 18 chuỗi.
+
+  Chi tiết ở mục 4, CT4.
+- **Việc tiếp theo:** chủ dự án xem và bảo commit (chỉ có tài liệu và script, code không đổi). Sau đó tới CT5b (bật vị trí vào việc chọn xe, tài xế). G3-7: xoá các bản sao cũ khi chủ dự án đồng ý.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -93,7 +98,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT2 | Cấu hình tuyến và loại xe; dữ liệu mẫu | QĐ-19, QĐ-20 | CT0 | **có** (loại xe tuyến 10, 11) | ĐÃ COMMIT `bbedfd8`, `ed38ce6`, đã push | 2026-11-16 → 17 |
 | CT5a | Định nghĩa vị trí (luật dùng chung cho bộ sinh và app), bến nhà xe và tài xế; **chưa bật** vào việc chọn xe | QĐ-23 | CT2 | **có** (bến nhà) | ĐÃ COMMIT `4c3ce51`, `d39c17e` + commit `docs:` sau đó, đã push | 2026-11-17 |
 | CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | XONG trên bản sao; ĐÃ COMMIT `7cb8fb4`, `9bb463f` + commit `docs:` sau đó, đã push | 2026-11-17 |
-| CT4 | Thay lịch sử trên DB thật | QĐ-21 | CT3 đã commit | **có** | CHƯA BẮT ĐẦU | |
+| CT4 | Thay lịch sử trên DB thật (lịch sử GĐ3 được lưu trữ, không xoá) | QĐ-21 | CT3 đã commit | **có** | XONG trên DB thật, **chưa commit** tài liệu | 2026-11-17 |
 | CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | CHƯA BẮT ĐẦU | |
 | CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | CHƯA BẮT ĐẦU | |
 | CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | CHƯA BẮT ĐẦU | |
@@ -403,16 +408,32 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Điều kiện trước khi chạy:** code CT3 đã commit; app đã tắt; DB thật vẫn giống lúc sao lưu; **chủ dự án xác nhận lần cuối**.
 
-- [ ] Sao lưu bằng `mysqldump` ra `E:\Y4 S2\PRETHESIS\ProjectBackup\db\`. Khôi phục thử vào một bản sao và so số dòng + `CHECKSUM TABLE`.
-- [ ] Chủ dự án xác nhận lần cuối.
-- [ ] Chạy PART A → PART B → bộ sinh → PART C trên DB thật. So từng chuyến với bản tổng duyệt.
-- [ ] Để file nhu cầu thật cạnh file sao lưu, ngoài git.
-- [ ] `verify`:
-  - các trang chính trả 200;
-  - màn Dự báo, Đề xuất, What-if chỉ còn 6 tuyến;
-  - ghi lại số liệu.
-- [ ] G3-7: xoá bản sao cũ khi chủ dự án đồng ý.
-- [ ] Ghi kết quả vào file này và roadmap §7, §8.
+- [x] **Sao lưu** (2026-11-17) vào `E:\Y4 S2\PRETHESIS\ProjectBackup\db\`:
+  - `busmanagement_2026-11-17_truoc-CT4.sql` — toàn bộ DB thật. Khôi phục thử vào `busmanagement_test`: `CHECKSUM TABLE` 11/11 bảng và ảnh chụp giống hệt;
+  - `busmanagement_2026-11-17_lich-su-GD3_chi-bang-trips.sql` — riêng 21.192 dòng `trips` của GĐ3.
+- [x] **Chủ dự án xác nhận lần cuối** bằng 5 bước, và sửa PART B: *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN lịch sử GĐ3 và trừ km khỏi odometer"*. Ghi ở QĐ-21.
+  - Cách làm: xoá mềm (`is_deleted = 1`) bằng script mới `ct4_archive_old_history.sql`.
+  - Mở lại bằng `ct4_restore_old_history.sql`.
+  - Đã kiểm trước: app không có truy vấn SQL thuần hay màn hình nào đọc chuyến đã xoá mềm.
+- [x] **Tổng duyệt cách làm mới** trên `busmanagement_test` (khôi phục từ bản sao lưu CT4):
+  - PART A → lưu trữ → bộ sinh → PART C cho 0 vi phạm;
+  - 26.670 chuyến **giống hệt tổng duyệt CT3** (MD5 trên mọi chuyến và odometer);
+  - script mở lại trả về **đúng** dữ liệu đang hiện và odometer của DB thật trước CT4 (cùng MD5), chạy lần hai không đổi gì.
+- [x] **Trên DB thật:**
+  - PART A: 21.192 chuyến GĐ3, không gì trỏ vào, 3.252.020 km;
+  - lưu trữ: 21.192 dòng `is_deleted = 1`, bảng vẫn đủ 21.211 dòng, 17 chuyến còn hiện; odometer 3.270.405 → 18.385, km từ lần bảo dưỡng 18.355 trước và sau;
+  - bộ sinh (profile `backfill`, datasource mặc định, 10 kết nối vào `busmanagement`): 26.670 chuyến, **giống hệt tổng duyệt tới từng chuyến** (cùng MD5);
+  - PART C: **mọi cột vi phạm = 0**; odometer 4.858.345 = 18.385 + 4.839.960.
+- [x] File nhu cầu thật `nhu-cau-that_2023-01-01_2026-11-16_CT4.csv` để cạnh bản sao lưu, ngoài git. Giống từng byte với file của tổng duyệt.
+- [x] **`verify`** (profile mặc định):
+  - 16 trang trả 200, log sạch;
+  - màn Dự báo 18 chuỗi, tới 16/11/2026, 14,5% bán hết, 25 ô cần tăng cường, tự chấm 16,5% (SN4 17,9%), Tết 2026 17,8% (39,6%);
+  - Đề xuất 25 thẻ (7 có lãi, 18 lỗ dự kiến, 0 thiếu tài nguyên);
+  - What-if: 25 chuyến thêm cần, phủ 25;
+  - không trang phân tích nào còn tên bến của tuyến cũ (Mỹ Đình, Niệm Nghĩa, Đà Nẵng, Huế);
+  - DB không đổi sau verify.
+- [ ] G3-7: xoá bản sao cũ (`busmanagement_gd2`, `busmanagement_ct3`) khi chủ dự án đồng ý.
+- [x] Ghi kết quả vào file này, README thư mục script, roadmap §7, §8 và các tài liệu mô tả dữ liệu. **Chưa commit** — chờ chủ dự án bảo.
 
 **Xong khi:** PART C báo 0 vi phạm trên DB thật, kết quả giống tổng duyệt, các trang chạy.
 
@@ -522,6 +543,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
   - `docs/ai`, `README.md`;
   - hai sổ lỗi.
 - [ ] Bài học: cập nhật số liệu bài 14 sau khi sinh lại (NB size, các ví dụ); bài mới về cặp tuyến và điều độ nếu chủ dự án muốn. Build HTML.
+  - Ghi chú CT4: các ví dụ "DB thật" của bài 14 vẫn là số GĐ3, nay đã lưu trữ. Ví dụ: tuyến 1 lúc 06:00 ngày 13/02/2026; tự chấm 16,06% / 17,54%; 41 ô. Tuyến 1 không còn được sinh. Số mới: 16,5% / 17,9%, 25 ô.
 - [ ] Ghi phần giới hạn và hướng phát triển: cặp dài + L1, M3, tăng tần suất B1/B2, tối ưu kíp lái K2.
 
 ---
@@ -539,6 +561,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-17 (CT5a) | `d7e11adb` | *"chốt CM-5 cách B, CM-12 cách (a). xong thì hãy kiểm tra lại 1 lần nữa, ổn và ok thì commit và push"* | CT5a: luật vị trí, bến nhà (code, form, danh sách), test (thử làm hỏng ok), sao lưu + đặt bến nhà trên DB thật, `verify` chỉ đọc (chọn xe giống hệt) và có ghi (bản sao), tài liệu + trỏ lại 78 trích dẫn. Kiểm lại lần cuối (test 230/230, 16 trang 200, chọn xe giống hệt), rồi commit `4c3ce51`, `d39c17e`, commit `docs:` và push |
 | 2026-11-17 (CT3) | `d7e11adb` | *"hãy làm CT03 đi"* | CT3: mô phỏng theo cặp + r; bộ xếp xe chạy vòng (`Dispatcher`); test 243/243; script PART A/B/C; tổng duyệt trên bản sao `busmanagement_ct3` (PART C 0 vi phạm, DB thật không đổi); số đo ghi ở CT3 |
 | 2026-11-17 (CT3, sau) | `d7e11adb` | *"cái này mới là sinh dữ liệu trên bản sau, CT04 mới áp dụng vô dữ liệu thật dk. chốt CM-16 giữ 6%, kiểm tra lại rồi commit và push"* | Xác nhận: CT3 chỉ chạy trên bản sao, CT4 mới áp vào DB thật. Chốt CM-16 (giữ 6%). Kiểm lại: test 243/243, PART C 0 vi phạm, `verify` 16 trang 200, DB thật giống hệt. Commit `7cb8fb4`, `9bb463f`, commit `docs:` và push |
+| 2026-11-17 (CT4) | `d7e11adb` | 5 bước CT4, PART B *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN lịch sử GĐ3 và trừ km khỏi odometer"* | Sao lưu (khôi phục thử ok) + bản riêng các dòng GĐ3. Script lưu trữ (xoá mềm) và script mở lại, tổng duyệt trên `busmanagement_test`. DB thật: PART A đúng số, lưu trữ 21.192 dòng (không xoá), bộ sinh 26.670 chuyến giống hệt tổng duyệt, PART C 0 vi phạm, `verify` 16 trang 200, Dự báo 18 chuỗi. Chưa commit |
 
 ---
 

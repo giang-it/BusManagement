@@ -198,6 +198,7 @@ Core transactional entity representing a scheduled bus dispatch.
 **Soft Delete:**
 - `@SQLDelete(sql = "UPDATE trips SET is_deleted = true WHERE id = ?")` — physical deletion is intercepted.
 - `@SQLRestriction("is_deleted = false")` — all queries automatically exclude soft-deleted rows.
+- **Archived history (route pairs CT4, 2026-11-17):** on the real DB, the 21,192 trips the GĐ2 generator wrote on 2026-10-22 are kept as soft-deleted rows (`is_deleted = 1`) instead of being deleted, as the owner asked. So the table holds more rows than any screen shows: 26,670 visible generator trips plus the owner's own, and 21,194 soft-deleted rows (the archive and 2 trips deleted in the app). `docs/development/route_pairs_research/ct4_restore_old_history.sql` swaps the archived and the current history.
 
 **Business helpers (computed, not persisted):**
 - `getOccupancyRate()` = `ticketsSold / totalSeats`

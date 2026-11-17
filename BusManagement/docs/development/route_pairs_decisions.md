@@ -86,6 +86,10 @@
 ### QĐ-21. Sinh lại dữ liệu (chốt 2026-11-16)
 
 - **Xoá lịch sử do bộ sinh GĐ3 tạo, rồi sinh lại.** Không dùng bộ lọc tuyến. Làm theo đúng cách GĐ3 (QĐ-14): sao lưu, tổng duyệt trên bản sao, chủ dự án xác nhận lần cuối, xuất file nhu cầu thật.
+  - **Sửa ngày 2026-11-17 khi làm CT4**, chủ dự án: *"PART B: KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN lịch sử GĐ3 và trừ km khỏi odometer"*.
+  - Trên DB thật, lịch sử GĐ3 được **lưu trữ chứ không xoá**: xoá mềm (`is_deleted = 1`, đúng cách app tự xoá một chuyến). Dòng còn nguyên trong bảng; mọi truy vấn của app, bộ sinh và dự báo không thấy nó.
+  - Km của nó vẫn được trừ khỏi cả hai mốc odometer.
+  - Mở lại bằng `route_pairs_research/ct4_restore_old_history.sql`. Ngoài ra có thêm bản sao lưu riêng các dòng đó.
 - **Thứ tự:** tạo đủ cặp tuyến trước (đã xong trên DB thật), chỉnh loại xe (QĐ-20), rồi mới sinh.
 - **Giữ nguyên mọi quy luật hiện có của `HistorySimulation`:**
   - giờ trong ngày;
@@ -301,3 +305,6 @@
   - Ghi "cách hiểu khi cài" vào QĐ-21.
   - Mở **CM-16**: bão và hủy vẫn theo từng chiều trong lịch sử vòng xe.
 - **2026-11-17 (CT3, sau):** chủ dự án chốt *"chốt CM-16 giữ 6%"*. Bão và hủy giữ nguyên như QĐ-10, ghi vào QĐ-21. Code không đổi. Sau báo cáo CT3, chủ dự án bảo *"kiểm tra lại rồi commit và push"*, nên code được commit cùng các "cách hiểu khi cài" như đã ghi ở QĐ-21.
+- **2026-11-17 (CT4):** chủ dự án giao 5 bước của CT4 và sửa bước PART B: *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN lịch sử GĐ3"*.
+  - Ghi thành sửa đổi của QĐ-21: lưu trữ bằng xoá mềm thay cho xoá, có script mở lại.
+  - Đã làm trên DB thật. Không có quyết định mới nào khác.
