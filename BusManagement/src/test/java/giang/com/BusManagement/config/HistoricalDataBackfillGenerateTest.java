@@ -8,6 +8,9 @@ import giang.com.BusManagement.domain.Driver;
 import giang.com.BusManagement.domain.HolidayFlow;
 import giang.com.BusManagement.domain.Role;
 import giang.com.BusManagement.domain.Route;
+import giang.com.BusManagement.domain.RouteStation;
+import giang.com.BusManagement.domain.RouteStationId;
+import giang.com.BusManagement.domain.Station;
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.domain.User;
@@ -15,6 +18,8 @@ import giang.com.BusManagement.repository.BusRepository;
 import giang.com.BusManagement.repository.BusTypeRepository;
 import giang.com.BusManagement.repository.DriverRepository;
 import giang.com.BusManagement.repository.RouteRepository;
+import giang.com.BusManagement.repository.RouteStationRepository;
+import giang.com.BusManagement.repository.StationRepository;
 import giang.com.BusManagement.repository.TripRepository;
 import giang.com.BusManagement.repository.UserRepository;
 import jakarta.persistence.EntityManager;
@@ -27,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,9 +47,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Bộ sinh dữ liệu lịch sử chạy THẬT trên busmanagement_test (QĐ-10, QĐ-11): ghi DB, xếp
- * xe/tài xế theo ngày, cộng odometer, chạy lại không nhân bản, từ chối trộn với dữ liệu
- * của bộ sinh cũ, và né xe/người của chuyến có sẵn (GĐ3, lỗi #33).
+ * Bộ sinh dữ liệu lịch sử chạy THẬT trên busmanagement_test (QĐ-10, QĐ-11, QĐ-21): ghi DB, xe
+ * chạy vòng trên hai cặp tuyến, cộng odometer, chạy lại không nhân bản, chạy bổ sung nối tiếp
+ * đúng vị trí, từ chối trộn với dữ liệu của bộ sinh cũ hay danh sách tuyến thiếu chiều ngược,
+ * và né xe/người của chuyến có sẵn (GĐ3, lỗi #33).
  *
  * Gọi generate(lastDay) trực tiếp trên một instance dựng tay (bean chỉ tồn tại ở profile
  * backfill). @Transactional nên mọi bản ghi được rollback sau từng test.
@@ -56,6 +64,8 @@ class HistoricalDataBackfillGenerateTest {
 
     @Autowired private TripRepository tripRepository;
     @Autowired private RouteRepository routeRepository;
+    @Autowired private RouteStationRepository routeStationRepository;
+    @Autowired private StationRepository stationRepository;
     @Autowired private BusRepository busRepository;
     @Autowired private BusTypeRepository busTypeRepository;
     @Autowired private DriverRepository driverRepository;
@@ -64,42 +74,43 @@ class HistoricalDataBackfillGenerateTest {
 
     private HistoricalDataBackfill backfill;
     private List<Route> routes;
+    private Station home;
 
     @BeforeEach
     void setUp() {
+        home = station("Bến nhà GEN");
+        Station near = station("Bến gần GEN");
+        Station far = station("Bến xa GEN");
         BusType seats22 = busType("Lễ 22", 22);
         BusType seats40 = busType("Lễ 40", 40);
-        for (int i = 1; i <= 8; i++) {
+        for (int i = 1; i <= 10; i++) {
             bus("GEN-" + i, i <= 4 ? seats22 : seats40, 1000.0 * i);
         }
-        for (int i = 1; i <= 8; i++) {
+        for (int i = 1; i <= 14; i++) {
             driver("gen-driver-" + i);
         }
         routes = List.of(
-                route(seats22, HolidayFlow.LEAVING_HUB, 120.0, 120),
+                route(seats22, HolidayFlow.LEAVING_HUB, 120.0, 120, home, near),
+                route(seats22, HolidayFlow.TOWARD_HUB, 120.0, 120, near, home),
                 // 8 tiếng, mức tối đa bộ sinh nhận: chuyến 18:00 về lúc 02:00 hôm sau
-                route(seats40, HolidayFlow.TOWARD_HUB, 180.0, 480));
+                route(seats40, HolidayFlow.LEAVING_HUB, 180.0, 480, home, far),
+                route(seats40, HolidayFlow.TOWARD_HUB, 180.0, 480, far, home));
         flushAndClear();
         backfill = new HistoricalDataBackfill(tripRepository, routeRepository, busRepository, driverRepository);
+        backfill.routeIds = routes.stream().map(Route::getId).toList();
     }
 
     @Test
-    void generate_writesEveryDay_withOneTripPerBusAndDriverPerDay() {
+    void generate_writesEveryDay_withBusesAndDriversRunningInLoops() {
         int created = backfill.generate(LAST_DAY);
         flushAndClear();
 
         List<Trip> trips = generatedTrips();
         assertEquals(created, trips.size());
-        Map<LocalDate, Set<Long>> busesByDay = new HashMap<>();
-        Map<LocalDate, Set<Long>> driversByDay = new HashMap<>();
         Set<LocalDate> days = new HashSet<>();
         for (Trip trip : trips) {
             LocalDate day = trip.getDepartureTime().toLocalDate();
             days.add(day);
-            assertTrue(busesByDay.computeIfAbsent(day, d -> new HashSet<>()).add(trip.getBus().getId()),
-                    day + ": một xe hai chuyến");
-            assertTrue(driversByDay.computeIfAbsent(day, d -> new HashSet<>()).add(trip.getDriver().getUserId()),
-                    day + ": một tài xế hai chuyến");
             assertTrue(trip.getTicketsSold() <= trip.getTotalSeats());
             assertEquals(trip.getBus().getBusType().getCapacity(), trip.getTotalSeats());
             assertTrue(trip.getStatus() == TripStatus.COMPLETED || trip.getStatus() == TripStatus.CANCELLED);
@@ -109,6 +120,7 @@ class HistoricalDataBackfillGenerateTest {
             }
         }
         assertEquals(14, days.size(), "đủ 14 ngày từ EPOCH");
+        assertLoopsAreContinuous(trips);
     }
 
     /** Odometer: cộng CẢ HAI mốc đúng bằng km của chuyến COMPLETED — kmSinceLastMaintenance không đổi. */
@@ -150,16 +162,77 @@ class HistoricalDataBackfillGenerateTest {
         assertEquals(first, generatedTrips().size());
     }
 
-    /** Chạy bổ sung chỉ sinh ngày còn thiếu, và những ngày đó giống hệt một lần chạy liền. */
+    /**
+     * Chạy bổ sung chỉ sinh ngày còn thiếu, và NỐI TIẾP đúng chỗ lần trước dừng: xe và tài xế
+     * xuất phát từ bến mà chuyến cuối đã ghi của họ tới — kể cả qua ranh giới hai lần chạy.
+     */
     @Test
-    void topUp_generatesOnlyTheMissingDays() {
+    void topUp_generatesOnlyTheMissingDays_andContinuesEveryLoop() {
         int first = backfill.generate(EPOCH.plusDays(6));
         flushAndClear();
         int second = backfill.generate(LAST_DAY);
         flushAndClear();
 
+        assertTrue(second > 0);
         assertEquals(first + second, generatedTrips().size());
         assertEquals(14, generatedTrips().stream().map(t -> t.getDepartureTime().toLocalDate()).distinct().count());
+        assertLoopsAreContinuous(generatedTrips());
+    }
+
+    /** Ngày đã sinh phải liền một mạch từ EPOCH: xe chạy vòng nên không sinh chen vào giữa. */
+    @Test
+    void aGapInTheGeneratedDays_isRefused() {
+        backfill.generate(EPOCH.plusDays(6));
+        flushAndClear();
+        List<Trip> dayThree = generatedTrips().stream()
+                .filter(t -> t.getDepartureTime().toLocalDate().equals(EPOCH.plusDays(3))).toList();
+        dayThree.stream().filter(Trip::isExtraTrip).forEach(tripRepository::delete);
+        flushAndClear();
+        dayThree.stream().filter(t -> !t.isExtraTrip()).forEach(tripRepository::delete);
+        flushAndClear();
+        int before = generatedTrips().size();
+
+        assertEquals(0, backfill.generate(LAST_DAY));
+        flushAndClear();
+        assertEquals(before, generatedTrips().size());
+    }
+
+    /** Tuyến không có chiều ngược trong danh sách thì xe đi không có đường về: dừng cả lần chạy. */
+    @Test
+    void aRouteWithoutItsReverse_isRefused() {
+        backfill.routeIds = List.of(routes.get(0).getId(), routes.get(2).getId(), routes.get(3).getId());
+        assertEquals(0, backfill.generate(LAST_DAY));
+        flushAndClear();
+        assertTrue(generatedTrips().isEmpty());
+    }
+
+    /** Cặp tuyến phải khớp đúng một chiều ngược (đề xuất CM-6): hai tuyến cùng bến về thì không biết ghép cặp nào. */
+    @Test
+    void aRouteWithTwoReverses_isRefused() {
+        Station near = stationRepository.findAll().stream()
+                .filter(s -> "Bến gần GEN".equals(s.getStationName())).findFirst().orElseThrow();
+        Route second = route(routes.get(1).getSuitableBusType(), HolidayFlow.TOWARD_HUB, 120.0, 120, near, home);
+        List<Long> ids = new ArrayList<>(backfill.routeIds);
+        ids.add(second.getId());
+        backfill.routeIds = ids;
+        flushAndClear();
+
+        assertEquals(0, backfill.generate(LAST_DAY));
+        flushAndClear();
+        assertTrue(generatedTrips().isEmpty());
+    }
+
+    /** Xe hay tài xế chưa có bến nhà (CT5a) thì không biết họ bắt đầu từ đâu: dừng. */
+    @Test
+    void aBusWithoutAHomeStation_isRefused() {
+        Bus bus = busWithPlate("GEN-3");
+        bus.setHomeStation(null);
+        busRepository.save(bus);
+        flushAndClear();
+
+        assertEquals(0, backfill.generate(LAST_DAY));
+        flushAndClear();
+        assertTrue(generatedTrips().isEmpty());
     }
 
     /** Dữ liệu dạng bộ sinh mà ngày EPOCH lại trống là của bộ sinh cũ: phải xoá (GĐ3) trước. */
@@ -187,8 +260,8 @@ class HistoricalDataBackfillGenerateTest {
      */
     @Test
     void existingTrips_holdTheirBusAndStaff_onEveryDayTheyTouch() {
-        driver("gen-driver-9");
-        driver("gen-driver-10"); // 10 tài xế: giữ 3 người vẫn đủ 6 khung mỗi ngày
+        driver("gen-driver-15");
+        driver("gen-driver-16"); // 16 tài xế: giữ 3 người vẫn đủ người cho vòng xe mỗi ngày
         flushAndClear();
         Bus heldBus = busWithPlate("GEN-1");
         Driver heldDriver = driverNamed("gen-driver-1");
@@ -274,6 +347,39 @@ class HistoricalDataBackfillGenerateTest {
 
     // =====================================================================
 
+    /**
+     * Bất biến vòng xe (QĐ-21 (c)) trên các chuyến dạng bộ sinh đã ghi: theo từng xe và từng tài
+     * xế, chuyến đầu từ bến nhà, chuyến sau từ bến chuyến trước tới, và nghỉ đủ.
+     */
+    private void assertLoopsAreContinuous(List<Trip> trips) {
+        Map<Long, List<Trip>> byBus = new HashMap<>();
+        Map<Long, List<Trip>> byDriver = new HashMap<>();
+        for (Trip trip : trips) {
+            if (trip.getStatus() == TripStatus.CANCELLED || trip.getDepartureTime().getMinute() % 10 != 0
+                    || trip.getDepartureTime().getHour() % 6 != 0) {
+                continue; // chuyến hủy không chạy; chuyến có sẵn của test nằm ngoài vòng xe
+            }
+            byBus.computeIfAbsent(trip.getBus().getId(), k -> new ArrayList<>()).add(trip);
+            byDriver.computeIfAbsent(trip.getDriver().getUserId(), k -> new ArrayList<>()).add(trip);
+        }
+        assertFalse(byBus.isEmpty());
+        for (Map<Long, List<Trip>> runs : List.of(byBus, byDriver)) {
+            long rest = runs == byBus ? 60 : 30;
+            runs.forEach((id, list) -> {
+                list.sort(Comparator.comparing(Trip::getDepartureTime));
+                assertEquals(home.getId(), list.get(0).getRoute().getDepartureStation().getId(), "#" + id);
+                for (int i = 1; i < list.size(); i++) {
+                    Trip before = list.get(i - 1);
+                    Trip next = list.get(i);
+                    assertEquals(before.getRoute().getDestinationStation().getId(),
+                            next.getRoute().getDepartureStation().getId(), "#" + id + " " + next.getDepartureTime());
+                    assertFalse(before.getArrivalTimeExpected().plusMinutes(rest).isAfter(next.getDepartureTime()),
+                            "#" + id + " " + next.getDepartureTime() + ": nghỉ chưa đủ");
+                }
+            });
+        }
+    }
+
     private List<Trip> generatedTrips() {
         Set<Long> routeIds = new HashSet<>();
         routes.forEach(r -> routeIds.add(r.getId()));
@@ -319,9 +425,16 @@ class HistoricalDataBackfillGenerateTest {
         return busTypeRepository.save(type);
     }
 
+    private Station station(String name) {
+        Station station = new Station();
+        station.setStationName(name);
+        return stationRepository.save(station);
+    }
+
     private void bus(String plate, BusType type, double odometer) {
         Bus bus = new Bus();
         bus.setLicensePlate(plate);
+        bus.setHomeStation(home);
         bus.setBusType(type);
         bus.setOdometer(odometer);
         bus.setLastMaintenanceOdometer(odometer - 100);
@@ -344,17 +457,30 @@ class HistoricalDataBackfillGenerateTest {
         d.setTotalDrivingHours24h(0.0);
         d.setIsActive(true);
         d.setLicenseExpiryDate(LocalDate.of(2030, 1, 1));
+        d.setHomeStation(home);
         user.setDriver(d);
         userRepository.save(user);
     }
 
-    private Route route(BusType type, HolidayFlow flow, double km, int minutes) {
+    private Route route(BusType type, HolidayFlow flow, double km, int minutes, Station from, Station to) {
         Route route = new Route();
         route.setSuitableBusType(type);
         route.setHolidayFlow(flow);
         route.setDistanceKm(km);
         route.setEstimatedDuration(minutes);
-        return routeRepository.save(route);
+        Route saved = routeRepository.save(route);
+        stop(saved, from, 1);
+        stop(saved, to, 2);
+        return saved;
+    }
+
+    private void stop(Route route, Station station, int order) {
+        RouteStation rs = new RouteStation();
+        rs.setId(new RouteStationId(route.getId(), station.getId()));
+        rs.setRoute(route);
+        rs.setStation(station);
+        rs.setStopOrder(order);
+        routeStationRepository.save(rs);
     }
 
     private void flushAndClear() {

@@ -32,6 +32,10 @@ class HistorySimulationTest {
     private static final RouteProfile IN = new RouteProfile(4, HolidayFlow.TOWARD_HUB, 40);
     private static final RouteProfile CROSS = new RouteProfile(3, null, 40);
     private static final List<RouteProfile> ROUTES = List.of(OUT, IN, CROSS);
+    /** Một cặp đi / về (QĐ-21): Miền Đông → Vũng Tàu và chiều ngược. */
+    private static final RouteProfile PAIR_OUT = new RouteProfile(10, HolidayFlow.LEAVING_HUB, 22, 11L);
+    private static final RouteProfile PAIR_IN = new RouteProfile(11, HolidayFlow.TOWARD_HUB, 22, 10L);
+    private static final List<RouteProfile> PAIRED = List.of(PAIR_OUT, PAIR_IN);
 
     private static HistorySimulation simulation(LocalDate lastDay) {
         return new HistorySimulation(HistoricalDataBackfill.RANDOM_SEED, ROUTES, lastDay);
@@ -56,6 +60,68 @@ class HistorySimulationTest {
                 }
             }
         }
+    }
+
+    /** Cùng phép thử cho một cặp: đợt về được cân theo CẢ đợt đi, mà vẫn không đổi khi chạy bổ sung. */
+    @Test
+    void aLaterRun_reproducesEveryEarlierDay_forAPairToo() {
+        LocalDate earlierEnd = LocalDate.of(2024, 6, 30);
+        HistorySimulation earlier = new HistorySimulation(HistoricalDataBackfill.RANDOM_SEED, PAIRED, earlierEnd);
+        HistorySimulation later = new HistorySimulation(HistoricalDataBackfill.RANDOM_SEED, PAIRED, LAST_DAY);
+        for (LocalDate d = HistorySimulation.EPOCH; !d.isAfter(earlierEnd); d = d.plusDays(1)) {
+            for (RouteProfile route : PAIRED) {
+                for (int h = 0; h < HistorySimulation.DEPARTURE_HOURS.size(); h++) {
+                    assertEquals(earlier.mean(route, d, h), later.mean(route, d, h), route + " " + d + " " + h);
+                    assertEquals(earlier.demand(route, d, h), later.demand(route, d, h), route + " " + d + " " + h);
+                }
+            }
+        }
+    }
+
+    /**
+     * QĐ-21 (a): mức tuyến, độ trôi và nhảy bậc rút theo CẶP — hai chiều của một cặp có cùng
+     * "mức khách" mọi ngày; chỉ hình dạng theo chiều (mùa, thứ, lễ) là khác. Hai tuyến không ghép
+     * cặp thì mỗi tuyến một mức như trước.
+     */
+    @Test
+    void pairedRoutes_shareTheirLevel_whileUnpairedRoutesDoNot() {
+        HistorySimulation paired = new HistorySimulation(HistoricalDataBackfill.RANDOM_SEED, PAIRED, LAST_DAY);
+        HistorySimulation unpaired = simulation(LAST_DAY);
+        double largestGap = 0;
+        for (LocalDate d = HistorySimulation.EPOCH; !d.isAfter(LAST_DAY); d = d.plusDays(1)) {
+            assertEquals(paired.levelLog(PAIR_OUT, d), paired.levelLog(PAIR_IN, d), 1e-9, d.toString());
+            largestGap = Math.max(largestGap, Math.abs(unpaired.levelLog(OUT, d) - unpaired.levelLog(IN, d)));
+        }
+        assertTrue(largestGap > 0.02, "tuyến lẻ vẫn tự rút mức riêng: lệch lớn nhất " + largestGap);
+    }
+
+    /**
+     * QĐ-21 (b), CM-3: tổng khách dư của đợt VỀ = r × tổng khách dư của đợt ĐI của cùng cặp, mỗi
+     * (dịp lễ, năm) một r, r đều trong [0,85; 1,15], tâm 100% — có năm về ít hơn, có năm về nhiều hơn.
+     */
+    @Test
+    void returnWave_isTheOutboundWaveTimesR_withRCentredOnOneHundredPercent() {
+        HistorySimulation simulation = new HistorySimulation(HistoricalDataBackfill.RANDOM_SEED, PAIRED, LAST_DAY);
+        double sum = 0;
+        double min = Double.MAX_VALUE;
+        double max = 0;
+        int n = 0;
+        for (Holiday holiday : Holiday.values()) {
+            for (int year = 2023; year <= 2027; year++) {
+                double r = simulation.returnRatio(PAIR_OUT.pairKey(), holiday, year);
+                double out = simulation.holidayExcess(PAIR_OUT.routeId(), holiday, year);
+                double back = simulation.holidayExcess(PAIR_IN.routeId(), holiday, year);
+                assertTrue(out > 0, holiday + " " + year + ": đợt đi có khách dư");
+                assertEquals(r, back / out, 1e-6, holiday + " " + year);
+                assertTrue(r >= HistorySimulation.RETURN_RATIO_MIN && r <= HistorySimulation.RETURN_RATIO_MAX);
+                sum += r;
+                min = Math.min(min, r);
+                max = Math.max(max, r);
+                n++;
+            }
+        }
+        assertEquals(1.0, sum / n, 0.05, "tâm của r");
+        assertTrue(min < 0.95 && max > 1.05, "r dao động hai phía: " + min + " … " + max);
     }
 
     @Test

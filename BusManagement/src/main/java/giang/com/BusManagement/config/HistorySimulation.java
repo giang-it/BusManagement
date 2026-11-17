@@ -44,6 +44,20 @@ import java.util.Random;
  * ngày chạy. Vì vậy chạy hôm nay hay chạy bổ sung tuần sau đều cho đúng cùng một con
  * số cho cùng một ngày — đây là thứ bộ sinh cũ thiếu (nó tính xu hướng từ
  * "hôm nay − 84" nên mỗi lần chạy bổ sung lại reset, tạo hình răng cưa: lỗi #31).
+ *
+ * ====================================================================
+ * CẶP TUYẾN (CT3, QĐ-21 trong docs/development/route_pairs_decisions.md)
+ * ====================================================================
+ * Hai chiều của một cặp (RouteProfile.partnerRouteId) dùng CHUNG mức tuyến, độ trôi, các
+ * lần nhảy bậc và độ lớn lễ từng năm — rút theo khoá cặp (RouteProfile.pairKey) — nên không
+ * còn chuyện chiều đi nhảy bậc −15% mà chiều về thì không (QĐ-21 (a)). Phần riêng của mỗi
+ * chiều giữ nguyên: mùa, thứ trong tuần, hình dạng lễ theo hướng dòng khách, bão, hủy chuyến,
+ * nhiễu và ý định tăng cường.
+ *
+ * Khách quay về sau lễ (QĐ-21 (b)): với mỗi (cặp, dịp lễ, năm), tổng khách DƯ của đợt về
+ * bằng r × tổng khách dư của đợt đi, r đều trong [0,85; 1,15], tâm 100% (CM-3). Đợt về giữ
+ * hình dạng cũ, chỉ biên độ được giải lại cho khớp tổng (balanceReturnWave). r rút từ một
+ * luồng ngẫu nhiên MỚI, nên các luồng cũ không xê dịch.
  */
 final class HistorySimulation {
 
@@ -114,8 +128,23 @@ final class HistorySimulation {
         }
     }
 
-    /** Thông tin bộ sinh cần về một tuyến. */
-    record RouteProfile(long routeId, HolidayFlow holidayFlow, int standardSeats) {
+    /**
+     * Thông tin bộ sinh cần về một tuyến. partnerRouteId = tuyến chiều ngược của cùng cặp (QĐ-19,
+     * QĐ-21), hoặc null nếu tuyến chạy lẻ — khi đó tuyến tự làm thành một "cặp" của riêng nó.
+     */
+    record RouteProfile(long routeId, HolidayFlow holidayFlow, int standardSeats, Long partnerRouteId) {
+
+        RouteProfile(long routeId, HolidayFlow holidayFlow, int standardSeats) {
+            this(routeId, holidayFlow, standardSeats, null);
+        }
+
+        /**
+         * Khoá chung của cặp (QĐ-21 (a)): id nhỏ hơn trong hai chiều. Mức tuyến, độ trôi, nhảy bậc và
+         * độ lớn lễ từng năm rút theo khoá này, nên hai chiều của một cặp dùng chung "mức khách".
+         */
+        long pairKey() {
+            return partnerRouteId == null ? routeId : Math.min(routeId, partnerRouteId);
+        }
     }
 
     /** Kỳ nghỉ chính thức mô phỏng của một dịp lễ trong một năm. */
@@ -134,10 +163,24 @@ final class HistorySimulation {
     private static final long CANCEL = 8;
     private static final long EXTRA = 9;
     private static final long SLOT_ORDER = 10;
+    /** Tỉ lệ khách quay về sau lễ r (QĐ-21 (b), CT3) — luồng MỚI, không xê dịch các luồng cũ. */
+    private static final long RETURN = 11;
+
+    /** r rút đều trong [0,85; 1,15], tâm 100% (CM-3). */
+    static final double RETURN_RATIO_MIN = 0.85;
+    static final double RETURN_RATIO_MAX = 1.15;
 
     private final long seed;
-    private final LocalDate lastDay;
+    /**
+     * Mô phỏng chạy tới HẾT NĂM lastYear, không dừng ở lastDay: (1) đợt về sau lễ được cân theo
+     * đợt đi bằng số khách của CẢ đợt, nên phải thấy cả đợt dù lastDay rơi giữa chừng — nhờ vậy
+     * chạy bổ sung về sau ra đúng cùng con số; (2) bộ điều độ nhìn trước sang ngày lastDay + 1.
+     * Mọi quá trình vẫn tính từ EPOCH, nên kéo dài khoảng không đổi con số của ngày nào trước đó.
+     */
+    private final LocalDate horizonEnd;
     private final int days;
+    private final Map<String, Double> returnRatios = new HashMap<>();
+    private final Map<String, Double> holidayExcess = new HashMap<>();
     private final Map<Holiday, Map<Integer, OfficialBreak>> breaks = new EnumMap<>(Holiday.class);
 
     private final Map<Long, double[]> baseLog = new HashMap<>();
@@ -157,9 +200,9 @@ final class HistorySimulation {
                     + " và nằm trong phạm vi lịch ngày lễ (HolidayCalendar).");
         }
         this.seed = seed;
-        this.lastDay = lastDay;
-        this.days = (int) ChronoUnit.DAYS.between(EPOCH, lastDay) + 1;
         int lastYear = Math.min(lastDay.getYear() + 1, HolidayCalendar.LAST_COVERED_YEAR);
+        this.horizonEnd = LocalDate.of(lastYear, 12, 31);
+        this.days = (int) ChronoUnit.DAYS.between(EPOCH, horizonEnd) + 1;
         for (Holiday holiday : Holiday.values()) {
             Map<Integer, OfficialBreak> byYear = new HashMap<>();
             for (int year = EPOCH.getYear(); year <= lastYear; year++) {
@@ -167,9 +210,26 @@ final class HistorySimulation {
             }
             breaks.put(holiday, byYear);
         }
+        Map<Long, RouteProfile> byId = new HashMap<>();
+        routes.forEach(r -> byId.put(r.routeId(), r));
         for (RouteProfile route : routes) {
-            prepare(route, lastYear);
+            prepare(route, lastYear, returnRouteOfPair(route, byId));
         }
+        for (RouteProfile route : routes) {
+            if (returnRouteOfPair(route, byId)) {
+                balanceReturnWave(route, byId.get(route.partnerRouteId()), lastYear);
+            }
+        }
+    }
+
+    /**
+     * Tuyến này là chiều VỀ bến lớn (TOWARD_HUB) của một cặp có chiều ĐI (LEAVING_HUB) — tức đợt
+     * về sau lễ của nó được cân theo đợt đi của tuyến cặp (QĐ-21 (b)). Cặp không theo chiều, hay
+     * khai hai chiều cùng hướng, giữ cách cũ (mỗi chiều một biên độ chuẩn).
+     */
+    private static boolean returnRouteOfPair(RouteProfile route, Map<Long, RouteProfile> byId) {
+        RouteProfile partner = route.partnerRouteId() != null ? byId.get(route.partnerRouteId()) : null;
+        return partner != null && Flow.of(route.holidayFlow()) == Flow.IN && Flow.of(partner.holidayFlow()) == Flow.OUT;
     }
 
     // =========================================================================
@@ -259,21 +319,29 @@ final class HistorySimulation {
     // Chuẩn bị theo tuyến
     // =========================================================================
 
-    private void prepare(RouteProfile route, int lastYear) {
+    /**
+     * @param balanced true = tuyến là chiều VỀ của một cặp đi / về: đợt lễ của nó chưa dựng ở đây
+     *                 mà ở balanceReturnWave(), sau khi đợt đi của tuyến cặp đã có (QĐ-21 (b))
+     */
+    private void prepare(RouteProfile route, int lastYear, boolean balanced) {
         long id = route.routeId();
+        // QĐ-21 (a): mức, trôi, nhảy bậc, độ lớn lễ rút theo CẶP; bão, hủy, nhu cầu, ý định tăng
+        // cường vẫn theo từng tuyến (từng chiều).
+        long pair = route.pairKey();
         Flow flow = Flow.of(route.holidayFlow());
-        routeLevel.put(id, uniform(random(LEVEL, id, 0, 0), ROUTE_LEVEL_MIN, ROUTE_LEVEL_MAX));
+        routeLevel.put(id, uniform(random(LEVEL, pair, 0, 0), ROUTE_LEVEL_MIN, ROUTE_LEVEL_MAX));
 
-        // Mức: tăng trưởng + bước ngẫu nhiên tính từ EPOCH + nhảy bậc theo từng năm.
+        // Mức: tăng trưởng + bước ngẫu nhiên tính từ EPOCH + nhảy bậc theo từng năm. Riêng phần
+        // mùa (season) đi theo chiều: chiều về có bướu cuối hè, chiều đi có bướu đầu hè.
         double[] base = new double[days];
-        Random walk = random(WALK, id, 0, 0);
+        Random walk = random(WALK, pair, 0, 0);
         double level = 0;
         for (int day = 0; day < days; day++) {
             level += walk.nextGaussian() * WALK_SD;
             base[day] = GROWTH_PER_YEAR * day / 365.25 + level + season(flow, EPOCH.plusDays(day));
         }
-        for (int year = EPOCH.getYear(); year <= lastDay.getYear(); year++) {
-            Random jump = random(JUMP, id, year, 0);
+        for (int year = EPOCH.getYear(); year <= horizonEnd.getYear(); year++) {
+            Random jump = random(JUMP, pair, year, 0);
             if (jump.nextDouble() < JUMP_PROBABILITY_PER_YEAR) {
                 LocalDate when = LocalDate.of(year, 1, 1).plusDays(jump.nextInt(LocalDate.of(year, 1, 1).lengthOfYear()));
                 double step = Math.log(uniform(jump, JUMP_MIN, JUMP_MAX));
@@ -285,18 +353,12 @@ final class HistorySimulation {
         baseLog.put(id, base);
 
         double[][] holidays = new double[DEPARTURE_HOURS.size()][days];
-        for (Holiday holiday : Holiday.values()) {
-            for (int year = EPOCH.getYear(); year <= lastYear; year++) {
-                OfficialBreak officialBreak = breaks.get(holiday).get(year);
-                // Độ lớn mỗi lần lễ dao động ±15%, giống nhau cho mọi khung của tuyến.
-                double jitter = uniform(random(JITTER, id, holiday.ordinal(), year), 0.85, 1.15);
-                for (int h = 0; h < DEPARTURE_HOURS.size(); h++) {
-                    int hour = DEPARTURE_HOURS.get(h);
-                    if (holiday == Holiday.LUNAR_NEW_YEAR) {
-                        addTet(holidays[h], flow, hour, officialBreak, HolidayCalendar.anchorOf(holiday, year), jitter);
-                    } else {
-                        addSmallHoliday(holidays[h], flow, hour, officialBreak, SMALL_AMPLITUDE.get(holiday) * jitter);
-                    }
+        if (!balanced) {
+            for (Holiday holiday : Holiday.values()) {
+                for (int year = EPOCH.getYear(); year <= lastYear; year++) {
+                    double[][] term = occurrence(route, holiday, year, standardAmplitude(route, holiday, year));
+                    holidayExcess.put(key(id, holiday, year), positiveExcess(route, term));
+                    addInto(holidays, term);
                 }
             }
         }
@@ -304,6 +366,144 @@ final class HistorySimulation {
 
         closure.put(id, storms(id));
         wishedExtras.put(id, operatorWishes(id, flow, lastYear));
+    }
+
+    /**
+     * Biên độ chuẩn của một lần lễ: độ lớn mặc định theo chiều (Tết) hay theo dịp (lễ nhỏ), nhân
+     * dao động ±15% của năm đó. Dao động rút theo CẶP (QĐ-21 (a)), nên hai chiều cùng "to" hay
+     * cùng "nhỏ" trong cùng một năm.
+     */
+    private double standardAmplitude(RouteProfile route, Holiday holiday, int year) {
+        double jitter = jitter(route, holiday, year);
+        return holiday == Holiday.LUNAR_NEW_YEAR
+                ? TET_AMPLITUDE.get(Flow.of(route.holidayFlow())) * jitter
+                : SMALL_AMPLITUDE.get(holiday) * jitter;
+    }
+
+    private double jitter(RouteProfile route, Holiday holiday, int year) {
+        return uniform(random(JITTER, route.pairKey(), holiday.ordinal(), year), 0.85, 1.15);
+    }
+
+    /** Hệ số lễ (log) của MỘT lần lễ trên mọi khung của tuyến, với biên độ cho trước. */
+    private double[][] occurrence(RouteProfile route, Holiday holiday, int year, double amplitude) {
+        Flow flow = Flow.of(route.holidayFlow());
+        OfficialBreak officialBreak = breaks.get(holiday).get(year);
+        double[][] term = new double[DEPARTURE_HOURS.size()][days];
+        for (int h = 0; h < DEPARTURE_HOURS.size(); h++) {
+            int hour = DEPARTURE_HOURS.get(h);
+            if (holiday == Holiday.LUNAR_NEW_YEAR) {
+                addTet(term[h], flow, hour, officialBreak, HolidayCalendar.anchorOf(holiday, year), amplitude,
+                        jitter(route, holiday, year));
+            } else {
+                addSmallHoliday(term[h], flow, hour, officialBreak, amplitude);
+            }
+        }
+        return term;
+    }
+
+    private static void addInto(double[][] target, double[][] term) {
+        for (int h = 0; h < target.length; h++) {
+            for (int day = 0; day < target[h].length; day++) {
+                target[h][day] += term[h][day];
+            }
+        }
+    }
+
+    /**
+     * Tổng khách DƯ của một lần lễ trên một tuyến: Σ trên mọi ngày, mọi khung của max(0, nhu cầu
+     * ngày thường × (hệ số lễ − 1)). Chỉ tính phần tăng — những ngày lễ làm vắng đi (giữa kỳ
+     * nghỉ, chiều ngược) không trừ vào đợt.
+     */
+    private double positiveExcess(RouteProfile route, double[][] term) {
+        double total = 0;
+        for (int h = 0; h < term.length; h++) {
+            for (int day = 0; day < days; day++) {
+                if (term[h][day] > 0) {
+                    total += normalMean(route, day, h) * (Math.exp(term[h][day]) - 1);
+                }
+            }
+        }
+        return total;
+    }
+
+    /** Nhu cầu kỳ vọng của khung khi KHÔNG có lễ — cùng công thức mean(), bỏ phần hệ số lễ. */
+    private double normalMean(RouteProfile route, int day, int hourIndex) {
+        Flow flow = Flow.of(route.holidayFlow());
+        DayOfWeek dow = EPOCH.plusDays(day).getDayOfWeek();
+        return route.standardSeats() * HOUR_LOAD[hourIndex] * routeLevel.get(route.routeId())
+                * normalisedWeek(flow)[dow.getValue() - 1] * weekHourFactor(flow, dow, DEPARTURE_HOURS.get(hourIndex))
+                * Math.exp(baseLog.get(route.routeId())[day]);
+    }
+
+    /**
+     * QĐ-21 (b), CM-3: với mỗi lần lễ, tổng khách dư của đợt VỀ (tuyến returnRoute) = r × tổng
+     * khách dư của đợt ĐI (tuyến cặp), r rút đều trong [0,85; 1,15] theo (cặp, dịp lễ, năm).
+     * Hình dạng đợt về giữ nguyên như bản cũ (đông nhất quanh ngày nghỉ cuối); chỉ biên độ của nó
+     * được giải bằng chia đôi khoảng, vì tổng khách dư tăng đơn điệu theo biên độ. Tết còn một đợt
+     * quay lại nhỏ sau Rằm (biên độ cố định), cũng tính vào tổng của đợt về.
+     */
+    private void balanceReturnWave(RouteProfile returnRoute, RouteProfile outbound, int lastYear) {
+        double[][] holidays = holidayLog.get(returnRoute.routeId());
+        for (Holiday holiday : Holiday.values()) {
+            for (int year = EPOCH.getYear(); year <= lastYear; year++) {
+                double out = holidayExcess.get(key(outbound.routeId(), holiday, year));
+                double r = uniform(random(RETURN, returnRoute.pairKey(), holiday.ordinal(), year),
+                        RETURN_RATIO_MIN, RETURN_RATIO_MAX);
+                double target = r * out;
+                double lo = 0;
+                double hi = Math.max(1e-6, standardAmplitude(returnRoute, holiday, year)) * 2;
+                while (positiveExcess(returnRoute, occurrence(returnRoute, holiday, year, hi)) < target && hi < 64) {
+                    hi *= 2;
+                }
+                if (positiveExcess(returnRoute, occurrence(returnRoute, holiday, year, lo)) >= target) {
+                    hi = 0;
+                }
+                for (int i = 0; i < 60 && hi > lo; i++) {
+                    double mid = (lo + hi) / 2;
+                    if (positiveExcess(returnRoute, occurrence(returnRoute, holiday, year, mid)) < target) {
+                        lo = mid;
+                    } else {
+                        hi = mid;
+                    }
+                }
+                double[][] term = occurrence(returnRoute, holiday, year, hi);
+                holidayExcess.put(key(returnRoute.routeId(), holiday, year), positiveExcess(returnRoute, term));
+                returnRatios.put(key(returnRoute.pairKey(), holiday, year), r);
+                addInto(holidays, term);
+            }
+        }
+    }
+
+    private static String key(long id, Holiday holiday, int year) {
+        return id + "/" + holiday + "/" + year;
+    }
+
+    /** r của một lần lễ của một cặp (cho test). */
+    double returnRatio(long pairKey, Holiday holiday, int year) {
+        Double r = returnRatios.get(key(pairKey, holiday, year));
+        if (r == null) {
+            throw new IllegalArgumentException("Không có r cho cặp " + pairKey + ", " + holiday + " " + year);
+        }
+        return r;
+    }
+
+    /** Tổng khách dư của một lần lễ trên một tuyến (cho test). */
+    double holidayExcess(long routeId, Holiday holiday, int year) {
+        return holidayExcess.get(key(routeId, holiday, year));
+    }
+
+    /**
+     * log "mức khách" của một tuyến tại một ngày: mức tuyến + tăng trưởng + trôi + nhảy bậc, bỏ
+     * phần mùa theo chiều và mọi hệ số lễ. QĐ-21 (a): hai chiều của một cặp có cùng con số này.
+     */
+    double levelLog(RouteProfile route, LocalDate date) {
+        return baseLog.get(route.routeId())[dayIndex(date)] + Math.log(routeLevel.get(route.routeId()))
+                - season(Flow.of(route.holidayFlow()), date);
+    }
+
+    /** Ngày cuối mà mô phỏng có số (hết năm lastYear) — bộ điều độ nhìn trước tới đây. */
+    LocalDate horizonEnd() {
+        return horizonEnd;
     }
 
     /** Mùa trong năm: các "bướu" theo ngày trong năm, cộng khoảng lặng sau Tết. */
@@ -337,9 +537,13 @@ final class HistorySimulation {
         return total;
     }
 
-    /** Hình dạng Tết theo hướng dòng khách, bám theo kỳ nghỉ — chép từ holiday_log() của bước 0. */
-    private void addTet(double[] log, Flow flow, int hour, OfficialBreak b, LocalDate tet, double jitter) {
-        double amplitude = TET_AMPLITUDE.get(flow) * jitter;
+    /**
+     * Hình dạng Tết theo hướng dòng khách, bám theo kỳ nghỉ — chép từ holiday_log() của bước 0.
+     * amplitude = độ lớn đợt chính (mặc định TET_AMPLITUDE × jitter; chiều về của một cặp được
+     * cân lại theo QĐ-21 (b)); jitter vẫn quyết độ lớn đợt quay lại nhỏ sau Rằm.
+     */
+    private void addTet(double[] log, Flow flow, int hour, OfficialBreak b, LocalDate tet, double amplitude,
+            double jitter) {
         LocalDate s = b.firstDayOff();
         LocalDate e = b.lastDayOff();
         for (int k = -9; k <= 0; k++) {
@@ -428,7 +632,7 @@ final class HistorySimulation {
     /** Đợt đóng tuyến vì bão: tối đa một đợt mỗi năm, 1–3 ngày, phần lớn rơi vào tháng 7–11. */
     private boolean[] storms(long routeId) {
         boolean[] closed = new boolean[days];
-        for (int year = EPOCH.getYear(); year <= lastDay.getYear(); year++) {
+        for (int year = EPOCH.getYear(); year <= horizonEnd.getYear(); year++) {
             Random random = random(STORM, routeId, year, 0);
             if (random.nextDouble() >= STORM_PROBABILITY_PER_YEAR) {
                 continue;
@@ -534,7 +738,7 @@ final class HistorySimulation {
     private int dayIndex(LocalDate date) {
         int day = dayIndexUnchecked(date);
         if (day < 0 || day >= days) {
-            throw new IllegalArgumentException("Ngày " + date + " nằm ngoài khoảng mô phỏng " + EPOCH + " → " + lastDay);
+            throw new IllegalArgumentException("Ngày " + date + " nằm ngoài khoảng mô phỏng " + EPOCH + " → " + horizonEnd);
         }
         return day;
     }
