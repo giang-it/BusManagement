@@ -3344,9 +3344,9 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
   đêm. Chuyến tăng cường của job 10 giây (+30 phút) thì vẫn có thể dính. Kế hoạch hiện để việc sửa đi cùng
   L1 khi làm cặp dài (QĐ-26, QĐ-27). Chủ dự án có thể quyết sửa riêng sớm hơn.
 
-## 35. Hai câu kiểm lịch tài xế gộp vai bằng `OR` qua bảng nối — quét cả bảng `trips`; form Tạo và màn Duyệt thủ công mất 23–28 giây
+## 35. Hai câu kiểm lịch tài xế gộp vai bằng `OR` qua bảng nối — quét cả bảng `trips`; form Tạo và màn Duyệt thủ công mất 23–28 giây — ĐÃ SỬA 2026-11-17, commit `7fb50f4` (2026-11-22, đã push)
 
-- **Gốc:** hai câu JPQL trong `TripRepository` gộp các vai bằng `OR` trải qua bảng nối `trip_co_drivers`:
+- **Gốc (trước bản sửa):** hai câu JPQL trong `TripRepository` gộp các vai bằng `OR` trải qua bảng nối `trip_co_drivers`:
   - `existsOverlappingTripForDriver` (`TripRepository.java:131-142`): `LEFT JOIN t.coDrivers cd WHERE (t.driver = :driver OR cd = :driver)`, dùng cho cửa sổ bận (`TripService.java:721`);
   - `findTripsForDriverOnDate` (`:186-197`): `LEFT JOIN FETCH t.coDrivers cd WHERE (t.driver = :driver OR cd = :driver OR t.assistant = :driver)`, dùng cho giờ lái trong ngày (`TripService.java:761`).
   - MySQL không dùng được index nào cho một `OR` trải qua hai bảng, nên mỗi lần gọi đọc cả bảng `trips`. Từ CT4, bảng có 47.881 dòng, gồm 21.192 dòng GĐ3 đã xoá mềm; `@SQLRestriction` chỉ lọc chúng **sau khi** đọc.
@@ -3361,11 +3361,48 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
   - Admin chờ khoảng 25 giây mỗi lần mở màn Duyệt thủ công, và mỗi lần form Tạo gọi lại API (đổi giờ hay tuyến).
   - Job 10 giây cũng chậm theo: một chuyến tăng cường có phân công mất khoảng 28 giây mới hiện trên bản sao.
   - Màn Đề xuất dùng `AvailabilityContext` (nạp sẵn) nên không dính.
-- **Hướng sửa (chưa làm):** đúng cách CT5b đã sửa câu vị trí.
-  - Tách mỗi câu theo vai: tài xế, phụ xe, và tài xế phụ qua `JOIN` thường. Gộp ở `TripService`: "bận" = OR của ba câu; danh sách = hợp, bỏ trùng theo id.
-  - Giữ nguyên ngữ nghĩa, kèm test tương đương (`TripServiceAvailabilityContextTest` đã so hai đường).
-  - Thêm index (vd `(driver_id, departure_time)`) là đổi schema, chủ dự án quyết.
 - **Không sửa trong CT5b:** hai câu nằm ngoài phạm vi, và được validator, cửa sổ bận lẫn giờ lái của mọi màn dùng chung.
+- **Đã sửa 2026-11-17** (chủ dự án: *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"*). Cùng cách CT5b sửa câu vị trí: **mỗi vai một câu**, `TripService` ghép lại. Không đổi schema, không thêm index.
+  - **Bận lịch:** `existsOverlappingTripForDriver` nay chỉ xét cột `driver` (`TripRepository.java:126-142`, sửa tại chỗ). Vai tài xế phụ là câu mới `existsOverlappingTripForCoDriver` (`JOIN t.coDrivers cd WHERE cd = :driver`, cuối file). Bộ ba `…ForDriver` / `…ForCoDriver` / `…ForAssistant` khớp ba trường `driver`, `coDrivers`, `assistant` của `Trip`. `isDriverBusyInWindow` OR ba câu (`TripService.java:720-728`).
+  - **Giờ lái trong ngày:** `findTripsForDriverOnDate` nay chỉ xét cột `driver` (`:181-197`, tại chỗ). Thêm `findTripsForCoDriverOnDate` và `findTripsForAssistantOnDate` ở cuối file. Hàm mới `TripService.tripsOfPersonOnDate` (mục cuối file) hợp ba danh sách, mỗi chuyến một lần theo id, đúng phạm vi "mọi vai" của câu gộp cũ và của nhánh `AvailabilityContext`.
+  - **Nguyên nhân thứ hai, cùng triệu chứng:** các dropdown xếp người theo giờ lái bằng `thenComparingDouble(d -> getDrivingHoursForDate(...))`. Phép sắp xếp gọi khoá ở **mỗi lần so sánh**, nên màn Duyệt thủ công gọi `getDrivingHoursForDate` **439 lần** cho 30 người. Nay khoá `drivingHoursKey` nhớ giờ của từng người trong một lần sắp xếp, cùng ý với `standingFirst` của CT5b.
+    - Áp cho bốn chỗ sắp xếp (`TripService.java:1535`, `:1563`, `:1636`, `:1683`).
+    - Hai chỗ `min()` của máy chọn (`:506`, `:514`) giữ nguyên, vì min gọi khoá tối đa hai lần mỗi người, và Bài 00a dùng đúng dòng 506 làm ví dụ.
+  - Sửa tại chỗ, không xê dịch dòng nào mà bài học trích (`TripService` 1–2239, `TripRepository` 1–597).
+  - **Sửa luôn lỗi #36** (ngay dưới), vì câu tài xế phụ mới nạp `coDrivers` đủ.
+  - **Test:** `TripServiceAvailabilityContextTest` +1 (chuyến hai tài xế phụ; đỏ trên code cũ: 6,0 thay vì 4,0), `TripServiceAssistantAvailabilityTest` +1 (danh sách vẫn xếp ít giờ lên trước). `mvnw test` 261/261.
+    - Thử làm hỏng 5 cách, cách nào cũng đỏ đúng test mong đợi: bỏ câu bận vai tài xế phụ; bỏ câu giờ lái vai tài xế chính; bỏ câu giờ lái vai tài xế phụ; quay về fetch-rồi-lọc; khoá sắp xếp trả hằng số.
+  - **`verify` trên DB thật** (chỉ đọc, code cuối):
+    - API form Tạo có tuyến: khoảng 28 s → **6,7–8,5 s**; không tuyến: 23 s → **2,4 s**. Kết quả JSON **giống hệt** bản trước khi sửa ở cả 7 trường hợp (6 tuyến + không tuyến).
+    - Form Sửa 2535, Đề xuất, Gợi ý tài xế, What-if: HTML giống hệt từng dòng. Form Sửa 5,2 → 3,3 s; Đề xuất 7,8 → 3,4 s.
+    - DB giống hệt trước và sau.
+  - **A/B trên bản sao** (cùng dữ liệu, code đã commit `d973419` so với code sửa): màn Duyệt thủ công **67–68 s → 6–6,7 s**; API form Tạo không tuyến 44–59 s → 1,9–2,3 s (bản sao vừa nạp lại nên cả hai đều chậm hơn trên DB thật). Lỗi #36 thấy được ngay trên màn hình (xem #36).
+  - **Còn lại, ghi để chủ dự án quyết:**
+    - API form Tạo **có tuyến** vẫn khoảng 7 s. 3,1 s là 788 câu vị trí của CT5b: mỗi người được tính vị trí tới **4 lần** (sắp xếp và ghi chú, ở cả danh sách tài xế lẫn phụ xe). Tính một lần mỗi người thì còn khoảng 1 s, nhưng phải cấu trúc lại `TripRestController` và các hàm `…ForTimeRange(…, route)` của CT5b.
+    - Câu giờ lái vai tài xế chính còn khoảng 9 ms một lần, vì index chỉ có `driver_id`. Index ghép `(driver_id, departure_time)` sẽ nhanh hơn nữa, nhưng là đổi schema.
+- **Còn lại, cố ý không sửa:** `existsAnyTripForDriver` và `existsTripForDriverWithStatusIn` (`TripRepository.java:270-289`) cũng `OR` ba vai qua `trip_co_drivers`. Chúng chỉ chạy một lần mỗi khi Admin xoá hay khoá một tài xế (`DriverService`), đo trên DB thật khoảng 0,06 s, nên không đáng đổi (Bài 04 trích các dòng này). Hai câu chết `countBusyTripsAnyRole` / `findAllTripsByDriverOnDate` đã ghi ở `Proj_functions_summary.md`.
+
+## 36. Câu giờ lái đếm thiếu tài xế phụ khi chuyến có từ hai tài xế phụ trở lên — ĐÃ SỬA 2026-11-17 cùng #35, commit `7fb50f4` (2026-11-22, đã push)
+
+- **Gốc:** câu gộp cũ `findTripsForDriverOnDate` vừa `LEFT JOIN FETCH t.coDrivers cd` vừa lọc `cd = :driver` trên **chính** lần nối đó.
+  - Với một người là **tài xế phụ**, Hibernate nạp collection `coDrivers` chỉ gồm các dòng qua bộ lọc, tức chỉ chính người đó.
+  - `sumDrivingHours` chia giờ cho `1 + coDrivers.size()` (`TripService.java:805-811`). Kết quả: chia cho quá ít người, phần giờ **lớn** hơn thật.
+- **Phân loại (ba ngả):** **sai sót thật.** Luật là chia đều cho mọi người lái (Bài 06 §8.1, `TripServiceDriverShareTest`). Không quyết định nào chọn cách tính này. Bài 06 §9.3 mục 6 đã nêu là nghi vấn "[SUY LUẬN — chưa kiểm chứng]".
+- **Bằng chứng:**
+  - Test mới `TripServiceAvailabilityContextTest.drivingHours_ofEveryDriverOnATripWithTwoCoDrivers_isTheTripSharedByThree` chạy trên code **trước** bản sửa: chuyến 12 giờ, tài xế chính + 2 tài xế phụ. Nhánh SQL tính **6,0 giờ** (12 ÷ 2) cho tài xế phụ, thay vì **4,0** (12 ÷ 3).
+  - Mỗi nhánh đọc tươi từ DB. Test so với con số đúng, không chỉ so hai nhánh với nhau.
+- **Hậu quả: sai theo CẢ HAI chiều**, không chỉ "chặn nhầm" như Bài 06 từng đoán.
+  - Collection thiếu được nạp **một lần** cho mỗi persistence context, tức mỗi yêu cầu web. Những người được xét sau dùng lại đúng đối tượng đó. Người xét đầu tiên bị tính **thừa** giờ; tài xế chính và những tài xế phụ khác xét sau thấy collection thiếu, nên cũng bị tính thừa (chia cho quá ít người), hoặc bị tính **0 giờ** nếu chính họ vắng khỏi collection.
+  - **A/B trên bản sao 2026-11-17**, với code đã commit `d973419`. Chuyến Q: 22/11 06:00–12:00, tài xế chính #10, tài xế phụ #6 và #7, đúng là 2 giờ mỗi người.
+    - API form Tạo, khung 6 giờ cùng ngày (2 + 6 = 8, phải mời cả ba): code cũ chỉ mời #7. **Chặn nhầm** #6 và #10, vì bị tính 3 giờ.
+    - Khung 6,5 giờ (2 + 6,5 = 8,5, không được mời ai): code cũ **mời #7**, vì tính 0 giờ. **Cho lọt** qua luật 8 giờ/ngày ở dropdown.
+    - Lưu chuyến 6,5 giờ với #7: validator cũ từ chối nhưng báo *"đã được phân công lái 3.0h"* (thật ra 2,0). Dropdown mời một lựa chọn mà bước lưu chắc chắn từ chối, phá nguyên tắc một chiều.
+    - Lưu chuyến 6 giờ **hợp lệ** với #6: validator cũ **từ chối nhầm** (*"3.0h … thêm chuyến này (6.0h) sẽ vượt 8h/ngày"*).
+    - Code sửa trên cùng bản sao: khung 6 giờ mời #6, #7, #10; khung 6,5 giờ không mời ai trong ba người; lưu #7 bị từ chối với đúng *"2.0h"*; lưu #6 **thành công**.
+  - Chỉ gặp ở chuyến có ≥ 2 tài xế phụ: chuyến > 16 giờ (cần ≥ 3 người lái), hoặc khi Admin gán dư.
+  - Trên DB thật chỉ có chuyến #14 (tuyến 6, 30 giờ, 01/08/2026, tài xế phụ 5, 6, 7). Không chuyến tương lai nào có ≥ 2 tài xế phụ.
+- **Đã sửa:** `findTripsForCoDriverOnDate` nối `coDrivers` **hai lần**: một lần chỉ để lọc (`JOIN t.coDrivers cd WHERE cd = :driver`), một lần `FETCH` không lọc, nên collection đủ. Hai câu vai tài xế chính và phụ xe `FETCH` không lọc.
+  - Thử làm hỏng (quay về fetch-rồi-lọc trên một lần nối): đúng test này đỏ, lại ra 6,0.
 
 ## Mục đã có hướng xử lý trong kế hoạch (không đánh số)
 

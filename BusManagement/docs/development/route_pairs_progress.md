@@ -81,7 +81,12 @@
   - `verify` trên DB thật (chỉ đọc) và trên bản sao (ghi); DB thật giống hệt trước và sau.
 
   Chi tiết ở mục 4, CT5b. Phát hiện lỗi #35 (có sẵn, không thuộc CT5b): form Tạo và màn Duyệt thủ công mất 23–28 giây.
-- **Việc tiếp theo:** sửa lỗi #35 (chủ dự án bảo ngày 2026-11-17: *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"*), rồi tới CT6. G3-7: xoá các bản sao cũ khi chủ dự án đồng ý.
+- **Lỗi #35 và #36 đã sửa ngày 2026-11-17; đã commit và push ngày 2026-11-22:** `7fb50f4` (code + test), `c615164` (bài học), rồi commit `docs:` ngay sau đó. Chủ dự án: *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"*. Không thuộc giai đoạn CT nào; chi tiết ở `current_bugs_found.md` #35, #36.
+  - Lịch của một người (bận, giờ lái) hỏi riêng từng vai, như câu vị trí CT5b; khoá sắp xếp theo giờ lái được nhớ.
+  - Sửa luôn #36, phát hiện khi sửa: chuyến có ≥ 2 tài xế phụ bị chia giờ sai **theo cả hai chiều**.
+  - Test 261/261, thử làm hỏng 5 cách.
+  - `verify` DB thật chỉ đọc: API form Tạo 28 → 7 s (có tuyến), 23 → 2,4 s (không tuyến); kết quả giống hệt. A/B trên bản sao: màn Duyệt thủ công 67 → 6 s.
+- **Việc tiếp theo:** CT6 (đã làm trong cây làm việc ngày 2026-11-19, chưa commit), rồi CT7. Tuỳ chủ dự án: gộp phép tính vị trí 4 lần/người của CT5b (form Tạo có tuyến còn khoảng 7 s), index ghép. G3-7: xoá các bản sao cũ khi chủ dự án đồng ý.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -621,6 +626,8 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-17 (CT5b) | `d7e11adb` | Bắt đầu CT5b; *"hãy dừng lại để phiên sau tiếp tục làm"* | Code + test vị trí; `verify` thấy lỗi giao một xe hai lần (thêm phía sau của luật) và câu vị trí của người chậm (API form Tạo > 2 phút). Dừng giữa chừng, chưa commit |
 | 2026-11-17 (CT5b, tiếp) | `8bf87e0f` | *"sửa truy vấn chậm đi, sau đó hãy kt lại, đảm bảo CT5b đã hoàn thành và test lại app"* | Tách câu vị trí theo vai (+2 test, thử làm hỏng ok); test 259/259; `verify` DB thật (19 trang 200, Đề xuất 25 thẻ / 0 vi phạm, form Sửa và API khớp SQL) và bản sao (job, Duyệt, từ chối, xác nhận); tài liệu; lỗi #35. Chưa commit |
 | 2026-11-17 (CT5b, commit) | `8bf87e0f` | *"tôi hiểu rồi, commit và push đi, sau đó sửa #35"* | `verify` ngắn trước commit; commit `5f52879`, `345c8be`, commit `docs:`; push cùng `6b6ecf8` |
+| 2026-11-17 (lỗi #35) | `8bf87e0f` | *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"* | Làm trong worktree riêng, vì app 8080 của chủ dự án chạy từ `target/classes` có devtools. Mỗi vai một câu cho bận và giờ lái; khoá sắp xếp giờ lái được nhớ; chứng minh và sửa #36 (test đỏ trên code cũ, A/B trên bản sao: cho lọt và chặn nhầm). Test 261/261; `verify` DB thật và A/B bản sao; tài liệu. Chưa commit |
+| 2026-11-22 (commit #35/#36) | `2d46500c` | Chủ dự án duyệt 5 đề xuất của CT7; *"trước tiên bạn hãy commit #35/36 và push"* | Chép cả cây làm việc (có CT6) ra `ProjectBackup\patches\2026-11-22_ct6_truoc-commit-35-36\`; đặt lại bản #35/#36 của ngày 19/11 để commit. Kiểm lại đúng các file đó trong worktree: test 261/261, `verify` DB thật chỉ đọc (20 trang/API 200, API form Tạo 3,5 s, DB giống hệt). Commit `7fb50f4`, `c615164`, commit `docs:`; push. Rồi chép lại bản CT6 |
 
 ---
 

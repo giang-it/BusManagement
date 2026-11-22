@@ -1119,6 +1119,32 @@
 
 ---
 
+### TC_TRIP_044 — Giờ lái trong ngày của tài xế phụ trên chuyến có HAI tài xế phụ (lỗi #36)
+
+- **Mã TC:** TC_TRIP_044
+- **Tên Kịch Bản:** Luật ≤ 8 giờ lái/ngày chia đều giờ cho mọi người lái, kể cả khi chuyến có hai tài xế phụ
+- **Điều kiện tiên quyết:** bản sao của DB thật. Chuyến Q `ACTIVE` ngày 22/11, 06:00–12:00 (6 giờ), tạo qua form: tài xế chính #10, tài xế phụ #6 và #7. Ba người lái, nên mỗi người đã lái **2 giờ** ngày đó. Không ai trong ba người có chuyến nào khác ngày 22/11
+- **Các bước thực hiện:**
+  1. `GET /api/admin/trips/available-resources?departure=2026-11-22T13:00:00&arrival=2026-11-22T19:00:00` (6 giờ) — đọc danh sách `drivers`
+  2. Như bước 1 với `arrival=2026-11-22T19:30:00` (6,5 giờ)
+  3. Tạo chuyến 22/11 13:00–19:30, tài xế chính #7
+  4. Tạo chuyến 22/11 13:00–19:00, tài xế chính #6
+- **Kết quả mong đợi:**
+  - Bước 1: #6, #7, #10 **có** trong danh sách (2 + 6 = 8 ≤ 8)
+  - Bước 2: cả ba **không** có (2 + 6,5 = 8,5 > 8)
+  - Bước 3: ⛔ *"Tài xế chính … đã được phân công lái 2.0h trong ngày 2026-11-22, thêm chuyến này (6.5h) sẽ vượt 8h/ngày!"*
+  - Bước 4: `"Tạo chuyến xe thành công!"`
+- **Đã chạy:** 2026-11-17 trên bản sao (`busmanagement_test`, cổng 8098), cả hai bản code, cùng dữ liệu.
+  - **Code sửa:** đúng như trên.
+  - **Code đã commit `d973419` (trước bản sửa):**
+    - bước 1 chỉ mời #7;
+    - bước 2 **mời #7**;
+    - bước 3 báo *"3.0h"*;
+    - bước 4 bị **từ chối nhầm** (*"3.0h … (6.0h) sẽ vượt 8h/ngày"*).
+- **Tự động hoá:** `TripServiceAvailabilityContextTest.drivingHours_ofEveryDriverOnATripWithTwoCoDrivers_isTheTripSharedByThree`
+
+---
+
 <a name="module-4"></a>
 ## MODULE 4: HỆ THỐNG AI ĐỀ XUẤT CHUYẾN TĂNG CƯỜNG (AI Scheduler)
 **Service:** `TripService` — `@Scheduled(fixedRate = 10_000)`  
@@ -2574,12 +2600,12 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 |---|---|---|---|
 | Module 1 — Bus Management | 13 | 5 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
-| Module 3 — Trip FSM & CRUD | 25 | 6 | 19 |
+| Module 3 — Trip FSM & CRUD | 26 | 6 | 20 |
 | Module 4 — AI Scheduler | 20 | 6 | 14 |
 | Module 5 — Admin Approval | 14 | 7 | 7 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **104** | **41** | **63** |
+| **TỔNG** | **105** | **41** | **64** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2588,7 +2614,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

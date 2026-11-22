@@ -221,13 +221,14 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 - **Áp dụng chung cho cả vai trò driver chính, coDriver, và assistant** — đây là nguồn của vấn đề "phụ xe bị áp sai ràng buộc giờ lái" đã ghi nhận ở mục 6.7.
 
 ### 7.8. `getDrivingHoursForDate(driver, date, excludeTripId)`
-- Lấy tất cả trip của driver trong ngày (vai trò driver chính, coDriver, hoặc assistant) ở status `PENDING_APPROVAL/ACTIVE/DEPARTED`.
+- Lấy tất cả trip của driver trong ngày (vai trò driver chính, coDriver, hoặc assistant) ở status `PENDING_APPROVAL/ACTIVE/DEPARTED/COMPLETED`. Từ lỗi #35 (2026-11-17), mỗi vai là một câu riêng (`findTripsForDriverOnDate`, `findTripsForCoDriverOnDate`, `findTripsForAssistantOnDate`), và `TripService.tripsOfPersonOnDate` hợp lại, mỗi chuyến một lần. Câu gộp cũ quét cả bảng `trips`, và với tài xế phụ còn nạp `coDrivers` thiếu: lỗi #36, chuyến 12 giờ ba người lái bị tính 6 giờ thay vì 4.
 - Nếu driver đóng vai **assistant** ở 1 trip nào đó trong ngày → giờ lái từ trip đó tính = 0.0 (phụ xe không lái).
 - Nếu đóng vai driver chính hoặc coDriver → tính `durationHours / totalDriversOfThatTrip` (chia đều), cap tối đa 8.0/trip, cộng dồn.
 - Cộng thêm `driver.totalDrivingHours24h` (baseline mock-seed) **chỉ khi** `date` là **hôm nay** — đây là design có chủ đích, ghi rõ trong code: field này là dữ liệu giả lập cho demo, dự kiến sẽ được thay bằng API cập nhật real-time từ thiết bị GPS/IoT trong tương lai.
 
 ### 7.9. `isDriverBusyInWindow(driver, windowStart, windowEnd, excludeTripId)`
-- True nếu driver bận **với vai trò driver chính** (kể cả coDriver, qua `existsOverlappingTripForDriver`) **hoặc** bận **với vai trò assistant** (`existsOverlappingTripForAssistant`) trong cửa sổ.
+- True nếu driver bận trong cửa sổ ở **bất kỳ vai nào**: driver chính (`existsOverlappingTripForDriver`), coDriver (`existsOverlappingTripForCoDriver`), hoặc assistant (`existsOverlappingTripForAssistant`). Mỗi vai một câu từ lỗi #35 (2026-11-17); trước đó driver chính và coDriver nằm chung một câu `OR`, quét cả bảng `trips`.
+- Các dropdown xếp người theo giờ lái trong ngày bằng khoá `drivingHoursKey`, nhớ giờ của từng người trong một lần sắp xếp. Trước lỗi #35, mỗi lần so sánh lại hỏi DB.
 
 ---
 
