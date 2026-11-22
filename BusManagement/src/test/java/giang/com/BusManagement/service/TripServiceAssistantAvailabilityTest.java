@@ -138,6 +138,22 @@ class TripServiceAssistantAvailabilityTest {
                 "Với fixture này phải lệch ít nhất một người ('loaded') — nếu bằng nhau, bộ lọc giờ đã lọt vào nhánh phụ xe");
     }
 
+    /**
+     * Lỗi #35: khoá sắp xếp "giờ lái trong ngày" nay được nhớ theo từng người (drivingHoursKey) thay
+     * vì hỏi DB ở mỗi lần so sánh. Thứ tự phải giữ nguyên: ít giờ lên trước. 'loaded' được lưu trước
+     * (id nhỏ hơn), nên một khoá hỏng — vd trả cùng một số cho mọi người — để nó đứng trước và test đỏ.
+     */
+    @Test
+    @DisplayName("#35: danh sách phụ xe vẫn xếp người ít giờ lái lên trước")
+    void assistantList_isSortedByDrivingHours_leastFirst() {
+        List<Long> assistants = tripService.getAvailableAssistantsForTimeRange(departure, arrival).stream()
+                .map(Driver::getUserId).toList();
+
+        assertTrue(assistants.contains(free.getUserId()) && assistants.contains(loaded.getUserId()), "" + assistants);
+        assertTrue(assistants.indexOf(free.getUserId()) < assistants.indexOf(loaded.getUserId()),
+                "free (0h) phải đứng trước loaded (6h): " + assistants);
+    }
+
     // =====================================================================
     // Chiều ngược lại: KHÔNG được nới lỏng những ràng buộc còn lại
     // =====================================================================

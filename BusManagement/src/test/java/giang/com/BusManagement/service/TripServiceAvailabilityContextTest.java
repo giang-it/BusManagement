@@ -101,7 +101,7 @@ class TripServiceAvailabilityContextTest {
 
         // Gắn D1 làm TÀI XẾ PHỤ (co-driver) của coTrip bằng SQL trực tiếp vào bảng
         // nối, KHÔNG qua @ManyToMany của ORM. Chèn thẳng để cả hai nhánh đều thấy
-        // quan hệ này: SQL existsOverlappingTripForDriver JOIN coDrivers, và nhánh
+        // quan hệ này: SQL existsOverlappingTripForCoDriver JOIN coDrivers, và nhánh
         // preload lazy-load coDrivers khi duyệt vai trò.
         //
         // LƯU Ý (cập nhật 2026-07-24): ban đầu cách này là BẮT BUỘC, vì flush một
@@ -205,6 +205,33 @@ class TripServiceAvailabilityContextTest {
         // Neo chống "pass rỗng nghĩa": ngày ref có chuyến D1 lái chính nên giờ > 0.
         assertTrue(tripService.getDrivingHoursForDate(driver, ref, null, null) > 0,
                 "Sanity: D1 phải có giờ lái > 0 ở ngày ref — bảo vệ test khỏi pass rỗng nghĩa");
+    }
+
+    /**
+     * Lỗi #35: chuyến có HAI tài xế phụ. Giờ lái chia đều cho 1 + số tài xế phụ (sumDrivingHours), nên
+     * mỗi người của chuyến 12 giờ, ba người lái, được 4 giờ. Câu SQL cũ vừa LEFT JOIN FETCH coDrivers vừa
+     * lọc trên chính nó, nên với một tài xế phụ nó nạp collection CHỈ gồm người đó (Bài 06 §9.3 mục 6
+     * từng nêu là nghi vấn). So con số đúng, không chỉ so hai nhánh với nhau: hai nhánh chạy chung một
+     * persistence context thì có thể cùng sai. Mỗi nhánh đọc tươi từ DB (clear trước).
+     */
+    @Test
+    void drivingHours_ofEveryDriverOnATripWithTwoCoDrivers_isTheTripSharedByThree() {
+        Driver main = saveDriver("avail-d3", "AV-D3");
+        Driver secondCo = saveDriver("avail-d4", "AV-D4");
+        LocalDateTime dep = ref.plusDays(5).plusHours(6); // ngày trống trong setUp
+        save(trip(main, List.of(em.find(Driver.class, driver.getUserId()), secondCo), null, null,
+                dep, dep.plusHours(12), TripStatus.ACTIVE));
+        tripRepository.flush();
+
+        for (Driver person : List.of(driver, secondCo, main)) {
+            em.clear();
+            double sql = tripService.getDrivingHoursForDate(person, dep, null, null);
+            em.clear();
+            AvailabilityContext fresh = tripService.buildAvailabilityContext(ref.minusDays(10), ref.plusDays(10));
+            double mem = tripService.getDrivingHoursForDate(person, dep, null, fresh);
+            assertEquals(4.0, sql, 1e-9, "SQL: 12 giờ chia cho 3 người lái — " + person.getLicenseNumber());
+            assertEquals(4.0, mem, 1e-9, "context: 12 giờ chia cho 3 người lái — " + person.getLicenseNumber());
+        }
     }
 
     // =====================================================================

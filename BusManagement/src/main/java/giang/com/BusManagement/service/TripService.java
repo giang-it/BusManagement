@@ -406,9 +406,9 @@ public class TripService {
     /**
      * Tài xế tham gia chuyến ở BẤT KỲ vai trò nào — tài xế chính, tài xế phụ
      * (coDrivers) hoặc phụ xe (assistant) — so theo userId. Hợp nhất đúng phạm vi
-     * của hai câu SQL {@code existsOverlappingTripForDriver} (driver OR coDriver)
-     * và {@code existsOverlappingTripForAssistant} (assistant), cũng là phạm vi mà
-     * {@code findTripsForDriverOnDate} dùng để tính giờ lái.
+     * của ba câu SQL {@code existsOverlappingTripFor…} (Driver, CoDriver, Assistant
+     * — mỗi vai một câu, lỗi #35), cũng là phạm vi mà {@link #tripsOfPersonOnDate}
+     * dùng để tính giờ lái.
      */
     private static boolean tripInvolvesDriver(Trip t, Driver driver) {
         Long id = driver.getUserId();
@@ -704,8 +704,8 @@ public class TripService {
     }
 
     /**
-     * Bản nhận AvailabilityContext. ctx == null → hai câu SQL exists cho vai trò
-     * tài xế/phụ xe (đường cũ, giữ nguyên). ctx != null → xét trên các chuyến đã
+     * Bản nhận AvailabilityContext. ctx == null → ba câu SQL exists, mỗi vai trên
+     * xe một câu (lỗi #35). ctx != null → xét trên các chuyến đã
      * preload: bận khi có chuyến ở trạng thái bận, dính tài xế ở BẤT KỲ vai trò
      * nào ({@link #tripInvolvesDriver}) và giao khoảng thời gian
      * ({@link #intervalsOverlap}). Package-private để test tương đương gọi được cả
@@ -717,9 +717,9 @@ public class TripService {
                 TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED);
 
         if (ctx == null) {
-            // Bận với tư cách tài xế chính (hoặc tài xế phụ)?
-            boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(
-                    driver, busyStatuses, windowStart, windowEnd, excludeTripId);
+            // Bận với tư cách tài xế chính hoặc tài xế phụ? Mỗi vai một câu (lỗi #35)
+            boolean busyAsDriver = tripRepository.existsOverlappingTripForDriver(driver, busyStatuses, windowStart, windowEnd, excludeTripId)
+                    || tripRepository.existsOverlappingTripForCoDriver(driver, busyStatuses, windowStart, windowEnd, excludeTripId);
             if (busyAsDriver)
                 return true;
 
@@ -743,7 +743,7 @@ public class TripService {
 
     /**
      * Bản nhận AvailabilityContext. ctx == null → nạp chuyến của tài xế trong ngày
-     * qua DB (findTripsForDriverOnDate — đường cũ). ctx != null → lọc các chuyến đã
+     * qua DB ({@link #tripsOfPersonOnDate}, mỗi vai một câu). ctx != null → lọc các chuyến đã
      * preload theo đúng phạm vi câu SQL đó (dính tài xế, đúng ngày, đúng trạng
      * thái, không bị loại trừ). Cả hai nhánh đưa danh sách chuyến cho
      * {@link #sumDrivingHours} — luật tính giờ nằm MỘT CHỖ, không nhân bản.
@@ -758,7 +758,7 @@ public class TripService {
 
         List<Trip> trips;
         if (ctx == null) {
-            trips = tripRepository.findTripsForDriverOnDate(driver, busyStatuses, startOfDay, endOfDay, excludeTripId);
+            trips = tripsOfPersonOnDate(driver, busyStatuses, startOfDay, endOfDay, excludeTripId);
         } else {
             trips = ctx.trips().stream()
                     .filter(t -> busyStatuses.contains(t.getStatus()))
@@ -1532,7 +1532,7 @@ public class TripService {
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> getDrivingHoursForDate(d, departure, tripId) + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
-                .sorted(fittingPeopleFirst(trip).thenComparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
+                .sorted(fittingPeopleFirst(trip).thenComparingDouble(drivingHoursKey(departure, tripId)))
                 .collect(Collectors.toList());
     }
 
@@ -1560,7 +1560,7 @@ public class TripService {
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, tripId))
-                .sorted(fittingPeopleFirst(trip).thenComparingDouble(d -> getDrivingHoursForDate(d, departure, tripId)))
+                .sorted(fittingPeopleFirst(trip).thenComparingDouble(drivingHoursKey(departure, tripId)))
                 .collect(Collectors.toList());
     }
 
@@ -1633,7 +1633,7 @@ public class TripService {
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> getDrivingHoursForDate(d, departure, null) + effectiveHours <= 8.0)
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
-                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
+                .sorted(Comparator.comparingDouble(drivingHoursKey(departure, null)))
                 .collect(Collectors.toList());
     }
 
@@ -1680,7 +1680,7 @@ public class TripService {
                 .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
                 .filter(d -> d.isLicenseValid(departure.toLocalDate()))
                 .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null))
-                .sorted(Comparator.comparingDouble(d -> getDrivingHoursForDate(d, departure, null)))
+                .sorted(Comparator.comparingDouble(drivingHoursKey(departure, null)))
                 .collect(Collectors.toList());
     }
 
@@ -2236,5 +2236,41 @@ public class TripService {
                     .ifPresent(leg -> personAfter.put(person.getUserId(), leg));
         }
         return new AvailabilityContext(trips, busBefore, personBefore, busAfter, personAfter);
+    }
+
+    // =========================================================================
+    // LỊCH CỦA MỘT NGƯỜI THEO TỪNG VAI — lỗi #35
+    // =========================================================================
+
+    /**
+     * Mọi chuyến khởi hành trong [startOfDay, endOfDay) mà người này có mặt ở BẤT KỲ vai nào — tài
+     * xế chính, tài xế phụ, phụ xe — cho {@link #sumDrivingHours}. Cùng phạm vi với nhánh
+     * AvailabilityContext ({@link #tripInvolvesDriver}). TripRepository hỏi riêng từng vai, vì một
+     * câu gộp ba vai bằng OR qua trip_co_drivers quét cả bảng trips (lỗi #35); ở đây hợp ba danh
+     * sách, mỗi chuyến một lần theo id, như DISTINCT của câu gộp cũ. Thứ tự không quan trọng:
+     * sumDrivingHours chỉ cộng.
+     */
+    private List<Trip> tripsOfPersonOnDate(Driver person, List<TripStatus> statuses, LocalDateTime startOfDay,
+            LocalDateTime endOfDay, Long excludeTripId) {
+        java.util.Map<Long, Trip> byId = new java.util.LinkedHashMap<>();
+        java.util.stream.Stream.of(
+                tripRepository.findTripsForDriverOnDate(person, statuses, startOfDay, endOfDay, excludeTripId),
+                tripRepository.findTripsForCoDriverOnDate(person, statuses, startOfDay, endOfDay, excludeTripId),
+                tripRepository.findTripsForAssistantOnDate(person, statuses, startOfDay, endOfDay, excludeTripId))
+                .flatMap(List::stream)
+                .forEach(trip -> byId.putIfAbsent(trip.getId(), trip));
+        return new java.util.ArrayList<>(byId.values());
+    }
+
+    /**
+     * Khoá sắp xếp "giờ lái trong ngày", nhớ theo từng người (cùng ý với standingFirst). Phép sắp xếp
+     * gọi khoá ở MỖI lần so sánh — khoảng 2·log₂n lần cho mỗi người — và mỗi lần là ba câu SQL. Màn
+     * Duyệt thủ công từng gọi getDrivingHoursForDate 439 lần cho 30 người (lỗi #35). Mỗi lần sắp xếp
+     * một khoá mới, nên không có gì sống quá một yêu cầu. Hai chỗ min() ở findBestAvailableDriver giữ
+     * nguyên: min chỉ gọi khoá tối đa hai lần cho mỗi người.
+     */
+    private java.util.function.ToDoubleFunction<Driver> drivingHoursKey(LocalDateTime departure, Long tripId) {
+        java.util.Map<Driver, Double> memo = new java.util.IdentityHashMap<>();
+        return d -> memo.computeIfAbsent(d, person -> getDrivingHoursForDate(person, departure, tripId));
     }
 }

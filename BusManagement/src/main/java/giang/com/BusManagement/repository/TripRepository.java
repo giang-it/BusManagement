@@ -124,13 +124,13 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        boolean existsByOriginalTripAndStatusIn(Trip originalTrip, Collection<TripStatus> statuses);
 
        /**
-        * Kiểm tra tài xế có đang bận (với tư cách TÀI XẾ CHÍNH hoặc TÀI XẾ PHỤ) trong
-        * khoảng thời gian không.
+        * Kiểm tra tài xế có đang bận với tư cách TÀI XẾ CHÍNH (cột driver) trong khoảng
+        * thời gian không. Vai tài xế phụ là câu riêng existsOverlappingTripForCoDriver
+        * (cuối file): gộp "OR cd = :driver" qua coDrivers làm MySQL quét cả bảng trips (lỗi #35).
         * Bao gồm cả khoảng nghỉ 30 phút ở hai đầu (được thêm ở tầng service).
         */
        @Query("SELECT COUNT(t) > 0 FROM Trip t " +
-                     "LEFT JOIN t.coDrivers cd " +
-                     "WHERE (t.driver = :driver OR cd = :driver) " +
+                     "WHERE t.driver = :driver " +
                      "AND t.status IN :statuses " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
                      "AND (t.departureTime < :windowEnd AND t.arrivalTimeExpected > :windowStart)")
@@ -179,13 +179,13 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("excludeTripId") Long excludeTripId);
 
        /**
-        * [MỚI] Tìm các chuyến xe của một tài xế/phụ xe trong một ngày cụ thể (để tính
-        * tổng giờ lái/ngày)
-        * Kiểm tra xem tài xế có lái (chính hoặc phụ) hay là phụ xe trong chuyến đó.
+        * Các chuyến khởi hành trong một ngày mà người này là TÀI XẾ CHÍNH (để tính giờ lái/ngày).
+        * Vai tài xế phụ và phụ xe là hai câu riêng ở cuối file; TripService.tripsOfPersonOnDate hợp
+        * ba câu (lỗi #35). FETCH coDrivers không lọc, nên collection đủ mọi tài xế phụ.
         */
        @Query("SELECT DISTINCT t FROM Trip t " +
-                     "LEFT JOIN FETCH t.coDrivers cd " +
-                     "WHERE (t.driver = :driver OR cd = :driver OR t.assistant = :driver) " +
+                     "LEFT JOIN FETCH t.coDrivers " +
+                     "WHERE t.driver = :driver " +
                      "AND t.status IN :statuses " +
                      "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
                      "AND (t.departureTime >= :startOfDay AND t.departureTime < :endOfDay)")
@@ -595,4 +595,65 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        List<Trip> findTripsAsCoDriverDepartingFrom(@Param("driver") Driver driver,
                      @Param("statuses") Collection<TripStatus> statuses, @Param("t") LocalDateTime t,
                      org.springframework.data.domain.Pageable pageable);
+
+       // ── Lịch của một người theo TỪNG VAI (lỗi #35) ─────────────────────────────
+       // Như các câu vị trí ở trên: mỗi vai một câu, đi theo index khóa ngoại của vai đó.
+       // Gộp ba vai bằng OR qua trip_co_drivers thì MySQL quét cả bảng trips (đo trên DB thật
+       // 2026-11-17: 122 ms và 63 ms một lần; form Tạo và màn Duyệt thủ công 23–28 giây).
+       // TripService ghép các câu lại: bận = OR, danh sách = hợp, mỗi chuyến một lần.
+
+       /**
+        * Vai TÀI XẾ PHỤ của existsOverlappingTripForDriver (cùng điều kiện thời gian, trạng thái,
+        * loại trừ). JOIN thường, không fetch: chỉ để lọc theo index user_id của trip_co_drivers.
+        */
+       @Query("SELECT COUNT(t) > 0 FROM Trip t JOIN t.coDrivers cd " +
+                     "WHERE cd = :driver " +
+                     "AND t.status IN :statuses " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime < :windowEnd AND t.arrivalTimeExpected > :windowStart)")
+       boolean existsOverlappingTripForCoDriver(
+                     @Param("driver") Driver driver,
+                     @Param("statuses") List<TripStatus> statuses,
+                     @Param("windowStart") LocalDateTime windowStart,
+                     @Param("windowEnd") LocalDateTime windowEnd,
+                     @Param("excludeTripId") Long excludeTripId);
+
+       /**
+        * Vai TÀI XẾ PHỤ của findTripsForDriverOnDate. Nối coDrivers HAI lần: "cd" chỉ để lọc, còn lần
+        * FETCH không lọc để collection nạp đủ mọi tài xế phụ — sumDrivingHours chia giờ cho
+        * 1 + coDrivers.size(). Câu gộp cũ fetch và lọc trên cùng một lần nối, nên với một tài xế phụ
+        * nó nạp collection chỉ gồm chính người đó: chuyến 12 giờ ba người lái bị tính 6 giờ thay vì 4
+        * (TripServiceAvailabilityContextTest.drivingHours_ofEveryDriverOnATripWithTwoCoDrivers…).
+        */
+       @Query("SELECT DISTINCT t FROM Trip t " +
+                     "LEFT JOIN FETCH t.coDrivers " +
+                     "JOIN t.coDrivers cd " +
+                     "WHERE cd = :driver " +
+                     "AND t.status IN :statuses " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime >= :startOfDay AND t.departureTime < :endOfDay)")
+       List<Trip> findTripsForCoDriverOnDate(
+                     @Param("driver") Driver driver,
+                     @Param("statuses") List<TripStatus> statuses,
+                     @Param("startOfDay") LocalDateTime startOfDay,
+                     @Param("endOfDay") LocalDateTime endOfDay,
+                     @Param("excludeTripId") Long excludeTripId);
+
+       /**
+        * Vai PHỤ XE của findTripsForDriverOnDate. sumDrivingHours tính 0 giờ cho vai này, nhưng câu
+        * vẫn trả đủ "mọi chuyến của người đó trong ngày", đúng phạm vi của câu gộp cũ và của nhánh
+        * AvailabilityContext (tripInvolvesDriver).
+        */
+       @Query("SELECT DISTINCT t FROM Trip t " +
+                     "LEFT JOIN FETCH t.coDrivers " +
+                     "WHERE t.assistant = :driver " +
+                     "AND t.status IN :statuses " +
+                     "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +
+                     "AND (t.departureTime >= :startOfDay AND t.departureTime < :endOfDay)")
+       List<Trip> findTripsForAssistantOnDate(
+                     @Param("driver") Driver driver,
+                     @Param("statuses") List<TripStatus> statuses,
+                     @Param("startOfDay") LocalDateTime startOfDay,
+                     @Param("endOfDay") LocalDateTime endOfDay,
+                     @Param("excludeTripId") Long excludeTripId);
 }
