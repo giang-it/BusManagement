@@ -383,10 +383,9 @@ từng phần, dựng câu truy vấn <span class="tag tag-spring">SPRING</span>
 List&lt;Trip&gt; findByDepartureTimeBetweenAndStatus(LocalDateTime start, LocalDateTime end, TripStatus status); // :194</code></pre></div>
 <p>Để ý <code>is_deleted = false</code> tự xuất hiện — đó là <code>@SQLRestriction</code> (§1.5).</p>
 <p><strong>Kiểu 2 — JPQL với <code>@Query</code> và <code>@Param</code>.</strong> Khi điều kiện quá phức tạp để đặt tên.</p>
-<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:130-142</code> (<code>existsOverlappingTripForDriver</code>):</p>
+<p><span class="tag tag-code">CODE</span> <code>TripRepository.java:132-142</code> (<code>existsOverlappingTripForDriver</code>):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT COUNT(t) &gt; 0 FROM Trip t " +
-       "LEFT JOIN t.coDrivers cd " +
-       "WHERE (t.driver = :driver OR cd = :driver) " +                 // tài xế chính HOẶC tài xế phụ
+       "WHERE t.driver = :driver " +                                   // vai tài xế chính (cột driver)
        "AND t.status IN :statuses " +
        "AND (:excludeTripId IS NULL OR t.id &lt;&gt; :excludeTripId) " +     // bỏ qua chính chuyến đang sửa
        "AND (t.departureTime &lt; :windowEnd AND t.arrivalTimeExpected &gt; :windowStart)") // hai khoảng giao nhau
@@ -399,6 +398,13 @@ boolean existsOverlappingTripForDriver(
 <p>Điều kiện &quot;trùng lịch&quot; <code>departureTime &lt; windowEnd AND arrivalTimeExpected &gt; windowStart</code> là công
 thức chuẩn để kiểm <strong>hai khoảng thời gian có giao nhau không</strong>; chạm đúng biên thì <strong>không</strong> tính
 là trùng.</p>
+<p>Mỗi vai trên xe là <strong>một câu riêng</strong>: <code>existsOverlappingTripForDriver</code> (cột <code>driver</code>),
+<code>existsOverlappingTripForCoDriver</code> (<code>JOIN t.coDrivers cd WHERE cd = :driver</code>, cuối file) và
+<code>existsOverlappingTripForAssistant</code>; <code>TripService.isDriverBusyInWindow</code> OR ba kết quả. Trước đây vai
+tài xế chính và tài xế phụ nằm chung một câu <code>t.driver = :driver OR cd = :driver</code>. Một <code>OR</code> trải qua
+hai bảng như thế làm MySQL không dùng được index nào và phải đọc cả bảng <code>trips</code>: 63 ms một lần trên
+DB thật, form Tạo và màn Duyệt mất 23–28 giây (lỗi #35, sửa 2026-11-17). Bài học: JPQL đúng chưa
+chắc đã nhanh — muốn biết thì đo (<code>EXPLAIN</code>, <code>performance_schema</code>).</p>
 <p><strong>Kiểu 3 — Projection: chỉ lấy vài cột, trả <code>Object[]</code>.</strong> <span class="tag tag-code">CODE</span> <code>TripRepository.java:483-485</code>:</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">@Query("SELECT t.route.id, t.departureTime, t.ticketsSold, t.totalSeats FROM Trip t " +
        "WHERE t.status = :status AND t.totalSeats &gt; 0 ORDER BY t.departureTime")
@@ -1029,7 +1035,7 @@ tầng controller bằng MockMvc và chưa có test giao diện tự động.</p
 <tr>
 <td>JPQL / <code>@Query</code> / <code>@Param</code></td>
 <td>Truy vấn trên entity / khai báo nó / nối tham số</td>
-<td><code>existsOverlappingTripForDriver</code> (<code>:117-129</code>)</td>
+<td><code>existsOverlappingTripForDriver</code> (<code>:132-142</code>)</td>
 </tr>
 <tr>
 <td>Projection</td>

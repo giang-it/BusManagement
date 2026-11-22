@@ -212,12 +212,11 @@ List<Trip> findByDepartureTimeBetweenAndStatus(LocalDateTime start, LocalDateTim
 
 **Kiểu 2 — JPQL với `@Query` và `@Param`.** Khi điều kiện quá phức tạp để đặt tên.
 
-[CODE] `TripRepository.java:130-142` (`existsOverlappingTripForDriver`):
+[CODE] `TripRepository.java:132-142` (`existsOverlappingTripForDriver`):
 
 ```java
 @Query("SELECT COUNT(t) > 0 FROM Trip t " +
-       "LEFT JOIN t.coDrivers cd " +
-       "WHERE (t.driver = :driver OR cd = :driver) " +                 // tài xế chính HOẶC tài xế phụ
+       "WHERE t.driver = :driver " +                                   // vai tài xế chính (cột driver)
        "AND t.status IN :statuses " +
        "AND (:excludeTripId IS NULL OR t.id <> :excludeTripId) " +     // bỏ qua chính chuyến đang sửa
        "AND (t.departureTime < :windowEnd AND t.arrivalTimeExpected > :windowStart)") // hai khoảng giao nhau
@@ -232,6 +231,14 @@ boolean existsOverlappingTripForDriver(
 Điều kiện "trùng lịch" `departureTime < windowEnd AND arrivalTimeExpected > windowStart` là công
 thức chuẩn để kiểm **hai khoảng thời gian có giao nhau không**; chạm đúng biên thì **không** tính
 là trùng.
+
+Mỗi vai trên xe là **một câu riêng**: `existsOverlappingTripForDriver` (cột `driver`),
+`existsOverlappingTripForCoDriver` (`JOIN t.coDrivers cd WHERE cd = :driver`, cuối file) và
+`existsOverlappingTripForAssistant`; `TripService.isDriverBusyInWindow` OR ba kết quả. Trước đây vai
+tài xế chính và tài xế phụ nằm chung một câu `t.driver = :driver OR cd = :driver`. Một `OR` trải qua
+hai bảng như thế làm MySQL không dùng được index nào và phải đọc cả bảng `trips`: 63 ms một lần trên
+DB thật, form Tạo và màn Duyệt mất 23–28 giây (lỗi #35, sửa 2026-11-17). Bài học: JPQL đúng chưa
+chắc đã nhanh — muốn biết thì đo (`EXPLAIN`, `performance_schema`).
 
 **Kiểu 3 — Projection: chỉ lấy vài cột, trả `Object[]`.** [CODE] `TripRepository.java:483-485`:
 
@@ -769,7 +776,7 @@ trang qua HTTP và đối chiếu DB trước/sau. Vì sao cần cả hai [CODE 
 | `ddl-auto` | Hibernate tự tạo/bổ sung bảng theo entity | `application.properties:18` |
 | `JpaRepository` | Interface cho sẵn CRUD | `TripRepository.java:18` |
 | Derived query | Tên method thành câu truy vấn | `existsByBusIdAndStatusIn` (`:350`) |
-| JPQL / `@Query` / `@Param` | Truy vấn trên entity / khai báo nó / nối tham số | `existsOverlappingTripForDriver` (`:117-129`) |
+| JPQL / `@Query` / `@Param` | Truy vấn trên entity / khai báo nó / nối tham số | `existsOverlappingTripForDriver` (`:132-142`) |
 | Projection | Chỉ lấy vài cột, trả `Object[]` | `findDemandHistoryByStatus` (`:440-442`) |
 | LAZY / EAGER | Nạp khi cần / nạp ngay | `Trip.java:39` |
 | Proxy (Hibernate) | Object giữ chỗ cho quan hệ LAZY | [SPRING] |

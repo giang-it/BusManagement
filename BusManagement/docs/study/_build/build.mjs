@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { marked } from 'marked';
 
 const [, , input, output, pageTitle, chip] = process.argv;
-let md = readFileSync(input, 'utf8');
+let md = readFileSync(input, 'utf8').replace(/\r\n/g, '\n'); // CRLF (git autocrlf on Windows) would defeat the H1 regex below and leave the page header empty
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const slug = (s) => s

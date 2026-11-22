@@ -189,8 +189,8 @@ sequenceDiagram
     S->>S: 40 ghế lớn hơn 40 chỗ? không
     Note over S: validateStaffForTrip - 10h, cần 2 tài xế, có 2, có phụ xe, không trùng vai
     loop An rồi Bình
-        S->>R: existsOverlappingTripForDriver, ForAssistant - cửa sổ 05:30 đến 16:30
-        S->>R: findTripsForDriverOnDate - cả ngày mai
+        S->>R: existsOverlappingTripForDriver, ForCoDriver, ForAssistant - cửa sổ 05:30 đến 16:30
+        S->>R: findTripsForDriverOnDate, ForCoDriverOnDate, ForAssistantOnDate - cả ngày mai
         R->>DB: SELECT chuyến của người đó khởi hành ngày mai
         S->>S: giờ đã có cộng 5.0 lớn hơn 8.0?
     end
@@ -621,7 +621,8 @@ bệnh: "đã quá hạn" khác "sẽ sắp quá hạn".
 | Recommendation xác nhận lại bằng validator dù bộ chọn đã lọc | Thẻ gợi ý cũ vài giờ vẫn hiện "đủ điều kiện" | Cùng khuôn `confirmAutoAssignedTrip()` | roadmap §9 |
 | Vị trí: **cứng cho máy, mềm cho người**, validator không chặn | Máy giao xe đang ở bến khác mà không ai xem lại; còn Admin vẫn điều được xe rỗng có chủ ý | Chặn ở validator thì Admin không điều xe rỗng được, và các chuyến đã có mà lệch chuỗi sẽ thành không sửa được | CM-5 cách B, QĐ-23 (2026-11-17) |
 | Luật vị trí xét **hai phía**: đứng ở bến đi, và chuyến kế tiếp đã nhận đi từ bến tới | Màn Đề xuất (xếp thẻ theo lãi, không theo giờ) giao một xe cả Đà Lạt 06:00 lẫn Đà Lạt 18:00 cùng ngày | Chỉ xét phía trước là đủ khi chuyến được xếp theo giờ; Đề xuất và Admin thì không | `verify` CT5b trên DB thật; test `twoCardsOutOfTimeOrder…` |
-| Vị trí của người: hỏi **riêng từng vai** rồi lấy chuyến muộn nhất | Một câu `driver = ? OR assistant = ? OR ? MEMBER OF coDrivers` quét cả bảng `trips`: 0,46 s một lần, API form Tạo hơn 2 phút | Gộp `OR` ngắn hơn nhưng MySQL bỏ mọi index | đo trên DB thật 2026-11-17 |
+| Lịch của một người — vị trí, bận, giờ lái — hỏi **riêng từng vai** rồi `TripService` ghép lại | Một câu gộp ba vai bằng `OR` qua `trip_co_drivers` quét cả bảng `trips`: câu vị trí 0,46 s một lần (API form Tạo hơn 2 phút), câu bận 63 ms và câu giờ lái 122 ms (form Tạo, màn Duyệt 23–28 giây) | Gộp `OR` ngắn hơn nhưng MySQL bỏ mọi index; tách vai thì mỗi câu đi theo index khóa ngoại của vai đó | đo trên DB thật 2026-11-17; CT5b và lỗi #35 |
+| Khoá sắp xếp "giờ lái trong ngày" được **nhớ** theo từng người (`drivingHoursKey`) | Phép sắp xếp hỏi DB ở mỗi lần so sánh: màn Duyệt thủ công từng gọi `getDrivingHoursForDate` 439 lần cho 30 người | Cùng ý với `standingFirst` của CT5b; hai chỗ `min()` của máy chọn giữ nguyên vì chỉ gọi khoá tối đa hai lần mỗi người | lỗi #35 |
 
 ### 9.2. Bug thật đã từng xảy ra ở chức năng này
 
@@ -674,14 +675,19 @@ màn Duyệt đánh ★ cho xe mà #22 chắc chắn từ chối, vì số ghế
 5. **"Một ngày" là ngày lịch của giờ khởi hành.** Chuyến 22:00 → 04:00 cộng trọn 6h vào ngày khởi hành
    và 0h vào hôm sau (§8.2). Đúng như đặc tả nói "single calendar day"
    (`current_functional_spec.md:174`), nhưng nên biết khi bị hỏi về chuyến đêm.
-6. **[SUY LUẬN — chưa kiểm chứng] Câu tính giờ lái có thể đếm thiếu tài xế phụ.**
-   `findTripsForDriverOnDate` (`TR:186-191`) vừa `LEFT JOIN FETCH t.coDrivers cd` vừa lọc
-   `cd = :driver`. Với một chuyến mà người được xét là **tài xế phụ** và chuyến có **từ hai** tài xế phụ,
-   Hibernate có thể nạp collection `coDrivers` chỉ gồm các dòng thoả điều kiện ⇒ `totalDrivers` nhỏ hơn
-   thật ⇒ phần chia **lớn** hơn thật ⇒ validator khắt khe hơn (chặn nhầm, không cho lọt). Chỉ xảy ra với
-   chuyến > 16h. Test tương đương `TripServiceAvailabilityContextTest` chỉ dựng chuyến **một** tài xế
-   phụ nên không chạm ca này. Không thấy trong `current_bugs_found.md` hay `project_report.md`; nêu như
-   một nghi vấn cần kiểm, không phải lỗi đã xác nhận.
+6. **Lỗi #36 (đã kiểm chứng và đã sửa 2026-11-17, cùng lỗi #35) — câu tính giờ lái đếm thiếu tài xế
+   phụ.** Câu gộp cũ `findTripsForDriverOnDate` vừa `LEFT JOIN FETCH t.coDrivers cd` vừa lọc
+   `cd = :driver` trên chính lần nối đó. Với một chuyến mà người được xét là **tài xế phụ** và chuyến có
+   **từ hai** tài xế phụ, Hibernate nạp collection `coDrivers` chỉ gồm chính người đó ⇒ `totalDrivers`
+   nhỏ hơn thật ⇒ phần chia **lớn** hơn thật. Bài này từng nêu là nghi vấn; test
+   `TripServiceAvailabilityContextTest.drivingHours_ofEveryDriverOnATripWithTwoCoDrivers_isTheTripSharedByThree`
+   chạy trên code cũ cho **6,0 giờ** thay vì **4,0** (chuyến 12 giờ, ba người lái). Nay mỗi vai một câu:
+   `findTripsForDriverOnDate` (`TR:186-191`) chỉ xét cột `driver`, còn `findTripsForCoDriverOnDate` (cuối
+   file) nối `coDrivers` **hai lần** — một lần để lọc, một lần `FETCH` không lọc — nên collection đủ.
+   Thường chỉ gặp ở chuyến > 16 giờ (cần ≥ 3 người lái) hoặc khi Admin gán dư tài xế phụ.
+   **Bài này từng đoán sai một nửa** ("chặn nhầm, không cho lọt"). Collection thiếu được nạp một lần
+   cho cả yêu cầu web, nên người xét sau có thể bị tính **0 giờ**. A/B trên bản sao: code cũ **mời**
+   một tài xế phụ cho khung làm họ lên 8,5 giờ/ngày, và từ chối nhầm một ngày đúng 8 giờ (sổ lỗi #36).
 7. **Chữ "Odo" trong câu báo bảo dưỡng** in km **kể từ lần bảo dưỡng**, không phải đồng hồ tổng (§4).
 8. **Mâu thuẫn comment ↔ code (code thắng):**
    - Comment `TS:1180-1185` nói `findBestAvailableBus()` dùng xe sắp/quá hạn "làm fallback cuối cùng kèm
@@ -712,8 +718,8 @@ màn Duyệt đánh ★ cho xe mà #22 chắc chắn từ chối, vì số ghế
 | `…busDryRun_nullBus_propagatesNpeInsteadOfFailing` (`:371`) | `bus = null` ⇒ `NullPointerException` bay ra, **không** thành `fail` |
 | `TripServiceSeatCapacityTest` (`:108`–`:214`, 9 test) | 30 > 22 bị từ chối kèm số trong câu báo; = 22 và < 22 qua; xe không loại ⇒ bỏ qua; đường throw cùng luật; AI và màn Duyệt đặt số ghế theo xe; không nhận xe nhỏ hơn số vé đã bán |
 | `TripServiceDriverShareTest` (9 test, JUnit thuần) | Bảng phần chia §8.1; biên 8h vẫn 1 người; tuyến 9h lệch 3,5h (21 → 25 người); bất biến một chiều; phần chia ≤ 8h |
-| `TripServiceAssistantAvailabilityTest` (4 test) | Người trượt luật 8h vắng ở danh sách tài xế nhưng có ở danh sách phụ xe; phụ xe vẫn bị loại khi khoá / hết bằng / trùng lịch; validator nhận đúng người đó |
-| `TripServiceAvailabilityContextTest` (4 test) | Nhánh nạp sẵn (Phase 7) cho **cùng** kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày; và (GĐ6) một chuyến giữ chỗ được chính các luật đó nhìn thấy, chỉ trong bộ nhớ |
+| `TripServiceAssistantAvailabilityTest` (5 test) | Người trượt luật 8h vắng ở danh sách tài xế nhưng có ở danh sách phụ xe; phụ xe vẫn bị loại khi khoá / hết bằng / trùng lịch; validator nhận đúng người đó; (lỗi #35) danh sách vẫn xếp người ít giờ lái lên trước |
+| `TripServiceAvailabilityContextTest` (5 test) | Nhánh nạp sẵn (Phase 7) cho **cùng** kết quả với nhánh SQL ở các ca biên: bận xe, bận người mọi vai, giờ lái nhiều ngày; (GĐ6) một chuyến giữ chỗ được chính các luật đó nhìn thấy, chỉ trong bộ nhớ; và (lỗi #36) chuyến có hai tài xế phụ: mọi người lái được 12 ÷ 3 = 4 giờ ở **cả hai** nhánh |
 | `TripServiceLocationTest` (14 test) và `LocationRuleTest` (8 test) | Vị trí (CT5b): máy chỉ chọn xe/người đúng bến; hai phía của luật; thẻ xét ngược giờ không giao một xe hai lần; nhánh nạp sẵn = nhánh SQL; mọi vai trên xe; dropdown mời đủ, đúng bến lên đầu, có ghi chú; validator không chặn |
 
 **Chưa có test tự động** cho: luật đủ `ceil(h/8)` tài xế và luật trùng vai (grep `src/test` không thấy
