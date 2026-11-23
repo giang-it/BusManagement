@@ -7,7 +7,7 @@
 > - thêm một dòng vào mục 5 (nhật ký).
 >
 > Tài liệu liên quan:
-> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-16).
+> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-23).
 > - Đợt trước (dự báo): [`forecast_progress.md`](forecast_progress.md), [`forecast_decisions.md`](forecast_decisions.md).
 > - `THESIS_ROADMAP.md` vẫn là tracker chung của cả dự án. §7 trỏ về file này, §8 ghi một mục ngắn cho mỗi phiên.
 
@@ -86,7 +86,16 @@
   - Sửa luôn #36, phát hiện khi sửa: chuyến có ≥ 2 tài xế phụ bị chia giờ sai **theo cả hai chiều**.
   - Test 261/261, thử làm hỏng 5 cách.
   - `verify` DB thật chỉ đọc: API form Tạo 28 → 7 s (có tuyến), 23 → 2,4 s (không tuyến); kết quả giống hệt. A/B trên bản sao: màn Duyệt thủ công 67 → 6 s.
-- **Việc tiếp theo:** CT6 (đã làm trong cây làm việc ngày 2026-11-19, chưa commit), rồi CT7. Tuỳ chủ dự án: gộp phép tính vị trí 4 lần/người của CT5b (form Tạo có tuyến còn khoảng 7 s), index ghép. G3-7: xoá các bản sao cũ khi chủ dự án đồng ý.
+- **CT6 xong ngày 2026-11-19; đã commit và push ngày 2026-11-23** (chủ dự án duyệt mọi đề xuất: *"oke, tôi đồng ý tất cả, hãy kiểm tra những chức năng, file liên quan và làm … xong thì cũng test luôn"*; rồi *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"*). Commit `5b38e71` (code + test), `8957099` (bài học), rồi commit `docs:` ngay sau đó:
+  - trang `/admin/timetable`: cặp tuyến suy bằng đảo bến, một nguồn giờ chạy và danh sách tuyến cho bộ sinh lẫn app, nút "Tạo lịch" xếp mọi khung theo giờ bằng `autoAssignResources` của job 10 giây trên một context lập lịch;
+  - test 273/273 (+12); thử làm hỏng 7 chỗ, chỗ nào cũng đúng test cần đỏ;
+  - `verify` trên bản sao rồi DB thật (có sao lưu): 125 chuyến mở bán + 1 chờ phân công cho 20–26/11, 7 phép kiểm SQL độc lập 0 vi phạm;
+  - DB thật: đóng 5 chuyến demo `DEPARTED` (CM-22), thêm 126 chuyến.
+
+  - Kiểm lại trước khi commit (2026-11-23): test 273/273 trên đúng bản CT6; bản sao DB thật, chạy bằng bản CT6 + CT7 (CT7 không đổi đường lập lịch), "Tạo lịch" 27/11–03/12: 121 chuyến mở bán + 5 chờ phân công, cùng phép kiểm SQL độc lập 0 vi phạm; DB thật giống hệt trước và sau.
+
+  Chi tiết ở mục 4, CT6. Làm trong worktree, vì `#35/#36` vẫn chưa commit và app 8080 của chủ dự án chạy từ `target/classes`.
+- **Việc tiếp theo:** #35/#36 đã commit và push ngày 2026-11-22; CT6 ngày 2026-11-23. Chuyến #51360 (Vũng Tàu → Miền Đông 06:00 20/11, chờ chọn xe) đã được chủ dự án **hủy** ngày 2026-11-22, khi giờ đi đã qua. Còn mở: CM-23 (chuyến thường lệ đã qua giờ mà không ai vận hành, và lần chạy bổ sung lịch sử) — chủ dự án bảo *"bàn sau"* (2026-11-22). Tuỳ chủ dự án: gộp phép tính vị trí 4 lần/người của CT5b, index ghép. Sau đó tới CT7. G3-7: xoá các bản sao cũ (`busmanagement_gd2`, `busmanagement_ct3`, nay thêm `busmanagement_ct6`) khi chủ dự án đồng ý.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -113,7 +122,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | XONG trên bản sao; ĐÃ COMMIT `7cb8fb4`, `9bb463f` + commit `docs:` sau đó, đã push | 2026-11-17 |
 | CT4 | Thay lịch sử trên DB thật (lịch sử GĐ3 được lưu trữ, không xoá) | QĐ-21 | CT3 đã commit | **có** | XONG trên DB thật; tài liệu ĐÃ COMMIT `6b6ecf8`, đã push | 2026-11-17 |
 | CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | ĐÃ COMMIT `5f52879`, `345c8be` + commit `docs:` sau đó, đã push | 2026-11-17 |
-| CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | CHƯA BẮT ĐẦU | |
+| CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | ĐÃ COMMIT `5b38e71`, `8957099` + commit `docs:` sau đó, đã push; DB thật có lịch 20–26/11 | 2026-11-19 → 23 |
 | CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | CHƯA BẮT ĐẦU | |
 | CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7 | **có** (chuyến chờ duyệt) | CHƯA BẮT ĐẦU | |
 | CT9 | Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe | QĐ-25, QĐ-26 | CT8 | có | CHƯA BẮT ĐẦU | |
@@ -519,21 +528,41 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Mục tiêu:** app biết tuyến nào đi cặp với tuyến nào, có lịch 06/12/18, và tạo được chuyến thường lệ tương lai theo vòng xe.
 
-**Cần chốt:** CM-4, CM-6, CM-14.
+**Cần chốt:** CM-4, CM-6, CM-14. **Đã chốt 2026-11-19**, cùng sáu điểm tìm ra khi đối chiếu code và DB: CM-17…CM-22 (`route_pairs_decisions.md`).
 
-- [ ] **Suy cặp:** viết hàm tìm tuyến ngược trong `RouteService` (đảo bến đầu/cuối, phải có đúng một tuyến khớp), kèm test.
-- [ ] **Nguồn giờ chạy thường lệ** theo CM-4, dùng chung cho bộ sinh và app. Bỏ hằng số trùng lặp.
-- [ ] **Tạo chuyến thường lệ cho N ngày tới:**
-  - xếp theo vòng, xe và tài xế ở đúng bến (CT5);
-  - đi qua cổng `validateBusForTrip` / `validateStaffForTrip`;
-  - không tạo trùng (khung đã có chuyến thường lệ thì bỏ qua);
-  - trạng thái theo CM-14;
-  - kích hoạt bằng nút cho Admin.
-- [ ] Controller mới theo mẫu `AdminBusController` (chỉ tiêm Service).
-- [ ] Test, `verify` (tạo lịch trên DB thật cho một tuần, có sao lưu).
-- [ ] Tài liệu; roadmap §6 Hidden Cost #10c.
+- [x] **Suy cặp** (CM-6), 2026-11-19: `RouteService.reverseRoutesOf(route, routes)` (static, cuối lớp, không xê dịch dòng bài 03 trích), đảo bến đầu/cuối, trả mọi tuyến khớp. Bộ lập lịch chỉ ghép khi có đúng một, và chỉ giữ tuyến khi chiều ngược cũng qua (lượt 2). Test `RouteServiceReverseRouteTest` (3).
+- [x] **Nguồn giờ chạy thường lệ** (CM-4): `domain/RegularTimetable` (`DEPARTURE_HOURS`, `DEFAULT_ROUTE_IDS`, `ROUTE_IDS_PROPERTY`). `HistorySimulation.DEPARTURE_HOURS` và `HistoricalDataBackfill.routeIds` trỏ về đó, sửa tại chỗ, không thêm dòng. Trước CT6 chỉ có một bản (`HistorySimulation.java:68`), nhưng nó package-private nên app không đọc được.
+- [x] **Tạo chuyến thường lệ cho N ngày tới** (`service/RegularTimetableService.generate`):
+  - mọi khung xếp chung một trục giờ (CM-19); xe và người chọn bằng `autoAssignResources` của job 10 giây (luật vị trí CT5b), trên context lập lịch `TripService.buildTimetableContext` (CM-21: xe `TRAVELING` có chuyến giải thích được xếp; km chuyến chưa xong cộng vào bảo trì);
+  - cổng dry-run rồi lưu qua `createManualTrip` → `ACTIVE` (CM-14); chuyến vừa xếp được giữ chỗ trong context;
+  - không tạo trùng: khung có chuyến chính ở mọi trạng thái thì bỏ qua (CM-18, `TripRepository.findMainTripDeparturesBetween`);
+  - giá = `RecommendationService.loadLatestPrices` (CM-20); không ai đứng đúng bến → `PENDING_APPROVAL` chưa có xe (CM-17);
+  - nút cho Admin; mặc định 7 ngày, trần 14 (CM-21).
+- [x] **Controller** `AdminTimetableController` (`/admin/timetable`, chỉ tiêm service); trang `timetable.html`; ô "Lịch Thường Lệ" ở cuối lưới `dashboard.html` (không xê dịch dòng bài 01–03 trích); nhãn "📅 Chuyến thường lệ" ở hàng chờ duyệt, tiêu đề "Phê duyệt chuyến thường lệ" ở màn Duyệt.
+- [x] **Test**, 2026-11-19:
+  - `RegularTimetableServiceTest` (9), `RouteServiceReverseRouteTest` (3). `mvnw test` **273/273**.
+  - **Thử làm hỏng 7 chỗ**, lần nào cũng đỏ đúng test cần đỏ: bỏ km cam kết → test bảo trì; chỉ xe `READY` → test xe đang chạy; nhận mọi xe `TRAVELING` → cùng test đó; xếp theo tuyến trước → test vòng xe + bảo trì; không giữ chỗ → hai test đó; bỏ lượt 2 ghép cặp → test cặp tuyến; bỏ kiểm khung đã có → hai test khung. Khôi phục, khớp từng byte.
+- [x] **`verify` trên bản sao** `busmanagement_ct6` (cổng 8098, PID 32296; 10 kết nối vào bản sao, 0 vào DB thật):
+  - trang trước khi bấm: 3 cặp, giá theo giờ, 0/18 khung mỗi ngày;
+  - đóng 5 chuyến demo `DEPARTED` bằng nút "Hoàn thành" (CM-22): 5 xe về `READY`, odometer cộng đúng km;
+  - "Tạo lịch" 20/11, 7 ngày: **125 mở bán + 1 chờ phân công** (Vũng Tàu → Miền Đông 06:00 20/11), 19,6 s; bấm lại: 0 + 0, bỏ qua 126 khung, 2,4 s;
+  - phép kiểm SQL độc lập (`ct6_check.sql`: vị trí xe, vị trí người, chồng giờ xe ±1 giờ, người ±30 phút, giờ lái/ngày, km bảo trì, số ghế, giá): **0 vi phạm**;
+  - mỗi cặp đúng loại xe gợi ý: Vũng Tàu 2 Limousine/ngày, Cần Thơ 2 Ghế ngồi (3 ở ngày đầu), Đà Lạt 4 Giường nằm;
+  - 17 trang 200, log sạch; duyệt tay #51360 bằng 29A-001.12 → `ACTIVE`, 22 ghế.
+- [x] **`verify` trên DB thật** (cổng 8099, PID 30340), sau sao lưu `ProjectBackup\db\busmanagement_2026-11-19_truoc-CT6.sql` (khôi phục thử, `CHECKSUM TABLE` khớp):
+  - màn Đề xuất trước: 18 thẻ đủ điều kiện, 7 thiếu tài nguyên;
+  - đóng 5 chuyến demo `DEPARTED` (#3, #6, #11, #12, #13); "Tạo lịch" 20/11, 7 ngày: 125 + 1, 21,2 s; phép kiểm SQL: 0 vi phạm;
+  - màn Đề xuất sau: 17 / 8 — xe của chuyến chính nay bị coi là bận (nửa đầu của Hidden Cost #10c);
+  - màn Dự báo tự chấm vẫn 16,5% (SN4 17,9%), như sau CT4; 18 trang 200, log sạch;
+  - DB thật: 48.008 chuyến (47.882 + 126); #51360 để chờ chủ dự án chọn xe.
+- [x] **Tài liệu**, 2026-11-19: spec (mục mới "Regular Timetable"), summary (§7.5, §7.6, §20 mới), `trip_lifecycle_fsm.md` §2, `test_case.md` (TC_TRIP_045…048, bảng thống kê), QĐ-22 "cách cài ở CT6" và CM-4/6/14/17…23, roadmap §6 (#10c), §7, §8, bài 01 (ghi chú: chuyến 13 đã đóng). `database_schema.md` không đổi: CT6 không thêm cột hay bảng.
+- **Phát hiện khi làm, ghi lại:**
+  - **CM-23 (mở):** chuyến thường lệ đã qua giờ mà không ai bấm "Xuất phát/Hoàn thành" vẫn `ACTIVE`. Chúng hiện ở nhóm "Trễ giờ" của Bảng điều hành. Lần chạy bổ sung lịch sử sau này cũng bỏ qua cả ngày đó (`HistoricalDataBackfill.existingGeneratorDays`, `:1229-1241`, coi mọi chuyến lúc 06/12/18:00 là "dạng bộ sinh"), nên dự báo không có quan sát cho những ngày ấy.
+  - **Kíp quay đầu ở Đà Lạt đổi vai.** Ví dụ 21/11, xe 29A-001.14: đi 06:00 với tài xế A1 và phụ xe A2, về 18:00 với A2 lái và A1 làm phụ xe. Luật hiện hành cho phép, vì 8 giờ chỉ tính vai lái (lỗi #13), nhưng hai người trực 06:00–24:00. Đưa vào CT9 / tối ưu kíp (QĐ-26, QĐ-27).
+  - **Bộ dựng bài học** (`docs/study/_build/build.mjs`) không tách được tiêu đề từ file `.md` có CRLF, như file `.md` trong worktree. Vì vậy HTML bài 00b, 06 của phiên #35 có tiêu đề trang rỗng. Đã sửa: một dòng chuẩn hoá CRLF → LF lúc đọc. Đã dựng lại 00b, 06, 01; dựng file LF cho kết quả y hệt bản đã commit.
+- [x] **Commit**, 2026-11-23 (chủ dự án: *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"*): `5b38e71` (code + test), `8957099` (bài 01), rồi commit `docs:`; đã push. Trước đó kiểm lại: test 273/273 trên đúng bản CT6 (worktree `wt-ct6`), "Tạo lịch" 27/11–03/12 trên bản sao DB thật (bản CT6 + CT7) 121 + 5 chuyến, `ct6_check.sql` 0 vi phạm.
 
-**Xong khi:** DB thật có chuyến thường lệ tương lai cho 3 cặp, mỗi xe chạy đúng vòng.
+**Xong khi:** DB thật có chuyến thường lệ tương lai cho 3 cặp, mỗi xe chạy đúng vòng. **Đạt 2026-11-19** (20–26/11).
 
 ### CT7 — Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng (QĐ-22)
 
@@ -627,7 +656,9 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-17 (CT5b, tiếp) | `8bf87e0f` | *"sửa truy vấn chậm đi, sau đó hãy kt lại, đảm bảo CT5b đã hoàn thành và test lại app"* | Tách câu vị trí theo vai (+2 test, thử làm hỏng ok); test 259/259; `verify` DB thật (19 trang 200, Đề xuất 25 thẻ / 0 vi phạm, form Sửa và API khớp SQL) và bản sao (job, Duyệt, từ chối, xác nhận); tài liệu; lỗi #35. Chưa commit |
 | 2026-11-17 (CT5b, commit) | `8bf87e0f` | *"tôi hiểu rồi, commit và push đi, sau đó sửa #35"* | `verify` ngắn trước commit; commit `5f52879`, `345c8be`, commit `docs:`; push cùng `6b6ecf8` |
 | 2026-11-17 (lỗi #35) | `8bf87e0f` | *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"* | Làm trong worktree riêng, vì app 8080 của chủ dự án chạy từ `target/classes` có devtools. Mỗi vai một câu cho bận và giờ lái; khoá sắp xếp giờ lái được nhớ; chứng minh và sửa #36 (test đỏ trên code cũ, A/B trên bản sao: cho lọt và chặn nhầm). Test 261/261; `verify` DB thật và A/B bản sao; tài liệu. Chưa commit |
+| 2026-11-19 (CT6) | `dba5da64` | Giải thích lại CT6 kèm ví dụ (DB thật đọc lúc 14:47); chủ dự án *"oke, tôi đồng ý tất cả, hãy kiểm tra những chức năng, file liên quan và làm … xong thì cũng test luôn"* | Chốt CM-4/6/14, CM-17…22. Code trong worktree (#35/#36 mang theo). Test 273/273, thử làm hỏng 7 chỗ. `verify` bản sao rồi DB thật (sao lưu, khôi phục thử): đóng 5 chuyến demo, tạo lịch 20–26/11 = 125 + 1, kiểm SQL 0 vi phạm, Đề xuất 18/7 → 17/8, Dự báo không đổi. Sửa bộ dựng bài học (CRLF) và dựng lại 00b, 06, 01. Mở CM-23. Chưa commit |
 | 2026-11-22 (commit #35/#36) | `2d46500c` | Chủ dự án duyệt 5 đề xuất của CT7; *"trước tiên bạn hãy commit #35/36 và push"* | Chép cả cây làm việc (có CT6) ra `ProjectBackup\patches\2026-11-22_ct6_truoc-commit-35-36\`; đặt lại bản #35/#36 của ngày 19/11 để commit. Kiểm lại đúng các file đó trong worktree: test 261/261, `verify` DB thật chỉ đọc (20 trang/API 200, API form Tạo 3,5 s, DB giống hệt). Commit `7fb50f4`, `c615164`, commit `docs:`; push. Rồi chép lại bản CT6 |
+| 2026-11-23 (commit CT6) | `7b523bdf` | *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"* | Chụp cả cây làm việc (CT6 + CT7) ra `ProjectBackup\patches\2026-11-23_ct6-ct7_truoc-commit\`. Rà lại code CT6. Test 273/273 trên đúng bản CT6 (worktree `wt-ct6`). Bản sao DB thật (bản CT6 + CT7): "Tạo lịch" 27/11–03/12 ra 121 mở bán + 5 chờ phân công, `ct6_check.sql` 0 vi phạm; DB thật giống hệt. Commit `5b38e71` (code + test), `8957099` (bài 01), rồi commit `docs:`; đã push |
 
 ---
 

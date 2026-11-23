@@ -1145,6 +1145,75 @@
 
 ---
 
+### TC_TRIP_045 — Lịch thường lệ: tạo 7 ngày cho 3 cặp tuyến, xe và kíp đứng đúng bến (route pairs CT6)
+
+- **Mã TC:** TC_TRIP_045
+- **Tên Kịch Bản:** Admin bấm "Tạo lịch" ở `/admin/timetable`; mọi khung 06/12/18 của 6 tuyến có chuyến, mỗi xe chạy đúng vòng
+- **Điều kiện tiên quyết:** DB thật hay bản sao, chưa có chuyến chính nào từ 20/11 tới 26/11. 5 chuyến demo `DEPARTED` đã đóng (CM-22)
+- **Các bước thực hiện:**
+  1. `GET /admin/timetable` — đọc bảng "Cặp tuyến có lịch"
+  2. `POST /admin/timetable/generate` với `from=2026-11-20`, `days=7`
+  3. Đọc kết quả trên trang, rồi chạy phép kiểm SQL độc lập (vị trí lúc khởi hành tính từ chuyến gần nhất tới nơi, chồng giờ ±1 giờ / ±30 phút, giờ lái theo ngày, km bảo trì, số ghế, giá)
+- **Kết quả mong đợi:**
+  - Bước 1: 3 cặp (#2 ↔ #12, #5 ↔ #13, #10 ↔ #11), giờ 06:00 · 12:00 · 18:00, giá 300.000 / 180.000 / 100.000đ, không tuyến nào bị loại
+  - Bước 2: flash *"Đã xếp lịch 20/11/2026 → 26/11/2026: 125 chuyến mở bán, 1 chuyến chờ phân công xe."*; bảng "Đã có lịch" 18 / 18 cho mỗi ngày 20–26/11
+  - Bước 3: mọi phép kiểm 0 vi phạm. Chuyến mở bán: `ACTIVE`, có `sale_opened_at`, số ghế = sức chứa xe. Mỗi cặp chạy đúng loại xe gợi ý: Vũng Tàu 2 Limousine/ngày, Cần Thơ 2 Ghế ngồi, Đà Lạt 4 Giường nằm
+- **Đã chạy:** 2026-11-19, trên bản sao `busmanagement_ct6` (cổng 8098) rồi trên DB thật (cổng 8099, có sao lưu `busmanagement_2026-11-19_truoc-CT6.sql`): đúng như trên ở cả hai, 19,6 s và 21,2 s. Ví dụ ngày 21/11: Vũng Tàu, 29A-001.10 và 11A-111.11 thay nhau chạy cả 6 chuyến; Đà Lạt, 29A-001.14 đi 06:00, về 18:00
+- **Tự động hoá:** `RegularTimetableServiceTest.aDayOfThePair_formsTheBusLoopsByItself_andTheFarEndStartsWithAPendingTrip`, `…maintenanceCountsTheKmAlreadyPlanned_notOnlyTheTripAtHand`, `…aBusOnTheRoadToday_isScheduledForTomorrow_butAnUnexplainedTravelingFlagIsNot`
+
+---
+
+### TC_TRIP_046 — Lịch thường lệ: bấm lại không tạo trùng; chuyến tạo tay và chuyến đã hủy giữ khung (CM-18)
+
+- **Mã TC:** TC_TRIP_046
+- **Tên Kịch Bản:** Bấm "Tạo lịch" lần hai cho cùng các ngày
+- **Điều kiện tiên quyết:** đã làm TC_TRIP_045
+- **Các bước thực hiện:**
+  1. `POST /admin/timetable/generate` với `from=2026-11-20`, `days=7` lần nữa
+- **Kết quả mong đợi:**
+  - *"… 0 chuyến mở bán, 0 chuyến chờ phân công xe."*; *"126 khung đã có chuyến"*; số chuyến trong DB không đổi
+  - Một chuyến chính Admin tạo tay lúc 06:15 giữ khung 06:00; một chuyến đã hủy giữ khung của nó; chuyến tăng cường 12:30 **không** giữ khung 12:00
+- **Đã chạy:** 2026-11-19 trên bản sao: 0 / 0, bỏ qua 126 khung, 2,4 s. Phần chuyến tạo tay / đã hủy / tăng cường khoá bằng test
+- **Tự động hoá:** `RegularTimetableServiceTest.pressingTheButtonAgain_createsNothing`, `…aManualTrip_orACancelledOne_keepsItsSlot_butAnExtraTripDoesNot`
+
+---
+
+### TC_TRIP_047 — Lịch thường lệ: bến xa chưa có xe → chuyến chờ duyệt chưa có xe, Admin chọn tay (CM-17)
+
+- **Mã TC:** TC_TRIP_047
+- **Tên Kịch Bản:** Khung Vũng Tàu → Miền Đông 06:00 ngày đầu, khi chưa xe nào đứng ở Vũng Tàu
+- **Điều kiện tiên quyết:** như TC_TRIP_045, trước bước 2
+- **Các bước thực hiện:**
+  1. Làm TC_TRIP_045 bước 2
+  2. `GET /admin/trips/pending`, rồi `GET /admin/trips/approve/{id}` của chuyến đó
+  3. `POST /admin/trips/approve` với một Limousine đang ở Miền Đông và một tài xế trong danh sách
+- **Kết quả mong đợi:**
+  - Bước 1: chuyến `PENDING_APPROVAL` không xe, không tài xế, 22 ghế tạm; trang kết quả ghi lý do *"Không có xe nào sẵn sàng / … / đang ở bến xuất phát …"* và có nút "Xem & phân công"
+  - Bước 2: hàng chờ có nhãn *"📅 Chuyến thường lệ"*; màn Duyệt ghi *"Phê duyệt chuyến thường lệ"*, mời mọi xe hợp lệ, xe ở Miền Đông kèm *"⚠ đang ở Bến xe Miền Đông"*
+  - Bước 3: *"✅ Chuyến xe #… đã được phân công và kích hoạt thành công!"*; chuyến `ACTIVE`, 22 ghế theo xe được chọn (#26)
+- **Đã chạy:** 2026-11-19 trên bản sao: #51360, duyệt bằng 29A-001.12 → `ACTIVE`, 22 ghế. Trên DB thật, #51360 (cùng khung) **để chờ duyệt** cho chủ dự án tự chọn xe
+- **Tự động hoá:** `RegularTimetableServiceTest.aDayOfThePair_formsTheBusLoopsByItself_andTheFarEndStartsWithAPendingTrip` (phần chuyến chờ duyệt)
+
+---
+
+### TC_TRIP_048 — Lịch thường lệ: đầu vào sai và cặp tuyến không hợp lệ (CM-6, CM-21)
+
+- **Mã TC:** TC_TRIP_048
+- **Tên Kịch Bản:** Ngày bắt đầu ở quá khứ, số ngày ngoài 1…14, tuyến thiếu chiều ngược
+- **Điều kiện tiên quyết:** —
+- **Các bước thực hiện:**
+  1. `POST /admin/timetable/generate` với `from` = hôm qua
+  2. Như trên với `days=0`, rồi `days=15`
+  3. Cấu hình `backfill.route-ids` chỉ có một chiều của một cặp, mở `/admin/timetable`
+- **Kết quả mong đợi:**
+  - Bước 1: *"Lỗi: Ngày bắt đầu … đã qua — lịch chỉ tạo cho hôm nay trở đi."*, không chuyến nào được tạo
+  - Bước 2: *"Lỗi: Số ngày phải từ 1 đến 14."*
+  - Bước 3: khung cảnh báo *"Tuyến trong cấu hình nhưng không xếp được lịch"* ghi rõ lý do; tuyến đó không có chuyến
+- **Đã chạy:** chưa chạy tay; khoá bằng test
+- **Tự động hoá:** `RegularTimetableServiceTest.theInputIsChecked_andPastSlotsOfTodayAreSkipped`, `…aRouteWithoutItsReverse_orWithTwoOfThem_isNotScheduled_andThePageSaysWhy`, `RouteServiceReverseRouteTest` (3 test)
+
+---
+
 <a name="module-4"></a>
 ## MODULE 4: HỆ THỐNG AI ĐỀ XUẤT CHUYẾN TĂNG CƯỜNG (AI Scheduler)
 **Service:** `TripService` — `@Scheduled(fixedRate = 10_000)`  
@@ -2600,12 +2669,12 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 |---|---|---|---|
 | Module 1 — Bus Management | 13 | 5 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
-| Module 3 — Trip FSM & CRUD | 26 | 6 | 20 |
+| Module 3 — Trip FSM & CRUD | 30 | 7 | 23 |
 | Module 4 — AI Scheduler | 20 | 6 | 14 |
 | Module 5 — Admin Approval | 14 | 7 | 7 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **105** | **41** | **64** |
+| **TỔNG** | **109** | **42** | **67** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2614,7 +2683,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

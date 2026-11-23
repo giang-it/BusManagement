@@ -195,7 +195,8 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 - Trip mới: copy `route`, `price` từ gốc; `status = PENDING_APPROVAL`; `isExtraTrip = true`; `originalTrip` = trip gốc. `totalSeats` chỉ **tạm** chép từ gốc.
 - Gọi `autoAssignResources(extraTrip)` (mục 7.5) — nếu thành công gán bus/driver/assistant/coDrivers vào trip mới **và đặt `totalSeats` = sức chứa của xe được gán** (`busType.capacity`; lỗi #22, 2026-09-19 — trước đây chép nguyên số ghế của chuyến gốc, vốn là số Admin gõ tay, nên đã sinh chuyến bán 40 ghế trên xe 22 chỗ); nếu fail, log lý do, giữ số ghế của gốc làm chỗ trống (`approveTrip()` đặt lại theo sức chứa xe Admin chọn — mục #26, 2026-09-24), **vẫn save trip** (ở trạng thái `PENDING_APPROVAL` không có resource — chờ Admin xử lý thủ công qua `AdminTripController`).
 
-### 7.5. `autoAssignResources(trip)` — Thuật toán AI trung tâm
+### 7.5. `autoAssignResources(trip, ctx)` — Thuật toán AI trung tâm
+*(Tham số `ctx` thêm ở CT6, 2026-11-19: job 10 giây truyền `null` — mọi phép kiểm hỏi DB, y như trước; lịch thường lệ (§20) truyền context lập lịch, qua `TripService.assignRegularTrip`.)*
 1. Tính `tripDurationHours`.
 2. `findBestAvailableBus()` — fail nếu null.
 3. `requiredDrivers = ceil(tripDurationHours / 8.0)`, tối thiểu 1.
@@ -210,6 +211,7 @@ Không có chức năng sửa/xóa/list user nào khác trong code.
 - Lọc cứng: xe **không** bận trong cửa sổ, **chưa** `needsMaintenance()`, và **sau chuyến này vẫn chưa** `isNearMaintenance(quãng đường)`; trong số còn lại chọn theo `preferredTypeThenLeastWorn` (đúng loại trước, rồi `kmSinceLastMaintenance` nhỏ nhất).
 - **Vị trí (QĐ-23, CT5b, 2026-11-17), lọc cứng:** xe phải **vừa chuỗi** (`busFits` → `LocationRule.fits`, `TripService.java:327`): lúc khởi hành nó đứng ở bến đi của tuyến (bến cuối của chuyến gần nhất chưa huỷ, hoặc bến nhà), và chuyến kế tiếp đã nhận của nó, nếu có, xuất phát từ bến đến. Áp ở cả bản hỏi DB lẫn bản `AvailabilityContext` (màn Đề xuất); context nạp sẵn lượt gần nhất **trước** và lượt sớm nhất **sau** khoảng đã nạp cho từng xe. Tuyến chưa có bến thì không lọc.
 - Dropdown chọn xe thủ công (Duyệt, Sửa, Tạo) **không** lọc theo vị trí: xe vừa chuỗi lên đầu, xe khác kèm ghi chú (`busLocationNotes`); validator không kiểm vị trí (CM-5 cách B).
+- **Context lập lịch (CT6, CM-21, 2026-11-19), chỉ lịch thường lệ dùng** (`TripService.buildTimetableContext`): ứng viên là xe validator nhận theo trạng thái — `READY`, hoặc `TRAVELING` có chuyến `DEPARTED` giải thích (lỗi #19, `travelingFlagExplained`, dùng chung với `validateBusForTrip`) — thay cho "xe `READY` lúc này" (`TripService.java:318`); và luật sát bảo trì cộng thêm km mọi chuyến chưa xong của xe (`ctx.committedKm`, `:329`). Context thường (màn Đề xuất) và `ctx == null` (job) không có hai thứ này: hành vi không đổi.
 - **Không có fallback bảo trì:** không xe nào qua ba bộ lọc thì trả `null` (`TripService.java:326-331`, kiểm 2026-10-23). ~~Fallback: nếu không có xe nào thỏa ngưỡng bảo trì, vẫn chọn xe ít km nhất trong số xe không bận, kèm log cảnh báo "SÁT/QUÁ NGƯỠNG BẢO TRÌ".~~ — câu cũ này lệch code; comment trong `validateBusForTrip()` (`TripService.java:1184`) vẫn còn nhắc "fallback cuối cùng" đó.
 
 ### 7.7. `findBestAvailableDriver(departure, arrival, tripDurationHours, totalDriversCount, excludeDrivers)`
@@ -636,7 +638,7 @@ Không entity mới, không ghi, không tạo chuyến — nhất quán với c�
 Tái dùng `findBestAvailableDriver` cho từng thẻ khiến trang mất ~18,7s (mỗi thẻ quét N tài xế × truy vấn giờ/bận). Thêm `AvailabilityContext` (class **chỉ chứa dữ liệu**) nạp toàn bộ lịch liên quan **một lần**, cùng các overload nhận `ctx` trên `findBestAvailableBus/Driver` và ba leaf (`isBusBusy`, `isDriverBusyInWindow`, `getDrivingHoursForDate`): `ctx == null` → SQL như cũ (đường phân công **không đụng tới**); `ctx != null` → xét trên dữ liệu preload. Kết quả lúc ship Phase 7 **~0,97s (≈19×)**, nội dung **byte-identical**. Luật tính giờ tách vào `sumDrivingHours(...)` (một chỗ); predicate giao-khoảng/vai-trò là phép toán nền tảng, có test `TripServiceAvailabilityContextTest` chốt Java ≡ SQL ở các ca biên, và (từ GĐ6) chốt rằng một chuyến giữ chỗ được chính các luật đó nhìn thấy.
 
 ### 18.8. Giới hạn có chủ đích
-- **Lịch chạy thường lệ của những ngày tới chưa có trong DB** (dữ liệu mô phỏng dừng ở ngày cuối có dữ liệu), nên xe và tài xế của chuyến chính không bị trừ: một thẻ có thể chọn đúng chiếc xe sẽ chạy chuyến chính. Có từ Phase 7, GĐ6 giữ nguyên.
+- ~~**Lịch chạy thường lệ của những ngày tới chưa có trong DB** (dữ liệu mô phỏng dừng ở ngày cuối có dữ liệu), nên xe và tài xế của chuyến chính không bị trừ: một thẻ có thể chọn đúng chiếc xe sẽ chạy chuyến chính. Có từ Phase 7, GĐ6 giữ nguyên.~~ **Từ CT6 (2026-11-19)** lịch thường lệ được tạo ở `/admin/timetable` (§20); context của màn này nạp chuyến chính như mọi chuyến khác, nên xe và kíp của chúng là bận (DB thật: 18 thẻ đủ điều kiện / 7 thiếu → 17 / 8). Ngày nào chưa bấm "Tạo lịch" thì vẫn như cũ. Màn này vẫn **chưa trừ số ghế** của chuyến chính khỏi nhu cầu của khung — CT7.
 - **Chậm theo số thẻ:** mỗi thẻ chọn xe, chọn tài xế và qua cổng SQL (~0,1 giây mỗi thẻ). Đo ngày 2026-10-23: 4,9–6,0 giây với 41 thẻ; tuần Tết số thẻ có thể gấp đôi.
 - Luật "sắp tới hạn bảo dưỡng" xét km của **từng chuyến riêng lẻ**, không cộng dồn các chuyến giữ chỗ của cùng một xe — giống hệt khi Admin tự xếp nhiều chuyến tương lai cho một xe.
 - MVP một tài xế chính: mọi tuyến dự báo được đều ≤ 8 giờ; chuyến dài cần tài xế phụ / phụ xe nằm ngoài bước này.
@@ -682,3 +684,46 @@ Số chuyến thêm phủ được = ⌊Σ theo ngày của min(số chuyến th
 - Năng lực là **tổng năng lực** đội xe, chưa trừ lịch chạy thường lệ — ước lượng lạc quan; màn hình ghi rõ.
 - Tiền tính với **xe chuẩn**; màn Đề xuất tính với xe thật được chọn, nên hai màn chỉ bằng nhau khi các thẻ đều chạy xe chuẩn.
 - Δxe quy ra ghế bằng sức chứa trung bình đội xe; không chọn được loại xe thêm vào.
+
+---
+
+## 20. Module: Lịch thường lệ (route pairs CT6, 2026-11-19) — `AdminTimetableController` (`/admin/timetable`)
+
+Quyết định: QĐ-20, QĐ-22, CM-4, CM-6, CM-14, CM-17…CM-22 (`route_pairs_decisions.md`).
+
+### 20.1. Thành phần
+- `domain/RegularTimetable`: `DEPARTURE_HOURS = [6, 12, 18]`, `DEFAULT_ROUTE_IDS = "2,12,5,13,10,11"`, `ROUTE_IDS_PROPERTY` (khoá `backfill.route-ids`). Bộ sinh lịch sử dùng lại cả hai (`HistorySimulation.DEPARTURE_HOURS`, `HistoricalDataBackfill.routeIds`) — một nguồn cho lịch sử và lịch thật (CM-4).
+- `RouteService.reverseRoutesOf(route, routes)` (static, không đọc DB): tuyến đi từ bến đến của route về bến đi của nó, suy từ trạm dừng (CM-6).
+- `service/RegularTimetableService`: `overview()` (trang) và `generate(from, days)` (một transaction).
+- `TripService`, mục cuối "LỊCH THƯỜNG LỆ": `buildTimetableContext`, `assignRegularTrip` (= `autoAssignResources(trip, ctx)`), `reserveRegularTrip`, `travelingFlagExplained` (dùng chung với `validateBusForTrip`).
+- `TripRepository.findMainTripDeparturesBetween(routeIds, from, to)`: (tuyến, giờ đi) của mọi chuyến **không** tăng cường, mọi trạng thái.
+- `RecommendationService.loadLatestPrices()` mở từ `private` thành package-private để lịch dùng **cùng** giá với màn Đề xuất (CM-20).
+- `dto/RegularTimetableViewDto`, `dto/RegularTimetableRunDto`; `templates/admin/timetable.html`; ô "Lịch Thường Lệ" trên `dashboard.html`.
+
+### 20.2. Chọn tuyến (`plan()`)
+- Lượt 1, từng tuyến trong cấu hình: có trong DB; có `estimatedDuration`; có **đúng một** tuyến chiều ngược; tuyến đó cũng trong cấu hình.
+- Lượt 2: giữ tuyến khi tuyến chiều ngược của nó cũng qua lượt 1 — lịch theo cặp, không chạy một chiều.
+- Tuyến bị loại hiện trên trang kèm lý do.
+
+### 20.3. `generate(from, days)`
+- Đầu vào: `from` ≥ hôm nay; `1 ≤ days ≤ MAX_DAYS (14)`; mặc định 7 (= `ForecastService.FORECAST_HORIZON_DAYS`). Sai → `IllegalArgumentException`, controller hiện flash "Lỗi: …".
+- Mọi khung (tuyến × ngày × giờ) xếp theo giờ đi, cùng giờ thì theo id tuyến (CM-19). Mỗi khung:
+  1. đã qua giờ → bỏ qua (`skippedPast`);
+  2. đã có chuyến chính — không tăng cường, cùng tuyến, cùng ngày, cùng giờ (06:xx), mọi trạng thái kể cả `CANCELLED` → bỏ qua (`skippedExisting`, CM-18);
+  3. chưa có giá vé lịch sử của (tuyến, giờ) → bỏ qua (`skippedNoPrice`, CM-20);
+  4. `assignRegularTrip` trên context lập lịch → nếu được: số ghế = sức chứa xe (`TripService.seatCapacityOf`), cổng dry-run xe rồi nhân sự, qua thì `createManualTrip` (`ACTIVE`, `saleOpenedAt`) và `reserveRegularTrip` (context thấy chuyến này: bận, giờ lái, vị trí, km);
+  5. không được (không xe/kíp đứng ở bến đi, hay cổng từ chối) → lưu chuyến `PENDING_APPROVAL` không xe, số ghế tạm = xe chuẩn của tuyến, kèm lý do trong kết quả (CM-17).
+- Cổng chạy bản dry-run trước vì `createManualTrip` ném exception khi từ chối, mà exception đi qua proxy giao dịch sẽ đánh dấu cả lần bấm phải rollback.
+
+### 20.4. Context lập lịch (CM-21)
+- `buildTimetableContext(spanStart, spanEnd)` = `buildAvailabilityContext` + `lookAhead(xe được xếp, km đã cam kết)`. Khoảng nạp dư một ngày sau ngày cuối.
+- Xe được xếp: `READY`, hoặc `TRAVELING` có chuyến `DEPARTED` giải thích; `REPAIRING` không.
+- Km đã cam kết: tổng `route.distanceKm` của các chuyến `PENDING_APPROVAL`/`ACTIVE`/`DEPARTED` của xe, cộng thêm mỗi chuyến vừa xếp. `findBestAvailableBus` cộng nó vào `isNearMaintenance`.
+
+### 20.5. Màn hàng chờ và màn Duyệt
+- `pending-trips.html`: chuyến không tăng cường mang nhãn "📅 Chuyến thường lệ".
+- `approve-form.html`: tiêu đề "Phê duyệt chuyến thường lệ" cho chuyến không tăng cường. Duyệt, từ chối không đổi; từ chối = `CANCELLED`, nên khung đó không bị bấm lại dựng lên.
+
+### 20.6. Test
+- `RegularTimetableServiceTest` (9): một ngày của cặp ra vòng 2 xe, khung đầu ở bến xa chờ duyệt; bấm lại không tạo gì; chuyến tạo tay / đã hủy giữ khung, chuyến tăng cường thì không; khung không có giá; km cam kết; xe đang chạy hôm nay được xếp, cờ TRAVELING lệch thì không, màn Đề xuất vẫn chỉ xe READY; ghép cặp (không có / hai tuyến ngược / thiếu chiều); trang; đầu vào và khung đã qua giờ.
+- `RouteServiceReverseRouteTest` (3, JUnit thuần).

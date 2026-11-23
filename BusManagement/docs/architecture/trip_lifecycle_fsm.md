@@ -14,12 +14,12 @@ Every `Trip` holds a `TripStatus` field that progresses through a defined set of
 
 ### `PENDING_APPROVAL`
 - **Meaning:** Created by the AI scheduler, awaiting administrator review.
-- **When entered:** `createExtraTrip()` in the scheduled job.
+- **When entered:** `createExtraTrip()` in the scheduled job; and, since route pairs CT6 (2026-11-19), `RegularTimetableService.generate()` for a **regular** slot that no bus or crew standing at the start could be found for (CM-17) — such a trip is not an extra trip (`isExtraTrip = false`, no `originalTrip`) and carries no resources. Both are new rows, so neither is a transition.
 - **Side effects on entry:** None. Resources may be unassigned if AI could not allocate them.
 
 ### `ACTIVE`
 - **Meaning:** Trip is live and open for ticket sales. `saleOpenedAt` is stamped once.
-- **When entered:** Manual trip creation (`createManualTrip`), manual approval (`approveTrip`), or AI-confirm (`confirmAutoAssignedTrip`), and via `updateTripStatus`.
+- **When entered:** Manual trip creation (`createManualTrip` — also the door the regular timetable of CT6 saves its trips through, after the dry-run gates), manual approval (`approveTrip`), or AI-confirm (`confirmAutoAssignedTrip`), and via `updateTripStatus`.
 - **Validation rules (on approval entry):** Full bus + staff validation runs before activating. See Section 8.
 - **Side effects on entry:** `saleOpenedAt = now()` if not already set.
 
