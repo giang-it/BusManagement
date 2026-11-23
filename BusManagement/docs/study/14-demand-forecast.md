@@ -59,8 +59,8 @@ không đổi"*. Anh chuyển sang màn Đề xuất tăng cường: thẻ của
 | Loại | File | Trách nhiệm (1 dòng) |
 |---|---|---|
 | Template | `tpl/admin/demand-forecast.html` | Bảng 7 ngày, biểu đồ 35 ngày, khối tự chấm điểm, khối Tết, bảng hệ số lễ, thông tin lần khớp; hai khối `<script>` vẽ Chart.js |
-| JavaScript | `tpl/admin/demand-forecast.html:442-492`, `:494-533` | Dựng biểu đồ từ số liệu Thymeleaf đổ vào; đổi chuỗi khi chọn trong ô `select` (chỉ phía trình duyệt) |
-| Controller | `…/controller/admin/ForecastController.java:45-49` | Một `GET`, không tham số, gọi `buildForecastPage()`, đưa vào Model key `view` |
+| JavaScript | `tpl/admin/demand-forecast.html:450-500`, `:502-541` | Dựng biểu đồ từ số liệu Thymeleaf đổ vào; đổi chuỗi khi chọn trong ô `select` (chỉ phía trình duyệt) |
+| Controller | `…/controller/admin/ForecastController.java:48-55` | Một `GET`, không tham số, gọi `buildForecastPage()`, đưa vào Model key `view`; từ CT7 của đợt cặp tuyến thêm key `pairGroups` (cùng các chuỗi đó, gom theo cặp tuyến — `PairPlanService.forecastByPair`) |
 | Service | `FS:212-366` | Hai cửa `buildForecast()` / `buildForecastPage()`; gom khung, chọn chuỗi, gọi mô hình, nhớ kết quả, dựng DTO |
 | Service — luật dùng chung | `FS:482-514` | `isHot()`, `tripsNeeded()`, `extraTripPassengers()` — Bài 17, 18 gọi |
 | Service — tự chấm điểm | `FS:622-791` | Lùi về 8 ngày gốc, khối Tết, SN4 sạch, chấm điểm |
@@ -70,7 +70,7 @@ không đổi"*. Anh chuyển sang màn Đề xuất tăng cường: thẻ của
 | Entity / enum | `…/domain/Route.java:82-84`, `…/domain/HolidayFlow.java:27-32` | `Route.holidayFlow`: tuyến học hệ số lễ chung với tuyến nào |
 | Repository | `TR:483-485` `findDemandHistoryByStatus`; `RouteRepository.java:22-26` `findAllWithStations`; `BusRepository.java:16-17` `findAllWithBusType` | 4 cột lịch sử; tuyến + loại xe; sức chứa trung bình đội xe |
 | DTO | `…/dto/DemandForecastViewDto.java`, `ForecastSeriesDto`, `ForecastPointDto`, `ForecastAccuracyDto` | Toàn màn / một chuỗi / một ô / tự chấm điểm |
-| Người dùng lại | `…/service/RecommendationService.java:134`, `…/service/WhatIfSimulationService.java:159` | Gọi `buildForecast()` (không tự chấm điểm) |
+| Người dùng lại | `…/service/RecommendationService.java:169`, `…/service/WhatIfSimulationService.java:180` | Gọi `buildForecast()` (không tự chấm điểm) |
 | Test | `test/service/ForecastServiceTest` (8), `ForecastServiceRulesTest` (10), `ForecastServiceReferenceTest` (4), `SlotDemandModelTest` (8), `SlotDemandModelReferenceTest` (5), `ArrowSolverTest` (2), `test/domain/HolidayCalendarTest` (13) | §9.4 |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
@@ -203,7 +203,7 @@ sequenceDiagram
 |---|---|---|---|---|---|---|---|
 | 1 | Trình duyệt | `tpl/admin/dashboard-analytics.html:409` | link "Dự báo nhu cầu" | — | gửi `GET /admin/analytics/forecast` | request | [CODE] |
 | 2 | Spring MVC | — | DispatcherServlet | URL | tìm handler theo `@RequestMapping("/admin/analytics/forecast")` + `@GetMapping` | `viewForecast(Model)` | [SPRING] |
-| 3 | Controller | `ForecastController.java:46-47` | `viewForecast` | `Model` | gọi `forecastService.buildForecastPage()` — bean được Spring tiêm qua constructor (`@RequiredArgsConstructor`) | proxy | [CODE] |
+| 3 | Controller | `ForecastController.java:49-50` | `viewForecast` | `Model` | gọi `forecastService.buildForecastPage()` — bean được Spring tiêm qua constructor (`@RequiredArgsConstructor`) | proxy | [CODE] |
 | 4 | Proxy | `FS:218` | `@Transactional(readOnly = true)` | — | mở transaction **chỉ đọc**: Hibernate không theo dõi thay đổi để ghi | gọi `build(LocalDate.now(), true)` | [SPRING] |
 | 5 | Service | `FS:224-225` | `build` | hôm nay | `forecastFrom` = ngày mai; `calendarEnd` = 31/12/2032 | — | [CODE] |
 | 6 | Repository | `TR:483-485` | `findDemandHistoryByStatus(COMPLETED)` | trạng thái | JPQL 4 cột, lọc `totalSeats > 0`, sắp theo giờ khởi hành. [SUY LUẬN — SQL tương đương] `SELECT t.route_id, t.departure_time, t.tickets_sold, t.total_seats FROM trips t WHERE t.status = 'COMPLETED' AND t.total_seats > 0 AND (t.is_deleted = false) ORDER BY t.departure_time` — vế `is_deleted` do `@SQLRestriction` của `Trip` thêm | `List<Object[]>` | [CODE]/[SPRING] |
@@ -222,8 +222,8 @@ sequenceDiagram
 | 19 | Service | `FS:325-344` | sắp xếp, gắn thông tin | — | chuỗi có tỉ số đỉnh cao nhất lên đầu; thông tin lần khớp, bảng hệ số lễ (`:545-589`), dữ liệu biểu đồ (`:591-607`) | — | [CODE] |
 | 20 | Service | `FS:346-364`, `:622-689` | tự chấm điểm | `input` | `cachedBacktest` trống ⇒ `runBacktest`: 8 lần khớp ở 8 ngày gốc + 1 lần cho khối Tết; chấm bằng `score()` (`:724-764`) | `ForecastAccuracyDto` | [CODE] |
 | 21 | Proxy | — | kết thúc `buildForecastPage()` | — | commit transaction chỉ đọc (không có gì để ghi) | DTO | [SPRING] |
-| 22 | Controller | `ForecastController.java:47-48` | `model.addAttribute("view", …)` | DTO | trả tên view `admin/demand-forecast` | — | [CODE] |
-| 23 | View | `tpl/admin/demand-forecast.html:134-184` | bảng 7 ngày | `view.series` | mỗi ô in nhu cầu, %, ô đỏ khi `needsReinforcement` kèm "cần N chuyến" (`:170-181`) | HTML | [CODE] |
+| 22 | Controller | `ForecastController.java:51-54` | `model.addAttribute("view", …)`, `model.addAttribute("pairGroups", …)` | DTO | trả tên view `admin/demand-forecast` | — | [CODE] |
+| 23 | View | `tpl/admin/demand-forecast.html:134-190` | bảng 7 ngày | `pairGroups` (từ CT7: cùng `view.series`, gom theo cặp tuyến, mỗi cặp một dòng tiêu đề) | mỗi ô in nhu cầu, %, ô đỏ khi `needsReinforcement` kèm "cần N chuyến" (`:176-187`) | HTML | [CODE] |
 | 24 | View | `:440-492` | `th:inline="javascript"` | `view.previewChart` | Thymeleaf in mảng số vào biến JS; trình duyệt tải Chart.js 4.4.1 và vẽ ba đường: nhu cầu, ghế một xe, 90% xe | biểu đồ | [CODE]/[SPRING] |
 | 25 | JS | `:484-490` | sự kiện `change` của `#previewSeries` | chỉ số chuỗi | thay dữ liệu ba đường, `chart.update()` — không gọi server | — | [CODE] |
 
@@ -355,12 +355,12 @@ sequenceDiagram
 
 | # | Tầng | Vị trí | Làm gì | Nhãn |
 |---|---|---|---|---|
-| 1–2 | Controller → Service | `RecommendationController`, `RecommendationService.java:129-134` | mở transaction chỉ đọc của `buildRecommendations()`, gọi `buildForecast()` **một lần** cho cả request | [CODE] |
+| 1–2 | Controller → Service | `RecommendationController`, `RecommendationService.java:164-169` | mở transaction chỉ đọc của `buildRecommendations()`, gọi `buildForecast()` **một lần** cho cả request | [CODE] |
 | 3 | Proxy | `FS:212` | `buildForecast()` cũng `@Transactional(readOnly = true)`; đang có transaction bên ngoài nên **tham gia** transaction đó (mặc định `REQUIRED`) | [SPRING] |
 | 4–5 | Service, Repository | `FS:227-260` | đọc lại 4 cột và dựng lại ma trận — rẻ hơn nhiều so với một lần khớp: cả trang Dự báo khi dùng lại kết quả chỉ mất 0,16–0,6 giây trên DB thật | [CODE] |
 | 6 | Service | `FS:264-275` | ma trận giống hệt ⇒ `reused = true`, dùng `cachedRun` | [CODE] |
 | 7 | Service | `FS:346` | `withAccuracy = false` ⇒ bỏ qua 9 lần khớp của phần tự chấm điểm | [CODE] |
-| 8 | Service | `RecommendationService.java:181-187` | ô có `needsReinforcement` ⇒ `tripsNeeded − 1` chuyến thêm, hỏi `ForecastService.extraTripPassengers` mỗi chuyến chở bao nhiêu khách (Bài 17) | [CODE] |
+| 8 | Service | `RecommendationService.java:220-236` | ô có `needsReinforcement` ⇒ `tripsNeeded − 1` chuyến thêm (từ CT7 của đợt cặp tuyến: `tripsNeeded` − số chuyến đã có trong khung), hỏi `ForecastService.extraTripPassengers` mỗi chuyến chở bao nhiêu khách (Bài 17) | [CODE] |
 
 **Vì sao tách hai cửa.** Phần tự chấm điểm cần 9 lần khớp thêm (2–3 giây). Chỉ màn Dự báo hiện nó;
 Đề xuất và What-if chỉ cần dự báo. Tách ra thì hai màn đó không bao giờ trả chi phí này (QĐ-16, G5-4).
@@ -377,7 +377,7 @@ liệu để học**, ví dụ ngay sau khi chạy profile `demo` mà chưa ch�
 2. `aggregateSlots` cho ra vài khung; không chuỗi nào đủ 28 ngày ⇒ `keys` rỗng (`FS:229-232`).
 3. `FS:253-255`: `if (keys.isEmpty()) return view;` — trả DTO với `series` rỗng, `model = null`,
    `accuracy = null`. **Không ném exception nào**, transaction chỉ đọc kết thúc bình thường.
-4. Template `tpl/admin/demand-forecast.html:185-194` hiện *"Chưa đủ dữ liệu lịch sử để dự báo. Mỗi nhóm
+4. Template `tpl/admin/demand-forecast.html:191-200` hiện *"Chưa đủ dữ liệu lịch sử để dự báo. Mỗi nhóm
    (tuyến × khung giờ) cần ít nhất 28 ngày có chuyến đã hoàn thành"* kèm đúng lệnh
    `mvnw spring-boot:run -Dspring-boot.run.profiles=backfill`. Khối tự chấm điểm, biểu đồ, bảng hệ số lễ
    tự ẩn nhờ các `th:if` (`:214`, `:232`, `:363`, `:422`).
@@ -402,7 +402,7 @@ màn hình báo khi 35 ngày xem trước chạm mốc ấy (`tpl/admin/demand-f
   (`:159`) → nhân hệ số kịch bản vào nhu cầu → `ForecastService.tripsNeeded(nhu cầu × hệ số, ghế)`
   (`:254`). Ở 100% nhu cầu, số chuyến thêm bằng số thẻ Đề xuất vì cùng một hàm.
 - **Trang chủ admin:** `tpl/admin/dashboard.html:137` chỉ là một link tới cùng `GET`.
-- **Ô chọn chuỗi của khối Tết** `#tetSeries` (`tpl/admin/demand-forecast.html:524-531`): JS đổi dữ liệu
+- **Ô chọn chuỗi của khối Tết** `#tetSeries` (`tpl/admin/demand-forecast.html:532-539`): JS đổi dữ liệu
   bốn đường của biểu đồ Tết (vé thật, ghế đã chạy, mô hình, SN4), không gọi server.
 
 ---
@@ -435,7 +435,7 @@ Màn này chỉ đọc, nên "luật" ở đây là luật **chọn dữ liệu*
 
 | Annotation / cơ chế | Nghĩa đời thường | Tác dụng ở đây | Bỏ đi thì sao |
 |---|---|---|---|
-| `@Controller` + `@RequestMapping` + `@GetMapping` (`ForecastController.java:30-31`, `:45`) | "Quầy lễ tân nhận yêu cầu tới địa chỉ này" (Bài 00a) | URL `/admin/analytics/forecast` vào `viewForecast` | 404 |
+| `@Controller` + `@RequestMapping` + `@GetMapping` (`ForecastController.java:32-33`, `:48`) | "Quầy lễ tân nhận yêu cầu tới địa chỉ này" (Bài 00a) | URL `/admin/analytics/forecast` vào `viewForecast` | 404 |
 | `@RequiredArgsConstructor` (Lombok) | "Tự viết constructor nhận mọi field `final`" | Spring tiêm `ForecastService` vào controller, ba repository vào service (`FS:101-106`) | Phải tự viết constructor |
 | `@Service` (`FS:100`) | "Đăng ký làm nhân viên xử lý" | Một bean duy nhất ⇒ **một** bộ nhớ đệm cho cả ba màn | Không tiêm được; nhiều bản ⇒ nhiều bộ nhớ đệm |
 | `@Transactional(readOnly = true)` (`FS:212`, `:218`) | "Phiên làm việc chỉ đọc" (Bài 00b) | Hibernate không theo dõi thay đổi; LAZY load được trong phiên | Mỗi câu repository thành một transaction riêng; nhờ JOIN FETCH và open-in-view (mặc định bật) trang có lẽ vẫn chạy, nhưng mất lời hứa "chỉ đọc" và Bài 17, 18 không còn đọc chung một ảnh chụp [SUY LUẬN — chưa kiểm chứng] |
@@ -560,6 +560,10 @@ Khung dự báo **30** khách, xe chuẩn 22 chỗ. `tripsNeeded` = max(2, ⌈30
 Tiền, với số của tuyến 1 (120 km, 120 phút, giá vé 120.000đ, chi phí mặc định 6.000đ/km và 50.000đ/giờ):
 chi phí = 6.000 × 120 + 50.000 × 2 = 820.000đ; doanh thu = 8,20 × 120.000 ≈ 984.000đ ⇒ lãi khoảng
 +164.000đ. Một chuyến thêm của tuyến này cần khoảng 820.000 ÷ 120.000 ≈ **6,8** khách tràn mới hoà vốn.
+*(Từ CT7 của đợt cặp tuyến, 2026-11-22, màn Đề xuất tính lãi **cả vòng**: xe tăng cường rời bến nhà
+thì phải về, nên thẻ cộng thêm một lượt đi kèm — thường gần 0 khách. Cùng ví dụ: 984.000 − 2 × 820.000
+≈ **−656.000đ**, và muốn hoà vốn cả vòng chuyến thêm phải chở khoảng **13,7** khách. Xem
+`service/LoopEconomics` và QĐ-22 trong `route_pairs_decisions.md`.)*
 Phần này thuộc Bài 17; ở đây chỉ cần nhớ: **con số khách của chuyến thêm cũng đến từ dự báo**.
 
 ---

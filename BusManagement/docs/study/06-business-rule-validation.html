@@ -232,7 +232,7 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 </tr>
 <tr>
 <td>Người gọi (dry-run)</td>
-<td><code>…/service/RecommendationService.java:317-333</code></td>
+<td><code>…/service/RecommendationService.java:500-510</code> (gọi ở <code>:382</code> và cho mỗi lượt đi kèm)</td>
 <td>Cổng xác nhận cuối của thẻ gợi ý</td>
 </tr>
 <tr>
@@ -289,8 +289,8 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 <td><code>/admin/analytics/recommendation</code></td>
 <td><code>RecommendationController</code> <code>:35-38</code></td>
 <td>menu Analytics (Bài 17)</td>
-<td><code>buildRecommendations()</code> → <code>buildCard()</code> → <strong>hai bản dry-run</strong> (<code>RecommendationService.java:320-321</code>)</td>
-<td>thẻ <code>RECOMMENDED</code> (màn ghi &quot;Đủ điều kiện&quot;) hoặc <code>STALE</code> kèm lý do (<code>recommendation.html:191</code>, <code>:228</code>)</td>
+<td><code>buildRecommendations()</code> → <code>buildCard()</code> → <strong>hai bản dry-run</strong> (<code>RecommendationService.java:504</code>, <code>:508</code>)</td>
+<td>thẻ <code>RECOMMENDED</code> (màn ghi &quot;Đủ điều kiện&quot;) hoặc <code>STALE</code> kèm lý do (<code>recommendation.html:211</code>, <code>:276</code>)</td>
 </tr>
 <tr>
 <td>GET (<code>fetch</code>)</td>
@@ -823,7 +823,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>2</td>
 <td>Proxy</td>
-<td><code>RecommendationService.java:129</code></td>
+<td><code>RecommendationService.java:164</code></td>
 <td><code>@Transactional(readOnly = true)</code></td>
 <td>—</td>
 <td>mở transaction <strong>chỉ đọc</strong> — bắt buộc, vì validator đọc quan hệ LAZY (javadoc <code>TS:1397-1398</code>)</td>
@@ -833,7 +833,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>3</td>
 <td>Service</td>
-<td><code>RecommendationService.java:265-272</code></td>
+<td><code>RecommendationService.java:319-320</code>, <code>:513-518</code></td>
 <td>dựng <code>candidate</code></td>
 <td>một chuyến thêm của khung dự báo đông</td>
 <td><code>new Trip()</code>: route, giờ đi, giờ đến = giờ đi + <code>estimatedDuration</code>. <strong>Không lưu</strong></td>
@@ -923,7 +923,7 @@ sẽ đông; bộ chọn đã tìm được xe và tài xế cho một chuyến 
 <tr>
 <td>12</td>
 <td>View</td>
-<td><code>recommendation.html:191</code>, <code>:228</code></td>
+<td><code>recommendation.html:211</code>, <code>:276</code></td>
 <td>nhãn + ghi chú</td>
 <td><code>view</code></td>
 <td><code>STALE</code> hiện badge vàng; cột ghi chú in <code>c.note</code> — chính câu tiếng Việt của validator</td>
@@ -1294,7 +1294,7 @@ mời rồi bị từ chối lúc lưu.</p>
 <tr>
 <td><code>@Transactional(readOnly = true)</code> bao quanh dry-run</td>
 <td>&quot;Mở phiên đọc để chạm được quan hệ LAZY&quot;</td>
-<td><code>RecommendationService.java:129</code></td>
+<td><code>RecommendationService.java:164</code></td>
 <td>Validator đọc <code>trip.getRoute()</code>, <code>bus.getBusType()</code>… ngoài phiên ⇒ <code>LazyInitializationException</code> — bản dry-run <strong>không</strong> bắt lỗi này (đúng ý)</td>
 </tr>
 <tr>

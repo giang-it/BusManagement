@@ -195,13 +195,13 @@ không đổi&quot;</em>. Anh chuyển sang màn Đề xuất tăng cường: th
 </tr>
 <tr>
 <td>JavaScript</td>
-<td><code>tpl/admin/demand-forecast.html:442-492</code>, <code>:494-533</code></td>
+<td><code>tpl/admin/demand-forecast.html:450-500</code>, <code>:502-541</code></td>
 <td>Dựng biểu đồ từ số liệu Thymeleaf đổ vào; đổi chuỗi khi chọn trong ô <code>select</code> (chỉ phía trình duyệt)</td>
 </tr>
 <tr>
 <td>Controller</td>
-<td><code>…/controller/admin/ForecastController.java:45-49</code></td>
-<td>Một <code>GET</code>, không tham số, gọi <code>buildForecastPage()</code>, đưa vào Model key <code>view</code></td>
+<td><code>…/controller/admin/ForecastController.java:48-55</code></td>
+<td>Một <code>GET</code>, không tham số, gọi <code>buildForecastPage()</code>, đưa vào Model key <code>view</code>; từ CT7 của đợt cặp tuyến thêm key <code>pairGroups</code> (cùng các chuỗi đó, gom theo cặp tuyến — <code>PairPlanService.forecastByPair</code>)</td>
 </tr>
 <tr>
 <td>Service</td>
@@ -250,7 +250,7 @@ không đổi&quot;</em>. Anh chuyển sang màn Đề xuất tăng cường: th
 </tr>
 <tr>
 <td>Người dùng lại</td>
-<td><code>…/service/RecommendationService.java:134</code>, <code>…/service/WhatIfSimulationService.java:159</code></td>
+<td><code>…/service/RecommendationService.java:169</code>, <code>…/service/WhatIfSimulationService.java:180</code></td>
 <td>Gọi <code>buildForecast()</code> (không tự chấm điểm)</td>
 </tr>
 <tr>
@@ -434,7 +434,7 @@ khớp mô hình (đường chậm), dự báo, tự chấm điểm, Thymeleaf, 
 <tr>
 <td>3</td>
 <td>Controller</td>
-<td><code>ForecastController.java:46-47</code></td>
+<td><code>ForecastController.java:49-50</code></td>
 <td><code>viewForecast</code></td>
 <td><code>Model</code></td>
 <td>gọi <code>forecastService.buildForecastPage()</code> — bean được Spring tiêm qua constructor (<code>@RequiredArgsConstructor</code>)</td>
@@ -624,8 +624,8 @@ khớp mô hình (đường chậm), dự báo, tự chấm điểm, Thymeleaf, 
 <tr>
 <td>22</td>
 <td>Controller</td>
-<td><code>ForecastController.java:47-48</code></td>
-<td><code>model.addAttribute(&quot;view&quot;, …)</code></td>
+<td><code>ForecastController.java:51-54</code></td>
+<td><code>model.addAttribute(&quot;view&quot;, …)</code>, <code>model.addAttribute(&quot;pairGroups&quot;, …)</code></td>
 <td>DTO</td>
 <td>trả tên view <code>admin/demand-forecast</code></td>
 <td>—</td>
@@ -634,10 +634,10 @@ khớp mô hình (đường chậm), dự báo, tự chấm điểm, Thymeleaf, 
 <tr>
 <td>23</td>
 <td>View</td>
-<td><code>tpl/admin/demand-forecast.html:134-184</code></td>
+<td><code>tpl/admin/demand-forecast.html:134-190</code></td>
 <td>bảng 7 ngày</td>
-<td><code>view.series</code></td>
-<td>mỗi ô in nhu cầu, %, ô đỏ khi <code>needsReinforcement</code> kèm &quot;cần N chuyến&quot; (<code>:170-181</code>)</td>
+<td><code>pairGroups</code> (từ CT7: cùng <code>view.series</code>, gom theo cặp tuyến, mỗi cặp một dòng tiêu đề)</td>
+<td>mỗi ô in nhu cầu, %, ô đỏ khi <code>needsReinforcement</code> kèm &quot;cần N chuyến&quot; (<code>:176-187</code>)</td>
 <td>HTML</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -763,7 +763,7 @@ static int tripsNeeded(double demand, int standardSeats) {
 </thead><tbody><tr>
 <td>1–2</td>
 <td>Controller → Service</td>
-<td><code>RecommendationController</code>, <code>RecommendationService.java:129-134</code></td>
+<td><code>RecommendationController</code>, <code>RecommendationService.java:164-169</code></td>
 <td>mở transaction chỉ đọc của <code>buildRecommendations()</code>, gọi <code>buildForecast()</code> <strong>một lần</strong> cho cả request</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -798,8 +798,8 @@ static int tripsNeeded(double demand, int standardSeats) {
 <tr>
 <td>8</td>
 <td>Service</td>
-<td><code>RecommendationService.java:181-187</code></td>
-<td>ô có <code>needsReinforcement</code> ⇒ <code>tripsNeeded − 1</code> chuyến thêm, hỏi <code>ForecastService.extraTripPassengers</code> mỗi chuyến chở bao nhiêu khách (Bài 17)</td>
+<td><code>RecommendationService.java:220-236</code></td>
+<td>ô có <code>needsReinforcement</code> ⇒ <code>tripsNeeded − 1</code> chuyến thêm (từ CT7 của đợt cặp tuyến: <code>tripsNeeded</code> − số chuyến đã có trong khung), hỏi <code>ForecastService.extraTripPassengers</code> mỗi chuyến chở bao nhiêu khách (Bài 17)</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
 </tbody></table></div>
@@ -815,7 +815,7 @@ liệu để học</strong>, ví dụ ngay sau khi chạy profile <code>demo</co
 <li><code>aggregateSlots</code> cho ra vài khung; không chuỗi nào đủ 28 ngày ⇒ <code>keys</code> rỗng (<code>FS:229-232</code>).</li>
 <li><code>FS:253-255</code>: <code>if (keys.isEmpty()) return view;</code> — trả DTO với <code>series</code> rỗng, <code>model = null</code>,
 <code>accuracy = null</code>. <strong>Không ném exception nào</strong>, transaction chỉ đọc kết thúc bình thường.</li>
-<li>Template <code>tpl/admin/demand-forecast.html:185-194</code> hiện <em>&quot;Chưa đủ dữ liệu lịch sử để dự báo. Mỗi nhóm
+<li>Template <code>tpl/admin/demand-forecast.html:191-200</code> hiện <em>&quot;Chưa đủ dữ liệu lịch sử để dự báo. Mỗi nhóm
 (tuyến × khung giờ) cần ít nhất 28 ngày có chuyến đã hoàn thành&quot;</em> kèm đúng lệnh
 <code>mvnw spring-boot:run -Dspring-boot.run.profiles=backfill</code>. Khối tự chấm điểm, biểu đồ, bảng hệ số lễ
 tự ẩn nhờ các <code>th:if</code> (<code>:214</code>, <code>:232</code>, <code>:363</code>, <code>:422</code>).</li>
@@ -837,7 +837,7 @@ màn hình báo khi 35 ngày xem trước chạm mốc ấy (<code>tpl/admin/dem
 (<code>:159</code>) → nhân hệ số kịch bản vào nhu cầu → <code>ForecastService.tripsNeeded(nhu cầu × hệ số, ghế)</code>
 (<code>:254</code>). Ở 100% nhu cầu, số chuyến thêm bằng số thẻ Đề xuất vì cùng một hàm.</li>
 <li><strong>Trang chủ admin:</strong> <code>tpl/admin/dashboard.html:137</code> chỉ là một link tới cùng <code>GET</code>.</li>
-<li><strong>Ô chọn chuỗi của khối Tết</strong> <code>#tetSeries</code> (<code>tpl/admin/demand-forecast.html:524-531</code>): JS đổi dữ liệu
+<li><strong>Ô chọn chuỗi của khối Tết</strong> <code>#tetSeries</code> (<code>tpl/admin/demand-forecast.html:532-539</code>): JS đổi dữ liệu
 bốn đường của biểu đồ Tết (vé thật, ghế đã chạy, mô hình, SN4), không gọi server.</li>
 </ul>
 <hr>
@@ -910,7 +910,7 @@ bốn đường của biểu đồ Tết (vé thật, ghế đã chạy, mô hì
 <th>Bỏ đi thì sao</th>
 </tr>
 </thead><tbody><tr>
-<td><code>@Controller</code> + <code>@RequestMapping</code> + <code>@GetMapping</code> (<code>ForecastController.java:30-31</code>, <code>:45</code>)</td>
+<td><code>@Controller</code> + <code>@RequestMapping</code> + <code>@GetMapping</code> (<code>ForecastController.java:32-33</code>, <code>:48</code>)</td>
 <td>&quot;Quầy lễ tân nhận yêu cầu tới địa chỉ này&quot; (Bài 00a)</td>
 <td>URL <code>/admin/analytics/forecast</code> vào <code>viewForecast</code></td>
 <td>404</td>
@@ -1160,6 +1160,10 @@ thêm chở đầy như cầu nối GĐ5).</li>
 <p>Tiền, với số của tuyến 1 (120 km, 120 phút, giá vé 120.000đ, chi phí mặc định 6.000đ/km và 50.000đ/giờ):
 chi phí = 6.000 × 120 + 50.000 × 2 = 820.000đ; doanh thu = 8,20 × 120.000 ≈ 984.000đ ⇒ lãi khoảng
 +164.000đ. Một chuyến thêm của tuyến này cần khoảng 820.000 ÷ 120.000 ≈ <strong>6,8</strong> khách tràn mới hoà vốn.
+<em>(Từ CT7 của đợt cặp tuyến, 2026-11-22, màn Đề xuất tính lãi <strong>cả vòng</strong>: xe tăng cường rời bến nhà
+thì phải về, nên thẻ cộng thêm một lượt đi kèm — thường gần 0 khách. Cùng ví dụ: 984.000 − 2 × 820.000
+≈ <strong>−656.000đ</strong>, và muốn hoà vốn cả vòng chuyến thêm phải chở khoảng <strong>13,7</strong> khách. Xem
+<code>service/LoopEconomics</code> và QĐ-22 trong <code>route_pairs_decisions.md</code>.)</em>
 Phần này thuộc Bài 17; ở đây chỉ cần nhớ: <strong>con số khách của chuyến thêm cũng đến từ dự báo</strong>.</p>
 <hr>
 <h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>

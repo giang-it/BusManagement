@@ -331,7 +331,7 @@ thay vì nối nhiều chuỗi bằng `+`. Chỉ là cách viết chuỗi cho d�
   `CostParameters.fuelCostPerKm`). Không dùng `double` cho tiền vì `double` làm tròn sai kiểu
   `0.1 + 0.2 = 0.30000000000000004`. Phép tính viết bằng method: `a.multiply(b)`, `a.add(b)`,
   `a.subtract(b)`, `setScale(0, RoundingMode.HALF_UP)` (làm tròn về đồng) — xem
-  `RecommendationService.estimateCost()`.
+  `LoopEconomics.tripCost()` (phép tính chi phí một lượt của màn Đề xuất và What-if, từ CT7 của đợt cặp tuyến).
 - **`LocalDate`** (ngày), **`LocalDateTime`** (ngày + giờ), **`Duration`** (khoảng thời gian):
   `Duration.between(departure, arrival).toMinutes() / 60.0` = số giờ của chuyến
   (`Trip.getTripDurationHours()`). `departure.minusMinutes(30)`, `.plusHours(1)`,

@@ -810,7 +810,7 @@ repository, `@Transactional` để rollback).
   - Dashboard (Bài 12): đếm xe `READY`/`TRAVELING` (`DashboardService.java:156-157`).
   - Đề Xuất Thay Xe (Bài 16): xếp hạng 70% theo odometer.
   - Dự báo, Recommendation (Bài 14, 17): chỉ đọc chuyến `COMPLETED` (`ForecastService.java:228`,
-    `RecommendationService.java:380`).
+    `RecommendationService.java:584`).
 - **FSM bị ảnh hưởng bởi:** km của tuyến (Bài 03 — sửa km khi có chuyến `DEPARTED` thì **cảnh báo**,
   vì FSM đọc km lúc hoàn thành); chính sách sửa chuyến (Bài 07); màn Duyệt (Bài 09).
 

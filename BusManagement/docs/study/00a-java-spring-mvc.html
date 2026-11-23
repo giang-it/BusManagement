@@ -501,7 +501,7 @@ thay vì nối nhiều chuỗi bằng <code>+</code>. Chỉ là cách viết chu
 <code>CostParameters.fuelCostPerKm</code>). Không dùng <code>double</code> cho tiền vì <code>double</code> làm tròn sai kiểu
 <code>0.1 + 0.2 = 0.30000000000000004</code>. Phép tính viết bằng method: <code>a.multiply(b)</code>, <code>a.add(b)</code>,
 <code>a.subtract(b)</code>, <code>setScale(0, RoundingMode.HALF_UP)</code> (làm tròn về đồng) — xem
-<code>RecommendationService.estimateCost()</code>.</li>
+<code>LoopEconomics.tripCost()</code> (phép tính chi phí một lượt của màn Đề xuất và What-if, từ CT7 của đợt cặp tuyến).</li>
 <li><strong><code>LocalDate</code></strong> (ngày), <strong><code>LocalDateTime</code></strong> (ngày + giờ), <strong><code>Duration</code></strong> (khoảng thời gian):
 <code>Duration.between(departure, arrival).toMinutes() / 60.0</code> = số giờ của chuyến
 (<code>Trip.getTripDurationHours()</code>). <code>departure.minusMinutes(30)</code>, <code>.plusHours(1)</code>,
