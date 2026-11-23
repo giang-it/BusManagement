@@ -316,11 +316,18 @@
                         <li>Buffer chuẩn bị tái dùng hằng số <code>BUS_PREP_BUFFER_HOURS</code> của hệ thống.</li>
                         <li>Trần theo tài xế = số tài xế × 8h ÷ thời lượng chuyến TB.</li>
                         <li><strong>Nhu cầu tính bằng số khách</strong>: hệ số nhu cầu nhân thẳng vào số khách dự báo
-                            (không kẹp ở 100%); mỗi khung cần (số chuyến cần − 1) chuyến thêm, theo đúng quy tắc 90% xe
-                            chuẩn của màn Dự báo. Ở 100%, số chuyến thêm bằng số thẻ của màn Đề xuất.</li>
-                        <li><strong>Tiền tính theo khách tràn</strong>: mỗi chuyến thêm (xe chuẩn của tuyến) chỉ chở
-                            phần khách mà các chuyến trước nó không chở hết, nhân giá vé lịch sử; trong mỗi ngày, kế
-                            hoạch phủ được lấy chuyến có lãi cao trước — cùng thứ tự màn Đề xuất.</li>
+                            (không kẹp ở 100%); mỗi khung cần (số chuyến cần − số chuyến đã có trong khung) chuyến
+                            thêm, theo đúng quy tắc 90% xe chuẩn của màn Dự báo. Khung chưa có chuyến nào thì coi như
+                            có một xe chuẩn. Ở 100%, số chuyến thêm bằng số thẻ của màn Đề xuất.</li>
+                        <li><strong>Tiền tính theo khách tràn, cả vòng</strong>: mỗi chuyến thêm (xe chuẩn của tuyến)
+                            chỉ chở phần khách mà các chuyến trước nó không chở hết, nhân giá vé lịch sử; cộng thêm
+                            <strong>lượt đi kèm</strong> theo kế hoạch — xe dự phòng giả định ở bến nhà, nên chuyến thêm
+                            rời bến nhà thì xe về bằng khung chiều ngược sớm nhất, chuyến thêm tới bến nhà thì xe được
+                            đưa tới bằng khung chiều ngược muộn nhất còn kịp — cả tiền vé lẫn chi phí. Màn Đề xuất chọn
+                            xe thật nên có thể khác kế hoạch này. Trong mỗi ngày, kế hoạch phủ được lấy chuyến có lãi
+                            cao trước — cùng thứ tự màn Đề xuất.</li>
+                        <li><strong>Giới hạn</strong>: độ phủ vẫn tính mỗi chuyến thêm là <em>một</em> lượt xe, dù vòng
+                            của nó chạy hai lượt (lượt đi kèm không được trừ vào năng lực).</li>
                         <li><strong>Độ phủ đối chiếu theo TỪNG NGÀY</strong>, không gộp cả chân trời: mỗi ngày chỉ
                             phủ được tối đa <em>năng lực một ngày</em>, phần nhàn rỗi của ngày vắng
                             <strong>không</strong> chuyển sang ngày cao điểm được — một xe rảnh hôm thứ Ba không chạy

@@ -165,7 +165,9 @@ class WhatIfSimulationServiceTest {
         assertEquals(10, outcome.getGap());
         assertEquals(4, outcome.getProfitableTrips());
         assertEquals(0, outcome.getEstimatedProfit().compareTo(outcome.getProfitableProfit()), "chỉ toàn chuyến có lãi");
-        assertEquals(0, new BigDecimal("3280000").compareTo(outcome.getEstimatedCost()), "4 × 820.000 đ");
+        // Tuyến test không có bến nên không có chiều ngược: mỗi chuyến thêm cộng một lượt về rỗng cùng quãng
+        // đường (lãi cả vòng, CT7).
+        assertEquals(0, new BigDecimal("6560000").compareTo(outcome.getEstimatedCost()), "4 × (820.000 + 820.000) đ");
     }
 
     private WhatIfOutcomeDto scenario(int demandFactorPercent) {

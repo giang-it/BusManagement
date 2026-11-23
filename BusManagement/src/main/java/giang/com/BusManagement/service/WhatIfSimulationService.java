@@ -4,6 +4,7 @@ import giang.com.BusManagement.domain.Bus;
 import giang.com.BusManagement.domain.BusStatus;
 import giang.com.BusManagement.domain.CostParameters;
 import giang.com.BusManagement.domain.Route;
+import giang.com.BusManagement.domain.Station;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.dto.DemandForecastViewDto;
 import giang.com.BusManagement.dto.ForecastPointDto;
@@ -21,8 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import java.util.IntSummaryStatistics;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -75,6 +77,21 @@ import java.util.stream.Collectors;
  * theo số khách vẫn còn 2 chuyến thêm; doanh thu cũng coi mọi chuyến thêm là đầy xe.
  *
  * ====================================================================
+ * TIỀN CẢ VÒNG, CHỈ PHẦN KHUNG CÒN THIẾU (route pairs CT7, W1 và cách 2a)
+ * ====================================================================
+ * Cùng định nghĩa với màn Đề xuất, qua cùng một lớp tính tiền ({@link LoopEconomics}):
+ * <ul>
+ *   <li>số chuyến thêm của khung = số chuyến cần − số chuyến đã có trong khung (đọc DB, không chọn
+ *       xe); khung chưa có chuyến nào thì coi như có một xe chuẩn;</li>
+ *   <li>tiền của mỗi chuyến thêm là tiền CẢ VÒNG: cộng lượt đi kèm THEO KẾ HOẠCH — xe dự phòng giả định
+ *       đứng ở bến nhà (QĐ-23), nên chuyến thêm rời bến nhà thì "về ngay" bằng khung chiều ngược sớm
+ *       nhất, chuyến thêm tới bến nhà thì "đưa xe tới trước" bằng khung muộn nhất còn kịp.</li>
+ * </ul>
+ * Màn Đề xuất chọn xe thật nên có thể đi khác kế hoạch (xe rảnh đang ở bến xa, tài xế chưa kịp nghỉ);
+ * ở đây là mô hình đếm nên chỉ có kế hoạch. NĂNG LỰC không đổi (W1): mỗi chuyến thêm vẫn tính một lượt
+ * xe trong độ phủ, dù vòng của nó chạy hai lượt — ghi ở phần giới hạn của màn.
+ *
+ * ====================================================================
  * NĂNG LỰC ĐỐI CHIẾU THEO NGÀY, KHÔNG GỘP CẢ CHÂN TRỜI
  * ====================================================================
  * Độ phủ = Σ theo từng ngày của min(số chuyến thêm cần trong ngày đó, servablePerDay),
@@ -112,20 +129,16 @@ public class WhatIfSimulationService {
     private final TripRepository tripRepository;
 
     /**
-     * Hạn giờ lái/ngày để suy năng lực theo tài xế. Cùng giá trị với
-     * validateStaffForTrip() và RecommendationService.MAX_DAILY_DRIVING_HOURS.
+     * Hạn giờ lái/ngày để suy năng lực theo tài xế. Một nguồn với phép tính số tài xế
+     * của một lượt ({@link LoopEconomics#MAX_DAILY_DRIVING_HOURS}, cùng giá trị với validateStaffForTrip()).
      */
-    private static final double MAX_DAILY_DRIVING_HOURS = 8.0;
+    private static final double MAX_DAILY_DRIVING_HOURS = LoopEconomics.MAX_DAILY_DRIVING_HOURS;
 
     /**
-     * Buffer chuẩn bị xe giữa hai chuyến. Mirror TripService.BUS_PREP_BUFFER_HOURS
-     * (private, không mở visibility chỉ cho một màn đọc — theo tiền lệ
-     * DispatchController tự khai báo lại kèm comment trỏ về nguồn).
+     * Buffer chuẩn bị xe giữa hai chuyến. Một nguồn với phép tính lượt đi kèm
+     * ({@link LoopEconomics#PREP_BUFFER_HOURS}, mirror TripService.BUS_PREP_BUFFER_HOURS).
      */
-    private static final double PREP_BUFFER_HOURS = 1.0;
-
-    /** Thời lượng mặc định (phút) nếu tuyến thiếu estimatedDuration — cùng fallback createExtraTrip(). */
-    private static final int DEFAULT_DURATION_MINUTES = 240;
+    private static final double PREP_BUFFER_HOURS = LoopEconomics.PREP_BUFFER_HOURS;
 
     /** Kẹp hệ số nhu cầu về khoảng hợp lý để tránh input vô nghĩa. */
     private static final int MIN_DEMAND_FACTOR = 50;
@@ -149,6 +162,14 @@ public class WhatIfSimulationService {
     /** Kết quả suy throughput theo cycle-time — giữ lại để hiển thị cách suy trên màn. */
     private record Derivation(double operatingWindowHours, double avgTripDurationHours,
             double tripsPerBusPerDay) {
+    }
+
+    /**
+     * Những gì phép tính tiền cả vòng cần mà không phụ thuộc cột (CT7): tuyến chiều ngược duy nhất của
+     * từng tuyến, các bến nhà của đội xe, chuyến đã có theo khung, nhu cầu dự báo theo khung.
+     */
+    private record Pairing(Map<Long, Route> reverseOf, Set<Long> homeStations,
+            Map<String, LoopEconomics.SlotTrips> tripsBySlot, Map<String, LoopEconomics.SlotDemand> demandBySlot) {
     }
 
     @Transactional(readOnly = true)
@@ -187,9 +208,22 @@ public class WhatIfSimulationService {
                 .mapToInt(b -> b.getBusType().getCapacity())
                 .sum();
 
-        Map<Long, Route> routesById = routeRepository.findAllWithStations().stream()
+        List<Route> routes = routeRepository.findAllWithStations();
+        Map<Long, Route> routesById = routes.stream()
                 .collect(Collectors.toMap(Route::getId, Function.identity(), (a, b) -> a));
-        Map<Long, Map<Integer, BigDecimal>> prices = loadLatestPrices();
+        Map<Long, Map<Integer, BigDecimal>> prices =
+                LoopEconomics.latestPrices(tripRepository.findPriceHistoryByStatus(TripStatus.COMPLETED));
+
+        // Cặp tuyến, bến nhà, chuyến đã có theo khung và nhu cầu theo khung (CT7): cùng nguồn và cùng
+        // khoảng thời gian màn Đề xuất đọc, để hai màn đếm cùng số chuyến thêm và cùng tiền.
+        Pairing pairing = new Pairing(reverseRoutes(routes),
+                buses.stream().map(Bus::getHomeStation).filter(Objects::nonNull).map(Station::getId)
+                        .collect(Collectors.toSet()),
+                LoopEconomics.slotTrips(tripRepository.findSlotSeatsBetween(RecommendationService.SLOT_STATUSES,
+                        LocalDate.now().atStartOfDay(), forecast.getForecastFrom()
+                                .plusDays(forecast.getHorizonDays() + 1L + LoopEconomics.COMPANION_SEARCH_DAYS)
+                                .atStartOfDay())),
+                LoopEconomics.demandBySlot(forecast));
 
         Derivation der = deriveThroughput(forecast, routesById);
         view.setOperatingWindowHours(der.operatingWindowHours());
@@ -199,7 +233,7 @@ public class WhatIfSimulationService {
         view.setAvgFleetCapacity(avgFleetCapacity);
 
         // --- Cột HIỆN TRẠNG: nguồn lực thật, nhu cầu 100%, chi phí mặc định ---
-        view.setBaseline(computeOutcome(forecast, routesById, prices, der,
+        view.setBaseline(computeOutcome(forecast, routesById, prices, pairing, der,
                 readyBuses, activeDrivers, baselineSeats,
                 100, costDefaults.getFuelCostPerKm(), costDefaults.getDriverWagePerHour()));
 
@@ -213,7 +247,7 @@ public class WhatIfSimulationService {
         BigDecimal wageRate = lever.getDriverWagePerHour() != null
                 ? lever.getDriverWagePerHour() : costDefaults.getDriverWagePerHour();
 
-        view.setScenarioOutcome(computeOutcome(forecast, routesById, prices, der,
+        view.setScenarioOutcome(computeOutcome(forecast, routesById, prices, pairing, der,
                 scenarioBuses, scenarioDrivers, scenarioSeats,
                 lever.getDemandFactorPercent(), fuelRate, wageRate));
 
@@ -225,13 +259,17 @@ public class WhatIfSimulationService {
     // =========================================================================
 
     private WhatIfOutcomeDto computeOutcome(DemandForecastViewDto forecast, Map<Long, Route> routesById,
-            Map<Long, Map<Integer, BigDecimal>> prices, Derivation der,
+            Map<Long, Map<Integer, BigDecimal>> prices, Pairing pairing, Derivation der,
             int buses, int drivers, long totalSeats,
             int demandFactorPercent, BigDecimal fuelRate, BigDecimal wageRate) {
 
         double factor = demandFactorPercent / 100.0;
         // Độ phân tán nhu cầu của lần khớp — cùng con số màn Đề xuất dùng để tính khách tràn.
         double nbSize = forecast.getModel() != null ? forecast.getModel().getNegativeBinomialSize() : 0.0;
+        // Tiền theo tham số và hệ số nhu cầu của CỘT này; cùng lớp tính tiền với màn Đề xuất (CT7).
+        LoopEconomics economics = new LoopEconomics(prices, pairing.demandBySlot(), pairing.tripsBySlot(), nbSize,
+                factor, fuelRate, wageRate);
+        LocalDateTime now = LocalDateTime.now();
 
         // Năng lực: trần theo xe và trần theo tài xế, lấy cái nhỏ hơn.
         double busThroughput = buses * der.tripsPerBusPerDay();
@@ -240,30 +278,46 @@ public class WhatIfSimulationService {
                 : 0.0;
         double servablePerDay = Math.min(busThroughput, driverThroughput);
 
-        // Nhu cầu: nhân hệ số vào số khách rồi hỏi dự báo khung cần mấy chuyến — mỗi chuyến
-        // thêm một phần tử, kèm tiền của nó (G6-5).
+        // Nhu cầu: nhân hệ số vào số khách rồi hỏi dự báo khung cần mấy chuyến, trừ các chuyến khung đã
+        // có (CT7, cách 2a) — mỗi chuyến thêm còn thiếu một phần tử, kèm tiền CẢ VÒNG của nó (G6-5, W1).
         List<ExtraTrip> extras = new ArrayList<>();
         int hotSlots = 0;
         for (ForecastSeriesDto series : forecast.getSeries()) {
             Route route = routesById.get(series.getRouteId());
             int seats = series.getStandardSeats();
-            BigDecimal price = priceOf(prices, series.getRouteId(), series.getDepartureHour());
-            BigDecimal tripCost = route != null ? tripCost(route, fuelRate, wageRate) : null;
+            int hour = series.getDepartureHour();
+            BigDecimal price = economics.price(series.getRouteId(), hour);
+            BigDecimal tripCost = route != null ? economics.tripCost(route) : null;
+            Route reverse = route != null ? pairing.reverseOf().get(route.getId()) : null;
             for (ForecastPointDto point : series.getPoints()) {
                 double demand = point.getPredictedDemand() * factor;
-                int count = ForecastService.tripsNeeded(demand, seats) - 1;
-                if (count > 0) {
+                int tripsNeeded = ForecastService.tripsNeeded(demand, seats);
+                if (tripsNeeded > 1) {
                     hotSlots++;
                 }
+                LoopEconomics.SlotTrips inSlot = economics.inSlot(series.getRouteId(), point.getDate(), hour, seats);
+                int count = LoopEconomics.extrasStillNeeded(tripsNeeded, inSlot);
+                // Lượt đi kèm theo kế hoạch (xe dự phòng ở bến nhà) — cùng một lượt cho mọi chuyến thêm của khung.
+                LoopEconomics.Leg leg = null;
+                if (route != null && count > 0) {
+                    LocalDateTime departure = point.getDate().atTime(hour, 0);
+                    leg = economics.planned(route, reverse, departure,
+                            departure.plusMinutes(LoopEconomics.durationMinutes(route)), pairing.homeStations(), now,
+                            seats);
+                }
                 for (int k = 1; k <= count; k++) {
-                    // Doanh thu: khách tràn rơi vào ghế của chuyến thêm thứ k (xe chuẩn) × giá vé
-                    // lịch sử của khung. Không có giá, hoặc tuyến đã bị xóa → không ước được.
+                    // Doanh thu: khách tràn rơi vào ghế của chuyến thêm thứ k (xe chuẩn) sau các chuyến đã
+                    // có, × giá vé lịch sử của khung, cộng tiền vé của lượt đi kèm. Không có giá, hoặc tuyến
+                    // đã bị xóa → không ước được.
                     BigDecimal revenue = null;
-                    if (price != null && route != null) {
-                        double passengers = ForecastService.extraTripPassengers(demand, k * seats, seats, nbSize);
-                        revenue = price.multiply(BigDecimal.valueOf(passengers)).setScale(0, RoundingMode.HALF_UP);
+                    BigDecimal cost = tripCost;
+                    if (route != null) {
+                        double passengers = ForecastService.extraTripPassengers(demand,
+                                inSlot.seats() + (k - 1) * seats, seats, nbSize);
+                        revenue = LoopEconomics.plus(LoopEconomics.revenue(price, passengers), leg.revenue());
+                        cost = LoopEconomics.plus(tripCost, leg.cost());
                     }
-                    extras.add(new ExtraTrip(point.getDate(), revenue, tripCost));
+                    extras.add(new ExtraTrip(point.getDate(), revenue, cost));
                 }
             }
         }
@@ -309,36 +363,6 @@ public class WhatIfSimulationService {
                 hotSlots, needed, coverable, gap, coveragePct,
                 estimatedCost, estimatedRevenue, estimatedProfit,
                 profitableTrips, profitableTrips > 0 ? profitableProfit : null);
-    }
-
-    /**
-     * Chi phí một chuyến thêm theo tham số của cột: nhiên liệu theo quãng đường + lương
-     * theo thời lượng × số tài xế — cùng công thức RecommendationService.estimateCost, làm
-     * tròn tới đồng như ở đó, để ở 100% nhu cầu tiền của màn này cộng đúng bằng các thẻ.
-     * Bỏ qua thành phần thiếu dữ liệu, không đoán; thiếu cả hai thì null.
-     */
-    private BigDecimal tripCost(Route route, BigDecimal fuelRate, BigDecimal wageRate) {
-        int durationMinutes = route.getEstimatedDuration() != null && route.getEstimatedDuration() > 0
-                ? route.getEstimatedDuration() : DEFAULT_DURATION_MINUTES;
-        double durationHours = durationMinutes / 60.0;
-
-        // Số tài xế cần: mọi tuyến vào forecast hiện đều ≤ 8h ⇒ = 1; vẫn tính
-        // theo ceil(dur/8) cho KHỚP CHÍNH XÁC công thức chi phí Phase 7
-        // (RecommendationService.estimateCost) và bền với tuyến > 8h sau này.
-        int requiredDrivers = Math.max(1, (int) Math.ceil(durationHours / MAX_DAILY_DRIVING_HOURS));
-
-        BigDecimal cost = BigDecimal.ZERO;
-        boolean any = false;
-        if (route.getDistanceKm() != null && fuelRate != null) {
-            cost = cost.add(fuelRate.multiply(BigDecimal.valueOf(route.getDistanceKm())));
-            any = true;
-        }
-        if (wageRate != null) {
-            cost = cost.add(wageRate.multiply(BigDecimal.valueOf(durationHours))
-                    .multiply(BigDecimal.valueOf(requiredDrivers)));
-            any = true;
-        }
-        return any ? cost.setScale(0, RoundingMode.HALF_UP) : null;
     }
 
     /**
@@ -439,25 +463,19 @@ public class WhatIfSimulationService {
     }
 
     // =========================================================================
-    // GIÁ VÉ LỊCH SỬ (giống RecommendationService — projection, không nạp Trip)
+    // CẶP TUYẾN (CT7)
     // =========================================================================
 
-    private Map<Long, Map<Integer, BigDecimal>> loadLatestPrices() {
-        Map<Long, Map<Integer, BigDecimal>> result = new HashMap<>();
-        for (Object[] row : tripRepository.findPriceHistoryByStatus(TripStatus.COMPLETED)) {
-            if (row[0] == null || row[1] == null || row[2] == null) {
-                continue;
+    /** Tuyến chiều ngược của từng tuyến, chỉ khi có ĐÚNG MỘT — cùng quy ước với màn Đề xuất (CM-6). */
+    private static Map<Long, Route> reverseRoutes(List<Route> routes) {
+        Map<Long, Route> result = new HashMap<>();
+        for (Route route : routes) {
+            List<Route> reverse = RouteService.reverseRoutesOf(route, routes);
+            if (reverse.size() == 1) {
+                result.put(route.getId(), reverse.get(0));
             }
-            Long routeId = ((Number) row[0]).longValue();
-            int hour = ((java.time.LocalDateTime) row[1]).getHour();
-            BigDecimal price = (BigDecimal) row[2];
-            result.computeIfAbsent(routeId, k -> new HashMap<>()).putIfAbsent(hour, price);
         }
         return result;
-    }
-
-    private BigDecimal priceOf(Map<Long, Map<Integer, BigDecimal>> prices, Long routeId, int hour) {
-        return prices.getOrDefault(routeId, Map.of()).get(hour);
     }
 
     // =========================================================================

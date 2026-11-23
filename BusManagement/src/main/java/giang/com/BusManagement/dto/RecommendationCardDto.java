@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * PHASE 7 — MỘT thẻ đề xuất: "khung (tuyến × ngày × giờ) này được dự báo đông, đây
@@ -18,12 +19,18 @@ import java.time.LocalDate;
  *
  * Từ GĐ6 (QĐ-17) mỗi thẻ là MỘT chuyến thêm: khung cần N chuyến thì có N − 1 thẻ,
  * "chuyến thêm k/(N − 1)". Số khách kỳ vọng là phần khách TRÀN rơi vào ghế của chuyến
- * này, sau xe chuẩn và các chuyến thêm trước nó (ForecastService.extraTripPassengers);
- * doanh thu = số khách đó × giá vé lịch sử của khung. Chi phí = nhiên liệu × quãng
- * đường + lương × giờ × số tài xế, theo tham số Admin; lợi nhuận = doanh thu − chi phí
- * (chỉ khi có giá vé). Ghế của chuyến là sức chứa của xe được chọn; chưa chọn được xe
- * (NO_RESOURCE) thì tính bằng xe chuẩn của tuyến, để thẻ vẫn cho biết chuyến đó đáng
- * giá bao nhiêu.
+ * này, sau các chuyến đã có trong khung và các chuyến thêm trước nó
+ * (ForecastService.extraTripPassengers); doanh thu = số khách đó × giá vé lịch sử của khung.
+ * Ghế của chuyến là sức chứa của xe được chọn; chưa chọn được xe (NO_RESOURCE) thì tính bằng xe
+ * chuẩn của tuyến, để thẻ vẫn cho biết chuyến đó đáng giá bao nhiêu.
+ *
+ * Từ route pairs CT7 (QĐ-22, PA-B, cách 2a):
+ * <ul>
+ *   <li>khung đã có M chuyến (thường lệ, tăng cường, tạo tay) thì chỉ còn N − M thẻ, đánh số
+ *       tiếp theo các chuyến đã có (khung cần 2 chuyến thêm, đã có 1 → một thẻ "chuyến thêm 2/2");</li>
+ *   <li>mỗi thẻ là MỘT VÒNG: chuyến thêm cộng lượt đi kèm ({@link CompanionLeg}). Doanh thu, chi phí
+ *       và lợi nhuận ước tính là của CẢ VÒNG; phần riêng của chuyến thêm ở tripRevenue / tripCost.</li>
+ * </ul>
  */
 @Data
 @NoArgsConstructor
@@ -57,11 +64,19 @@ public class RecommendationCardDto {
     /** Nhu cầu ÷ ghế xe chuẩn, không kẹp: 1,44 nghĩa là cần thêm 44% một xe. */
     private double demandRatio;
 
-    /** Thứ tự của chuyến thêm này trong khung, từ 1. */
+    /** Thứ tự của chuyến thêm này trong khung, từ 1 — đếm cả chuyến thêm đã có trong khung. */
     private int extraIndex;
 
     /** Số chuyến thêm khung cần = số chuyến cần − 1. */
     private int extraCount;
+
+    /**
+     * Số chuyến đã có trong khung (chưa hủy) lúc xem, và tổng số ghế của chúng (CT7, cách 2a). Khung
+     * chưa có chuyến nào — chưa tạo lịch — thì là 1 chuyến xe chuẩn (giả định); existingAssumed = true.
+     */
+    private int existingTrips;
+    private int existingSeats;
+    private boolean existingAssumed;
 
     // --- Kết cục & tài nguyên ---
     private RecommendationStatus status;
@@ -82,16 +97,63 @@ public class RecommendationCardDto {
     /** Giá vé lịch sử của khung (chuyến COMPLETED gần nhất cùng tuyến+giờ). */
     private BigDecimal ticketPrice;
 
-    /** Doanh thu ước tính = expectedPassengers × ticketPrice, làm tròn tới đồng. */
+    /** Doanh thu riêng của chuyến thêm = expectedPassengers × ticketPrice, làm tròn tới đồng. */
+    private BigDecimal tripRevenue;
+
+    /** Chi phí riêng của chuyến thêm = nhiên liệu/km × quãng đường + lương/giờ × giờ × số tài xế. */
+    private BigDecimal tripCost;
+
+    /** Lượt đi kèm của vòng (CT7). Không bao giờ null. */
+    private CompanionLeg companion;
+
+    /** Doanh thu ước tính của CẢ VÒNG = tripRevenue + doanh thu lượt đi kèm. */
     private BigDecimal estimatedRevenue;
 
     // --- Ước tính chi phí & lợi nhuận (Phase 7 bước 3; theo tham số CostParameters) ---
-    /** Chi phí vận hành ước tính = nhiên liệu/km × quãng đường + lương/giờ × giờ × số tài xế. */
+    /** Chi phí ước tính của CẢ VÒNG = tripCost + chi phí lượt đi kèm. */
     private BigDecimal estimatedCost;
 
-    /** Lợi nhuận ước tính = doanh thu − chi phí. CÓ THỂ ÂM: thẻ gắn nhãn "lỗ dự kiến". */
+    /** Lợi nhuận CẢ VÒNG = doanh thu − chi phí. CÓ THỂ ÂM: thẻ gắn nhãn "lỗ dự kiến". */
     private BigDecimal estimatedProfit;
 
     /** Câu giải thích kết cục (vì sao đủ điều kiện / vì sao thiếu tài nguyên). */
     private String note;
+
+    /**
+     * Lượt đi kèm của một chuyến thêm (route pairs CT7, {@link LoopLegKind}): đi cùng khung nào, xe và
+     * tài xế nào, chở bao nhiêu khách tràn của khung đó, tiền bao nhiêu.
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CompanionLeg {
+
+        private LoopLegKind kind;
+
+        /** Tuyến của lượt đi kèm (chiều ngược); null khi không có lượt cụ thể. */
+        private Long routeId;
+
+        private String routeLabel;
+
+        /** Giờ khởi hành (cùng giờ một chuyến thường lệ của chiều ngược); null khi không có lượt cụ thể. */
+        private LocalDateTime departure;
+
+        /**
+         * true khi lượt này đã chọn được xe + tài xế và được giữ chỗ; false khi chỉ là KẾ HOẠCH (thẻ
+         * thiếu tài nguyên, hay chưa xếp được lượt cụ thể).
+         */
+        private boolean reserved;
+
+        private String busPlate;
+
+        private String driverName;
+
+        /** Số khách tràn kỳ vọng của khung đi kèm rơi vào ghế của lượt này. */
+        private double passengers;
+
+        /** null khi khung đi kèm chưa có giá vé lịch sử (khi đó cả vòng tính như 0 đồng tiền vé ở lượt này). */
+        private BigDecimal revenue;
+
+        private BigDecimal cost;
+    }
 }

@@ -668,4 +668,16 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      "AND t.route.id IN :routeIds AND t.departureTime >= :from AND t.departureTime < :to")
        List<Object[]> findMainTripDeparturesBetween(@Param("routeIds") Collection<Long> routeIds,
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+       /**
+        * Route pairs CT7 (cách 2a): tuyến, giờ khởi hành và số ghế của mọi chuyến ở các trạng thái cho
+        * trước — màn Đề xuất và What-if truyền mọi trạng thái trừ CANCELLED — khởi hành trong [from, to),
+        * kể cả chuyến tăng cường và chuyến Admin tạo tay. LoopEconomics.slotTrips gom theo khung (tuyến,
+        * ngày, giờ), để hai màn chỉ đề xuất phần chuyến khung còn thiếu. Chỉ scalar, như
+        * findPriceHistoryByStatus. Chuyến xóa mềm tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t.route.id, t.departureTime, t.totalSeats FROM Trip t " +
+                     "WHERE t.status IN :statuses AND t.departureTime >= :from AND t.departureTime < :to")
+       List<Object[]> findSlotSeatsBetween(@Param("statuses") Collection<TripStatus> statuses,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

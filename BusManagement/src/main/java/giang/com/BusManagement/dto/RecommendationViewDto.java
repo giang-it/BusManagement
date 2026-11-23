@@ -39,13 +39,13 @@ public class RecommendationViewDto {
     // --- Số liệu tổng hợp ---
     /** Số ngày-khung được dự báo vượt ngưỡng tăng cường. */
     private int hotSlotCount;
-    /** Số chuyến thêm các khung đó cần = số thẻ. */
+    /** Số chuyến thêm các khung đó còn cần (đã trừ chuyến có sẵn trong khung, CT7) = số thẻ. */
     private int totalCandidates;
     private int recommendedCount;
     private int noResourceCount;
-    /** Số thẻ có lợi nhuận ước tính dương. */
+    /** Số thẻ có lợi nhuận ước tính (cả vòng, từ CT7) dương. */
     private int profitableCount;
-    /** Số thẻ có lợi nhuận ước tính âm ("lỗ dự kiến"). */
+    /** Số thẻ có lợi nhuận ước tính (cả vòng) âm ("lỗ dự kiến"). */
     private int lossCount;
 
     // --- Tham số chi phí đang áp dụng (Phase 7 bước 3) — để trang hiển thị minh
@@ -54,4 +54,11 @@ public class RecommendationViewDto {
     private BigDecimal costFuelPerKm;
     /** Lương tài xế/giờ đang dùng (đồng). */
     private BigDecimal costWagePerHour;
+
+    // --- Route pairs CT7 (cách 2a) ---
+    /**
+     * Số chuyến thêm mà các khung đông cần nhưng ĐÃ CÓ trong hệ thống (job 10 giây, Admin tạo tay…),
+     * nên không có thẻ. Ví dụ khung cần 2 chuyến thêm, đã có 1 → 1 ở đây, và 1 thẻ.
+     */
+    private int alreadyInSlotCount;
 }

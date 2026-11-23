@@ -49,6 +49,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * vé (như ForecastServiceTest). Khung không bán hết (45 vé / 50 ghế) để EM không đoán lại. Chi phí
  * dùng tham số mặc định (bảng cost_parameters của DB test rỗng). @Transactional nên mọi bản ghi được
  * rollback sau từng test.
+ *
+ * Tuyến ở đây không có bến, nên không có tuyến chiều ngược: lãi cả vòng (route pairs CT7) tính chiều về
+ * như một lượt rỗng cùng quãng đường, và không có lượt đi kèm nào được giữ chỗ. Vòng có lượt về / lượt
+ * đưa xe tới thật nằm ở RecommendationLoopTest.
  */
 @SpringBootTest
 @Transactional
@@ -125,10 +129,15 @@ class RecommendationServiceTest {
                             + SlotDemandModel.expectedOverflow(demand, 66, size), 1e-9,
                     "hai chuyến thêm không chở quá số khách tràn");
 
-            // Tiền: doanh thu = khách × giá vé, chi phí = 6.000 đ/km × 120 km + 50.000 đ/giờ × 2 giờ.
+            // Tiền: doanh thu = khách × giá vé, chi phí một lượt = 6.000 đ/km × 120 km + 50.000 đ/giờ × 2 giờ.
+            // Tuyến test không có bến nên không có tuyến chiều ngược: lãi cả vòng (CT7) tính chiều về như
+            // một lượt rỗng cùng quãng đường — chi phí hai lượt, tiền vé chỉ của chuyến thêm.
             assertEquals(PRICE.multiply(BigDecimal.valueOf(first.getExpectedPassengers())).setScale(0, java.math.RoundingMode.HALF_UP),
-                    first.getEstimatedRevenue());
-            assertEquals(0, new BigDecimal("820000").compareTo(first.getEstimatedCost()));
+                    first.getTripRevenue());
+            assertEquals(first.getTripRevenue(), first.getEstimatedRevenue());
+            assertEquals(0, new BigDecimal("820000").compareTo(first.getTripCost()));
+            assertEquals(0, new BigDecimal("1640000").compareTo(first.getEstimatedCost()), "820.000 đ × 2 lượt");
+            assertEquals(giang.com.BusManagement.dto.LoopLegKind.ASSUMED_RETURN, first.getCompanion().getKind());
             assertTrue(first.getEstimatedProfit().signum() > 0, "chuyến thêm 1/2 có lãi");
             assertTrue(second.getEstimatedProfit().signum() < 0, "chuyến thêm 2/2 lỗ dự kiến, vẫn có thẻ");
             assertEquals(RecommendationStatus.RECOMMENDED, second.getStatus(), "lỗ vẫn là chuyến chạy được");

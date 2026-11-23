@@ -158,4 +158,14 @@ public final class AvailabilityContext {
     public void addCommittedKm(Long busId, double km) {
         committedKm.merge(busId, km, Double::sum);
     }
+
+    // ── Giữ chỗ thử (route pairs CT7) ───────────────────────────────────────────
+    // Vòng "đưa xe tới trước" của màn Đề xuất phải giữ thử lượt đưa xe tới, để luật vị trí thấy xe đã
+    // tới bến đi của chuyến thêm, rồi mới chọn xe cho chính chuyến thêm. Chọn không được thì trả lượt đó
+    // lại. Vẫn chỉ là dữ liệu: bỏ đúng đối tượng đã reserve, không xét gì.
+
+    /** Bỏ một chuyến đã {@link #reserve} (so theo đúng đối tượng). Không có thì không làm gì. */
+    public void release(Trip trip) {
+        trips.removeIf(t -> t == trip);
+    }
 }

@@ -18,8 +18,12 @@
                 <small class="text-muted">
                     <span class="fw-semibold" th:text="${view.hotSlotCount}">0</span>
                     khung giờ được dự báo vượt ngưỡng tăng cường trong
-                    <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày tới, cần
+                    <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày tới, còn thiếu
                     <span class="fw-semibold" th:text="${view.totalCandidates}">0</span> chuyến thêm
+                    <span th:if="${view.alreadyInSlotCount > 0}">
+                        (đã có <span class="fw-semibold" th:text="${view.alreadyInSlotCount}">0</span> chuyến thêm
+                        trong hệ thống)
+                    </span>
                 </small>
             </div>
             <div>
@@ -43,9 +47,14 @@
                 <strong>không tạo chuyến và không phân công ai</strong> — mỗi lần mở, hệ thống tính lại từ dự báo,
                 chọn thử xe + tài xế và ước tính doanh thu/chi phí/lợi nhuận để Admin tự quyết. Mỗi thẻ là
                 <strong>một chuyến thêm</strong>; khung cần nhiều chuyến thì có nhiều thẻ ("chuyến thêm 1/2, 2/2").
+                Chuyến <strong>đã có trong khung</strong> (thường lệ, tăng cường, tạo tay) được trừ ra: thẻ chỉ đề xuất
+                phần khung còn thiếu.
                 Doanh thu là <strong>ước tính</strong>: chuyến thêm chỉ chở <strong>khách tràn</strong> — phần nhu cầu
-                mà xe chuẩn và các chuyến thêm trước nó không chở hết, tính theo độ dao động của dự báo — nhân giá vé
-                lịch sử của khung.
+                mà các chuyến đã có và các chuyến thêm trước nó không chở hết, tính theo độ dao động của dự báo — nhân
+                giá vé lịch sử của khung.
+                Lãi là <strong>lãi cả vòng</strong>: xe tăng cường rời bến nhà thì phải <strong>về</strong>, xe ở đầu kia
+                thì phải được <strong>đưa tới</strong> — mỗi thẻ cộng thêm <strong>lượt đi kèm</strong> đó (đi cùng giờ
+                một chuyến thường lệ của chiều ngược, chở phần khách còn tràn của khung ấy) cả tiền vé lẫn chi phí.
                 Chi phí là <strong>ước tính theo tham số cấu hình</strong> (nhiên liệu/km × quãng đường + lương/giờ ×
                 thời lượng × số tài xế), <strong>không phải chi phí thật</strong> —
                 <a th:href="@{/admin/cost-parameters}">chỉnh tham số chi phí</a>.
@@ -76,10 +85,12 @@
             <div class="col">
                 <div class="card border-0 bg-white h-100 shadow-sm">
                     <div class="card-body">
-                        <div class="small text-muted">Chuyến thêm cần</div>
+                        <div class="small text-muted">Chuyến thêm còn thiếu</div>
                         <div class="fs-3 fw-bold" th:text="${view.totalCandidates}">0</div>
                         <div class="small text-muted">
-                            cho <span th:text="${view.hotSlotCount}">0</span> khung dự báo đông
+                            cho <span th:text="${view.hotSlotCount}">0</span> khung dự báo đông<span
+                                th:if="${view.alreadyInSlotCount > 0}">; đã có
+                                <span th:text="${view.alreadyInSlotCount}">0</span> chuyến thêm</span>
                         </div>
                     </div>
                 </div>
@@ -87,7 +98,7 @@
             <div class="col">
                 <div class="card border-0 bg-white h-100 shadow-sm">
                     <div class="card-body">
-                        <div class="small text-muted">Lãi / lỗ dự kiến</div>
+                        <div class="small text-muted">Lãi / lỗ cả vòng dự kiến</div>
                         <div class="fs-3 fw-bold">
                             <span class="text-success" th:text="${view.profitableCount}">0</span>
                             <span class="text-muted fs-5">·</span>
@@ -151,9 +162,10 @@
                                 <th>Tài Xế Đề Xuất</th>
                                 <th class="text-end">Số Khách KV</th>
                                 <th class="text-end">Giá Vé</th>
-                                <th class="text-end">Doanh Thu Ước Tính</th>
-                                <th class="text-end">Chi Phí Ước Tính</th>
-                                <th class="text-end">Lợi Nhuận Ước Tính</th>
+                                <th>Lượt Đi Kèm</th>
+                                <th class="text-end">Doanh Thu Cả Vòng</th>
+                                <th class="text-end">Chi Phí Cả Vòng</th>
+                                <th class="text-end">Lãi Cả Vòng</th>
                                 <th>Ghi Chú</th>
                             </tr>
                         </thead>
@@ -171,6 +183,11 @@
                                     </div>
                                     <span class="badge bg-primary-subtle text-primary-emphasis mt-1"
                                         th:text="'Chuyến thêm ' + ${c.extraIndex} + '/' + ${c.extraCount}">Chuyến thêm 1/1</span>
+                                    <div class="small text-muted mt-1" th:unless="${c.existingAssumed}"
+                                        th:text="'Khung đã có ' + ${c.existingTrips} + ' chuyến · ' + ${c.existingSeats} + ' ghế'">
+                                        Khung đã có 1 chuyến · 22 ghế</div>
+                                    <div class="small text-warning-emphasis mt-1" th:if="${c.existingAssumed}">
+                                        Chưa có lịch — giả định 1 xe chuẩn</div>
                                 </td>
                                 <td class="text-end">
                                     <div class="fw-bold">
@@ -208,14 +225,42 @@
                                     th:text="${c.ticketPrice != null}
                                         ? ${#numbers.formatDecimal(c.ticketPrice, 1, 'COMMA', 0, 'POINT')} + 'đ'
                                         : '—'">—</td>
-                                <td class="text-end fw-semibold"
-                                    th:text="${c.estimatedRevenue != null}
+                                <td class="small" th:with="leg=${c.companion}">
+                                    <div th:if="${leg.kind.name() == 'RETURN'}" class="fw-semibold">
+                                        <i class="bi bi-arrow-return-left"></i> Về ngay</div>
+                                    <div th:if="${leg.kind.name() == 'BRING'}" class="fw-semibold">
+                                        <i class="bi bi-arrow-right-circle"></i> Đưa xe tới trước</div>
+                                    <div th:if="${leg.kind.name() == 'NONE'}" class="fw-semibold">
+                                        <i class="bi bi-house"></i> Không cần</div>
+                                    <div th:if="${leg.kind.name() == 'ASSUMED_RETURN'}" class="fw-semibold">
+                                        <i class="bi bi-arrow-return-left"></i> Tính như về rỗng</div>
+                                    <div class="text-muted" th:if="${leg.routeLabel != null}">
+                                        <span th:text="${leg.routeLabel}">B → A</span>
+                                        <span th:if="${leg.departure != null}"
+                                            th:text="${#temporals.format(leg.departure, 'HH:mm dd/MM')}">12:00 01/01</span>
+                                    </div>
+                                    <div class="text-muted" th:if="${leg.reserved}">
+                                        <span th:text="${leg.busPlate}">—</span> ·
+                                        <span th:text="${leg.driverName}">—</span>
+                                    </div>
+                                    <div class="text-muted" th:if="${leg.routeLabel != null and !leg.reserved}">(theo kế hoạch)</div>
+                                    <div class="text-muted" th:if="${leg.kind.name() == 'RETURN' or leg.kind.name() == 'BRING'}"
+                                        th:text="${#numbers.formatDecimal(leg.passengers, 1, 1)} + ' khách KV'">0 khách KV</div>
+                                </td>
+                                <td class="text-end fw-semibold">
+                                    <span th:text="${c.estimatedRevenue != null}
                                         ? ${#numbers.formatDecimal(c.estimatedRevenue, 1, 'COMMA', 0, 'POINT')} + 'đ'
-                                        : '—'">—</td>
-                                <td class="text-end small"
-                                    th:text="${c.estimatedCost != null}
+                                        : '—'">—</span>
+                                    <div class="small text-muted fw-normal" th:if="${c.tripRevenue != null}"
+                                        th:text="'chuyến thêm ' + ${#numbers.formatDecimal(c.tripRevenue, 1, 'COMMA', 0, 'POINT')} + 'đ'">—</div>
+                                </td>
+                                <td class="text-end small">
+                                    <span th:text="${c.estimatedCost != null}
                                         ? ${#numbers.formatDecimal(c.estimatedCost, 1, 'COMMA', 0, 'POINT')} + 'đ'
-                                        : '—'">—</td>
+                                        : '—'">—</span>
+                                    <div class="text-muted" th:if="${c.tripCost != null}"
+                                        th:text="'chuyến thêm ' + ${#numbers.formatDecimal(c.tripCost, 1, 'COMMA', 0, 'POINT')} + 'đ'">—</div>
+                                </td>
                                 <td class="text-end fw-semibold"
                                     th:classappend="${c.estimatedProfit == null} ? '' : (${c.estimatedProfit.signum() >= 0} ? 'text-success' : 'text-danger')">
                                     <span th:text="${c.estimatedProfit != null}
@@ -237,15 +282,20 @@
                 </div>
             </div>
             <div class="card-footer bg-white small text-muted" th:if="${!#lists.isEmpty(view.cards)}">
-                Xếp theo lợi nhuận ước tính giảm dần (chuyến có lãi lên đầu). "Số khách KV" = số khách kỳ vọng mà
+                Xếp theo lãi cả vòng ước tính giảm dần (vòng có lãi lên đầu). "Số khách KV" = số khách kỳ vọng mà
                 chuyến thêm chở được: khách tràn rơi vào ghế của xe được chọn (chưa chọn được xe thì tính với xe
-                chuẩn của tuyến). Chuyến <strong>lỗ dự kiến</strong> vẫn được liệt kê vì khung đã vượt ngưỡng 90% —
+                chuẩn của tuyến). <strong>Lượt đi kèm</strong>: "Về ngay" — xe về bằng khung chiều ngược sớm nhất mà
+                xe và một tài xế kịp; "Đưa xe tới trước" — bến đi không có xe rảnh nên một xe từ đầu kia đi cùng khung
+                chiều ngược muộn nhất còn kịp; "Không cần" — xe đang ở bến xa, chuyến thêm đưa nó về bến nhà; "Tính như
+                về rỗng" — chưa xếp được lượt cụ thể nên cộng chi phí một lượt, không tiền vé. Lượt đi kèm chở phần khách
+                còn tràn của khung đó sau khi khung đã đủ chuyến, nên thường gần 0 khách. Hai thẻ ngược chiều không được
+                ghép thành một vòng. Chuyến <strong>lỗ dự kiến</strong> vẫn được liệt kê vì khung đã vượt ngưỡng 90% —
                 chạy hay không do Admin quyết. Trạng thái được suy từ cổng kiểm tra ràng buộc nghiệp vụ — cùng bộ
                 luật mà luồng phân công thật sẽ áp dụng, nên một thẻ "Đủ điều kiện" là chuyến mà hệ thống sẽ chấp
-                nhận nếu Admin tạo ngay bây giờ. Các chuyến được xét theo lãi kỳ vọng giảm dần; xe + tài xế của
-                thẻ đủ điều kiện được giữ, nên các thẻ "Đủ điều kiện" không trùng xe, không trùng tài xế và không
-                vượt 8 giờ lái — chạy được cùng lúc. Lịch chạy thường lệ của những ngày tới chưa có trong hệ thống
-                nên chưa được trừ khỏi đội xe.
+                nhận nếu Admin tạo ngay bây giờ. Các vòng được xét theo lãi kỳ vọng giảm dần; xe + tài xế của mọi lượt
+                trong vòng của thẻ đủ điều kiện được giữ, nên các thẻ "Đủ điều kiện" không trùng xe, không trùng tài xế
+                và không vượt 8 giờ lái — chạy được cùng lúc. Chuyến thường lệ đã tạo (trang Lịch thường lệ) chiếm xe và
+                người của chúng, và được tính là chuyến đã có của khung.
             </div>
         </div>
 

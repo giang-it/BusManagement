@@ -82,8 +82,8 @@ public class CostParameterService {
      *    tính, rồi biến "lợi nhuận" thành "doanh thu" trên màn Đề Xuất Tăng Cường
      *    và màn What-if mà không một cảnh báo nào.
      * 3. Số 0 không được xử lý đặc biệt ở bất kỳ đâu — nó chỉ âm thầm bị nuốt
-     *    thành 0đ trong phép nhân của RecommendationService.estimateCost() và
-     *    WhatIfSimulationService.computeOutcome().
+     *    thành 0đ trong phép nhân của LoopEconomics.tripCost() (màn Đề xuất và
+     *    What-if cùng dùng, từ route pairs CT7).
      * 4. WhatIfSimulationService.positiveOrNull() đã loại 0/âm với cùng lý do
      *    ("để tránh chi phí âm") — đây chỉ là áp cùng lập trường cho nguồn cấu
      *    hình được LƯU, thay vì chỉ cho ô ghi đè tạm thời.
