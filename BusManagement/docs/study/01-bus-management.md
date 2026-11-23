@@ -424,7 +424,8 @@ Chuỗi `foreign_key_checks=0` nằm ở `src/main/resources/application.propert
 ## §4. Luồng lỗi — đặt xe sang `REPAIRING` khi xe đang có chuyến chạy dở
 
 Tình huống: xe 6 đang chở khách (chuyến 13 ở `DEPARTED`). Admin mở Sửa, chọn `REPAIRING`, **tiện
-tay đổi luôn hãng xe**, bấm Lưu.
+tay đổi luôn hãng xe**, bấm Lưu. *(Số liệu lúc viết bài. Ngày 2026-11-19, CT6 đã đóng chuyến 13 trên
+DB thật (CM-22), nên xe 6 nay `READY`; muốn tái hiện thì dùng một xe có chuyến `DEPARTED`.)*
 
 | Bước | Chuyện gì xảy ra | Vị trí | Nhãn |
 |---|---|---|---|

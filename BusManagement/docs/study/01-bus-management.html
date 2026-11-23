@@ -1019,7 +1019,8 @@ public void deleteBus(Long id) {
 <hr>
 <h2 id="4-luong-loi-dat-xe-sang-repairing-khi-xe-dang-co-chuyen-chay-do">§4. Luồng lỗi — đặt xe sang <code>REPAIRING</code> khi xe đang có chuyến chạy dở</h2>
 <p>Tình huống: xe 6 đang chở khách (chuyến 13 ở <code>DEPARTED</code>). Admin mở Sửa, chọn <code>REPAIRING</code>, <strong>tiện
-tay đổi luôn hãng xe</strong>, bấm Lưu.</p>
+tay đổi luôn hãng xe</strong>, bấm Lưu. <em>(Số liệu lúc viết bài. Ngày 2026-11-19, CT6 đã đóng chuyến 13 trên
+DB thật (CM-22), nên xe 6 nay <code>READY</code>; muốn tái hiện thì dùng một xe có chuyến <code>DEPARTED</code>.)</em></p>
 <div class="table-wrap"><table><thead><tr>
 <th>Bước</th>
 <th>Chuyện gì xảy ra</th>
