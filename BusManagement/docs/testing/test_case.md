@@ -2411,6 +2411,18 @@ Toàn bộ module chỉ đọc: không có case nào ghi dữ liệu. Trang là
   - Số thẻ Đề xuất = số "Chuyến thêm cần" của What-if ở 100% = Σ(số chuyến cần − 1) của các ô đỏ (TC_RC_002, TC_WI_001)
   - Doanh thu theo khách tràn, không còn "đầy xe × giá vé" (TC_RC_001); What-if dưới 100% vẫn đếm đúng (TC_WI_002)
 
+### TC_FC_010 — Bảng 7 ngày gom theo cặp tuyến (route pairs CT7, phần M1)
+
+- **Mã TC:** TC_FC_010
+- **Tên Kịch Bản:** Happy path — hai chiều của một cặp đặt liền nhau
+- **Điều kiện tiên quyết:** Như TC_FC_001; các tuyến có lịch ghép được thành cặp
+- **Các bước thực hiện:** Mở `/admin/analytics/forecast`, xem bảng 7 ngày
+- **Kết quả mong đợi:**
+  - Mỗi cặp một dòng tiêu đề "Bến xe Miền Đông ↔ …"; dưới đó 3 chuỗi chiều rời Miền Đông (06, 12, 18) rồi 3 chuỗi chiều về
+  - Cặp có ô đỏ cao nhất lên trước; tuyến không có đúng một tuyến chiều ngược ở nhóm cuối
+  - Mọi con số của các ô không đổi so với trước (chỉ đổi thứ tự); tổng số chuỗi không đổi
+  - Tự động: `PairPlanServiceTest.theForecastTable_groupsBothDirectionsOfAPair_outboundFirst`
+
 ---
 
 <a name="module-9"></a>
@@ -2485,8 +2497,8 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
   3. Đối chiếu giá vé bằng SQL: giá của chuyến `COMPLETED` gần nhất cùng (tuyến, giờ khởi hành)
 - **Kết quả mong đợi:**
   - **HTTP 200**, không ném `TemplateProcessingException`/`SpelEvaluationException`/`LazyInitializationException`
-  - Số thẻ của một khung = "cần N chuyến" trên trang Dự báo − 1; thẻ ghi "Chuyến thêm k/(N − 1)"
-  - "Số khách KV" khớp bước 2 (1 chữ số thập phân); doanh thu = số khách × giá vé (làm tròn tới đồng); chi phí = nhiên liệu/km × km + lương/giờ × giờ × số tài xế; lợi nhuận = doanh thu − chi phí
+  - Số thẻ của một khung = "cần N chuyến" trên trang Dự báo − số chuyến đã có trong khung (khung chưa có chuyến nào: − 1; route pairs CT7, xem TC_RC_010); thẻ ghi "Chuyến thêm k/(N − 1)"
+  - "Số khách KV" khớp bước 2 (1 chữ số thập phân); doanh thu = số khách × giá vé (làm tròn tới đồng); chi phí một lượt = nhiên liệu/km × km + lương/giờ × giờ × số tài xế; từ CT7 doanh thu, chi phí, lợi nhuận trên thẻ là **của cả vòng** (cộng lượt đi kèm, xem TC_RC_008), phần riêng của chuyến thêm ghi ngay dưới
   - Ví dụ trên DB thật (2026-10-23): tuyến Niệm Nghĩa → Mỹ Đình, 18:00, 25/10: 57,6 khách / xe 40 chỗ, chuyến thêm chở 17,7 khách, lãi 1.324.275đ
   - Trang **không** tạo chuyến/không phân công (DB không đổi trước và sau khi mở nhiều lần)
   - ⚠️ Nếu thẻ của khung 20,1 khách / xe 22 chỗ hiện ~20 khách (đầy xe) thì cầu nối cũ đã quay lại
@@ -2498,7 +2510,7 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
 - **Điều kiện tiên quyết:** Như TC_RC_001
 - **Các bước thực hiện:** Đối chiếu với trang Dự báo cùng thời điểm: số khung đông và tổng (số chuyến cần − 1) của các ô đỏ
 - **Kết quả mong đợi:**
-  - "Chuyến thêm cần … cho X khung dự báo đông" khớp chính xác: X = số ô đỏ; số chuyến thêm = Σ(N − 1)
+  - "… khung dự báo đông …, còn thiếu Y chuyến thêm" khớp chính xác: X = số ô đỏ; Y = Σ(N − số chuyến đã có), khung chưa có chuyến nào tính là 1 (từ CT7; trước đó Σ(N − 1))
   - ⚠️ Nếu ai đó nhét lại việc so sánh với 0.90 vào `RecommendationService`, con số sẽ lệch khỏi Dự báo — case này bắt được
 
 ### TC_RC_003 — Giữ chỗ: các thẻ "Đủ điều kiện" chạy được cùng lúc
@@ -2561,6 +2573,61 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
   - Chuyến thêm có lãi của khung muộn "Đủ điều kiện"; chuyến thêm lỗ của khung sớm "Thiếu tài nguyên"
   - Tự động: `RecommendationServiceTest.scarceBus_goesToTheMostProfitableExtraTrip_notTheEarliest`
 
+### TC_RC_008 — Mỗi thẻ là một vòng: "về ngay" ở khung chiều ngược sớm nhất (route pairs CT7, PA-B)
+
+- **Mã TC:** TC_RC_008
+- **Tên Kịch Bản:** Happy path — lãi cả vòng của chuyến thêm rời bến nhà
+- **Điều kiện tiên quyết:** Một khung chiều đi (rời Bến xe Miền Đông) được dự báo đông; ở Miền Đông có xe rảnh và tài xế rảnh; tuyến có đúng một tuyến chiều ngược
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/recommendation`, tìm thẻ của khung đó
+  2. Đọc cột "Lượt đi kèm" và ba cột tiền cả vòng
+- **Kết quả mong đợi:**
+  - Cột "Lượt đi kèm" ghi **"Về ngay"**, tuyến chiều ngược, giờ là khung thường lệ (06/12/18) **sớm nhất** sau giờ tới + 1 giờ mà xe và một tài xế (≤ 8 giờ/ngày) kịp — ví dụ tuyến Đà Lạt 06:00 tới 12:00, tài xế duy nhất đã lái 6 giờ thì lượt về là **06:00 sáng hôm sau**, không phải 18:00
+  - Có biển số và tên tài xế của lượt về; số khách KV của lượt về thường gần 0
+  - Chi phí cả vòng = 2 × chi phí một lượt (ví dụ Vũng Tàu: 2 × 700.000đ); doanh thu cả vòng = doanh thu chuyến thêm + doanh thu lượt về
+  - Trên DB thật ngày 2026-11-22: 10 thẻ "Về ngay"; chi phí khớp phép tính tay ở cả 22 thẻ đủ điều kiện
+  - Tự động: `RecommendationLoopTest.anExtraTripLeavingHome_…`, `…theReturnLegWaitsForTheNextMorning_…`
+
+### TC_RC_009 — Bến xa không có xe: "đưa xe tới trước"; xe kẹt ở bến xa: "không cần" (CT7)
+
+- **Mã TC:** TC_RC_009
+- **Tên Kịch Bản:** Edge case — thẻ ở bến xa
+- **Điều kiện tiên quyết:** (a) Một khung chiều về (về Miền Đông) dự báo đông, ở bến xa không có xe rảnh; (b) một xe bến nhà Miền Đông đang đứng ở bến xa, không còn chuyến nào
+- **Các bước thực hiện:** Mở trang, xem thẻ của hai khung
+- **Kết quả mong đợi:**
+  - (a) Thẻ **"Đủ điều kiện"** (trước CT7: "Thiếu tài nguyên"), lượt đi kèm **"Đưa xe tới trước"** — khung chiều đi **muộn nhất** mà xe tới kịp giờ đi của chuyến thêm cộng 1 giờ; cùng một xe chạy lượt đưa tới và chuyến thêm; chi phí 2 lượt
+  - (b) Lượt đi kèm **"Không cần"**, chi phí cả vòng = một lượt
+  - Không đưa được xe nào tới (ví dụ khung 06:00 ngày mai lúc đã quá 23:00 hôm nay): thẻ "Thiếu tài nguyên", ghi chú nói rõ
+  - Tự động: `RecommendationLoopTest.anExtraTripFromTheFarEnd_…`, `…aBusStrandedAtTheFarEnd_…`
+
+### TC_RC_010 — Chỉ đề xuất phần khung còn thiếu (CT7, cách 2a)
+
+- **Mã TC:** TC_RC_010
+- **Tên Kịch Bản:** Edge case — khung đã có chuyến
+- **Điều kiện tiên quyết:** Trên **bản sao** DB: một khung đông cần 2 chuyến đã có chuyến chính và một chuyến tăng cường (06:30); một khung khác đã có chuyến chính chạy xe lớn hơn xe chuẩn; một khung có chuyến chính đã hủy
+- **Các bước thực hiện:** Mở trang Đề xuất
+- **Kết quả mong đợi:**
+  - Khung đã đủ 2 chuyến **không có thẻ**; tiêu đề ghi "(đã có 1 chuyến thêm trong hệ thống)"
+  - Khung có xe lớn vẫn có thẻ, ghi "Khung đã có 1 chuyến · 40 ghế"; số khách KV tính sau 40 ghế đó (gần 0)
+  - Khung có chuyến chính đã hủy ghi "Chưa có lịch — giả định 1 xe chuẩn" (chuyến hủy không chở ai)
+  - Tự động: `RecommendationLoopTest.tripsAlreadyInTheSlot_areSubtracted_andTheirRealSeatsCount`
+
+### TC_RC_011 — Trang "Kế hoạch cặp tuyến" (CT7, CM-9)
+
+- **Mã TC:** TC_RC_011
+- **Tên Kịch Bản:** Happy path — nhìn là thấy chiều nào được tăng cường, xe đi rồi về thế nào
+- **Điều kiện tiên quyết:** Đã bấm "Tạo lịch" cho các ngày sắp tới ở `/admin/timetable`; màn Đề xuất có thẻ đủ điều kiện
+- **Các bước thực hiện:**
+  1. Từ trang chủ bấm ô **"Kế Hoạch Cặp Tuyến"** (hay `/admin/analytics/pair-plan`)
+  2. Ở bảng tổng quan, bấm một ngày có ★
+- **Kết quả mong đợi:**
+  - **HTTP 200**; tổng quan có một dòng mỗi cặp (Miền Đông ↔ Đà Lạt / Cần Thơ / Vũng Tàu), mỗi ngày ghi số ★, số "thiếu" và lãi cả vòng — khớp các thẻ của màn Đề xuất cùng lúc
+  - Bảng của từng cặp: hai dòng khung (chiều đi, chiều về) ở 06:00 / 12:00 / 18:00 với dự báo, ghế đã có, "cần N", ★; mỗi xe một hàng — ví dụ cặp Vũng Tàu 23/11/2026: 29A-001.10 "→ đi 06:00, ← về 12:00, → đi 18:00", tối ngủ ở Bến xe Vũng Tàu
+  - Hàng ★ có chuyến thêm và lượt về / lượt đưa xe tới, ghi chú lý do và lãi cả vòng; chuyến thêm chưa xếp được nằm dưới bảng kèm lý do
+  - Ngày chưa tạo lịch: dòng cảnh báo "chưa có chuyến nào — bấm Tạo lịch"
+  - Trang **không** ghi DB
+  - Tự động: `PairPlanServiceTest` (4)
+
 ---
 
 <a name="module-11"></a>
@@ -2620,6 +2687,19 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 - **Kết quả mong đợi:**
   - Bước 1: cột Kịch bản đổi chi phí; màn tham số chi phí và DB **không** đổi
   - Bước 2: giá 0 hoặc âm bị coi là "không ghi đè" (dùng giá cấu hình); hệ số bị kẹp về 50% và 300%; HTTP 200
+
+### TC_WI_006 — Tiền cả vòng theo kế hoạch; năng lực không đổi (route pairs CT7, CM-7 = W1)
+
+- **Mã TC:** TC_WI_006
+- **Tên Kịch Bản:** Regression — một định nghĩa lãi với màn Đề xuất
+- **Điều kiện tiên quyết:** Như TC_WI_001
+- **Các bước thực hiện:** Mở `/admin/analytics/what-if` ở 100%, so với màn Đề xuất cùng lúc
+- **Kết quả mong đợi:**
+  - Số chuyến thêm cần = số thẻ màn Đề xuất (cả hai trừ chuyến đã có trong khung)
+  - Chi phí kế hoạch phủ được = tổng chi phí **hai lượt** của mỗi chuyến thêm (DB thật ngày 2026-11-22: 88,1 triệu, đúng gấp đôi 44,05 triệu trước CT7)
+  - Khi xe thật đi đúng kế hoạch (xe dự phòng ở bến nhà, về ngay được), doanh thu và chi phí bằng đúng tổng các thẻ; khi có xe rảnh ở bến xa hay luật 8 giờ đẩy lượt về sang hôm sau thì hai màn khác nhau — trang ghi rõ giới hạn
+  - Độ phủ vẫn tính mỗi chuyến thêm là một lượt xe (trang ghi "Giới hạn")
+  - Tự động: `RecommendationLoopTest.whatIf_countsTheSameLoopMoney_asTheCards_…`, `WhatIfSimulationServiceTest`
 
 ---
 
@@ -2683,7 +2763,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

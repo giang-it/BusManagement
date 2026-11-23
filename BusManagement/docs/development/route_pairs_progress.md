@@ -7,7 +7,7 @@
 > - thêm một dòng vào mục 5 (nhật ký).
 >
 > Tài liệu liên quan:
-> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-23).
+> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-25).
 > - Đợt trước (dự báo): [`forecast_progress.md`](forecast_progress.md), [`forecast_decisions.md`](forecast_decisions.md).
 > - `THESIS_ROADMAP.md` vẫn là tracker chung của cả dự án. §7 trỏ về file này, §8 ghi một mục ngắn cho mỗi phiên.
 
@@ -19,7 +19,7 @@
 
 ---
 
-## 1. Trạng thái hiện tại (cập nhật 2026-11-17)
+## 1. Trạng thái hiện tại (cập nhật 2026-11-23)
 
 - **Mục tiêu của đợt** (theo ý thầy hướng dẫn):
   - màn dự báo gọn lại, chỉ còn 3 cặp tuyến hai chiều quanh Bến xe Miền Đông;
@@ -86,16 +86,23 @@
   - Sửa luôn #36, phát hiện khi sửa: chuyến có ≥ 2 tài xế phụ bị chia giờ sai **theo cả hai chiều**.
   - Test 261/261, thử làm hỏng 5 cách.
   - `verify` DB thật chỉ đọc: API form Tạo 28 → 7 s (có tuyến), 23 → 2,4 s (không tuyến); kết quả giống hệt. A/B trên bản sao: màn Duyệt thủ công 67 → 6 s.
-- **CT6 xong ngày 2026-11-19; đã commit và push ngày 2026-11-23** (chủ dự án duyệt mọi đề xuất: *"oke, tôi đồng ý tất cả, hãy kiểm tra những chức năng, file liên quan và làm … xong thì cũng test luôn"*; rồi *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"*). Commit `5b38e71` (code + test), `8957099` (bài học), rồi commit `docs:` ngay sau đó:
+- **CT6 xong ngày 2026-11-19; đã commit và push ngày 2026-11-23** (chủ dự án duyệt mọi đề xuất: *"oke, tôi đồng ý tất cả, hãy kiểm tra những chức năng, file liên quan và làm … xong thì cũng test luôn"*; rồi *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"*). Commit `5b38e71` (code + test), `8957099` (bài học), `c36fef3` (tài liệu):
   - trang `/admin/timetable`: cặp tuyến suy bằng đảo bến, một nguồn giờ chạy và danh sách tuyến cho bộ sinh lẫn app, nút "Tạo lịch" xếp mọi khung theo giờ bằng `autoAssignResources` của job 10 giây trên một context lập lịch;
   - test 273/273 (+12); thử làm hỏng 7 chỗ, chỗ nào cũng đúng test cần đỏ;
   - `verify` trên bản sao rồi DB thật (có sao lưu): 125 chuyến mở bán + 1 chờ phân công cho 20–26/11, 7 phép kiểm SQL độc lập 0 vi phạm;
   - DB thật: đóng 5 chuyến demo `DEPARTED` (CM-22), thêm 126 chuyến.
-
-  - Kiểm lại trước khi commit (2026-11-23): test 273/273 trên đúng bản CT6; bản sao DB thật, chạy bằng bản CT6 + CT7 (CT7 không đổi đường lập lịch), "Tạo lịch" 27/11–03/12: 121 chuyến mở bán + 5 chờ phân công, cùng phép kiểm SQL độc lập 0 vi phạm; DB thật giống hệt trước và sau.
+  - Kiểm lại trước khi commit (2026-11-23): test 273/273 trên đúng bản CT6; bản sao DB thật, chạy bằng bản CT6 + CT7 (CT7 không đổi đường lập lịch), "Tạo lịch" 27/11–03/12: 121 chuyến mở bán + 5 chờ phân công, cùng phép kiểm SQL độc lập 0 vi phạm; DB thật giống hệt trước và sau. Phát hiện **CM-25** (lịch nhìn trước không có bước bảo trì: từ 27/11 cặp Đà Lạt chạy chủ yếu bằng Limousine 22).
 
   Chi tiết ở mục 4, CT6. Làm trong worktree, vì `#35/#36` vẫn chưa commit và app 8080 của chủ dự án chạy từ `target/classes`.
-- **Việc tiếp theo:** #35/#36 đã commit và push ngày 2026-11-22; CT6 ngày 2026-11-23. Chuyến #51360 (Vũng Tàu → Miền Đông 06:00 20/11, chờ chọn xe) đã được chủ dự án **hủy** ngày 2026-11-22, khi giờ đi đã qua. Còn mở: CM-23 (chuyến thường lệ đã qua giờ mà không ai vận hành, và lần chạy bổ sung lịch sử) — chủ dự án bảo *"bàn sau"* (2026-11-22). Tuỳ chủ dự án: gộp phép tính vị trí 4 lần/người của CT5b, index ghép. Sau đó tới CT7. G3-7: xoá các bản sao cũ (`busmanagement_gd2`, `busmanagement_ct3`, nay thêm `busmanagement_ct6`) khi chủ dự án đồng ý.
+- **CT7 xong ngày 2026-11-22; đã commit và push ngày 2026-11-23** (chủ dự án duyệt 5 đề xuất: *"tôi đồng ý với những đề xuất của bạn (từ 1-5)"*, rồi *"hãy suy luận và tiến hành thực hiện code theo như đã đề xuất"*; rồi *"check lại … sau đó commit và push"*). Commit `fae225d` (CT7a), `3e513f0` (CT7b), `deeece9` (bài học), rồi commit `docs:` ngay sau đó:
+  - **CT7a:** màn Đề xuất tính lãi cả vòng (PA-B: về ngay / đưa xe tới / không cần / tính như về rỗng), chỉ đề xuất phần khung còn thiếu (2a); What-if tính tiền cả vòng (W1); một phép tính tiền chung `service/LoopEconomics`;
+  - **CT7b:** trang mới `/admin/analytics/pair-plan`; bảng 7 ngày của màn Dự báo gom theo cặp;
+  - test 292/292 (+19), thử làm hỏng 8 chỗ;
+  - `verify` DB thật chỉ đọc (DB giống hệt): đủ điều kiện 19 → 22, có lãi 7 → 3 (cả vòng); phép kiểm độc lập 41 lượt, 0 vi phạm; bản sao: "Tạo lịch" 27/11–03/12 vẫn chạy.
+  - Kiểm lại trước khi commit (2026-11-23): test 288/288 trên đúng bản CT7a và 292/292 trên bản CT7 đủ; `verify` DB thật chỉ đọc từ worktree `wt-ct7`: 24 lượt gọi trả 200 (16 trang, trang kế hoạch cho từng ngày trong 7 ngày, What-if 150 %), log sạch; 25 thẻ, 24 đủ điều kiện (10 về ngay, 11 đưa xe tới, 3 không cần); phép kiểm độc lập 45 lượt trên 15 xe và 22 người: 0 trùng giờ, 0 đứt chuỗi vị trí, 0 ngày quá 8 giờ, chi phí khớp phép tính tay ở cả 24 thẻ; 1 thẻ có lượt về do một xe khác chạy (đúng "cách hiểu khi cài" ở QĐ-22); DB thật giống hệt trước và sau.
+
+  Chi tiết ở mục 4, CT7. Mở **CM-24**: lịch phủ cả tuần thì hết tài xế cho chuyến thêm (1/25 trên bản sao, cả bản CT6; đo lại 2026-11-23: 2/25).
+- **Việc tiếp theo:** #35/#36 đã commit và push ngày 2026-11-22; CT6 và CT7 ngày 2026-11-23. Chuyến #51360 (Vũng Tàu → Miền Đông 06:00 20/11, chờ chọn xe) đã được chủ dự án **hủy** ngày 2026-11-22, khi giờ đi đã qua. Còn mở: CM-23 (chuyến thường lệ đã qua giờ mà không ai vận hành, và lần chạy bổ sung lịch sử) — chủ dự án bảo *"bàn sau"* (2026-11-22); **CM-24** (chọn cả vòng một lần) — cần chủ dự án chọn trước CT8, vì CT8 tự tạo chuyến từ đúng các thẻ này; **CM-25** (lịch nhìn trước không có bước bảo trì, nên cặp Đà Lạt phải dùng xe khác loại) — mở ngày 2026-11-23. Tuỳ chủ dự án: gộp phép tính vị trí 4 lần/người của CT5b, index ghép. G3-7: xoá các bản sao cũ (`busmanagement_gd2`, `busmanagement_ct3`, `busmanagement_ct6`) khi chủ dự án đồng ý.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -122,8 +129,8 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT3 | Bộ sinh mới: danh sách tuyến, chung mức theo cặp, khách về ±15%, xe chạy vòng, "về ngay" — chạy trên bản sao | QĐ-21 | CT2, CT5a | không | XONG trên bản sao; ĐÃ COMMIT `7cb8fb4`, `9bb463f` + commit `docs:` sau đó, đã push | 2026-11-17 |
 | CT4 | Thay lịch sử trên DB thật (lịch sử GĐ3 được lưu trữ, không xoá) | QĐ-21 | CT3 đã commit | **có** | XONG trên DB thật; tài liệu ĐÃ COMMIT `6b6ecf8`, đã push | 2026-11-17 |
 | CT5b | Bật vị trí vào việc chọn xe, tài xế (AI và dropdown) | QĐ-23 | CT4 | không | ĐÃ COMMIT `5f52879`, `345c8be` + commit `docs:` sau đó, đã push | 2026-11-17 |
-| CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | ĐÃ COMMIT `5b38e71`, `8957099` + commit `docs:` sau đó, đã push; DB thật có lịch 20–26/11 | 2026-11-19 → 23 |
-| CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | CHƯA BẮT ĐẦU | |
+| CT6 | Cặp tuyến và lịch thường lệ; tạo chuyến thường lệ tương lai | QĐ-22 | CT5b | **có** (chuyến tương lai) | ĐÃ COMMIT `5b38e71`, `8957099`, `c36fef3`, đã push; DB thật có lịch 20–26/11 | 2026-11-19 → 23 |
+| CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | ĐÃ COMMIT `fae225d` (CT7a, con số), `3e513f0` (CT7b, màn hình), `deeece9` + commit `docs:` sau đó, đã push | 2026-11-22 → 23 |
 | CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7 | **có** (chuyến chờ duyệt) | CHƯA BẮT ĐẦU | |
 | CT9 | Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe | QĐ-25, QĐ-26 | CT8 | có | CHƯA BẮT ĐẦU | |
 | CT10 | Tài liệu, bài học, chuẩn bị bảo vệ | — | CT9 | không | CHƯA BẮT ĐẦU | |
@@ -560,7 +567,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
   - **CM-23 (mở):** chuyến thường lệ đã qua giờ mà không ai bấm "Xuất phát/Hoàn thành" vẫn `ACTIVE`. Chúng hiện ở nhóm "Trễ giờ" của Bảng điều hành. Lần chạy bổ sung lịch sử sau này cũng bỏ qua cả ngày đó (`HistoricalDataBackfill.existingGeneratorDays`, `:1229-1241`, coi mọi chuyến lúc 06/12/18:00 là "dạng bộ sinh"), nên dự báo không có quan sát cho những ngày ấy.
   - **Kíp quay đầu ở Đà Lạt đổi vai.** Ví dụ 21/11, xe 29A-001.14: đi 06:00 với tài xế A1 và phụ xe A2, về 18:00 với A2 lái và A1 làm phụ xe. Luật hiện hành cho phép, vì 8 giờ chỉ tính vai lái (lỗi #13), nhưng hai người trực 06:00–24:00. Đưa vào CT9 / tối ưu kíp (QĐ-26, QĐ-27).
   - **Bộ dựng bài học** (`docs/study/_build/build.mjs`) không tách được tiêu đề từ file `.md` có CRLF, như file `.md` trong worktree. Vì vậy HTML bài 00b, 06 của phiên #35 có tiêu đề trang rỗng. Đã sửa: một dòng chuẩn hoá CRLF → LF lúc đọc. Đã dựng lại 00b, 06, 01; dựng file LF cho kết quả y hệt bản đã commit.
-- [x] **Commit**, 2026-11-23 (chủ dự án: *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"*): `5b38e71` (code + test), `8957099` (bài 01), rồi commit `docs:`; đã push. Trước đó kiểm lại: test 273/273 trên đúng bản CT6 (worktree `wt-ct6`), "Tạo lịch" 27/11–03/12 trên bản sao DB thật (bản CT6 + CT7) 121 + 5 chuyến, `ct6_check.sql` 0 vi phạm.
+- [x] **Commit**, 2026-11-23 (chủ dự án: *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"*): `5b38e71` (code + test), `8957099` (bài 01), `c36fef3` (tài liệu); đã push. Trước đó kiểm lại: test 273/273 trên đúng bản CT6 (worktree `wt-ct6`), "Tạo lịch" 27/11–03/12 trên bản sao DB thật (bản CT6 + CT7) 121 + 5 chuyến, `ct6_check.sql` 0 vi phạm. Phát hiện CM-25 (bảo trì trong lịch nhìn trước).
 
 **Xong khi:** DB thật có chuyến thường lệ tương lai cho 3 cặp, mỗi xe chạy đúng vòng. **Đạt 2026-11-19** (20–26/11).
 
@@ -568,21 +575,41 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 
 **Mục tiêu:** nhìn vào là thấy chiều nào được tăng cường, xe lấy từ đâu, đi rồi về thế nào, và lãi cả vòng.
 
-**Cần chốt:** CM-7, CM-9.
+**Cần chốt:** CM-7, CM-9. **Đã chốt 2026-11-22**, cùng PA-B, cách 2a và việc chia CT7a / CT7b (chủ dự án: *"tôi đồng ý với những đề xuất của bạn (từ 1-5)"*; ghi ở QĐ-22, "cách cài lãi cả vòng ở CT7").
 
-- [ ] **Lãi cả vòng:** tính chi phí chiều về và tiền vé của khách tràn chiều về (dùng cùng `extraTripPassengers`). Không còn để `estimateCost` chỉ tính một chiều (P3).
-- [ ] **Màn Đề xuất đếm chuyến đã có trong khung** (thường lệ, tăng cường, tạo tay): `seatsBefore` = tổng ghế đã có, và chỉ đề xuất phần còn thiếu (P4).
-- [ ] **Màn mới theo CM-9:**
-  - mỗi cặp một bảng, hai chiều cạnh nhau;
-  - mỗi xe một hàng theo vòng;
-  - chuyến thêm có dấu ★, kèm nguồn xe, lý do, lãi cả vòng;
-  - dòng tóm tắt: km rỗng, số xe dùng.
-- [ ] Màn Dự báo gom chuỗi theo cặp (phần M1).
-- [ ] What-if theo CM-7.
-- [ ] **Test:** `RecommendationServiceTest`, `WhatIfSimulationServiceTest`, `WhatIfCoverageTest`, cùng test mới. Chạy `verify`.
-- [ ] **Tài liệu:** spec, summary, bài 14 (phần Đề xuất).
+Làm trong worktree `wt-ct7` ngoài repo (app 8080 của chủ dự án chạy từ `target/classes`), sửa trên cây chính rồi chép sang để biên dịch và test. CT6 vẫn chưa commit; bản CT6 sạch trước khi sửa CT7 nằm ở `ProjectBackup\patches\2026-11-22_ct6_truoc-CT7\`.
 
-**Xong khi:** màn mới chạy trên DB thật; số liệu khớp phép tính tay ở một vài thẻ.
+**CT7a — con số:**
+- [x] **Một phép tính tiền chung** `service/LoopEconomics` (mới, package-private), 2026-11-22: chi phí một lượt (`:335`, trước bị chép ở `RecommendationService.estimateCost` và `WhatIfSimulationService.tripCost`), giá vé lịch sử (`latestPrices`, trước bị chép ở What-if), chuyến đã có theo khung (`inSlot` `:124`), tiền của lượt đi kèm (`companion` `:153`), lượt đi kèm theo kế hoạch (`planned` `:182`), giờ "về ngay" / "đưa xe tới" (`returnTimes` `:220`, `bringTimes` `:240`).
+- [x] **Lãi cả vòng — PA-B** (P3): `RecommendationService.buildCard` (`:314`) chọn xe ở bến đi; không có thì "đưa xe tới trước" (`bringBefore` `:440`, giữ chỗ thử rồi trả lại bằng `AvailabilityContext.release` mới `:168`); rồi "về ngay" (`returnAfter` `:460`) hay "không cần" (`endsAtHome` `:612`). Mọi lượt qua `selectBestAvailableBus/Driver` và cổng dry-run (`assignLeg` `:474`). DTO: `LoopLegKind`, `RecommendationCardDto.CompanionLeg`, tiền riêng của chuyến thêm (`tripRevenue`, `tripCost`), `existingTrips/Seats/Assumed`; `RecommendationViewDto.alreadyInSlotCount`.
+- [x] **Trừ chuyến đã có — cách 2a** (P4): `TripRepository.findSlotSeatsBetween` (`:681`, cuối file), trạng thái `RecommendationService.SLOT_STATUSES` (`:143`, mọi trạng thái trừ CANCELLED).
+- [x] **What-if — W1** (CM-7): tiền cả vòng theo kế hoạch, trừ chuyến đã có (giữ bất biến "ở 100% cùng số chuyến thêm"), năng lực không đổi; bỏ hai bản chép (`tripCost`, `loadLatestPrices`); trang ghi giới hạn.
+- [x] Màn Đề xuất: cột "Lượt đi kèm", tiền "cả vòng" kèm phần của chuyến thêm, "khung đã có M chuyến · S ghế" / "chưa có lịch", số chuyến thêm đã có; bỏ câu cũ "lịch thường lệ chưa có trong hệ thống".
+
+**CT7b — màn hình:**
+- [x] **Trang mới** `/admin/analytics/pair-plan` (CM-9): `PairPlanController`, `PairPlanService.build` (`:100`), `PairPlanViewDto`, `pair-plan.html`. Tổng quan 7 ngày (★ / thiếu / lãi cả vòng theo cặp, theo ngày); mỗi cặp một bảng cho ngày đang xem — hai dòng khung (dự báo, ghế đã có, "cần N", số ★), mỗi xe một hàng theo giờ 06/12/18, ★ chuyến thêm và lượt đi kèm, "tối ngủ ở", ghi chú của hàng ★; danh sách chuyến thêm chưa xếp được; dòng tóm tắt số xe, số ★, km lượt đi kèm, lãi cả vòng. Truy vấn `TripRepository.findPlanTrips` (`:691`). Ô "Kế Hoạch Cặp Tuyến" ở cuối lưới trang chủ (không xê dịch dòng bài học trích), nút ở màn Đề xuất, liên kết dưới bảng Dự báo.
+- [x] **Màn Dự báo gom theo cặp** (M1): `PairPlanService.forecastByPair` (`:392`), key `pairGroups` ở `ForecastController`; bảng 7 ngày có dòng tiêu đề cặp, chiều rời bến nhà trước. Chỉ đổi thứ tự hiển thị.
+
+**Test** (2026-11-22): `mvnw test` **292/292** (273 + 19).
+- Mới: `LoopEconomicsTest` (9, không Spring), `RecommendationLoopTest` (6: về ngay ở khung sớm nhất; What-if khớp tổng các thẻ khi xe đi đúng kế hoạch; luật 8 giờ đẩy lượt về sang sáng hôm sau; đưa xe tới bằng khung muộn nhất còn kịp; xe kẹt ở bến xa về bến nhà không cần lượt đi kèm; trừ chuyến đã có, ghế thật, chuyến hủy không tính), `PairPlanServiceTest` (4).
+- Sửa đúng 2 test cũ khẳng định chi phí một chiều: `RecommendationServiceTest` (820.000 → cả vòng 1.640.000đ, tuyến test không có chiều ngược nên tính như một lượt về rỗng), `WhatIfSimulationServiceTest` (3.280.000 → 6.560.000đ). Test "What-if khớp tổng các thẻ" vẫn xanh, không sửa.
+- **Thử làm hỏng 8 chỗ** trong worktree, chỗ nào cũng đúng test mong đợi đỏ: giờ về sắp ngược; lượt về không giữ chỗ; giờ đưa xe tới sắp ngược; bỏ chuyến đã có; bỏ loại "không cần"; lượt đi kèm chen trước nhu cầu của khung; chỉ thử một giờ về; What-if bỏ chi phí lượt đi kèm. Đã chép lại bản đúng.
+
+**`verify`** (2026-11-22, 23:29–23:55):
+- **DB thật, chỉ đọc** (app từ worktree, cổng 8099, PID 24712): 16 trang 200, log sạch; Đề xuất 9,0 s, Kế hoạch cặp tuyến 6–7 s, Dự báo 12 s (lần đầu khớp), What-if 0,9 s. DB giống hệt trước và sau (MD5 chuyến và xe).
+  - **Trước / sau trên cùng dữ liệu** (bản CT6 chạy lại ở cổng 8097, chỉ đọc): thẻ đủ điều kiện **19 → 22** (3 thẻ ở bến xa nay được "đưa xe tới"), thiếu tài nguyên 6 → 3; có lãi / lỗ **7 / 18 → 3 / 22** (lãi một chiều → lãi cả vòng). What-if: chi phí 44,05 → **88,1 triệu** (đúng gấp đôi), doanh thu 35,59 → 36,66 triệu, lãi −8,46 → **−51,44 triệu**; "chỉ chạy chuyến có lãi" 7 chuyến +7,06 triệu → 1 chuyến +1,38 triệu.
+  - Lượt đi kèm của 25 thẻ: 10 về ngay, 10 đưa xe tới, 3 không cần (xe của lịch 26/11 kẹt ở Đà Lạt vì lịch chưa tạo cho 27–29/11), 2 tính như về rỗng.
+  - **Phép kiểm độc lập** (đọc thẻ từ HTML, dò bằng SQL): 22 thẻ đủ điều kiện → 41 lượt giữ chỗ trên 15 xe và 23 người: **0** trùng giờ (xe ±1 giờ, người ±30 phút), **0** đứt chuỗi vị trí, **0** ngày quá 8 giờ lái; chi phí cả vòng khớp phép tính tay ở cả 22 thẻ; mọi lượt về đi sau giờ tới + 1 giờ, mọi lượt đưa xe tới về trước giờ đi 1 giờ, đúng tuyến chiều ngược.
+- **Bản sao** (`busmanagement_test` khôi phục từ DB thật, cổng 8098, 10 kết nối vào bản sao, 0 vào DB thật): "Tạo lịch" 27/11–03/12 bằng code CT7: 121 mở bán + 5 chờ phân công, 30 s — lịch CT6 vẫn chạy. Sau đó màn Đề xuất chỉ còn **1/25** thẻ đủ điều kiện; **bản CT6 trên cùng bản sao cũng 1/25** → ghi thành **CM-24** (dưới). Phép kiểm độc lập trên bản sao: 0 vi phạm.
+
+**Phát hiện khi làm, ghi lại:**
+- **CM-24 (mở):** lịch thường lệ phủ cả tuần thì hết tài xế cho chuyến thêm. Lịch gán phụ xe cho mọi chuyến (121/121), mỗi ngày dùng 22–26 / 33 tài xế; và luật vị trí hai phía (CT5b) xét riêng chuyến thêm: lúc 18:00 27/11 có 15 tài xế rảnh ở Miền Đông nhưng chuyến kế tiếp của họ lại đi từ Miền Đông, nên bị loại khỏi chuyến Miền Đông → Cần Thơ, dù lượt về sẽ đưa họ về kịp. Đề xuất "chọn cả vòng một lần" (một xe + một kíp cho cả vòng), chưa làm.
+- Màn Đề xuất ở 27–29/11 trên DB thật dùng xe của lịch 26/11 đang kẹt ở bến xa như xe rảnh (loại "không cần"). Đúng luật, nhưng là vì chưa bấm "Tạo lịch" cho những ngày đó; trang kế hoạch ghi rõ "chưa có lịch".
+
+- [x] **Tài liệu**, 2026-11-22: QĐ-22 "cách cài lãi cả vòng ở CT7", CM-7, CM-9 (đóng), CM-24 (mở), lịch sử; spec (Reinforcement Recommendation, What-if, Demand Forecast, mục mới "Route-Pair Plan"); summary; `test_case.md`; roadmap §6 (#10c), §7, §8; bài 14 (ví dụ tiền cả vòng, bảng gom theo cặp) và trỏ lại trích dẫn ở bài 00a, 03, 05, 06, 14 (dựng lại HTML); sổ lỗi (ba mục "đã có hướng xử lý" ghi đã làm ở CT7); javadoc `CostParameterService` (sửa tại chỗ, không đổi số dòng). `database_schema.md` không đổi: không thêm cột hay bảng.
+- [x] **Commit**, 2026-11-23, sau CT6: `fae225d` `feat(recommendation)` (CT7a; test 288/288 trên đúng bản đó), `3e513f0` `feat(pair-plan)` (CT7b; 292/292), `deeece9` `docs(study)` (bài 00a, 03, 05, 06, 14), rồi commit `docs:`; đã push. Trước đó `verify` DB thật chỉ đọc và phép kiểm độc lập 45 lượt, 0 vi phạm (mục 1).
+
+**Xong khi:** màn mới chạy trên DB thật; số liệu khớp phép tính tay ở một vài thẻ. **Đạt 2026-11-22** (22/22 thẻ khớp phép tính tay).
 
 ### CT8 — Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây (QĐ-24)
 
@@ -658,7 +685,9 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | 2026-11-17 (lỗi #35) | `8bf87e0f` | *"sau đó sửa #35 đảm bảo mọi thứ đều nhất quán, logic và phù hợp chuẩn với project"* | Làm trong worktree riêng, vì app 8080 của chủ dự án chạy từ `target/classes` có devtools. Mỗi vai một câu cho bận và giờ lái; khoá sắp xếp giờ lái được nhớ; chứng minh và sửa #36 (test đỏ trên code cũ, A/B trên bản sao: cho lọt và chặn nhầm). Test 261/261; `verify` DB thật và A/B bản sao; tài liệu. Chưa commit |
 | 2026-11-19 (CT6) | `dba5da64` | Giải thích lại CT6 kèm ví dụ (DB thật đọc lúc 14:47); chủ dự án *"oke, tôi đồng ý tất cả, hãy kiểm tra những chức năng, file liên quan và làm … xong thì cũng test luôn"* | Chốt CM-4/6/14, CM-17…22. Code trong worktree (#35/#36 mang theo). Test 273/273, thử làm hỏng 7 chỗ. `verify` bản sao rồi DB thật (sao lưu, khôi phục thử): đóng 5 chuyến demo, tạo lịch 20–26/11 = 125 + 1, kiểm SQL 0 vi phạm, Đề xuất 18/7 → 17/8, Dự báo không đổi. Sửa bộ dựng bài học (CRLF) và dựng lại 00b, 06, 01. Mở CM-23. Chưa commit |
 | 2026-11-22 (commit #35/#36) | `2d46500c` | Chủ dự án duyệt 5 đề xuất của CT7; *"trước tiên bạn hãy commit #35/36 và push"* | Chép cả cây làm việc (có CT6) ra `ProjectBackup\patches\2026-11-22_ct6_truoc-commit-35-36\`; đặt lại bản #35/#36 của ngày 19/11 để commit. Kiểm lại đúng các file đó trong worktree: test 261/261, `verify` DB thật chỉ đọc (20 trang/API 200, API form Tạo 3,5 s, DB giống hệt). Commit `7fb50f4`, `c615164`, commit `docs:`; push. Rồi chép lại bản CT6 |
+| 2026-11-22 (CT7) | `2d46500c` | *"hãy suy luận và tiến hành thực hiện code theo như đã đề xuất. hãy làm thật cẩn thận và thận trọng"* | Chụp CT6 sạch ra `ProjectBackup\patches\2026-11-22_ct6_truoc-CT7\`. CT7a: `LoopEconomics`, lãi cả vòng PA-B, cách 2a, What-if W1. CT7b: trang `/admin/analytics/pair-plan`, Dự báo gom theo cặp. Test 292/292, thử làm hỏng 8 chỗ. `verify` DB thật chỉ đọc (DB giống hệt; 19 → 22 đủ điều kiện, 7 → 3 có lãi; kiểm độc lập 41 lượt 0 vi phạm) và bản sao ("Tạo lịch" 27/11–03/12; 1/25 đủ điều kiện, bản CT6 cũng 1/25 → mở CM-24). Tài liệu, bài học. Chưa commit |
 | 2026-11-23 (commit CT6) | `7b523bdf` | *"check lại đảm bảo mọi thứ hoạt động đúng và logic, sau đó commit và push"* | Chụp cả cây làm việc (CT6 + CT7) ra `ProjectBackup\patches\2026-11-23_ct6-ct7_truoc-commit\`. Rà lại code CT6. Test 273/273 trên đúng bản CT6 (worktree `wt-ct6`). Bản sao DB thật (bản CT6 + CT7): "Tạo lịch" 27/11–03/12 ra 121 mở bán + 5 chờ phân công, `ct6_check.sql` 0 vi phạm; DB thật giống hệt. Commit `5b38e71` (code + test), `8957099` (bài 01), rồi commit `docs:`; đã push |
+| 2026-11-23 (commit CT7) | `7b523bdf` | Cùng lời dặn, sau khi commit CT6 | Rà lại code CT7. Tách CT7a khỏi CT7b: `TripRepository` chưa có truy vấn trang kế hoạch, `recommendation.html` chưa có nút sang trang đó. Test trên đúng từng bản sẽ commit: CT7a 288/288, CT7 292/292. `verify` DB thật chỉ đọc (24 lượt gọi 200; 25 thẻ, 24 đủ điều kiện; kiểm độc lập 45 lượt 0 vi phạm) và bản sao ("Tạo lịch" 27/11–03/12: 121 + 5 chuyến, `ct6_check.sql` 0 vi phạm; màn Đề xuất 2/25 → CM-24). DB thật giống hệt. Mở CM-25 (cặp Đà Lạt chỉ còn 9/42 chuyến giường nằm vì luật bảo trì nhìn trước). Commit `fae225d` (CT7a), `3e513f0` (CT7b), `deeece9` (bài học) + commit `docs:`; đã push |
 
 ---
 

@@ -587,7 +587,7 @@ Chưa sửa gì. Chờ quyết định của chủ dự án.
   **Là tính năng.** *(GĐ6, 2026-10-23: What-if không còn khai lại `0.90` — nó gọi
   `ForecastService.tripsNeeded`; `8.0` và `PREP_BUFFER_HOURS` vẫn khai lại như cũ.)* (Xem thêm #8: chỉ nửa "đọc cờ ở hệ số 100%" của ghi chú đó là
   chưa được hiện thực.)
-- **Nhân bản `estimateCost` và `loadLatestPrices()` sang `WhatIfSimulationService`:**
+- **Nhân bản `estimateCost` và `loadLatestPrices()` sang `WhatIfSimulationService`:** *(Hết từ route pairs CT7, 2026-11-22, commit `fae225d` ngày 2026-11-23: cả hai bản gom về `service/LoopEconomics` — `tripCost`, `latestPrices` — vì lãi cả vòng cần đúng một định nghĩa chi phí cho hai màn, CM-7.)*
   đúng là nhân bản (12 dòng `loadLatestPrices` giống từng chữ, cùng công thức chi
   phí), và roadmap không nói tới. **Nhưng** cả hai đều `private` trong
   `RecommendationService`, nên tái dùng đòi hỏi đúng cái mở-rộng-visibility mà chủ
@@ -3413,13 +3413,13 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
 - **Màn Đề xuất chỉ tính chi phí một chiều** (`RecommendationService.estimateCost`, `:407`):
   - đây là công thức Phase 7 bước 3 đã duyệt;
   - **quyết định hết hợp** vì QĐ-22 (lãi tính cả vòng);
-  - sửa ở CT7.
+  - sửa ở CT7. **Đã làm ở CT7 (2026-11-22, commit `fae225d` ngày 2026-11-23):** mỗi thẻ là một vòng — chuyến thêm cộng lượt đi kèm (về ngay / đưa xe tới / không cần / tính như về rỗng); phép tính chi phí một lượt chuyển về `service/LoopEconomics`, dùng chung với What-if.
 - **Màn Đề xuất không trừ chuyến đã có trong khung.** Nó giả định mỗi khung có đúng một xe chuẩn
   (`seatsBefore` bắt đầu bằng số ghế chuẩn). Thêm vào đó, chuyến tạo tay có `setExtraTrip(false)` và không
   có chuyến gốc (`AdminTripManagementController.java:178`), nên job 10 giây vẫn thêm được một chuyến nữa.
   Kết quả có thể là 3 xe cho 40 khách.
   - Hiện chưa xảy ra trên DB thật, vì không có chuyến tương lai nào.
-  - Sửa ở CT7 và CT8 (QĐ-24 điểm 4, 6).
+  - Sửa ở CT7 và CT8 (QĐ-24 điểm 4, 6). **Phần của màn Đề xuất đã làm ở CT7 (2026-11-22, commit `fae225d` ngày 2026-11-23, cách 2a):** số thẻ = số chuyến cần − số chuyến chưa hủy đã có trong khung, khách tính trên ghế thật; What-if đếm cùng cách. Phần job 10 giây còn ở CT8.
 - **Job 10 giây không bỏ qua chuyến tăng cường khi xét chuyến gốc** (`scanAndSuggestExtraTrips`, `:76`):
   - một chuyến tăng cường đã mở bán và bán > 90% sẽ được thêm chuyến tăng cường của chính nó (+30 phút nữa);
   - ví dụ 06:00 → 06:30 → **07:00**. Chuyến 07:00 rời khỏi khung giờ 06, nên vé của nó không còn được tính vào nhu cầu của khung 06:00;
