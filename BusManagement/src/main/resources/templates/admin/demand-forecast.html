@@ -149,8 +149,14 @@
                                 </th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr th:each="s : ${view.series}">
+                        <tbody th:each="g : ${pairGroups}">
+                            <tr class="table-secondary">
+                                <td th:colspan="${4 + #lists.size(view.series[0].points)}" class="fw-semibold small">
+                                    <i class="bi" th:classappend="${g.pair} ? 'bi-arrow-left-right' : 'bi-signpost'"></i>
+                                    <span th:text="${g.label}">A ↔ B</span>
+                                </td>
+                            </tr>
+                            <tr th:each="s : ${g.series}">
                                 <td>
                                     <div class="fw-semibold" th:text="${s.routeLabel}">Tuyến</div>
                                     <div class="small text-muted" th:text="${s.flowLabel}">Rời TP lớn</div>
@@ -200,7 +206,9 @@
                 đang chạy; khi đó số chuyến cần = ⌈nhu cầu ÷ ghế xe chuẩn⌉, ít nhất 2 &nbsp;
                 <span class="badge bg-warning text-dark">80–90%</span> sắp đầy &nbsp;
                 <span class="badge bg-success bg-opacity-25 text-dark">65–80%</span> khả quan.
-                Xếp theo mức đỉnh giảm dần.
+                Gom theo cặp tuyến: hai chiều liền nhau, chiều rời bến nhà trước; cặp có mức đỉnh cao nhất lên trước.
+                Xe chạy vòng hai chiều thế nào, chuyến thêm lấy xe từ đâu: xem
+                <a th:href="@{/admin/analytics/pair-plan}">Kế hoạch cặp tuyến</a>.
                 <span th:if="${view.historyStaleDays > 0}" class="d-block mt-1 text-warning">
                     <i class="bi bi-clock-history"></i>
                     Dữ liệu lịch sử kết thúc cách đây

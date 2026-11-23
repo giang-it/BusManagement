@@ -680,4 +680,15 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      "WHERE t.status IN :statuses AND t.departureTime >= :from AND t.departureTime < :to")
        List<Object[]> findSlotSeatsBetween(@Param("statuses") Collection<TripStatus> statuses,
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+       /**
+        * Route pairs CT7 — trang "Kế hoạch cặp tuyến": mọi chuyến trên các tuyến cho trước, ở các trạng
+        * thái cho trước, khởi hành trong [from, to), kèm xe (JOIN FETCH, vì mỗi hàng của trang là một xe).
+        * Sắp theo giờ đi rồi id. Chuyến xóa mềm tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t FROM Trip t LEFT JOIN FETCH t.bus WHERE t.route.id IN :routeIds AND t.status IN :statuses " +
+                     "AND t.departureTime >= :from AND t.departureTime < :to ORDER BY t.departureTime, t.id")
+       List<Trip> findPlanTrips(@Param("routeIds") Collection<Long> routeIds,
+                     @Param("statuses") Collection<TripStatus> statuses,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

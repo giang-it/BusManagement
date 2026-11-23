@@ -1,6 +1,8 @@
 package giang.com.BusManagement.controller.admin;
 
+import giang.com.BusManagement.dto.DemandForecastViewDto;
 import giang.com.BusManagement.service.ForecastService;
+import giang.com.BusManagement.service.PairPlanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class ForecastController {
 
     private final ForecastService forecastService;
+    private final PairPlanService pairPlanService;
 
     /**
      * Không nhận tham số: chân trời dự báo cố định 7 ngày kể từ ngày mai (xem trước 35
@@ -44,7 +47,10 @@ public class ForecastController {
      */
     @GetMapping
     public String viewForecast(Model model) {
-        model.addAttribute("view", forecastService.buildForecastPage());
+        DemandForecastViewDto view = forecastService.buildForecastPage();
+        model.addAttribute("view", view);
+        // Route pairs CT7 (phần M1): bảng 7 ngày gom theo cặp tuyến — chỉ đổi thứ tự hiển thị.
+        model.addAttribute("pairGroups", pairPlanService.forecastByPair(view.getSeries()));
         return "admin/demand-forecast";
     }
 }

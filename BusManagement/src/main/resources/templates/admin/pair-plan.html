@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kế Hoạch Cặp Tuyến - Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        .leg { display: block; white-space: nowrap; }
+        .leg-STAR { color: #b45309; font-weight: 600; }
+        .leg-RETURN, .leg-BRING { color: #6c757d; font-style: italic; }
+        .leg-EXTRA { color: #0d6efd; }
+        .slot-hot { background: rgba(220, 53, 69, .12); }
+        .day-link.active { font-weight: 700; }
+    </style>
+</head>
+
+<body class="bg-light">
+    <div class="container-fluid px-4 py-4" style="max-width:1400px;">
+
+        <div class="d-flex justify-content-between align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <div>
+                <h1 class="h2 mb-0"><i class="bi bi-arrow-left-right"></i> Kế Hoạch Cặp Tuyến</h1>
+                <small class="text-muted">
+                    Mỗi cặp hai chiều một bảng: xe chạy vòng đi–về theo giờ thường lệ, chuyến thêm
+                    <span class="leg-STAR">★</span> của màn Đề xuất cùng lượt đi kèm của nó.
+                </small>
+            </div>
+            <div>
+                <a th:href="@{/admin/analytics/recommendation}" class="btn btn-outline-primary">
+                    <i class="bi bi-lightbulb"></i> Đề xuất tăng cường
+                </a>
+                <a th:href="@{/admin/timetable}" class="btn btn-outline-success">
+                    <i class="bi bi-calendar-week"></i> Lịch thường lệ
+                </a>
+                <a th:href="@{/admin/dashboard}" class="btn btn-outline-secondary">
+                    <i class="bi bi-house"></i> Trang chủ
+                </a>
+            </div>
+        </div>
+
+        <div class="alert alert-info d-flex align-items-start" role="alert">
+            <i class="bi bi-info-circle-fill me-2 mt-1"></i>
+            <div>
+                Trang này <strong>không tính gì mới và không tạo chuyến</strong>: nó xếp lại chuyến đã có trong hệ
+                thống (thường lệ, tăng cường, tạo tay) và kết quả của
+                <a th:href="@{/admin/analytics/recommendation}">màn Đề xuất</a> — chuyến thêm
+                <span class="leg-STAR">★</span> đủ điều kiện, xe đã giữ chỗ, và lượt đi kèm của nó
+                (<em>về ngay</em>: xe về bằng khung chiều ngược sớm nhất; <em>đưa xe tới</em>: xe từ đầu kia đi
+                trước). Lãi là <strong>lãi cả vòng</strong> như màn Đề xuất. Dự báo dựa trên dữ liệu lịch sử
+                <strong>MÔ PHỎNG</strong> tới
+                <span class="fw-semibold" th:text="${#temporals.format(view.historyEnd, 'dd/MM/yyyy')}">—</span>
+                (<span th:text="${view.historyStaleDays}">0</span> ngày trước).
+            </div>
+        </div>
+
+        <div class="alert alert-warning small" th:if="${!#lists.isEmpty(view.problems)}">
+            <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle"></i> Tuyến có lịch nhưng không ghép được cặp:</div>
+            <ul class="mb-0">
+                <li th:each="p : ${view.problems}" th:text="${p}"></li>
+            </ul>
+        </div>
+
+        <!-- ============ TỔNG QUAN 7 NGÀY ============ -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0"><i class="bi bi-calendar3"></i> Chuyến thêm ★ theo ngày</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0 text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-start">Cặp</th>
+                                <th th:each="d : ${view.days}">
+                                    <a class="day-link" th:classappend="${d == view.selectedDate} ? 'active' : ''"
+                                        th:href="@{/admin/analytics/pair-plan(date=${d})}"
+                                        th:text="${#temporals.format(d, 'dd/MM')}">01/01</a>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="w : ${view.overview}">
+                                <td class="text-start fw-semibold" th:text="${w.pairLabel}">A ↔ B</td>
+                                <td th:each="c : ${w.days}" th:classappend="${c.date == view.selectedDate} ? 'table-active' : ''">
+                                    <span th:if="${c.extras > 0}" class="leg-STAR" th:text="${'★ ' + c.extras}">★ 1</span>
+                                    <span th:if="${c.unserved > 0}" class="badge bg-secondary"
+                                        th:text="${c.unserved + ' thiếu'}">1 thiếu</span>
+                                    <span th:if="${c.extras == 0 and c.unserved == 0}" class="text-muted">—</span>
+                                    <div class="small" th:if="${c.loopProfit != null}"
+                                        th:classappend="${c.loopProfit.signum() >= 0} ? 'text-success' : 'text-danger'"
+                                        th:text="${#numbers.formatDecimal(c.loopProfit, 1, 'COMMA', 0, 'POINT')} + 'đ'">0đ</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ BẢNG TỪNG CẶP CHO NGÀY ĐANG XEM ============ -->
+        <h4 class="mb-3">
+            Ngày <span th:text="${#temporals.format(view.selectedDate, 'dd/MM/yyyy')}">01/01/2026</span>
+        </h4>
+
+        <div class="card shadow-sm border-0 mb-4" th:each="p : ${view.pairs}">
+            <div class="card-header bg-white">
+                <div class="d-flex justify-content-between flex-wrap gap-2">
+                    <h5 class="mb-0">
+                        <i class="bi bi-arrow-left-right"></i> <span th:text="${p.pairLabel}">A ↔ B</span>
+                    </h5>
+                    <div class="small text-muted">
+                        <span th:text="${p.distanceKm != null ? #numbers.formatDecimal(p.distanceKm, 1, 0) + ' km' : ''}">100 km</span>
+                        <span th:if="${p.durationMinutes != null}" th:text="'· ' + ${p.durationMinutes} + ' phút'">· 120 phút</span>
+                        <span th:if="${p.busTypeLabel != null}" th:text="'· ' + ${p.busTypeLabel}">· Limousine 22 chỗ</span>
+                    </div>
+                </div>
+                <div class="small mt-1">
+                    <span class="fw-semibold" th:text="${p.busesUsed}">0</span> xe ·
+                    <span class="leg-STAR" th:text="${p.extras}">0</span> chuyến thêm ★ ·
+                    <span th:text="${#numbers.formatDecimal(p.companionKm, 1, 0)}">0</span> km lượt đi kèm (gần như rỗng) ·
+                    lãi cả vòng của các chuyến thêm:
+                    <span th:if="${p.loopProfit != null}" class="fw-semibold"
+                        th:classappend="${p.loopProfit.signum() >= 0} ? 'text-success' : 'text-danger'"
+                        th:text="${#numbers.formatDecimal(p.loopProfit, 1, 'COMMA', 0, 'POINT')} + 'đ'">0đ</span>
+                    <span th:if="${p.loopProfit == null}" class="text-muted">—</span>
+                </div>
+                <div class="small text-warning-emphasis mt-1" th:unless="${p.scheduled}">
+                    <i class="bi bi-calendar-x"></i> Ngày này cặp chưa có chuyến nào — bấm "Tạo lịch" ở
+                    <a th:href="@{/admin/timetable}">Lịch thường lệ</a>; màn Đề xuất đang giả định mỗi khung 1 xe chuẩn.
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:9rem;">Khung</th>
+                                <th class="text-center" th:each="s : ${p.slots}"
+                                    th:text="${#numbers.formatInteger(s.hour, 2)} + ':00'">06:00</th>
+                                <th style="width:9rem;">Tối ngủ ở</th>
+                            </tr>
+                            <tr>
+                                <td class="text-muted" th:text="'Đi: ' + ${p.outLabel}">Đi</td>
+                                <td class="text-center" th:each="s : ${p.slots}" th:classappend="${s.out.hot} ? 'slot-hot' : ''">
+                                    <span th:if="${s.out.demand != null}"
+                                        th:text="${#numbers.formatDecimal(s.out.demand, 1, 0)} + ' khách'">0 khách</span>
+                                    <span th:if="${s.out.demand == null}" class="text-muted">không dự báo</span>
+                                    <span class="text-muted" th:text="'/ ' + ${s.out.trips > 0 ? s.out.seats : s.out.standardSeats} + ' ghế'">/ 22 ghế</span>
+                                    <span th:if="${s.out.hot}" class="badge bg-danger" th:text="'cần ' + ${s.out.tripsNeeded}">cần 2</span>
+                                    <span th:if="${s.out.extras > 0}" class="leg-STAR" th:text="'★' + ${s.out.extras}">★1</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted" th:text="'Về: ' + ${p.backLabel}">Về</td>
+                                <td class="text-center" th:each="s : ${p.slots}" th:classappend="${s.back.hot} ? 'slot-hot' : ''">
+                                    <span th:if="${s.back.demand != null}"
+                                        th:text="${#numbers.formatDecimal(s.back.demand, 1, 0)} + ' khách'">0 khách</span>
+                                    <span th:if="${s.back.demand == null}" class="text-muted">không dự báo</span>
+                                    <span class="text-muted" th:text="'/ ' + ${s.back.trips > 0 ? s.back.seats : s.back.standardSeats} + ' ghế'">/ 22 ghế</span>
+                                    <span th:if="${s.back.hot}" class="badge bg-danger" th:text="'cần ' + ${s.back.tripsNeeded}">cần 2</span>
+                                    <span th:if="${s.back.extras > 0}" class="leg-STAR" th:text="'★' + ${s.back.extras}">★1</span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="r : ${p.rows}" th:classappend="${r.extra} ? 'table-warning' : ''">
+                                <td>
+                                    <span class="fw-semibold" th:if="${r.busPlate != null}" th:text="${r.busPlate}">51A</span>
+                                    <span class="text-danger" th:if="${r.busPlate == null}">Chưa có xe</span>
+                                    <span class="leg-STAR" th:if="${r.extra}">★</span>
+                                    <div class="text-muted" th:each="n : ${r.notes}" th:text="${n}" style="white-space:normal;"></div>
+                                </td>
+                                <td th:each="c : ${r.cells}">
+                                    <span th:each="l : ${c.legs}" class="leg" th:classappend="'leg-' + ${l.kind}">
+                                        <span th:text="${l.outbound} ? '→ đi' : '← về'">→ đi</span>
+                                        <span th:text="${#temporals.format(l.departure, 'HH:mm')}">06:00</span>
+                                        <span th:if="${l.kind == 'STAR'}">★ chuyến thêm</span>
+                                        <span th:if="${l.kind == 'RETURN'}">lượt về</span>
+                                        <span th:if="${l.kind == 'BRING'}">đưa xe tới</span>
+                                        <span th:if="${l.kind == 'EXTRA'}">tăng cường</span>
+                                        <span th:if="${l.passengers != null}"
+                                            th:text="'· ' + ${#numbers.formatDecimal(l.passengers, 1, 1)} + ' khách KV'"></span>
+                                        <span th:if="${l.status != null and l.status != 'ACTIVE'}" class="badge bg-light text-dark border"
+                                            th:text="${l.status}">PENDING_APPROVAL</span>
+                                    </span>
+                                </td>
+                                <td th:text="${r.sleepsAt}">Bến</td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(p.rows)}">
+                                <td th:colspan="${#lists.size(p.slots) + 2}" class="text-center text-muted py-3">
+                                    Chưa có chuyến nào trong ngày này.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white small" th:if="${!#lists.isEmpty(p.unserved)}">
+                <div class="fw-semibold text-secondary"><i class="bi bi-x-circle"></i> Chuyến thêm cần nhưng chưa xếp được:</div>
+                <ul class="mb-0 text-muted">
+                    <li th:each="u : ${p.unserved}" th:text="${u}"></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="small text-muted">
+            Mỗi hàng là một xe trong ngày (chuyến chưa có xe đứng riêng một hàng); "Tối ngủ ở" là bến cuối của lượt
+            cuối trong ngày của xe đó, xét mọi cặp. Hàng <span class="leg-STAR">★</span> có chuyến thêm hay lượt đi kèm
+            của màn Đề xuất — chỉ là đề xuất, chưa có trong hệ thống. "Km lượt đi kèm" là km của các lượt về ngay /
+            đưa xe tới / về rỗng của chuyến thêm ★ trong ngày: lượt đó chở phần khách còn tràn sau khi khung đã đủ
+            chuyến, nên thường gần 0 khách. Hai chuyến thêm ngược chiều không được ghép thành một vòng (để luật
+            giữ–về sau này).
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
