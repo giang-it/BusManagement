@@ -656,4 +656,16 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      @Param("startOfDay") LocalDateTime startOfDay,
                      @Param("endOfDay") LocalDateTime endOfDay,
                      @Param("excludeTripId") Long excludeTripId);
+
+       /**
+        * Route pairs CT6 (CM-18): tuyến và giờ khởi hành của mọi chuyến KHÔNG phải tăng cường trên
+        * các tuyến cho trước, khởi hành trong [from, to) — ở MỌI trạng thái, kể cả CANCELLED. Bộ lập
+        * lịch thường lệ coi khung (tuyến, ngày, giờ) đã có chuyến chính — thường lệ, hay Admin tự tạo
+        * lúc 06:15 — là đã xếp, nên bấm lại không tạo trùng; và chuyến Admin đã hủy thì không bị dựng
+        * lại. Chỉ scalar. Chuyến xóa mềm tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t.route.id, t.departureTime FROM Trip t WHERE t.isExtraTrip = false " +
+                     "AND t.route.id IN :routeIds AND t.departureTime >= :from AND t.departureTime < :to")
+       List<Object[]> findMainTripDeparturesBetween(@Param("routeIds") Collection<Long> routeIds,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

@@ -175,7 +175,7 @@ public class TripService {
         extraTrip.setOriginalTrip(trip); // trip đã tồn tại trong DB, gán trực tiếp không vi phạm FK
 
         // --- Bước 3: AI phân công tài nguyên ---
-        AutoAssignResult result = autoAssignResources(extraTrip);
+        AutoAssignResult result = autoAssignResources(extraTrip, null);
 
         if (result.isSuccess()) {
             extraTrip.setBus(result.getBus());
@@ -218,15 +218,15 @@ public class TripService {
 
     /**
      * Thuật toán trung tâm: Tự động phân công xe + tài xế chính + phụ xe
-     * cho một chuyến xe, tuân theo tất cả ràng buộc hệ thống.
+     * cho một chuyến xe, tuân theo tất cả ràng buộc hệ thống. ctx: null = hỏi DB (job 10 giây); lịch thường lệ (CT6) truyền context lập lịch.
      */
-    private AutoAssignResult autoAssignResources(Trip trip) {
+    private AutoAssignResult autoAssignResources(Trip trip, AvailabilityContext ctx) {
         LocalDateTime departure = trip.getDepartureTime();
         LocalDateTime arrival = trip.getArrivalTimeExpected();
         double tripDurationHours = Duration.between(departure, arrival).toMinutes() / 60.0;
 
         // Bước 1: Tìm xe phù hợp
-        Bus bus = findBestAvailableBus(trip, departure, arrival);
+        Bus bus = findBestAvailableBus(trip, departure, arrival, ctx);
         if (bus == null) {
             return AutoAssignResult.failure(
                     "Không có xe nào sẵn sàng / không bận / chưa tới ngưỡng bảo trì / đang ở bến xuất phát trong khung giờ này");
@@ -242,7 +242,7 @@ public class TripService {
 
         // Bước 2: Tìm tài xế chính
         Driver driver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                assignedStaff, false, trip.getRoute());
+                assignedStaff, false, ctx, trip.getRoute());
         if (driver == null) {
             return AutoAssignResult.failure(
                     "Không có tài xế chính hợp lệ (cần bằng còn hạn, rảnh, đủ định mức ngày, ở bến xuất phát)");
@@ -254,7 +254,7 @@ public class TripService {
         java.util.List<Driver> coDrivers = new java.util.ArrayList<>();
         for (int i = 1; i < requiredDrivers; i++) {
             Driver coDriver = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                    assignedStaff, false, trip.getRoute());
+                    assignedStaff, false, ctx, trip.getRoute());
             if (coDriver == null) {
                 return AutoAssignResult.failure(
                         "Không tìm đủ số lượng tài xế phụ hợp lệ cho chuyến dài " + Math.round(tripDurationHours)
@@ -270,7 +270,7 @@ public class TripService {
         // truyền isAssistantRole=true để bỏ qua điều kiện đó, chỉ còn kiểm tra bằng
         // lái còn hạn + không trùng lịch (không thể có mặt ở 2 chuyến cùng lúc).
         Driver assistant = findBestAvailableDriver(departure, arrival, tripDurationHours, requiredDrivers,
-                assignedStaff, true, trip.getRoute());
+                assignedStaff, true, ctx, trip.getRoute());
         if (assistant == null && tripDurationHours > 8.0) {
             return AutoAssignResult.failure(
                     "Không tìm thấy phụ xe hợp lệ (bắt buộc đối với chuyến xe dài trên 8 tiếng)");
@@ -303,7 +303,7 @@ public class TripService {
      * Bản nhận AvailabilityContext (Phase 7). ctx == null → hành vi y hệt bản cũ
      * (mọi truy vấn bận qua DB); ctx != null → các phép kiểm tra "bận" đọc từ dữ
      * liệu đã preload trong ctx thay vì truy vấn DB từng xe. Luật lọc/xếp hạng
-     * KHÔNG đổi — chỉ nguồn dữ liệu của isBusBusy đổi.
+     * KHÔNG đổi — chỉ nguồn dữ liệu đổi (bận; context lập lịch CT6 thêm danh sách xe và km đã cam kết).
      */
     private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival,
             AvailabilityContext ctx) {
@@ -315,7 +315,7 @@ public class TripService {
         // thật của xe khác loại (bán quá chỗ) không phát sinh: createExtraTrip() đặt
         // số ghế theo xe được chọn, và luật #22 vẫn kiểm ở mọi lối.
         BusType preferredType = trip.getRoute().getSuitableBusType();
-        List<Bus> candidates = busRepository.findByStatus(BusStatus.READY);
+        List<Bus> candidates = ctx != null && ctx.isLookAhead() ? ctx.schedulableBuses() : busRepository.findByStatus(BusStatus.READY);
 
         // Mở rộng cửa sổ thời gian để đảm bảo xe kịp chuẩn bị
         LocalDateTime windowStart = departure.minusHours(BUS_PREP_BUFFER_HOURS);
@@ -326,7 +326,7 @@ public class TripService {
         return candidates.stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null, ctx) && busFits(bus, trip.getRoute(), departure, arrival, ctx))
                 .filter(bus -> !bus.needsMaintenance())
-                .filter(bus -> !bus.isNearMaintenance(tripDistance))
+                .filter(bus -> !bus.isNearMaintenance(tripDistance + (ctx != null ? ctx.committedKm(bus.getId()) : 0.0)))
                 .min(preferredTypeThenLeastWorn(preferredType))
                 .orElse(null);
     }
@@ -1144,8 +1144,8 @@ public class TripService {
         // Dùng lại existsByBusIdAndStatusIn() có sẵn (BusService.updateBus đang
         // dùng cho guard #15), không thêm query mới.
         if (bus.getStatus() == BusStatus.TRAVELING) {
-            boolean explainedByARunningTrip = tripRepository.existsByBusIdAndStatusIn(
-                    bus.getId(), List.of(TripStatus.DEPARTED));
+            boolean explainedByARunningTrip = // một định nghĩa, dùng chung với danh sách xe của lịch thường lệ (CT6)
+                    travelingFlagExplained(bus);
             if (!explainedByARunningTrip) {
                 throw new IllegalArgumentException("Xe " + bus.getLicensePlate()
                         + " đang mang trạng thái TRAVELING nhưng không có chuyến nào đang chạy để giải thích"
@@ -1213,10 +1213,10 @@ public class TripService {
     /**
      * Sức chứa (số chỗ thật) của xe theo loại xe, hoặc null nếu xe chưa được gán
      * loại. Dùng chung cho luật sức chứa trong validateBusForTrip() và cho việc
-     * đặt số ghế theo xe được gán — createExtraTrip() (AI) và approveTrip() (phân
-     * công thủ công) — một định nghĩa.
+     * đặt số ghế theo xe được gán — createExtraTrip() (AI), approveTrip() (phân
+     * công thủ công) và lịch thường lệ (CT6, RegularTimetableService) — một định nghĩa.
      */
-    private static Integer seatCapacityOf(Bus bus) {
+    static Integer seatCapacityOf(Bus bus) {
         return bus.getBusType() != null ? bus.getBusType().getCapacity() : null;
     }
 
@@ -2272,5 +2272,72 @@ public class TripService {
     private java.util.function.ToDoubleFunction<Driver> drivingHoursKey(LocalDateTime departure, Long tripId) {
         java.util.Map<Driver, Double> memo = new java.util.IdentityHashMap<>();
         return d -> memo.computeIfAbsent(d, person -> getDrivingHoursForDate(person, departure, tripId));
+    }
+
+    // =========================================================================
+    // LỊCH THƯỜNG LỆ — route pairs CT6 (QĐ-20, QĐ-22; CM-14, CM-17…CM-22)
+    // =========================================================================
+    //
+    // RegularTimetableService xếp chuyến thường lệ của N ngày tới, khung sớm xếp trước, bằng ĐÚNG bộ
+    // máy chọn của job 10 giây — autoAssignResources: xe (vị trí CT5b, bận ±1 giờ, bảo trì, đúng loại
+    // rồi ít km), tài xế, tài xế phụ, phụ xe — chạy trên một AvailabilityContext "lập lịch trước".
+    // Context đó khác context của màn Đề xuất đúng hai điểm DỮ LIỆU (CM-21):
+    //   - xe được xếp là xe mà validateBusForTrip nhận theo trạng thái — READY, hoặc TRAVELING có
+    //     chuyến DEPARTED giải thích (lỗi #19) — thay cho "READY ngay lúc bấm nút": lịch là cho
+    //     những ngày tới. Xe REPAIRING không được xếp;
+    //   - km mọi chuyến chưa xong của xe (chờ duyệt, đang mở bán, đang chạy, cả chuyến vừa xếp) được
+    //     cộng vào luật bảo trì, vì km thật chỉ tăng khi chuyến hoàn thành (updateTripStatus).
+    // Không luật nào được chép. Cổng cuối vẫn là validateBusForTrip / validateStaffForTrip (SQL), và
+    // chuyến được lưu qua createManualTrip — lối tạo chuyến ACTIVE sẵn có của form Tạo.
+
+    /** Chuyến chưa chạy xong: km của chúng sẽ cộng vào odometer khi hoàn thành. */
+    private static final List<TripStatus> UNFINISHED_STATUSES = List.of(TripStatus.PENDING_APPROVAL,
+            TripStatus.ACTIVE, TripStatus.DEPARTED);
+
+    /**
+     * Context lập lịch cho [spanStart, spanEnd): đúng context của buildAvailabilityContext, cộng danh
+     * sách xe được xếp và km đã cam kết của từng xe (xem đầu mục).
+     */
+    @Transactional
+    public AvailabilityContext buildTimetableContext(LocalDateTime spanStart, LocalDateTime spanEnd) {
+        AvailabilityContext ctx = buildAvailabilityContext(spanStart, spanEnd);
+        List<Bus> schedulable = busRepository.findAll().stream()
+                .filter(bus -> bus.getStatus() == BusStatus.READY
+                        || bus.getStatus() == BusStatus.TRAVELING && travelingFlagExplained(bus))
+                .collect(Collectors.toList());
+        java.util.Map<Long, Double> committedKm = new java.util.HashMap<>();
+        for (TripStatus status : UNFINISHED_STATUSES) {
+            for (Trip trip : tripRepository.findByStatusWithRoute(status)) {
+                if (trip.getBus() != null && trip.getRoute().getDistanceKm() != null) {
+                    committedKm.merge(trip.getBus().getId(), trip.getRoute().getDistanceKm(), Double::sum);
+                }
+            }
+        }
+        ctx.lookAhead(schedulable, committedKm);
+        return ctx;
+    }
+
+    /** Phân công cho một chuyến thường lệ: đúng autoAssignResources của job 10 giây, trên context lập lịch. */
+    public AutoAssignResult assignRegularTrip(Trip trip, AvailabilityContext ctx) {
+        return autoAssignResources(trip, ctx);
+    }
+
+    /**
+     * Chuyến thường lệ vừa lưu: các chuyến xếp sau phải thấy nó — xe và người bận, giờ lái, vị trí
+     * (reserve) — và km của nó trong luật bảo trì.
+     */
+    public void reserveRegularTrip(Trip trip, AvailabilityContext ctx) {
+        ctx.reserve(trip);
+        if (trip.getBus() != null && trip.getRoute() != null && trip.getRoute().getDistanceKm() != null) {
+            ctx.addCommittedKm(trip.getBus().getId(), trip.getRoute().getDistanceKm());
+        }
+    }
+
+    /**
+     * Cờ TRAVELING của xe có chuyến DEPARTED nào giải thích không (lỗi #19). Một định nghĩa cho hai
+     * nơi: luật trạng thái của validateBusForTrip, và danh sách xe của context lập lịch.
+     */
+    private boolean travelingFlagExplained(Bus bus) {
+        return tripRepository.existsByBusIdAndStatusIn(bus.getId(), List.of(TripStatus.DEPARTED));
     }
 }

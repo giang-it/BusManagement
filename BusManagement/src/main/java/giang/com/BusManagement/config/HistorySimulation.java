@@ -64,8 +64,8 @@ final class HistorySimulation {
     /** Ngày đầu tiên của lịch sử mô phỏng (QĐ-10: có 4 lần Tết 2023–2026). */
     static final LocalDate EPOCH = LocalDate.of(2023, 1, 1);
 
-    /** Các khung giờ khởi hành — "time slot" mà dự báo gom nhóm. */
-    static final List<Integer> DEPARTURE_HOURS = List.of(6, 12, 18);
+    /** Các khung giờ khởi hành — "time slot" mà dự báo gom nhóm; chung với lịch thật (CT6, CM-4). */
+    static final List<Integer> DEPARTURE_HOURS = giang.com.BusManagement.domain.RegularTimetable.DEPARTURE_HOURS;
 
     /**
      * Mức tải ngày thường của XE CHUẨN theo khung 06/12/18: trung bình 5 tuyến của

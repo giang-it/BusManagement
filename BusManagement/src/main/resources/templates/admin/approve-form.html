@@ -43,8 +43,8 @@
     <!-- Header -->
     <div class="d-flex align-items-center gap-3 mb-4">
         <div>
-            <h2 class="mb-0">Phê duyệt chuyến tăng cường</h2>
-            <small class="text-muted">Chuyến được AI đề xuất từ chuyến gốc có &gt;90% lấp đầy ghế</small>
+            <h2 class="mb-0" th:text="${trip.extraTrip ? 'Phê duyệt chuyến tăng cường' : 'Phê duyệt chuyến thường lệ'}">Phê duyệt chuyến tăng cường</h2>
+            <small class="text-muted" th:text="${trip.extraTrip ? 'Chuyến được AI đề xuất từ chuyến gốc có >90% lấp đầy ghế' : 'Chuyến của lịch thường lệ — máy chưa tìm được xe hay kíp đang đứng ở bến xuất phát'}">Chuyến được AI đề xuất từ chuyến gốc có &gt;90% lấp đầy ghế</small>
         </div>
     </div>
 
@@ -61,7 +61,7 @@
     <!-- Thông tin chuyến xe -->
     <div class="card mb-4">
         <div class="card-header bg-dark text-white">
-            <strong>📋 Thông tin chuyến tăng cường #<span th:text="${trip.id}"></span></strong>
+            <strong>📋 Thông tin <span th:text="${trip.extraTrip ? 'chuyến tăng cường' : 'chuyến thường lệ'}">chuyến tăng cường</span> #<span th:text="${trip.id}"></span></strong>
         </div>
         <div class="card-body">
             <div class="row">

@@ -22,7 +22,7 @@
     <div class="d-flex align-items-center justify-content-between mb-4">
         <div>
             <h2 class="mb-0">🤖 Chuyến tăng cường chờ phê duyệt</h2>
-            <small class="text-muted">AI tự động tạo khi tỉ lệ lấp đầy ghế &gt; 90%</small>
+            <small class="text-muted">AI tự động tạo khi tỉ lệ lấp đầy ghế &gt; 90% · chuyến thường lệ chưa xếp được xe cũng nằm ở đây</small>
         </div>
         <a href="/admin/trip-management/trips" class="btn btn-outline-secondary">← Quản lý chuyến xe</a>
     </div>
@@ -83,6 +83,7 @@
                     <div class="fw-bold"
                         th:text="${trip.route.departurePointDisplay + ' → ' + trip.route.destinationPointDisplay}">
                     </div>
+                    <span th:unless="${trip.extraTrip}" class="badge bg-info text-dark">📅 Chuyến thường lệ</span>
                     <div class="text-muted small"
                         th:text="'Khởi hành: ' + ${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}">
                     </div>

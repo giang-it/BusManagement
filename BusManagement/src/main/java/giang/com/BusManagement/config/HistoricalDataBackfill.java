@@ -164,9 +164,9 @@ public class HistoricalDataBackfill implements CommandLineRunner {
 
     /**
      * Các tuyến được sinh (QĐ-20): mặc định ba cặp quanh Bến xe Miền Đông trên DB thật —
-     * Đà Lạt 2/12, Cần Thơ 13/5, Vũng Tàu 10/11. Package-private để test gán thẳng.
+     * Đà Lạt 2/12, Cần Thơ 13/5, Vũng Tàu 10/11 — cùng khoá với lịch thật (CT6). Package-private để test gán thẳng.
      */
-    @Value("${backfill.route-ids:2,12,5,13,10,11}")
+    @Value(giang.com.BusManagement.domain.RegularTimetable.ROUTE_IDS_PROPERTY)
     List<Long> routeIds;
 
     /** Seed cố định của toàn bộ mô phỏng: chạy trên máy khác vẫn ra đúng bộ số đó. */

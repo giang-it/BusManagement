@@ -219,4 +219,28 @@ public class RouteService {
             throw new IllegalArgumentException("Thời gian di chuyển dự kiến phải lớn hơn 0 phút!");
         }
     }
+
+    /**
+     * Route pairs CT6 (CM-6): các tuyến NGƯỢC của route trong routes — tuyến đi từ bến đến của route
+     * về bến đi của nó. Bến đi / bến đến suy từ trạm dừng (Route.getDepartureStation /
+     * getDestinationStation), nên cặp tuyến không cần cột nào trong bảng routes.
+     *
+     * Trả về MỌI tuyến khớp. Người gọi chỉ ghép cặp khi có đúng một: hai tuyến khớp — ví dụ hai
+     * đường khác nhau giữa cùng hai bến — là mơ hồ, và app báo ra thay vì đoán. Tuyến chưa có bến
+     * thì không có tuyến ngược. Không đọc DB: routes phải được nạp kèm trạm dừng
+     * (findAllWithStations).
+     */
+    public static List<Route> reverseRoutesOf(Route route, java.util.Collection<Route> routes) {
+        Station from = route.getDepartureStation();
+        Station to = route.getDestinationStation();
+        if (from == null || to == null) {
+            return List.of();
+        }
+        return routes.stream()
+                .filter(other -> !Objects.equals(other.getId(), route.getId()))
+                .filter(other -> other.getDepartureStation() != null && other.getDestinationStation() != null
+                        && Objects.equals(other.getDepartureStation().getId(), to.getId())
+                        && Objects.equals(other.getDestinationStation().getId(), from.getId()))
+                .toList();
+    }
 }

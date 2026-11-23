@@ -111,4 +111,51 @@ public final class AvailabilityContext {
     public LocationRule.Leg personLegAfter(Long userId) {
         return personLegAfter.get(userId);
     }
+
+    // ── Lập lịch trước (route pairs CT6, CM-21) ─────────────────────────────────
+    // Context do TripService.buildTimetableContext dựng cho bộ lập lịch thường lệ mang thêm
+    // hai thứ, vẫn chỉ là dữ liệu:
+    //   - XE ĐƯỢC XẾP LỊCH: thay cho "xe READY ngay lúc này". Lịch là cho những ngày tới, nên
+    //     một xe đang chạy hôm nay vẫn được xếp — TripService chọn danh sách này theo đúng luật
+    //     trạng thái của validateBusForTrip (lỗi #19);
+    //   - KM ĐÃ CAM KẾT của từng xe ở các chuyến chưa chạy xong: km thật chỉ tăng khi chuyến
+    //     hoàn thành, nên không có số này thì luật bảo trì chỉ thấy MỘT chuyến đang xét, không
+    //     thấy cả tuần đã xếp cho xe đó.
+    // Context của màn Đề xuất không có hai thứ này: isLookAhead() == false, committedKm == 0,
+    // nên mọi thứ chạy y như trước.
+
+    private List<giang.com.BusManagement.domain.Bus> schedulableBuses;
+    private final Map<Long, Double> committedKm = new HashMap<>();
+
+    /** Biến context thành context lập lịch: danh sách xe được xếp và km đã cam kết, theo id xe. */
+    public void lookAhead(List<giang.com.BusManagement.domain.Bus> buses, Map<Long, Double> kmByBus) {
+        this.schedulableBuses = new ArrayList<>(buses);
+        putAllKm(kmByBus);
+    }
+
+    private void putAllKm(Map<Long, Double> kmByBus) {
+        if (kmByBus != null) {
+            committedKm.putAll(kmByBus);
+        }
+    }
+
+    /** true khi đây là context lập lịch (buildTimetableContext). */
+    public boolean isLookAhead() {
+        return schedulableBuses != null;
+    }
+
+    /** Xe được xếp lịch; chỉ có nghĩa khi isLookAhead(). */
+    public List<giang.com.BusManagement.domain.Bus> schedulableBuses() {
+        return Collections.unmodifiableList(schedulableBuses);
+    }
+
+    /** Km xe này đã cam kết ở các chuyến chưa chạy xong; 0 nếu không có (hay không phải context lập lịch). */
+    public double committedKm(Long busId) {
+        return committedKm.getOrDefault(busId, 0.0);
+    }
+
+    /** Cộng km của một chuyến vừa xếp cho xe — cùng lúc với reserve() của chuyến đó. */
+    public void addCommittedKm(Long busId, double km) {
+        committedKm.merge(busId, km, Double::sum);
+    }
 }

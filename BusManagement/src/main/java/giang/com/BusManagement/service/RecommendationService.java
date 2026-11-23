@@ -373,9 +373,9 @@ public class RecommendationService {
      * Giá vé lịch sử theo (tuyến → giờ khởi hành → giá của chuyến COMPLETED gần
      * nhất). Repository trả scalar đã sắp theo thời gian GIẢM DẦN, nên
      * putIfAbsent giữ lại đúng dòng đầu tiên gặp cho mỗi khung — tức chuyến mới
-     * nhất. Không nạp entity Trip: một ứng viên chỉ cần con số giá.
+     * nhất. Không nạp entity Trip: một ứng viên chỉ cần con số giá. Lịch thường lệ (CT6) dùng chung hàm này.
      */
-    private Map<Long, Map<Integer, BigDecimal>> loadLatestPrices() {
+    Map<Long, Map<Integer, BigDecimal>> loadLatestPrices() {
         Map<Long, Map<Integer, BigDecimal>> result = new HashMap<>();
         for (Object[] row : tripRepository.findPriceHistoryByStatus(TripStatus.COMPLETED)) {
             if (row[0] == null || row[1] == null || row[2] == null) {
