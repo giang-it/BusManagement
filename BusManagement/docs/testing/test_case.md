@@ -274,6 +274,25 @@
   - Ở CT5a việc chọn xe chưa đọc bến nhà. Từ CT5b (2026-11-17) nó đọc vị trí, mà vị trí rơi về bến nhà khi xe chưa chạy chuyến nào — xem `TC_AI_019`, `TC_AI_020`, `TC_APR_017`
 - **Đã chạy:** 2026-11-17 trên bản sao (`busmanagement_test`): flash và DB đúng như trên. Cột "Bến Nhà" của danh sách mới được kiểm trên DB thật (20 xe hiện "Bến xe Miền Đông"), chưa kiểm sau khi đổi. Khoá thêm bằng `BusServiceTest.update_changesHomeStation`
 
+
+### TC_BUS_014 — Ngày bảo trì dự kiến: hiển thị, ghi nhận bảo trì thì tự xoá (route pairs CT7d, CM-25)
+
+- **Mã TC:** TC_BUS_014
+- **Tên Kịch Bản:** Happy path + edge — ngày bảo trì do Lịch thường lệ đặt
+- **Điều kiện tiên quyết:** Trên **bản sao** DB: đã bấm "Tạo lịch" (TC_TRIP_049), một xe có ngày bảo trì dự kiến
+- **Các bước thực hiện:**
+  1. Mở `/admin/buses`, xem cột "Cảnh Báo Bảo Dưỡng" của xe đó; mở form sửa xe
+  2. Lưu form mà không đổi "Km Lần Bảo Trì Cuối"
+  3. Đặt "Km Lần Bảo Trì Cuối" = Odometer rồi lưu (ghi nhận bảo trì)
+- **Kết quả mong đợi:**
+  - Bước 1: dòng "🔧 Bảo trì dự kiến dd/MM/yyyy"; form có khung xanh ghi ngày đó (chỉ để xem, không có ô sửa)
+  - Bước 2: ngày dự kiến giữ nguyên
+  - Bước 3: "Cập nhật thông tin xe thành công!", ngày dự kiến biến mất, km kể từ bảo trì = 0
+  - Ngày dự kiến đã qua mà chưa ghi nhận: dòng "⚠ Quá ngày bảo trì dự kiến, chưa ghi nhận: …", và ngày đó không còn tác dụng
+  - POST tạo xe tự chế mang `plannedMaintenanceDate`: xe được tạo **không** có ngày dự kiến
+- **Đã chạy:** 2026-11-23 trên bản sao `busmanagement_cm25b`: xe 29A-001.14 (bảo trì 27/11) — bước 3 xoá ngày, xe 29A-001.03 giữ ngày 29/11
+- **Tự động hoá:** `TripServiceMaintenancePlanTest.aMaintenanceDayBlocksTheBusForEveryone_andRecordingTheMaintenanceClearsIt`, `…aMaintenanceDayInThePast_…`, `…creatingABus_neverTakesAMaintenanceDayFromTheForm`
+
 ---
 
 <a name="module-2"></a>
@@ -1211,6 +1230,40 @@
   - Bước 3: khung cảnh báo *"Tuyến trong cấu hình nhưng không xếp được lịch"* ghi rõ lý do; tuyến đó không có chuyến
 - **Đã chạy:** chưa chạy tay; khoá bằng test
 - **Tự động hoá:** `RegularTimetableServiceTest.theInputIsChecked_andPastSlotsOfTodayAreSkipped`, `…aRouteWithoutItsReverse_orWithTwoOfThem_isNotScheduled_andThePageSaysWhy`, `RouteServiceReverseRouteTest` (3 test)
+
+
+### TC_TRIP_049 — Lịch thường lệ đặt ngày bảo trì ở bến nhà (route pairs CT7d, CM-25 cách M1)
+
+- **Mã TC:** TC_TRIP_049
+- **Tên Kịch Bản:** Happy path — xe sắp chạm mốc 90% theo lịch được nghỉ một ngày, hôm sau chạy lại
+- **Điều kiện tiên quyết:** **Bản sao** DB thật, lịch 20–26/11 đã có (xe giường nằm 29A-001.14 đã cam kết 4.200 km, km thật 230)
+- **Các bước thực hiện:**
+  1. `/admin/timetable`, "Tạo lịch" từ 27/11, 7 ngày
+  2. Xem bảng "ngày bảo trì vừa xếp", thẻ "Ngày bảo trì dự kiến", cột "🔧 bảo trì" của bảng "Đã có lịch"
+  3. Mở `/admin/analytics/pair-plan?date=` ngày bảo trì
+- **Kết quả mong đợi:**
+  - Chỉ xe **đúng loại** của tuyến, **đang ở bến nhà**, mà chỉ luật km chặn mới được đặt ngày; ngày đó xe không chạy chuyến nào; từ hôm sau xe được lấy lại trước (km tính từ 0)
+  - Xe sát / quá hạn theo km thật (51B-SAT.BT, 51B-QUA.BT) **không** được đặt ngày
+  - Trang kế hoạch cặp tuyến ghi "Bảo trì ở bến nhà ngày này: …"
+  - Phép kiểm độc lập (`check_maint.py`): 0 chuyến đẩy km ≥ 90% (có tính lại từ 0 sau ngày bảo trì), 0 chuyến chạm ngày bảo trì
+- **Đã chạy:** 2026-11-23 trên bản sao `busmanagement_cm25b`: 125 mở bán + 1 chờ phân công (code trước CT7d: 121 + 5); 3 ngày bảo trì — 29A-001.14 ngày 27/11 (4.430 km tính cả lịch), .03 ngày 29/11 (3.900), .04 ngày 30/11 (4.000); cặp Đà Lạt 29/42 chuyến giường nằm (trước: 9/42). 2026-11-25 **trên DB thật** (chủ dự án, sau sao lưu `busmanagement_2026-11-24_truoc-lich-27-11.sql`): cùng kết quả từng số — 125 + 1, cùng 3 ngày, Đà Lạt 29 giường nằm / 12 Limousine / 1 chờ, 0 chuyến chạm ngày bảo trì; trang xe, form xe, Lịch thường lệ, Kế hoạch cặp tuyến hiện đúng 3 ngày
+- **Tự động hoá:** `TripServiceMaintenancePlanTest.theTimetablePlansAMaintenanceDayAtHome_andTheBusRunsAgainTheDayAfter`, `…aBusAlreadyInTheWarningZoneNow_isNotPlannedByTheTimetable`, `RegularTimetableServiceTest.maintenanceCountsTheKmAlreadyPlanned_notOnlyTheTripAtHand`
+
+### TC_TRIP_050 — Ngày bảo trì chặn phân công tay; máy chỉ cho xe rời bến nhà khi về được (CT7d)
+
+- **Mã TC:** TC_TRIP_050
+- **Tên Kịch Bản:** Error/Edge — R1 ở cổng kiểm tra, R4 ở máy
+- **Điều kiện tiên quyết:** Sau TC_TRIP_049 trên bản sao; một chuyến chờ phân công trong ngày bảo trì của một xe
+- **Các bước thực hiện:**
+  1. Mở màn Duyệt của chuyến đó, xem ô chọn xe
+  2. Gửi POST `/admin/trips/approve` với đúng xe đang bảo trì
+- **Kết quả mong đợi:**
+  - Bước 1: ô chọn **không** mời xe đang bảo trì hôm đó
+  - Bước 2: *"⛔ Vi phạm ràng buộc: Xe … có lịch bảo trì dự kiến ngày dd/MM/yyyy ở bến nhà (do Lịch thường lệ xếp) — không xếp chuyến nào chạm vào ngày đó. …"*; chuyến vẫn chờ duyệt
+  - Chuyến khởi hành SAU ngày bảo trì được nhận dù km thật + km tuyến ≥ 90% (km tính từ 0)
+  - Máy (lịch, màn Đề xuất, job 10 giây) không cho một xe rời bến nhà nếu đi rồi về chạm 90%; người chọn thì vẫn chỉ xét chuyến đang lưu
+- **Đã chạy:** 2026-11-23 trên bản sao: chuyến #51493 (Đà Lạt → Miền Đông 12:00 27/11) với xe 29A-001.14 → bị từ chối đúng câu trên. Xe kẹt ở bến xa: 5 với code trước CT7d → 1 (29A-001.15, kẹt từ lịch 20–26/11 tạo trước CT7d). 2026-11-25 trên DB thật, ý "người chọn chỉ xét chuyến đang lưu": chủ dự án duyệt #51493 bằng 29A-001.15 — cổng cho qua (km thật 220 + 300), dù tính cả lịch là 4.720 km ≥ 4.500 nên máy không chọn xe này; sau đó 0 xe kẹt
+- **Tự động hoá:** `TripServiceMaintenancePlanTest.aMaintenanceDayBlocksTheBusForEveryone_…`, `…theMachineSendsABusAwayFromHome_onlyIfItCanComeBackBelowTheMark`, `…theRecommendationContext_countsTheKmAlreadyCommitted`, `…committedKm_fromTheContext_equalsTheDatabaseSum_beforeAndAfterAPlannedDay`
 
 ---
 
@@ -2582,7 +2635,7 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
   1. Mở `/admin/analytics/recommendation`, tìm thẻ của khung đó
   2. Đọc cột "Lượt đi kèm" và ba cột tiền cả vòng
 - **Kết quả mong đợi:**
-  - Cột "Lượt đi kèm" ghi **"Về ngay"**, tuyến chiều ngược, giờ là khung thường lệ (06/12/18) **sớm nhất** sau giờ tới + 1 giờ mà xe và một tài xế (≤ 8 giờ/ngày) kịp — ví dụ tuyến Đà Lạt 06:00 tới 12:00, tài xế duy nhất đã lái 6 giờ thì lượt về là **06:00 sáng hôm sau**, không phải 18:00
+  - Cột "Lượt đi kèm" ghi **"Về ngay"**, tuyến chiều ngược, giờ là khung thường lệ (06/12/18) **sớm nhất** sau giờ tới + 1 giờ mà **cùng xe và cùng tài xế** chạy được cả vòng (≤ 8 giờ/ngày; CT7c) — ví dụ tuyến Đà Lạt 06:00 tới 12:00, tài xế duy nhất đã lái 6 giờ thì lượt về là **06:00 sáng hôm sau**, không phải 18:00
   - Có biển số và tên tài xế của lượt về; số khách KV của lượt về thường gần 0
   - Chi phí cả vòng = 2 × chi phí một lượt (ví dụ Vũng Tàu: 2 × 700.000đ); doanh thu cả vòng = doanh thu chuyến thêm + doanh thu lượt về
   - Trên DB thật ngày 2026-11-22: 10 thẻ "Về ngay"; chi phí khớp phép tính tay ở cả 22 thẻ đủ điều kiện
@@ -2627,6 +2680,31 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
   - Ngày chưa tạo lịch: dòng cảnh báo "chưa có chuyến nào — bấm Tạo lịch"
   - Trang **không** ghi DB
   - Tự động: `PairPlanServiceTest` (4)
+
+
+### TC_RC_012 — Cả vòng một xe, một tài xế (route pairs CT7c, CM-24 PA-A)
+
+- **Mã TC:** TC_RC_012
+- **Tên Kịch Bản:** Happy path — lịch thường lệ phủ cả tuần mà vẫn có thẻ đủ điều kiện
+- **Điều kiện tiên quyết:** **Bản sao** DB thật; đã "Tạo lịch" cho cả 7 ngày tới (mọi chuyến có cả phụ xe)
+- **Các bước thực hiện:** Mở `/admin/analytics/recommendation`, xem các thẻ "Đủ điều kiện"
+- **Kết quả mong đợi:**
+  - Mỗi thẻ "Về ngay" / "Đưa xe tới trước" ghi **cùng một biển số và cùng một tài xế** cho chuyến thêm và lượt đi kèm
+  - Một tài xế đang ở bến nhà, chuyến kế tiếp cũng đi từ bến nhà, vẫn được chọn cho chuyến thêm rời bến nhà nếu lượt về đưa họ về kịp, và mỗi ngày ≤ 8 giờ lái
+  - Phép kiểm độc lập (`check_cards.py`): 0 trùng giờ (xe ±1 giờ, người ±30 phút), 0 đứt chuỗi vị trí, 0 ngày quá 8 giờ, 0 vượt mốc bảo trì
+- **Đã chạy:** 2026-11-23, cùng bản sao sau "Tạo lịch" 27/11–03/12: code trước CT7c 2/25 thẻ đủ điều kiện (16 "có xe nhưng không có tài xế"); chỉ CT7c 19/25; CT7c + CT7d 15/25 (máy nay cộng km đã xếp và quãng về — chỉ CT7c thì phép kiểm thấy 12 lượt vượt mốc bảo trì). DB thật (chỉ đọc): 25/25, 48 lượt, 0 vi phạm. 2026-11-25 DB thật (chỉ đọc), sau khi chủ dự án "Tạo lịch" 27/11–03/12: 15/25 (7 về ngay, 8 đưa xe tới; cả 15 vòng cùng một xe, cùng một tài xế), `check_cards.py` 30 lượt 0 vi phạm
+- **Tự động hoá:** `RecommendationLoopTest.theOnlyDriver_whoseNextTripLeavesHome_runsTheWholeLoop_becauseTheReturnBringsThemBackInTime`
+
+### TC_RC_013 — Không xếp được cả vòng: thiếu tài nguyên, không còn "tính như về rỗng" (CT7c)
+
+- **Mã TC:** TC_RC_013
+- **Tên Kịch Bản:** Edge case — chuyến thêm chạy được một mình nhưng không có lượt về cho cùng xe, cùng tài xế
+- **Điều kiện tiên quyết:** Tuyến 6 giờ có cặp; chỉ một tài xế, bằng lái hết hạn từ ngày kia (lượt về 18:00 cùng ngày thì quá 8 giờ, sáng ngày kia thì hết bằng)
+- **Các bước thực hiện:** Mở trang Đề xuất
+- **Kết quả mong đợi:**
+  - Thẻ **"Thiếu tài nguyên"**, ghi chú *"Không xếp được cả vòng (chuyến thêm rồi về ngay trong 2 ngày): có xe … nhưng không có tài xế nào rảnh, đang đứng đúng bến và còn đủ giờ lái …"*; tiền theo kế hoạch
+  - "Tính như về rỗng" chỉ còn ở tuyến không có đúng một tuyến chiều ngược
+- **Tự động hoá:** `RecommendationLoopTest.whenNoBusAndDriverCanRunTheWholeLoop_theCardHasNoResource_insteadOfAnEmptyReturn`
 
 ---
 
@@ -2747,14 +2825,14 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 
 | Module | Số TC | Happy Path | Error/Edge Case |
 |---|---|---|---|
-| Module 1 — Bus Management | 13 | 5 | 8 |
+| Module 1 — Bus Management | 14 | 6 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
-| Module 3 — Trip FSM & CRUD | 30 | 7 | 23 |
+| Module 3 — Trip FSM & CRUD | 32 | 8 | 24 |
 | Module 4 — AI Scheduler | 20 | 6 | 14 |
 | Module 5 — Admin Approval | 14 | 7 | 7 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **109** | **42** | **67** |
+| **TỔNG** | **112** | **44** | **68** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2763,7 +2841,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)* *(2026-11-23, CT7c + CT7d (CM-24, CM-25): Module 1 +1 — `TC_BUS_014` (Happy Path); Module 3 +2 — `TC_TRIP_049` (Happy Path), `TC_TRIP_050` (Error/Edge); Module 10 +2 — `TC_RC_012` (Happy Path), `TC_RC_013` (Error/Edge) — cộng theo cùng cách. `TC_RC_008` sửa tại chỗ: lượt về là cùng xe, cùng tài xế.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

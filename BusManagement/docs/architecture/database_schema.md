@@ -100,6 +100,7 @@ Physical bus records including odometer tracking and maintenance data.
 | `maintenance_threshold`     | `Double`     | nullable, default 5000 | Default applied **on creation** by `BusService.saveBus()`; on edit an empty box keeps the stored value (`updateBus`) |
 | `status`                    | `String`     | Enum, native `ENUM`    | `READY`, `TRAVELING`, `REPAIRING`          |
 | `home_station_id`           | `Station`    | FK → `stations.id`, nullable in DB | Home station (QĐ-23, CT5a, added 2026-11-17): where the bus stands before any trip; afterwards its location is the last station of its latest trip (`domain/LocationRule`). Required by the form **and** by `BusService.validate()`; nullable only because `ddl-auto=update` added it to a populated table. All 20 real buses set to Miền Đông (id 3) |
+| `planned_maintenance_date`  | `LocalDate`  | nullable (`DATE`)      | Planned maintenance day (route pairs CT7d, CM-25 option M1, added 2026-11-23): the day the bus stays at its home station for service. Set only by the Regular Timetable (`TripService.planDueMaintenance`); cleared when the Admin records a service (`BusService.updateBus`: last-maintenance reading raised); never taken from the create form. No trip may touch that day; trips departing after it count km from 0. A past date without a recorded service has no effect |
 
 **Relationships:**
 - `ManyToOne` → `bus_types` via `bus_type_id`
@@ -109,6 +110,8 @@ Physical bus records including odometer tracking and maintenance data.
 - `getKmSinceLastMaintenance()` = `odometer - lastMaintenanceOdometer`
 - `needsMaintenance()` = `kmSinceLastMaintenance >= maintenanceThreshold`
 - `isNearMaintenance(additionalKm)` = `(kmSinceLastMaintenance + additionalKm) >= maintenanceThreshold * 0.9`
+- `reachesNearMaintenance(km)` = `km >= maintenanceThreshold * 0.9` — the single definition of the 90% band (CT7d); `isNearMaintenance` calls it with the real km
+- `hasPlannedMaintenance(today)` = `plannedMaintenanceDate != null && plannedMaintenanceDate >= today` (CT7d)
 
 **Deletion rule:** Cannot be deleted if the bus has any associated trip record (checked via `TripRepository.existsByBusId`). Cannot be set to `REPAIRING` if it has any **unfinished** trip — `PENDING_APPROVAL`, `ACTIVE` **or `DEPARTED`**, i.e. exactly the complement of the FSM's terminal states.
 
@@ -390,6 +393,7 @@ erDiagram
         Double maintenanceThreshold
         String status
         Long homeStationId FK
+        LocalDate plannedMaintenanceDate
     }
     stations {
         Long id PK
