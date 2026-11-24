@@ -34,6 +34,8 @@ public class RegularTimetableRunDto {
     private List<PendingRow> pendingTrips;
     /** Tuyến trong cấu hình nhưng không xếp lịch được, mỗi dòng một lý do. */
     private List<String> problems;
+    /** Ngày bảo trì lần bấm này vừa đặt cho các xe sắp chạm mốc 90% theo lịch (CT7d, CM-25). */
+    private List<MaintenancePlanDto> maintenancePlanned;
 
     /** Một chuyến chờ Admin chọn xe: để mở thẳng màn Duyệt. */
     @Data

@@ -30,6 +30,8 @@ public class RegularTimetableViewDto {
     /** Tuyến trong cấu hình nhưng không xếp lịch được, mỗi dòng một lý do. */
     private List<String> problems;
     private List<DayRow> coverage;
+    /** Mọi ngày bảo trì dự kiến đang ghi trên xe, sớm trước — kể cả ngày đã qua mà chưa ghi nhận (CT7d). */
+    private List<MaintenancePlanDto> maintenance;
 
     /** Một cặp tuyến: chiều đi và chiều về, cùng km, thời lượng, loại xe gợi ý. */
     @Data
@@ -56,5 +58,7 @@ public class RegularTimetableViewDto {
         private LocalDate date;
         private int mainTrips;
         private int expected;
+        /** Biển số các xe nằm bảo trì ở bến nhà ngày này (CT7d). */
+        private List<String> maintenanceBuses;
     }
 }

@@ -228,23 +228,33 @@ class RegularTimetableServiceTest {
     // =====================================================================
 
     /**
-     * Ngưỡng 10.000 km, bị loại từ 9.000 km. Xe A (8.700) chạy 06:00 đi và 12:00 về: đã cam kết 200
-     * km, nên chuyến 18:00 đẩy nó tới 9.000 — bị loại, dù km THẬT của nó (8.700) vẫn ít nhất. Máy lấy
-     * C (8.800). Thiếu phép cộng km thì máy lấy lại A và chuyến 18:00 chạy quá mốc bảo trì.
+     * Ngưỡng 10.000 km, bị loại từ 9.000 km. Từ CT7d máy còn cộng quãng về bến nhà (R4): xe chỉ rời bến nhà
+     * khi đi rồi về vẫn dưới mốc. Xe A (8.700) chạy 06:00 đi (8.700 + 100 + 100 về = 8.900) và 12:00 về. Xe C
+     * (8.800) không đi nổi một vòng nào (8.800 + 200 = 9.000), nên ngay khung 06:00 được đặt ngày bảo trì ở
+     * bến nhà ngày mai (CT7d). Chuyến 18:00: A đã cam kết 200 km, đi thêm một vòng là 9.100 — bị loại, dù km
+     * THẬT của nó (8.700) ít nhất; B đang ở bến xa; C bảo trì — nên chờ phân công. Trước CT7d máy lấy C cho
+     * chuyến 18:00 (8.900), và C kẹt ở bến xa: về thêm 100 km là 9.000.
      */
     @Test
     void maintenanceCountsTheKmAlreadyPlanned_notOnlyTheTripAtHand() {
         Bus a = bus("TT-A", 8700, BusStatus.READY);
-        bus("TT-B", 8750, BusStatus.READY);
+        Bus b = bus("TT-B", 8750, BusStatus.READY);
         Bus c = bus("TT-C", 8800, BusStatus.READY);
         people(3);
         flushAndClear();
 
-        service.generate(TOMORROW, 1);
+        RegularTimetableRunDto run = service.generate(TOMORROW, 1);
 
         assertEquals(a.getId(), busOf(out, 6));
+        assertEquals(b.getId(), busOf(out, 12), "A ở bến xa, C bảo trì");
         assertEquals(a.getId(), busOf(back, 12));
-        assertEquals(c.getId(), busOf(out, 18), "A đã cam kết 200 km: 8.700 + 200 + 100 = 9.000 ≥ 90% ngưỡng");
+        assertNull(busOf(out, 18), "A: 8.700 + 200 đã cam kết + 100 + 100 về = 9.100 ≥ 90% ngưỡng");
+        assertEquals(b.getId(), busOf(back, 18));
+        assertEquals(1, run.getMaintenancePlanned().size());
+        assertEquals("TT-C", run.getMaintenancePlanned().get(0).getBusPlate());
+        assertEquals(TOMORROW, run.getMaintenancePlanned().get(0).getDate());
+        assertTrue(mainTrips().stream().noneMatch(t -> t.getBus() != null && t.getBus().getId().equals(c.getId())),
+                "ngày bảo trì: C không chạy");
     }
 
     // =====================================================================

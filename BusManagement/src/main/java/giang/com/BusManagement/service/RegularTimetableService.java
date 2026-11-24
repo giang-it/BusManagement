@@ -1,10 +1,13 @@
 package giang.com.BusManagement.service;
 
+import giang.com.BusManagement.domain.Bus;
 import giang.com.BusManagement.domain.RegularTimetable;
 import giang.com.BusManagement.domain.Route;
 import giang.com.BusManagement.domain.Trip;
+import giang.com.BusManagement.dto.MaintenancePlanDto;
 import giang.com.BusManagement.dto.RegularTimetableRunDto;
 import giang.com.BusManagement.dto.RegularTimetableViewDto;
+import giang.com.BusManagement.repository.BusRepository;
 import giang.com.BusManagement.repository.RouteRepository;
 import giang.com.BusManagement.repository.TripRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,9 @@ import java.util.stream.Collectors;
  * <li>đã có chuyến chính (không phải tăng cường, ở mọi trạng thái) thì bỏ qua — bấm lại không tạo
  * trùng, chuyến Admin tự tạo hay đã hủy được tôn trọng (CM-18);</li>
  * <li>đã qua giờ, hay chưa có giá vé lịch sử (CM-20), thì bỏ qua;</li>
+ * <li>xe đúng loại đang ở bến nhà mà chỉ luật km bảo trì chặn (sắp chạm mốc 90% theo lịch đã xếp) thì được
+ * đặt một ngày bảo trì ở bến nhà ({@link TripService#planDueMaintenance}, CT7d, CM-25 M1): ngày đó xe không
+ * chạy, từ hôm sau km tính lại từ 0;</li>
  * <li>còn lại thì máy chọn xe và kíp bằng ĐÚNG bộ máy của job 10 giây
  * ({@link TripService#assignRegularTrip}) — xe và người phải đứng ở bến xuất phát (CT5b) — qua
  * cổng kiểm tra, và lưu ACTIVE qua lối form Tạo ({@link TripService#createManualTrip}, CM-14);</li>
@@ -72,6 +78,7 @@ public class RegularTimetableService {
     private final RecommendationService recommendationService;
     private final RouteRepository routeRepository;
     private final TripRepository tripRepository;
+    private final BusRepository busRepository;
 
     /** Tuyến có lịch: cùng khoá cấu hình với bộ sinh lịch sử (CM-4). Package-private để test gán thẳng. */
     @Value(RegularTimetable.ROUTE_IDS_PROPERTY)
@@ -111,14 +118,22 @@ public class RegularTimetableService {
                     .add(slotKey((Long) row[0], departure));
         }
         int slotsPerDay = plan.routes().size() * hours.size();
+        // Ngày bảo trì dự kiến đang ghi trên xe (CT7d) — cả ngày đã qua mà chưa ghi nhận, để Admin thấy.
+        List<MaintenancePlanDto> maintenance = busRepository.findAll().stream()
+                .filter(bus -> bus.getPlannedMaintenanceDate() != null)
+                .sorted(Comparator.comparing(Bus::getPlannedMaintenanceDate).thenComparing(Bus::getLicensePlate))
+                .map(bus -> maintenanceRow(bus, bus.getKmSinceLastMaintenance(), !bus.hasPlannedMaintenance(today)))
+                .toList();
         List<RegularTimetableViewDto.DayRow> coverage = new ArrayList<>();
         for (int i = 0; i < MAX_DAYS; i++) {
             LocalDate day = today.plusDays(i);
             coverage.add(new RegularTimetableViewDto.DayRow(day,
-                    takenByDay.getOrDefault(day, Set.of()).size(), slotsPerDay));
+                    takenByDay.getOrDefault(day, Set.of()).size(), slotsPerDay,
+                    maintenance.stream().filter(m -> m.getDate().equals(day)).map(MaintenancePlanDto::getBusPlate)
+                            .toList()));
         }
         return new RegularTimetableViewDto(hours, today, DEFAULT_DAYS, MAX_DAYS, slotsPerDay, pairs,
-                plan.problems(), coverage);
+                plan.problems(), coverage, maintenance);
     }
 
     // =========================================================================
@@ -174,6 +189,8 @@ public class RegularTimetableService {
         int skippedPast = 0;
         int skippedNoPrice = 0;
         List<RegularTimetableRunDto.PendingRow> pendingRows = new ArrayList<>();
+        List<MaintenancePlanDto> maintenancePlanned = new ArrayList<>();
+        LocalDate lastDay = from.plusDays(days - 1L);
         for (Slot slot : slots) {
             Route route = slot.route();
             LocalDateTime departure = slot.departure();
@@ -192,6 +209,10 @@ public class RegularTimetableService {
             }
 
             Trip trip = newTrip(route, departure, price);
+            // CT7d (CM-25): xe đúng loại ở bến nhà mà chỉ luật km bảo trì chặn thì được đặt ngày bảo trì trước.
+            for (TripService.PlannedMaintenance planned : tripService.planDueMaintenance(trip, lastDay, ctx)) {
+                maintenancePlanned.add(maintenanceRow(planned.bus(), planned.kmBefore(), false));
+            }
             String reason = assignAndActivate(trip, ctx);
             if (reason == null) {
                 created++;
@@ -207,11 +228,19 @@ public class RegularTimetableService {
         }
 
         long elapsed = System.currentTimeMillis() - startedAt;
-        log.info("📅 [Lịch thường lệ] {} → {}: {} chuyến mở bán, {} chờ phân công, bỏ qua {} đã có / {} đã qua / {} chưa có giá ({} ms)",
-                from, from.plusDays(days - 1L), created, pendingRows.size(), skippedExisting, skippedPast,
+        log.info("📅 [Lịch thường lệ] {} → {}: {} chuyến mở bán, {} chờ phân công, {} ngày bảo trì, bỏ qua {} đã có / {} đã qua / {} chưa có giá ({} ms)",
+                from, lastDay, created, pendingRows.size(), maintenancePlanned.size(), skippedExisting, skippedPast,
                 skippedNoPrice, elapsed);
-        return new RegularTimetableRunDto(from, from.plusDays(days - 1L), created, pendingRows.size(),
-                skippedExisting, skippedPast, skippedNoPrice, elapsed, pendingRows, plan.problems());
+        return new RegularTimetableRunDto(from, lastDay, created, pendingRows.size(),
+                skippedExisting, skippedPast, skippedNoPrice, elapsed, pendingRows, plan.problems(), maintenancePlanned);
+    }
+
+    /** Một dòng ngày bảo trì dự kiến của xe cho trang (CT7d). */
+    private static MaintenancePlanDto maintenanceRow(Bus bus, double km, boolean overdue) {
+        String type = bus.getBusType() != null
+                ? bus.getBusType().getTypeName() + " " + bus.getBusType().getCapacity() + " chỗ" : null;
+        return new MaintenancePlanDto(bus.getId(), bus.getLicensePlate(), type, bus.getPlannedMaintenanceDate(), km,
+                bus.getMaintenanceThreshold(), overdue);
     }
 
     /**

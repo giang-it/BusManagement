@@ -42,6 +42,9 @@ public class PairPlanViewDto {
     /** Lý do không xếp được cặp (thiếu chiều ngược…), như trang Lịch thường lệ. */
     private List<String> problems = new ArrayList<>();
 
+    /** Xe nằm bảo trì ở bến nhà ngày đang xem (route pairs CT7d): "biển số (loại xe)". */
+    private List<String> maintenance = new ArrayList<>();
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

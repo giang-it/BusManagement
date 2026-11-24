@@ -478,7 +478,7 @@ public class RecommendationService {
         String money = " — số khách tính với xe chuẩn " + standardSeats + " chỗ, chiều đi kèm theo kế hoạch";
         if (extra.reverse() == null) {
             return (loop.bus() == null
-                    ? "Không có xe rảnh, đang ở bến xuất phát và chưa tới ngưỡng bảo dưỡng cho khung giờ này"
+                    ? "Không có xe rảnh, đang ở bến xuất phát và chưa tới ngưỡng bảo dưỡng (tính cả km đã xếp) cho khung giờ này"
                     : "Có xe " + loop.bus().getLicensePlate()
                             + " nhưng không có tài xế nào hợp lệ, rảnh và đang ở bến xuất phát cho khung giờ này")
                     + money;
@@ -489,7 +489,7 @@ public class RecommendationService {
                         + " và bến đi không có xe nào sẵn để chỉ chạy một lượt về bến nhà";
         return (loop.bus() == null
                 ? "Không xếp được cả vòng (" + what + "): không có xe rảnh, đang ở bến nhà và chưa tới ngưỡng bảo"
-                        + " dưỡng cho cả vòng"
+                        + " dưỡng (tính cả km đã xếp) cho cả vòng"
                 : "Không xếp được cả vòng (" + what + "): có xe " + loop.bus().getLicensePlate()
                         + " nhưng không có tài xế nào rảnh, đang đứng đúng bến và còn đủ giờ lái (≤ 8 giờ/ngày) cho"
                         + " mọi lượt của vòng")

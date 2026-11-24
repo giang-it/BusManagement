@@ -75,6 +75,17 @@
                                     <input type="number" step="0.1" min="1" class="form-control"
                                         th:field="*{maintenanceThreshold}">
                                 </div>
+                                <!-- Route pairs CT7d (CM-25): ngày bảo trì dự kiến chỉ để xem — Lịch thường lệ đặt, ghi nhận bảo trì thì tự xoá. -->
+                                <div class="col-12" th:if="${bus.plannedMaintenanceDate != null}">
+                                    <div class="alert alert-info small mb-0 py-2"
+                                        th:with="active=${bus.hasPlannedMaintenance(#temporals.createToday())}">
+                                        <i class="bi bi-tools"></i>
+                                        <span th:text="${(active ? 'Lịch thường lệ đã xếp ngày bảo trì dự kiến: ' : 'Ngày bảo trì dự kiến đã qua mà chưa ghi nhận bảo trì (không còn tác dụng): ')
+                                                       + #temporals.format(bus.plannedMaintenanceDate, 'dd/MM/yyyy')}"></span>.
+                                        Bảo trì xong, đặt <strong>Km Lần Bảo Trì Cuối</strong> = Odometer rồi lưu — ngày dự kiến
+                                        tự xoá.
+                                    </div>
+                                </div>
                                 <hr class="my-4">
                                 <h5 class="text-muted"><i class="bi bi-geo-alt"></i> Vị Trí</h5>
                                 <div class="col-md-6">

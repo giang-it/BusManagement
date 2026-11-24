@@ -303,7 +303,7 @@ public class TripService {
      * Bản nhận AvailabilityContext (Phase 7). ctx == null → hành vi y hệt bản cũ
      * (mọi truy vấn bận qua DB); ctx != null → các phép kiểm tra "bận" đọc từ dữ
      * liệu đã preload trong ctx thay vì truy vấn DB từng xe. Luật lọc/xếp hạng
-     * KHÔNG đổi — chỉ nguồn dữ liệu đổi (bận; context lập lịch CT6 thêm danh sách xe và km đã cam kết).
+     * KHÔNG đổi — chỉ nguồn dữ liệu đổi (bận, km đã cam kết; context lập lịch CT6 thêm danh sách xe). Bảo trì: CT7d.
      */
     private Bus findBestAvailableBus(Trip trip, LocalDateTime departure, LocalDateTime arrival,
             AvailabilityContext ctx) {
@@ -325,9 +325,9 @@ public class TripService {
 
         return candidates.stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null, ctx) && busFits(bus, trip.getRoute(), departure, arrival, ctx))
-                .filter(bus -> !bus.needsMaintenance())
-                .filter(bus -> !bus.isNearMaintenance(tripDistance + (ctx != null ? ctx.committedKm(bus.getId()) : 0.0)))
-                .min(preferredTypeThenLeastWorn(preferredType))
+                .filter(bus -> machineMaintenanceAllows(bus, tripDistance, // CT7d: ngày bảo trì, km cả lịch, quãng về
+                        homewardKm(bus, trip.getRoute(), tripDistance), departure, arrival, ctx))
+                .min(machineOrder(preferredType, departure, arrival, ctx)) // CT7d: đúng loại, rồi km cả lịch ít nhất
                 .orElse(null);
     }
 
@@ -335,10 +335,10 @@ public class TripService {
      * Thứ tự ưu tiên xe DUY NHẤT của hệ thống khi đã biết tuyến: xe đúng loại gợi ý
      * của tuyến trước (false xếp trước true), rồi xe ít km kể từ bảo trì nhất.
      *
-     * Dùng chung cho AI tự phân công (findBestAvailableBus lấy phần tử đầu) và
-     * dropdown Duyệt/Sửa (getAvailableBusesForTrip xếp cả danh sách), để người và
-     * AI hiểu "ưu tiên" theo cùng một cách — form Tạo xếp y hệt ở phía JS. Tuyến
-     * không quy định loại thì vế đầu bằng nhau với mọi xe ⇒ thuần theo km.
+     * Dùng cho dropdown Duyệt/Sửa (getAvailableBusesForTrip xếp cả danh sách) — form
+     * Tạo xếp y hệt ở phía JS. Máy (findBestAvailableBus, selectLoop) xếp CÙNG luật
+     * nhưng đo km tính cả lịch đã xếp (machineOrder, CT7d R5). Tuyến không quy
+     * định loại thì vế đầu bằng nhau với mọi xe ⇒ thuần theo km.
      */
     private static Comparator<Bus> preferredTypeThenLeastWorn(BusType preferredType) {
         return Comparator.comparing((Bus bus) -> !isOfType(bus, preferredType))
@@ -568,7 +568,7 @@ public class TripService {
         List<Trip> trips = tripRepository.findScheduleForAvailability(
                 List.of(TripStatus.PENDING_APPROVAL, TripStatus.ACTIVE, TripStatus.DEPARTED, TripStatus.COMPLETED),
                 spanStart, spanEnd);
-        return withLocations(trips, spanStart, spanEnd);
+        return withCommittedKm(withLocations(trips, spanStart, spanEnd)); // km đã cam kết: CT7d, cuối lớp
     }
 
     // Quản lý Finite State Machine (FSM)
@@ -1170,11 +1170,15 @@ public class TripService {
         // maintenanceThreshold NGAY BÂY GIỜ, chưa cần tính chuyến này) thì
         // tuyệt đối KHÔNG được gán vào bất kỳ chuyến nào — đúng theo yêu cầu
         // "Xe: Không gán xe đang trong lịch bảo trì" của functional spec.
-        if (bus.needsMaintenance()) {
+        if (bus.needsMaintenance() && !servicedBefore(bus, departure)) { // CT7d: trừ khi lịch đã có ngày bảo trì trước chuyến
             throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " (Odo: "
                     + Math.round(bus.getKmSinceLastMaintenance()) + "km) đã QUÁ HẠN bảo trì (ngưỡng: "
                     + Math.round(bus.getMaintenanceThreshold())
                     + "km) — không thể gán vào chuyến cho đến khi được bảo trì!");
+        }
+        // CT7d (CM-25): ngày bảo trì dự kiến giữ xe ở bến nhà cả ngày — không chuyến nào chạm vào ngày đó.
+        if (onPlannedMaintenanceDay(bus, departure, arrival)) {
+            throw new IllegalArgumentException(plannedMaintenanceRefusal(bus));
         }
 
         // RÀNG BUỘC BẢO TRÌ: Nếu quãng đường của CHUYẾN NÀY sẽ đẩy xe vào vùng
@@ -1186,9 +1190,9 @@ public class TripService {
         double tripDistance = trip.getRoute() != null && trip.getRoute().getDistanceKm() != null
                 ? trip.getRoute().getDistanceKm()
                 : 0.0;
-        if (bus.isNearMaintenance(tripDistance)) {
+        if (bus.reachesNearMaintenance(kmSinceMaintenanceAt(bus, departure) + tripDistance)) { // CT7d: 0 km sau ngày bảo trì dự kiến
             throw new IllegalArgumentException("Xe " + bus.getLicensePlate() + " (Odo: "
-                    + Math.round(bus.getKmSinceLastMaintenance()) + "km) sẽ SẮP/QUÁ ngưỡng bảo trì ("
+                    + Math.round(kmSinceMaintenanceAt(bus, departure)) + "km) sẽ SẮP/QUÁ ngưỡng bảo trì ("
                     + Math.round(bus.getMaintenanceThreshold())
                     + "km) sau chuyến này — vui lòng chọn xe khác hoặc đưa xe đi bảo trì trước!");
         }
@@ -1499,8 +1503,8 @@ public class TripService {
 
         return busRepository.findByStatus(BusStatus.READY).stream()
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, tripId))
-                .filter(bus -> !bus.needsMaintenance())
-                .filter(bus -> !bus.isNearMaintenance(tripDistance))
+                .filter(bus -> !onPlannedMaintenanceDay(bus, departure, arrival)) // CT7d: cùng hai luật bảo trì của validator
+                .filter(bus -> !bus.reachesNearMaintenance(kmSinceMaintenanceAt(bus, departure) + tripDistance))
                 .sorted(fittingBusesFirst(trip).thenComparing(preferredTypeThenLeastWorn(preferredType)))
                 .collect(Collectors.toList());
     }
@@ -1595,8 +1599,8 @@ public class TripService {
         return busRepository.findAllWithBusType().stream()
                 .filter(bus -> bus.getStatus() == giang.com.BusManagement.domain.BusStatus.READY)
                 .filter(bus -> !isBusBusy(bus, windowStart, windowEnd, null))
-                .filter(bus -> !bus.needsMaintenance())
-                .filter(bus -> !bus.isNearMaintenance(0))
+                .filter(bus -> !onPlannedMaintenanceDay(bus, departure, arrival)) // CT7d: như validator
+                .filter(bus -> !bus.reachesNearMaintenance(kmSinceMaintenanceAt(bus, departure)))
                 .sorted(Comparator.comparingDouble(Bus::getKmSinceLastMaintenance))
                 .collect(Collectors.toList());
     }
@@ -2281,12 +2285,12 @@ public class TripService {
     // RegularTimetableService xếp chuyến thường lệ của N ngày tới, khung sớm xếp trước, bằng ĐÚNG bộ
     // máy chọn của job 10 giây — autoAssignResources: xe (vị trí CT5b, bận ±1 giờ, bảo trì, đúng loại
     // rồi ít km), tài xế, tài xế phụ, phụ xe — chạy trên một AvailabilityContext "lập lịch trước".
-    // Context đó khác context của màn Đề xuất đúng hai điểm DỮ LIỆU (CM-21):
-    //   - xe được xếp là xe mà validateBusForTrip nhận theo trạng thái — READY, hoặc TRAVELING có
-    //     chuyến DEPARTED giải thích (lỗi #19) — thay cho "READY ngay lúc bấm nút": lịch là cho
-    //     những ngày tới. Xe REPAIRING không được xếp;
-    //   - km mọi chuyến chưa xong của xe (chờ duyệt, đang mở bán, đang chạy, cả chuyến vừa xếp) được
-    //     cộng vào luật bảo trì, vì km thật chỉ tăng khi chuyến hoàn thành (updateTripStatus).
+    // Context đó khác context của màn Đề xuất ở một điểm DỮ LIỆU (CM-21): xe được xếp là xe mà
+    // validateBusForTrip nhận theo trạng thái — READY, hoặc TRAVELING có chuyến DEPARTED giải thích
+    // (lỗi #19) — thay cho "READY ngay lúc bấm nút": lịch là cho những ngày tới. Xe REPAIRING không được
+    // xếp. Km mọi chuyến chưa xong của xe (chờ duyệt, đang mở bán, đang chạy, cả chuyến vừa xếp) được
+    // cộng vào luật bảo trì, vì km thật chỉ tăng khi chuyến hoàn thành (updateTripStatus) — CM-21 làm điều
+    // đó riêng cho bộ lập lịch; từ CT7d mọi bộ chọn của máy cùng cộng (xem mục "BẢO TRÌ TRONG LỊCH").
     // Không luật nào được chép. Cổng cuối vẫn là validateBusForTrip / validateStaffForTrip (SQL), và
     // chuyến được lưu qua createManualTrip — lối tạo chuyến ACTIVE sẵn có của form Tạo.
 
@@ -2295,8 +2299,8 @@ public class TripService {
             TripStatus.ACTIVE, TripStatus.DEPARTED);
 
     /**
-     * Context lập lịch cho [spanStart, spanEnd): đúng context của buildAvailabilityContext, cộng danh
-     * sách xe được xếp và km đã cam kết của từng xe (xem đầu mục).
+     * Context lập lịch cho [spanStart, spanEnd): đúng context của buildAvailabilityContext (cả km đã cam
+     * kết), cộng danh sách xe được xếp (xem đầu mục).
      */
     @Transactional
     public AvailabilityContext buildTimetableContext(LocalDateTime spanStart, LocalDateTime spanEnd) {
@@ -2305,15 +2309,7 @@ public class TripService {
                 .filter(bus -> bus.getStatus() == BusStatus.READY
                         || bus.getStatus() == BusStatus.TRAVELING && travelingFlagExplained(bus))
                 .collect(Collectors.toList());
-        java.util.Map<Long, Double> committedKm = new java.util.HashMap<>();
-        for (TripStatus status : UNFINISHED_STATUSES) {
-            for (Trip trip : tripRepository.findByStatusWithRoute(status)) {
-                if (trip.getBus() != null && trip.getRoute().getDistanceKm() != null) {
-                    committedKm.merge(trip.getBus().getId(), trip.getRoute().getDistanceKm(), Double::sum);
-                }
-            }
-        }
-        ctx.lookAhead(schedulable, committedKm);
+        ctx.lookAhead(schedulable);
         return ctx;
     }
 
@@ -2323,14 +2319,11 @@ public class TripService {
     }
 
     /**
-     * Chuyến thường lệ vừa lưu: các chuyến xếp sau phải thấy nó — xe và người bận, giờ lái, vị trí
-     * (reserve) — và km của nó trong luật bảo trì.
+     * Chuyến thường lệ vừa lưu: các chuyến xếp sau phải thấy nó — xe và người bận, giờ lái, vị trí, và km
+     * của nó trong luật bảo trì (reserve giữ cả ba).
      */
     public void reserveRegularTrip(Trip trip, AvailabilityContext ctx) {
         ctx.reserve(trip);
-        if (trip.getBus() != null && trip.getRoute() != null && trip.getRoute().getDistanceKm() != null) {
-            ctx.addCommittedKm(trip.getBus().getId(), trip.getRoute().getDistanceKm());
-        }
     }
 
     /**
@@ -2357,7 +2350,7 @@ public class TripService {
     //     [đầu − 30 phút, cuối + 30 phút] — xe và kíp chờ nhau ở bến xa;
     //   - vị trí: LocationRule.fits, cả khối coi như MỘT lượt từ bến đầu tới bến cuối;
     //   - giờ lái: mỗi lượt cộng vào ngày khởi hành của nó (như sumDrivingHours), mỗi ngày ≤ 8 giờ;
-    //   - bảo trì: km của mọi lượt trong khối;
+    //   - bảo trì: km của mọi lượt trong khối (từ CT7d: luật bảo trì của máy, mục cuối lớp);
     //   - bằng lái còn hạn vào ngày của mọi lượt; thứ tự ưu tiên như hai hàm gốc.
     // Không có luật mới. Cổng cuối vẫn là validateBusForTrip / validateStaffForTrip cho TỪNG lượt.
 
@@ -2389,9 +2382,9 @@ public class TripService {
                 .filter(b -> !isBusBusy(b, busFrom, busTo, null, ctx))
                 .filter(b -> block == null
                         || LocationRule.fits(busLegsAround(b, start, end, ctx), idOf(b.getHomeStation()), block))
-                .filter(b -> !b.needsMaintenance())
-                .filter(b -> !b.isNearMaintenance(km + (ctx != null ? ctx.committedKm(b.getId()) : 0.0)))
-                .min(preferredTypeThenLeastWorn(preferredType))
+                .filter(b -> machineMaintenanceAllows(b, km, homewardKm(b, last.getRoute(), distanceOf(last)), start,
+                        end, ctx))
+                .min(machineOrder(preferredType, start, end, ctx))
                 .orElse(null);
         return new LoopChoice(bus, bus != null ? driverForLoop(legs, block, start, end, ctx) : null);
     }
@@ -2452,5 +2445,186 @@ public class TripService {
     private static double distanceOf(Trip trip) {
         return trip.getRoute() != null && trip.getRoute().getDistanceKm() != null ? trip.getRoute().getDistanceKm()
                 : 0.0;
+    }
+
+    // =========================================================================
+    // BẢO TRÌ TRONG LỊCH — route pairs CT7d (CM-25, cách M1)
+    // =========================================================================
+    //
+    // Trước CT7d km chỉ được "trừ" khi Admin ghi nhận một lần bảo trì (BusService: km lần bảo trì cuối =
+    // odometer). Lịch nhìn trước (CM-21) cứ cộng km đã xếp mà không bao giờ trừ, nên một xe chạy vòng Đà
+    // Lạt (~450 km/ngày) rơi khỏi lịch sau chừng 10 ngày và cặp đó phải chạy xe khác loại (CM-25: 27/11–03/12
+    // chỉ 9/42 chuyến giường nằm). Từ CT7d:
+    //   R1 NGÀY BẢO TRÌ: Bus.plannedMaintenanceDate = ngày M xe nằm ở bến nhà để bảo trì. Không chuyến nào
+    //      của xe được chạm vào [M 00:00, M+1 00:00) — máy, ô chọn và validator như nhau. Với luật vị trí,
+    //      ngày đó là một lượt bến nhà → bến nhà, nên máy cũng không để xe ở bến xa vào ngày đó;
+    //   R2 KM TÍNH LẠI TỪ 0: chuyến khởi hành từ M+1 00:00 tính km từ 0 thay vì km thật hiện tại — máy, ô
+    //      chọn và validator như nhau. Ngày M đã qua mà Admin chưa ghi nhận bảo trì thì R1, R2 hết tác dụng
+    //      (Bus.hasPlannedMaintenance): số liệu nói xe chưa được bảo trì;
+    //   R3 MÁY CỘNG KM ĐÃ XẾP — cách hiểu của CM-21 mở cho mọi bộ chọn của máy (lịch, màn Đề xuất, job 10
+    //      giây): km tính từ lần bảo trì (R2) + km mọi chuyến chưa xong của xe trong CÙNG đoạn (trước M hay
+    //      sau M) + km của chuyến đang xét;
+    //   R4 PHẢI VỀ ĐƯỢC BẾN NHÀ: chuyến (hay vòng) kết thúc xa bến nhà của xe thì máy cộng thêm quãng đường
+    //      về. Bảo trì làm ở bến nhà và mốc 90% chặn MỌI chuyến, nên một xe chỉ nên rời bến nhà khi còn về
+    //      được dưới mốc; không thì nó kẹt ở bến xa. Ví dụ trên lịch 20–26/11: tối 26/11 xe 29A-001.15 ở Đà
+    //      Lạt với 4.420 km tính cả lịch, về thêm 300 km là 4.720 ≥ 4.500;
+    //   R5 THỨ TỰ CỦA MÁY: đúng loại gợi ý trước, rồi km tính cả lịch (R2 + R3) ít nhất — xe vừa bảo trì
+    //      theo lịch được dùng trước. Ô chọn của người vẫn xếp theo km thật (preferredTypeThenLeastWorn).
+    // Validator và ô chọn của người KHÔNG cộng km đã xếp (R3) hay quãng về (R4): chúng vẫn chỉ xét chuyến
+    // đang lưu, như trước — máy chặt hơn cổng, không bao giờ lỏng hơn.
+    // Ai đặt ngày M: bộ lập lịch thường lệ (planDueMaintenance), khi một xe đúng loại của tuyến đang ở bến
+    // nhà, mọi luật khác cho chạy, chỉ luật km chặn. Xe đang sát / quá hạn NGAY LÚC NÀY theo km thật (như các
+    // xe mẫu "Xe Sắp Bảo Trì", "Xe Quá Bảo Trì") thì vẫn như cũ: Admin bảo trì rồi ghi nhận.
+
+    /** Ngày bảo trì dự kiến còn hiệu lực hôm nay (R1, R2), hay null. */
+    private static java.time.LocalDate activeMaintenanceDate(Bus bus) {
+        return bus.hasPlannedMaintenance(java.time.LocalDate.now()) ? bus.getPlannedMaintenanceDate() : null;
+    }
+
+    /** R1: khoảng [start, end] chạm ngày bảo trì dự kiến của xe (chạm đúng 00:00 hai đầu thì không). */
+    boolean onPlannedMaintenanceDay(Bus bus, LocalDateTime start, LocalDateTime end) {
+        java.time.LocalDate day = activeMaintenanceDate(bus);
+        return day != null && start.isBefore(day.plusDays(1).atStartOfDay()) && end.isAfter(day.atStartOfDay());
+    }
+
+    /** R2: chuyến khởi hành sau ngày bảo trì dự kiến của xe — km tính lại từ 0. */
+    private static boolean servicedBefore(Bus bus, LocalDateTime departure) {
+        java.time.LocalDate day = activeMaintenanceDate(bus);
+        return day != null && !departure.isBefore(day.plusDays(1).atStartOfDay());
+    }
+
+    /** R2: km tính từ lần bảo trì, ở thời điểm departure — 0 sau ngày bảo trì dự kiến, ngược lại km thật. */
+    private static double kmSinceMaintenanceAt(Bus bus, LocalDateTime departure) {
+        return servicedBefore(bus, departure) ? 0.0 : bus.getKmSinceLastMaintenance();
+    }
+
+    /**
+     * R2 + R3: km của máy ngay trước khoảng [start, end] — km tính từ lần bảo trì cộng km mọi chuyến chưa xong
+     * của xe trong cùng đoạn (trước hay sau ngày bảo trì dự kiến). ctx == null → hỏi DB (job 10 giây).
+     */
+    double kmTowardMaintenance(Bus bus, LocalDateTime start, LocalDateTime end, AvailabilityContext ctx) {
+        java.time.LocalDate day = activeMaintenanceDate(bus);
+        LocalDateTime from = null;
+        LocalDateTime to = null;
+        if (day != null && servicedBefore(bus, start)) {
+            from = day.plusDays(1).atStartOfDay();
+        } else if (day != null) {
+            to = day.atStartOfDay();
+        }
+        double committed = ctx != null ? ctx.committedKm(bus.getId(), from, to)
+                : tripRepository.sumCommittedKmOfBus(bus, UNFINISHED_STATUSES, from, to);
+        return kmSinceMaintenanceAt(bus, start) + committed;
+    }
+
+    /** R4: quãng về bến nhà sau một chuyến (hay vòng) kết thúc trên tuyến lastRoute; 0 khi kết thúc ở bến nhà hay không biết bến. */
+    private static double homewardKm(Bus bus, Route lastRoute, double lastKm) {
+        Long home = idOf(bus.getHomeStation());
+        Long end = lastRoute != null ? idOf(lastRoute.getDestinationStation()) : null;
+        return home == null || end == null || home.equals(end) ? 0.0 : lastKm;
+    }
+
+    /** R1–R4 cho máy: xe chạy được [start, end] với km đó (và quãng về) mà chưa chạm mốc 90%. */
+    private boolean machineMaintenanceAllows(Bus bus, double km, double homewardKm, LocalDateTime start,
+            LocalDateTime end, AvailabilityContext ctx) {
+        return !onPlannedMaintenanceDay(bus, start, end)
+                && !bus.reachesNearMaintenance(kmTowardMaintenance(bus, start, end, ctx) + km + homewardKm);
+    }
+
+    /**
+     * R5: thứ tự của máy — xe đúng loại gợi ý trước (như preferredTypeThenLeastWorn), rồi km tính cả lịch ít
+     * nhất. Nhớ km theo từng xe (cùng ý với drivingHoursKey), vì đường DB hỏi một câu cho mỗi xe.
+     */
+    private Comparator<Bus> machineOrder(BusType preferredType, LocalDateTime start, LocalDateTime end,
+            AvailabilityContext ctx) {
+        java.util.Map<Bus, Double> memo = new java.util.IdentityHashMap<>();
+        return Comparator.comparing((Bus bus) -> !isOfType(bus, preferredType))
+                .thenComparingDouble(bus -> memo.computeIfAbsent(bus, b -> kmTowardMaintenance(b, start, end, ctx)));
+    }
+
+    /** Lý do validator từ chối một chuyến chạm ngày bảo trì dự kiến (R1). */
+    private static String plannedMaintenanceRefusal(Bus bus) {
+        return "Xe " + bus.getLicensePlate() + " có lịch bảo trì dự kiến ngày "
+                + bus.getPlannedMaintenanceDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                + " ở bến nhà (do Lịch thường lệ xếp) — không xếp chuyến nào chạm vào ngày đó. Hãy chọn xe khác; nếu xe"
+                + " đã được bảo trì, hãy ghi nhận ở màn Quản Lý Xe (km lần bảo trì cuối = odometer)!";
+    }
+
+    /** Sổ km đã cam kết cho context (R3): mọi chuyến chưa xong có xe, mọi ngày — một câu SQL. */
+    private AvailabilityContext withCommittedKm(AvailabilityContext ctx) {
+        for (Object[] row : tripRepository.findCommittedKm(UNFINISHED_STATUSES)) {
+            if (row[0] != null && row[1] != null && row[2] != null) {
+                ctx.addCommitted(((Number) row[0]).longValue(), (LocalDateTime) row[1], ((Number) row[2]).doubleValue());
+            }
+        }
+        return ctx;
+    }
+
+    /** Một ngày bảo trì vừa được bộ lập lịch đặt: xe, ngày, và km tính cả lịch tới đầu ngày đó. */
+    public record PlannedMaintenance(Bus bus, java.time.LocalDate date, double kmBefore) {
+    }
+
+    /**
+     * Bộ lập lịch thường lệ (CT7d, CM-25 M1), trước khi xếp chuyến {@code trip}: đặt ngày bảo trì cho các xe
+     * đã tới hạn THEO LỊCH. Một xe được đặt khi đủ cả năm điều kiện:
+     * <ol>
+     * <li>đúng loại gợi ý của tuyến (xe không chạy thêm được một lượt của chính loại tuyến nó phục vụ);</li>
+     * <li>đang đứng ở bến nhà, tức bến xuất phát của chuyến — bảo trì làm ở bến nhà;</li>
+     * <li>chưa có ngày bảo trì dự kiến còn hiệu lực — mỗi xe một ngày;</li>
+     * <li>km thật chưa vào vùng cảnh báo (xe sát / quá hạn ngay lúc này thì Admin bảo trì như cũ);</li>
+     * <li>mọi luật khác của máy (bận, vị trí) cho chạy chuyến này, chỉ luật km (R2–R4) chặn.</li>
+     * </ol>
+     * Ngày được chọn là ngày đầu tiên, từ ngày của chuyến tới lastDay, mà xe không chạy chuyến nào và nằm
+     * trọn ở bến nhà (một lượt bến nhà → bến nhà trọn ngày vừa chuỗi vị trí của xe). Không có ngày nào thì
+     * không đặt — xe bị loại như trước. Ghi vào xe (lưu cùng transaction của lần bấm "Tạo lịch").
+     */
+    public List<PlannedMaintenance> planDueMaintenance(Trip trip, java.time.LocalDate lastDay, AvailabilityContext ctx) {
+        Route route = trip.getRoute();
+        Long from = route != null ? idOf(route.getDepartureStation()) : null;
+        if (from == null || ctx == null || !ctx.isLookAhead()) {
+            return List.of();
+        }
+        LocalDateTime departure = trip.getDepartureTime();
+        LocalDateTime arrival = arrivalOf(trip);
+        double km = distanceOf(trip);
+        BusType preferredType = route.getSuitableBusType();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        List<PlannedMaintenance> planned = new java.util.ArrayList<>();
+        for (Bus bus : ctx.schedulableBuses()) {
+            if (!from.equals(idOf(bus.getHomeStation())) || preferredType != null && !isOfType(bus, preferredType)
+                    || bus.hasPlannedMaintenance(today) || bus.needsMaintenance() || bus.isNearMaintenance(0)
+                    || isBusBusy(bus, departure.minusHours(BUS_PREP_BUFFER_HOURS),
+                            arrival.plusHours(BUS_PREP_BUFFER_HOURS), null, ctx)
+                    || !busFits(bus, route, departure, arrival, ctx)
+                    || !bus.reachesNearMaintenance(kmTowardMaintenance(bus, departure, arrival, ctx) + km
+                            + homewardKm(bus, route, km))) {
+                continue;
+            }
+            java.time.LocalDate day = firstMaintenanceDay(bus, departure.toLocalDate(), lastDay, ctx);
+            if (day == null) {
+                continue;
+            }
+            double kmBefore = kmTowardMaintenance(bus, day.atStartOfDay(), day.atStartOfDay(), ctx);
+            bus.setPlannedMaintenanceDate(day);
+            busRepository.save(bus);
+            planned.add(new PlannedMaintenance(bus, day, kmBefore));
+            log.info("🔧 [Lịch thường lệ] Xe {} sắp chạm mốc bảo trì ({} km tính cả lịch) — bảo trì ở bến nhà ngày {}",
+                    bus.getLicensePlate(), Math.round(kmBefore), day);
+        }
+        return planned;
+    }
+
+    /** Ngày đầu tiên trong [first, last] mà xe không chạy chuyến nào và nằm trọn ở bến nhà; null nếu không có. */
+    private java.time.LocalDate firstMaintenanceDay(Bus bus, java.time.LocalDate first, java.time.LocalDate last,
+            AvailabilityContext ctx) {
+        Long home = idOf(bus.getHomeStation());
+        for (java.time.LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+            LocalDateTime start = day.atStartOfDay();
+            LocalDateTime end = day.plusDays(1).atStartOfDay();
+            if (!isBusBusy(bus, start, end, null, ctx)
+                    && LocationRule.fits(busLegsAround(bus, start, end, ctx), home, new LocationRule.Leg(home, home, start, end))) {
+                return day;
+            }
+        }
+        return null;
     }
 }

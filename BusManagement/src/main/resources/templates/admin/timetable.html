@@ -93,6 +93,33 @@
                         </tbody>
                     </table>
                 </div>
+
+                <div th:unless="${#lists.isEmpty(run.maintenancePlanned)}" class="mt-3">
+                    <p class="small text-muted mb-2">
+                        <i class="bi bi-tools"></i> Các xe dưới đây sắp chạm mốc 90% ngưỡng bảo trì theo lịch vừa xếp, nên
+                        được đặt <strong>một ngày bảo trì ở bến nhà</strong>: ngày đó xe không chạy, từ hôm sau km tính
+                        lại từ 0. Bảo trì xong thì ghi nhận ở màn Quản Lý Xe (km lần bảo trì cuối = odometer).
+                    </p>
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Xe</th>
+                                <th>Loại</th>
+                                <th>Ngày bảo trì</th>
+                                <th class="text-end">Km tính cả lịch tới hôm đó</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="m : ${run.maintenancePlanned}">
+                                <td th:text="${m.busPlate}"></td>
+                                <td th:text="${m.busTypeLabel != null ? m.busTypeLabel : '—'}"></td>
+                                <td th:text="${#temporals.format(m.date, 'dd/MM/yyyy')}"></td>
+                                <td class="text-end" th:text="${#numbers.formatInteger(m.km, 1, 'POINT')
+                                        + (m.threshold != null ? ' / ' + #numbers.formatInteger(m.threshold, 1, 'POINT') : '') + ' km'}"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -163,6 +190,9 @@
                         trùng.</li>
                     <li>Không có xe hay kíp ở bến xuất phát thì chuyến được tạo ở trạng thái <strong>chờ duyệt, chưa
                             có xe</strong>, để chọn tay ở màn Phê duyệt.</li>
+                    <li>Km bảo trì tính cả các chuyến đã xếp, và xe chỉ rời bến nhà khi còn về được dưới mốc 90%. Xe
+                        đúng loại sắp chạm mốc thì được đặt <strong>một ngày bảo trì ở bến nhà</strong> (bảng "Ngày bảo
+                        trì dự kiến" bên dưới).</li>
                 </ul>
                 <form th:action="@{/admin/timetable/generate}" method="post" class="row g-3 align-items-end">
                     <div class="col-md-4">
@@ -181,6 +211,48 @@
                         <span class="small text-muted ms-2">Có thể mất khoảng nửa phút.</span>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- ── Ngày bảo trì dự kiến (route pairs CT7d, CM-25) ──────────────── -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0"><i class="bi bi-tools"></i> Ngày bảo trì dự kiến</h5>
+            </div>
+            <div class="card-body">
+                <div th:if="${#lists.isEmpty(view.maintenance)}" class="text-muted small mb-2">Chưa xe nào có ngày bảo
+                    trì dự kiến.</div>
+                <table th:unless="${#lists.isEmpty(view.maintenance)}" class="table table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Xe</th>
+                            <th>Loại</th>
+                            <th>Ngày bảo trì</th>
+                            <th class="text-end">Km từ lần bảo trì cuối (km thật)</th>
+                            <th>Tình trạng</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="m : ${view.maintenance}">
+                            <td><a th:href="@{/admin/buses/edit/{id}(id=${m.busId})}" th:text="${m.busPlate}"></a></td>
+                            <td th:text="${m.busTypeLabel != null ? m.busTypeLabel : '—'}"></td>
+                            <td th:text="${#temporals.format(m.date, 'dd/MM/yyyy')}"></td>
+                            <td class="text-end" th:text="${#numbers.formatInteger(m.km, 1, 'POINT')
+                                    + (m.threshold != null ? ' / ' + #numbers.formatInteger(m.threshold, 1, 'POINT') : '') + ' km'}"></td>
+                            <td>
+                                <span th:if="${m.overdue}" class="badge bg-warning text-dark">Đã qua ngày, chưa ghi nhận bảo
+                                    trì — không còn tác dụng</span>
+                                <span th:unless="${m.overdue}" class="badge bg-info text-dark">Đã xếp</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="small text-muted mb-0">
+                    Lịch tự đặt ngày này khi một xe đúng loại của tuyến, đang ở bến nhà, sắp chạm mốc 90% ngưỡng bảo trì
+                    theo các chuyến đã xếp. Ngày đó xe nằm ở bến nhà, không chạy chuyến nào; chuyến từ hôm sau tính km từ
+                    0. Bảo trì xong, sửa xe ở màn Quản Lý Xe: km lần bảo trì cuối = odometer — ngày dự kiến tự xoá. Xe đã
+                    sát hay quá hạn ngay lúc này (km thật) thì vẫn bảo trì và ghi nhận như trước.
+                </p>
             </div>
         </div>
 
@@ -205,6 +277,10 @@
                                         th:style="${'width:' + (d.expected > 0 ? 100 * d.mainTrips / d.expected : 0) + '%'}">
                                     </div>
                                 </div>
+                            </td>
+                            <td class="small text-muted" style="width: 18rem">
+                                <span th:unless="${#lists.isEmpty(d.maintenanceBuses)}"
+                                    th:text="${'🔧 bảo trì: ' + #strings.listJoin(d.maintenanceBuses, ', ')}"></span>
                             </td>
                         </tr>
                     </tbody>

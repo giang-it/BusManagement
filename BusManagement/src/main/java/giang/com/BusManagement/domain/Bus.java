@@ -72,7 +72,7 @@ public class Bus {
     public boolean isNearMaintenance(double additionalKm) {
         if (maintenanceThreshold == null)
             return false;
-        return (getKmSinceLastMaintenance() + additionalKm) >= (maintenanceThreshold * NEAR_MAINTENANCE_RATIO);
+        return reachesNearMaintenance(getKmSinceLastMaintenance() + additionalKm); // cùng ngưỡng, xem cuối lớp
     }
 
     /**
@@ -86,4 +86,34 @@ public class Bus {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "home_station_id")
     private Station homeStation;
+
+    /**
+     * Ngày bảo trì dự kiến (route pairs CT7d, CM-25 cách M1 trong docs/development/route_pairs_decisions.md):
+     * ngày xe nằm ở bến nhà để bảo trì. Chỉ bộ lập lịch thường lệ đặt ngày này, khi xe sắp chạm mốc 90%
+     * trong những ngày đã xếp (TripService.planDueMaintenance). Ngày đó xe không chạy chuyến nào; chuyến
+     * khởi hành từ ngày hôm sau tính km từ 0. Admin bảo trì xong thì ghi nhận như trước (km lần bảo trì cuối
+     * = odometer) và ngày này tự xoá (BusService). Ngày đã qua mà chưa ghi nhận thì không còn tác dụng — xem
+     * hasPlannedMaintenance. Cột cho phép null, thêm bằng ddl-auto=update; đặt ở cuối lớp để không xê dịch số
+     * dòng mà các bài học đang trích.
+     */
+    private java.time.LocalDate plannedMaintenanceDate;
+
+    /**
+     * Ngày bảo trì dự kiến còn hiệu lực vào hôm nay: có ngày, và ngày đó chưa qua. Ngày đã qua mà km lần bảo
+     * trì cuối chưa được ghi nhận thì số liệu nói xe CHƯA được bảo trì, nên ngày đó không còn tác dụng.
+     */
+    public boolean hasPlannedMaintenance(java.time.LocalDate today) {
+        return plannedMaintenanceDate != null && !plannedMaintenanceDate.isBefore(today);
+    }
+
+    /**
+     * Một số km tính từ lần bảo trì có chạm vùng "sắp đến hạn" (≥ 90% maintenanceThreshold) không — định nghĩa
+     * DUY NHẤT của ngưỡng này. isNearMaintenance hỏi với km thật của xe; lịch có ngày bảo trì dự kiến (CT7d) hỏi
+     * với km tính lại từ 0 sau ngày đó.
+     */
+    public boolean reachesNearMaintenance(double kmSinceMaintenance) {
+        if (maintenanceThreshold == null)
+            return false;
+        return kmSinceMaintenance >= (maintenanceThreshold * NEAR_MAINTENANCE_RATIO);
+    }
 }

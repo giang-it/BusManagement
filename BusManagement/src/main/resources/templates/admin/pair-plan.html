@@ -104,6 +104,10 @@
         <h4 class="mb-3">
             Ngày <span th:text="${#temporals.format(view.selectedDate, 'dd/MM/yyyy')}">01/01/2026</span>
         </h4>
+        <div class="alert alert-info small py-2" th:if="${!#lists.isEmpty(view.maintenance)}">
+            <i class="bi bi-tools"></i> Bảo trì ở bến nhà ngày này (Lịch thường lệ đã xếp, xe không chạy chuyến nào):
+            <strong th:text="${#strings.listJoin(view.maintenance, ', ')}"></strong>
+        </div>
 
         <div class="card shadow-sm border-0 mb-4" th:each="p : ${view.pairs}">
             <div class="card-header bg-white">

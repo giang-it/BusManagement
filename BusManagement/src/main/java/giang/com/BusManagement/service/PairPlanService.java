@@ -119,6 +119,12 @@ public class PairPlanService {
         view.setDays(days);
         LocalDate selected = requested != null && days.contains(requested) ? requested : forecast.getForecastFrom();
         view.setSelectedDate(selected);
+        // CT7d: xe nằm bảo trì ở bến nhà ngày đang xem — lý do một cặp có thể phải chạy xe khác loại hôm đó.
+        busRepository.findAll().stream()
+                .filter(bus -> selected.equals(bus.getPlannedMaintenanceDate()) && bus.hasPlannedMaintenance(LocalDate.now()))
+                .sorted(java.util.Comparator.comparing(giang.com.BusManagement.domain.Bus::getLicensePlate))
+                .forEach(bus -> view.getMaintenance().add(bus.getLicensePlate()
+                        + (bus.getBusType() != null ? " (" + bus.getBusType().getTypeName() + ")" : "")));
 
         List<RecommendationCardDto> cards = recommendation.getCards();
         for (Pair pair : pairs) {

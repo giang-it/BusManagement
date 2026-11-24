@@ -75,6 +75,11 @@
                                             class="bi bi-exclamation-octagon"></i> Cần bảo trì gấp!</span>
                                     <span th:unless="${bus.needsMaintenance()}"
                                         class="badge bg-light text-success border border-success">An Toàn</span>
+                                    <div th:if="${bus.plannedMaintenanceDate != null}" class="small mt-1"
+                                        th:with="active=${bus.hasPlannedMaintenance(#temporals.createToday())}"
+                                        th:classappend="${active} ? 'text-primary' : 'text-warning'"
+                                        th:text="${(active ? '🔧 Bảo trì dự kiến ' : '⚠ Quá ngày bảo trì dự kiến, chưa ghi nhận: ')
+                                                 + #temporals.format(bus.plannedMaintenanceDate, 'dd/MM/yyyy')}"></div>
                                 </td>
                                 <td th:text="${bus.homeStation != null ? bus.homeStation.stationName : '—'}"></td>
                                 <td class="text-center">

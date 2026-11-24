@@ -82,7 +82,7 @@ public class BusService {
         if (bus.getOdometer() == null) {
             bus.setOdometer(0.0);
         }
-
+        bus.setPlannedMaintenanceDate(null); // CT7d: chỉ Lịch thường lệ đặt ngày này; POST tự chế không đặt được
         validate(bus);
         busRepository.save(bus);
     }
@@ -188,7 +188,7 @@ public class BusService {
             existing.setOdometer(form.getOdometer());
         }
         if (form.getLastMaintenanceOdometer() != null) {
-            existing.setLastMaintenanceOdometer(form.getLastMaintenanceOdometer());
+            recordMaintenance(existing, form.getLastMaintenanceOdometer()); // CT7d: kèm xoá ngày bảo trì dự kiến
         }
         if (form.getMaintenanceThreshold() != null) {
             existing.setMaintenanceThreshold(form.getMaintenanceThreshold());
@@ -274,5 +274,19 @@ public class BusService {
         if (bus.getHomeStation() == null || bus.getHomeStation().getId() == null) {
             throw new IllegalArgumentException("Phải chọn bến nhà cho xe — nơi xe đứng khi chưa chạy chuyến nào!");
         }
+    }
+
+    /**
+     * Route pairs CT7d (CM-25 cách M1): Admin ghi nhận một lần bảo trì bằng cách đặt km lần bảo trì cuối lên
+     * (thường = odometer). Khi số đó TĂNG, xe vừa được bảo trì thật, nên ngày bảo trì dự kiến mà Lịch thường
+     * lệ đã đặt (Bus.plannedMaintenanceDate) không còn cần: xoá đi, để km tính từ lần bảo trì thật. Số không
+     * đổi hay giảm (sửa lỗi gõ) thì giữ ngày dự kiến. Đặt ở cuối lớp để không xê dịch số dòng bài học trích.
+     */
+    private static void recordMaintenance(Bus bus, Double lastMaintenanceOdometer) {
+        Double before = bus.getLastMaintenanceOdometer();
+        if (before == null || lastMaintenanceOdometer > before) {
+            bus.setPlannedMaintenanceDate(null);
+        }
+        bus.setLastMaintenanceOdometer(lastMaintenanceOdometer);
     }
 }

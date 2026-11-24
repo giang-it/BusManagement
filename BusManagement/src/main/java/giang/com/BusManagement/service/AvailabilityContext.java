@@ -55,6 +55,7 @@ public final class AvailabilityContext {
      */
     public void reserve(Trip trip) {
         trips.add(trip);
+        reserved.add(trip);
     }
 
     // ── Vị trí (route pairs CT5b, QĐ-23) ─────────────────────────────────────────
@@ -114,29 +115,15 @@ public final class AvailabilityContext {
 
     // ── Lập lịch trước (route pairs CT6, CM-21) ─────────────────────────────────
     // Context do TripService.buildTimetableContext dựng cho bộ lập lịch thường lệ mang thêm
-    // hai thứ, vẫn chỉ là dữ liệu:
-    //   - XE ĐƯỢC XẾP LỊCH: thay cho "xe READY ngay lúc này". Lịch là cho những ngày tới, nên
-    //     một xe đang chạy hôm nay vẫn được xếp — TripService chọn danh sách này theo đúng luật
-    //     trạng thái của validateBusForTrip (lỗi #19);
-    //   - KM ĐÃ CAM KẾT của từng xe ở các chuyến chưa chạy xong: km thật chỉ tăng khi chuyến
-    //     hoàn thành, nên không có số này thì luật bảo trì chỉ thấy MỘT chuyến đang xét, không
-    //     thấy cả tuần đã xếp cho xe đó.
-    // Context của màn Đề xuất không có hai thứ này: isLookAhead() == false, committedKm == 0,
-    // nên mọi thứ chạy y như trước.
+    // XE ĐƯỢC XẾP LỊCH, thay cho "xe READY ngay lúc này": lịch là cho những ngày tới, nên một xe
+    // đang chạy hôm nay vẫn được xếp — TripService chọn danh sách này theo đúng luật trạng thái
+    // của validateBusForTrip (lỗi #19). Context của màn Đề xuất không có nó: isLookAhead() == false.
 
     private List<giang.com.BusManagement.domain.Bus> schedulableBuses;
-    private final Map<Long, Double> committedKm = new HashMap<>();
 
-    /** Biến context thành context lập lịch: danh sách xe được xếp và km đã cam kết, theo id xe. */
-    public void lookAhead(List<giang.com.BusManagement.domain.Bus> buses, Map<Long, Double> kmByBus) {
+    /** Biến context thành context lập lịch: danh sách xe được xếp. */
+    public void lookAhead(List<giang.com.BusManagement.domain.Bus> buses) {
         this.schedulableBuses = new ArrayList<>(buses);
-        putAllKm(kmByBus);
-    }
-
-    private void putAllKm(Map<Long, Double> kmByBus) {
-        if (kmByBus != null) {
-            committedKm.putAll(kmByBus);
-        }
     }
 
     /** true khi đây là context lập lịch (buildTimetableContext). */
@@ -149,13 +136,46 @@ public final class AvailabilityContext {
         return Collections.unmodifiableList(schedulableBuses);
     }
 
-    /** Km xe này đã cam kết ở các chuyến chưa chạy xong; 0 nếu không có (hay không phải context lập lịch). */
-    public double committedKm(Long busId) {
-        return committedKm.getOrDefault(busId, 0.0);
+    // ── Km đã cam kết (route pairs CT6 CM-21; từ CT7d cho MỌI context, CM-25) ────────────
+    // Km thật chỉ tăng khi chuyến hoàn thành (updateTripStatus), nên luật bảo trì của máy phải cộng
+    // thêm km của mọi chuyến chưa chạy xong của xe — không thì nó chỉ thấy MỘT chuyến đang xét, không
+    // thấy cả tuần đã xếp. Hai nguồn: các chuyến chưa xong đã có trong DB (buildAvailabilityContext nạp
+    // một lần, mọi ngày, không chỉ trong khoảng đã nạp), và các chuyến giữ chỗ bằng reserve(). Mỗi
+    // mục giữ giờ khởi hành, để TripService tách km trước / sau một ngày bảo trì dự kiến (CT7d).
+    // Vẫn chỉ là dữ liệu: cộng số km trong một khoảng giờ, không xét gì.
+
+    private record CommittedLeg(java.time.LocalDateTime departure, double km) {
     }
 
-    /** Cộng km của một chuyến vừa xếp cho xe — cùng lúc với reserve() của chuyến đó. */
-    public void addCommittedKm(Long busId, double km) {
-        committedKm.merge(busId, km, Double::sum);
+    private final Map<Long, List<CommittedLeg>> committed = new HashMap<>();
+    private final List<Trip> reserved = new ArrayList<>();
+
+    /** Một chuyến chưa xong đã có trong DB: xe, giờ khởi hành, km tuyến (nạp lúc dựng context). */
+    public void addCommitted(Long busId, java.time.LocalDateTime departure, double km) {
+        committed.computeIfAbsent(busId, id -> new ArrayList<>()).add(new CommittedLeg(departure, km));
+    }
+
+    /**
+     * Km xe này đã cam kết ở các chuyến chưa xong và các chuyến giữ chỗ, khởi hành trong [from, to);
+     * from / to null = không chặn phía đó. 0 nếu không có.
+     */
+    public double committedKm(Long busId, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        double km = 0.0;
+        for (CommittedLeg leg : committed.getOrDefault(busId, List.of())) {
+            if (within(leg.departure(), from, to)) {
+                km += leg.km();
+            }
+        }
+        for (Trip trip : reserved) {
+            if (trip.getBus() != null && busId.equals(trip.getBus().getId()) && trip.getRoute() != null
+                    && trip.getRoute().getDistanceKm() != null && within(trip.getDepartureTime(), from, to)) {
+                km += trip.getRoute().getDistanceKm();
+            }
+        }
+        return km;
+    }
+
+    private static boolean within(java.time.LocalDateTime t, java.time.LocalDateTime from, java.time.LocalDateTime to) {
+        return t != null && (from == null || !t.isBefore(from)) && (to == null || t.isBefore(to));
     }
 }

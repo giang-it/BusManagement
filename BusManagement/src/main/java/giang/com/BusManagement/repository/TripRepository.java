@@ -691,4 +691,25 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        List<Trip> findPlanTrips(@Param("routeIds") Collection<Long> routeIds,
                      @Param("statuses") Collection<TripStatus> statuses,
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+       /**
+        * Route pairs CT7d (CM-25) — KM ĐÃ CAM KẾT của cả đội xe: (id xe, giờ khởi hành, km tuyến) của mọi
+        * chuyến có xe ở các trạng thái cho trước (TripService truyền các trạng thái chưa chạy xong). Km thật
+        * chỉ vào odometer khi chuyến hoàn thành, nên đây là phần km mà luật bảo trì của máy phải cộng thêm.
+        * AvailabilityContext nạp một lần; chuyến xóa mềm tự bị loại nhờ @SQLRestriction.
+        */
+       @Query("SELECT t.bus.id, t.departureTime, r.distanceKm FROM Trip t JOIN t.route r " +
+                     "WHERE t.bus IS NOT NULL AND t.status IN :statuses")
+       List<Object[]> findCommittedKm(@Param("statuses") Collection<TripStatus> statuses);
+
+       /**
+        * Cùng phép đếm cho MỘT xe, khi không có AvailabilityContext (job 10 giây): tổng km tuyến của các chuyến
+        * của xe ở các trạng thái cho trước, khởi hành trong [from, to). from / to null = không chặn phía đó.
+        * Cùng vị từ với AvailabilityContext.committedKm (test TripServiceMaintenancePlanTest so hai đường).
+        */
+       @Query("SELECT COALESCE(SUM(r.distanceKm), 0.0) FROM Trip t JOIN t.route r " +
+                     "WHERE t.bus = :bus AND t.status IN :statuses " +
+                     "AND (:from IS NULL OR t.departureTime >= :from) AND (:to IS NULL OR t.departureTime < :to)")
+       Double sumCommittedKmOfBus(@Param("bus") Bus bus, @Param("statuses") Collection<TripStatus> statuses,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }
