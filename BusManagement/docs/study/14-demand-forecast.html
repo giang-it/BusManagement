@@ -250,7 +250,7 @@ không đổi&quot;</em>. Anh chuyển sang màn Đề xuất tăng cường: th
 </tr>
 <tr>
 <td>Người dùng lại</td>
-<td><code>…/service/RecommendationService.java:169</code>, <code>…/service/WhatIfSimulationService.java:180</code></td>
+<td><code>…/service/RecommendationService.java:177</code>, <code>…/service/WhatIfSimulationService.java:180</code></td>
 <td>Gọi <code>buildForecast()</code> (không tự chấm điểm)</td>
 </tr>
 <tr>
@@ -763,7 +763,7 @@ static int tripsNeeded(double demand, int standardSeats) {
 </thead><tbody><tr>
 <td>1–2</td>
 <td>Controller → Service</td>
-<td><code>RecommendationController</code>, <code>RecommendationService.java:164-169</code></td>
+<td><code>RecommendationController</code>, <code>RecommendationService.java:172-177</code></td>
 <td>mở transaction chỉ đọc của <code>buildRecommendations()</code>, gọi <code>buildForecast()</code> <strong>một lần</strong> cho cả request</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -798,7 +798,7 @@ static int tripsNeeded(double demand, int standardSeats) {
 <tr>
 <td>8</td>
 <td>Service</td>
-<td><code>RecommendationService.java:220-236</code></td>
+<td><code>RecommendationService.java:228-244</code></td>
 <td>ô có <code>needsReinforcement</code> ⇒ <code>tripsNeeded − 1</code> chuyến thêm (từ CT7 của đợt cặp tuyến: <code>tripsNeeded</code> − số chuyến đã có trong khung), hỏi <code>ForecastService.extraTripPassengers</code> mỗi chuyến chở bao nhiêu khách (Bài 17)</td>
 <td><span class="tag tag-code">CODE</span></td>
 </tr>
@@ -1163,7 +1163,9 @@ chi phí = 6.000 × 120 + 50.000 × 2 = 820.000đ; doanh thu = 8,20 × 120.000 �
 <em>(Từ CT7 của đợt cặp tuyến, 2026-11-22, màn Đề xuất tính lãi <strong>cả vòng</strong>: xe tăng cường rời bến nhà
 thì phải về, nên thẻ cộng thêm một lượt đi kèm — thường gần 0 khách. Cùng ví dụ: 984.000 − 2 × 820.000
 ≈ <strong>−656.000đ</strong>, và muốn hoà vốn cả vòng chuyến thêm phải chở khoảng <strong>13,7</strong> khách. Xem
-<code>service/LoopEconomics</code> và QĐ-22 trong <code>route_pairs_decisions.md</code>.)</em>
+<code>service/LoopEconomics</code> và QĐ-22 trong <code>route_pairs_decisions.md</code>. Từ CT7c (2026-11-23) cả vòng chạy
+bằng <strong>một xe và một tài xế</strong>, chọn một lần (<code>TripService.selectLoop</code>); không xếp được cả vòng thì thẻ
+&quot;thiếu tài nguyên&quot;. Từ CT7d máy còn cộng km đã xếp và quãng về bến nhà vào luật bảo trì.)</em>
 Phần này thuộc Bài 17; ở đây chỉ cần nhớ: <strong>con số khách của chuyến thêm cũng đến từ dự báo</strong>.</p>
 <hr>
 <h2 id="9-vi-sao-thiet-ke-nhu-vay-cam-bay-kiem-thu">§9. Vì sao thiết kế như vậy + cạm bẫy + kiểm thử</h2>

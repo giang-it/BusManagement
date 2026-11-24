@@ -403,7 +403,7 @@ existing.setIsActive(Boolean.TRUE.equals(formDriver.getIsActive())); // null cũ
 
 `Boolean.TRUE.equals(x)` — so sánh "an toàn với null": `x` là `null` thì ra `false` chứ không ném
 `NullPointerException` như khi viết `x == true` với `Boolean`. Dự án dùng mẫu này ở mọi chỗ đọc
-`isActive` (`TripService.java:484`, `:1302`…).
+`isActive` (`TripService.java:484`, `:1306`…).
 
 ---
 
@@ -511,7 +511,7 @@ model.addAttribute("roles", roles);   // còn ROLE_ADMIN, ROLE_USER
 | | `drivers` | thêm 1 dòng, `user_id` = id vừa sinh; `total_driving_hours24h`, `monthly_rest_days` = `NULL` |
 | Sửa tài xế | `users` | `username`, `full_name`, `email`, `phone`; `password` **chỉ** khi gõ mật khẩu mới |
 | | `drivers` | `license_number`, `license_expiry_date`, `experience_years`, `is_active` |
-| Khoá tài xế | `drivers.is_active` | `1 → 0`. Từ lúc đó người này biến khỏi mọi dropdown xếp chuyến và bị validator từ chối (`TripService.java:1302-1305`) |
+| Khoá tài xế | `drivers.is_active` | `1 → 0`. Từ lúc đó người này biến khỏi mọi dropdown xếp chuyến và bị validator từ chối (`TripService.java:1306-1309`) |
 | Xoá tài xế | `drivers`, `users` | `DELETE` cả hai dòng (cascade từ `User.driver`). Xoá thật, không soft delete |
 | Tạo tài khoản | `users` | thêm 1 dòng `ROLE_ADMIN` hoặc `ROLE_USER`; email `NULL` (form không có ô email); phone **không** được chuẩn hoá — để trống thì lưu chuỗi `""` |
 
@@ -668,7 +668,7 @@ hết hạn là sự kiện thật phải ghi được. Nếu làm, hình dạng
 
 - **Màn này ảnh hưởng tới:**
   - Validator và mọi đường xếp người (Bài 06–09): `isActive` và `isLicenseValid(ngày khởi hành)` ở
-    `TripService.java:484-492` (AI chọn tài xế), `:1302-1310`, `:1326-1330`, `:1350-1357` (validator
+    `TripService.java:484-492` (AI chọn tài xế), `:1306-1314`, `:1330-1334`, `:1354-1361` (validator
     tài xế chính / phụ / phụ xe), `:1531-1532`, `:1560-1561`, `:1632-1633`, `:1680-1681` (các dropdown).
   - Giờ lái trong ngày: `totalDrivingHours24h` cộng vào khi xét **hôm nay** (`TripService.java:827-831`).
   - Gợi ý tài xế (Bài 15): `DriverRecommendationService.java:85-93`.

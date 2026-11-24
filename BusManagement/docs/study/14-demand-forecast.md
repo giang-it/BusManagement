@@ -70,7 +70,7 @@ không đổi"*. Anh chuyển sang màn Đề xuất tăng cường: thẻ của
 | Entity / enum | `…/domain/Route.java:82-84`, `…/domain/HolidayFlow.java:27-32` | `Route.holidayFlow`: tuyến học hệ số lễ chung với tuyến nào |
 | Repository | `TR:483-485` `findDemandHistoryByStatus`; `RouteRepository.java:22-26` `findAllWithStations`; `BusRepository.java:16-17` `findAllWithBusType` | 4 cột lịch sử; tuyến + loại xe; sức chứa trung bình đội xe |
 | DTO | `…/dto/DemandForecastViewDto.java`, `ForecastSeriesDto`, `ForecastPointDto`, `ForecastAccuracyDto` | Toàn màn / một chuỗi / một ô / tự chấm điểm |
-| Người dùng lại | `…/service/RecommendationService.java:169`, `…/service/WhatIfSimulationService.java:180` | Gọi `buildForecast()` (không tự chấm điểm) |
+| Người dùng lại | `…/service/RecommendationService.java:177`, `…/service/WhatIfSimulationService.java:180` | Gọi `buildForecast()` (không tự chấm điểm) |
 | Test | `test/service/ForecastServiceTest` (8), `ForecastServiceRulesTest` (10), `ForecastServiceReferenceTest` (4), `SlotDemandModelTest` (8), `SlotDemandModelReferenceTest` (5), `ArrowSolverTest` (2), `test/domain/HolidayCalendarTest` (13) | §9.4 |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
@@ -355,12 +355,12 @@ sequenceDiagram
 
 | # | Tầng | Vị trí | Làm gì | Nhãn |
 |---|---|---|---|---|
-| 1–2 | Controller → Service | `RecommendationController`, `RecommendationService.java:164-169` | mở transaction chỉ đọc của `buildRecommendations()`, gọi `buildForecast()` **một lần** cho cả request | [CODE] |
+| 1–2 | Controller → Service | `RecommendationController`, `RecommendationService.java:172-177` | mở transaction chỉ đọc của `buildRecommendations()`, gọi `buildForecast()` **một lần** cho cả request | [CODE] |
 | 3 | Proxy | `FS:212` | `buildForecast()` cũng `@Transactional(readOnly = true)`; đang có transaction bên ngoài nên **tham gia** transaction đó (mặc định `REQUIRED`) | [SPRING] |
 | 4–5 | Service, Repository | `FS:227-260` | đọc lại 4 cột và dựng lại ma trận — rẻ hơn nhiều so với một lần khớp: cả trang Dự báo khi dùng lại kết quả chỉ mất 0,16–0,6 giây trên DB thật | [CODE] |
 | 6 | Service | `FS:264-275` | ma trận giống hệt ⇒ `reused = true`, dùng `cachedRun` | [CODE] |
 | 7 | Service | `FS:346` | `withAccuracy = false` ⇒ bỏ qua 9 lần khớp của phần tự chấm điểm | [CODE] |
-| 8 | Service | `RecommendationService.java:220-236` | ô có `needsReinforcement` ⇒ `tripsNeeded − 1` chuyến thêm (từ CT7 của đợt cặp tuyến: `tripsNeeded` − số chuyến đã có trong khung), hỏi `ForecastService.extraTripPassengers` mỗi chuyến chở bao nhiêu khách (Bài 17) | [CODE] |
+| 8 | Service | `RecommendationService.java:228-244` | ô có `needsReinforcement` ⇒ `tripsNeeded − 1` chuyến thêm (từ CT7 của đợt cặp tuyến: `tripsNeeded` − số chuyến đã có trong khung), hỏi `ForecastService.extraTripPassengers` mỗi chuyến chở bao nhiêu khách (Bài 17) | [CODE] |
 
 **Vì sao tách hai cửa.** Phần tự chấm điểm cần 9 lần khớp thêm (2–3 giây). Chỉ màn Dự báo hiện nó;
 Đề xuất và What-if chỉ cần dự báo. Tách ra thì hai màn đó không bao giờ trả chi phí này (QĐ-16, G5-4).
@@ -563,7 +563,9 @@ chi phí = 6.000 × 120 + 50.000 × 2 = 820.000đ; doanh thu = 8,20 × 120.000 �
 *(Từ CT7 của đợt cặp tuyến, 2026-11-22, màn Đề xuất tính lãi **cả vòng**: xe tăng cường rời bến nhà
 thì phải về, nên thẻ cộng thêm một lượt đi kèm — thường gần 0 khách. Cùng ví dụ: 984.000 − 2 × 820.000
 ≈ **−656.000đ**, và muốn hoà vốn cả vòng chuyến thêm phải chở khoảng **13,7** khách. Xem
-`service/LoopEconomics` và QĐ-22 trong `route_pairs_decisions.md`.)*
+`service/LoopEconomics` và QĐ-22 trong `route_pairs_decisions.md`. Từ CT7c (2026-11-23) cả vòng chạy
+bằng **một xe và một tài xế**, chọn một lần (`TripService.selectLoop`); không xếp được cả vòng thì thẻ
+"thiếu tài nguyên". Từ CT7d máy còn cộng km đã xếp và quãng về bến nhà vào luật bảo trì.)*
 Phần này thuộc Bài 17; ở đây chỉ cần nhớ: **con số khách của chuyến thêm cũng đến từ dự báo**.
 
 ---

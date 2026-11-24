@@ -237,7 +237,7 @@ sang bảo trì thay vì xóa.</p>
 <tr>
 <td>Luật thuần</td>
 <td><code>…/domain/LocationRule.java</code></td>
-<td>Xe đang ở bến nào, nhận thêm chuyến có vừa chuỗi không (QĐ-23). Từ CT5b gắn vào việc chọn xe (<code>TripService.java:1937</code>)</td>
+<td>Xe đang ở bến nào, nhận thêm chuyến có vừa chuỗi không (QĐ-23). Từ CT5b gắn vào việc chọn xe (<code>TripService.java:1941</code>)</td>
 </tr>
 <tr>
 <td>Entity</td>
@@ -305,7 +305,7 @@ riêng. Chỉ có 6 endpoint HTTP.</p>
 <td>GET</td>
 <td><code>/admin/buses/edit/{id}</code></td>
 <td><code>showEditForm()</code> <code>:44-57</code></td>
-<td>nút &quot;Sửa&quot; <code>bus-list.html:81-82</code></td>
+<td>nút &quot;Sửa&quot; <code>bus-list.html:86-87</code></td>
 <td><code>findById()</code>, <code>findAllBusTypes()</code></td>
 <td>view <code>bus-form</code>, hoặc redirect + flash <code>error</code> nếu không thấy xe</td>
 </tr>
@@ -321,7 +321,7 @@ riêng. Chỉ có 6 endpoint HTTP.</p>
 <td>GET</td>
 <td><code>/admin/buses/delete/{id}</code></td>
 <td><code>deleteBus()</code> <code>:72-81</code></td>
-<td>nút &quot;Xóa&quot; + <code>confirm()</code> <code>bus-list.html:83-86</code></td>
+<td>nút &quot;Xóa&quot; + <code>confirm()</code> <code>bus-list.html:88-91</code></td>
 <td><code>deleteBus()</code></td>
 <td>redirect <code>/admin/buses</code> + flash</td>
 </tr>
@@ -402,6 +402,13 @@ tắt kiểm tra khóa ngoại, service là lớp chặn duy nhất.</li>
 <li>Trên DB thật, cả 20 xe có bến nhà Miền Đông.</li>
 </ul>
 </li>
+<li><strong>Ngày bảo trì dự kiến</strong> (CT7d, CM-25, 2026-11-23): cột <code>planned_maintenance_date</code>, ở cuối <code>Bus.java</code>.<ul>
+<li>Chỉ Lịch thường lệ đặt, khi xe sắp chạm mốc 90% theo các chuyến đã xếp; màn này chỉ hiển thị (&quot;🔧 Bảo trì dự kiến dd/MM/yyyy&quot; dưới cột cảnh báo, khung xanh trên form sửa).</li>
+<li>Ngày đó xe nằm ở bến nhà, không chạy chuyến nào; chuyến từ hôm sau tính km từ 0.</li>
+<li>Ghi nhận bảo trì như cũ — gõ odometer vào &quot;Km Lần Bảo Trì Cuối&quot; rồi lưu — thì ngày dự kiến tự xoá (<code>BusService.recordMaintenance</code>, cuối lớp). Tạo xe mới không bao giờ có ngày này.</li>
+<li>Ví dụ: xe 4.430 km tính cả lịch, một vòng Đà Lạt nữa là 600 km → 5.030 ≥ 4.500, nên lịch xếp cho nó một ngày bảo trì; hôm sau nó chạy lại từ 0 km.</li>
+</ul>
+</li>
 </ol>
 <hr>
 <h2 id="3-trace-chi-tiet-cac-luong-chinh">§3. Trace chi tiết các luồng chính</h2>
@@ -472,7 +479,7 @@ câu hỏi &quot;sao xóa bằng GET&quot;.</li>
 </thead><tbody><tr>
 <td>1</td>
 <td>Trình duyệt</td>
-<td><code>bus-list.html:81-82</code></td>
+<td><code>bus-list.html:86-87</code></td>
 <td>link &quot;Sửa&quot;</td>
 <td>—</td>
 <td><code>th:href=&quot;@{/admin/buses/edit/{id}(id=${bus.id})}&quot;</code> sinh ra <code>/admin/buses/edit/5</code></td>
@@ -582,7 +589,7 @@ câu hỏi &quot;sao xóa bằng GET&quot;.</li>
 <tr>
 <td>12</td>
 <td>JavaScript</td>
-<td><code>bus-form.html:107-112</code></td>
+<td><code>bus-form.html:118-123</code></td>
 <td>listener <code>submit</code></td>
 <td>form</td>
 <td><code>form.checkValidity()</code>: ô <code>required</code> trống hoặc số <code>&lt; min</code> ⇒ <code>preventDefault()</code> (hủy gửi) và tô đỏ; ở đây hợp lệ vì ô Odometer <strong>không</strong> <code>required</code></td>
@@ -762,7 +769,7 @@ câu hỏi &quot;sao xóa bằng GET&quot;.</li>
 <tr>
 <td>30</td>
 <td>View</td>
-<td><code>bus-list.html:24-27</code>, <code>:53-88</code></td>
+<td><code>bus-list.html:24-27</code>, <code>:53-93</code></td>
 <td><code>th:if=&quot;${success}&quot;</code>, <code>th:each</code></td>
 <td><code>success</code>, <code>buses</code></td>
 <td>hiện khung xanh; mỗi xe một dòng, cột &quot;Chạy Từ Lần Bảo Trì Cuối&quot; gọi thẳng <code>bus.getKmSinceLastMaintenance()</code> (<code>:64</code>), cột cảnh báo gọi <code>bus.needsMaintenance()</code> (<code>:74-77</code>)</td>
@@ -881,7 +888,7 @@ lọc bảo trì.</p>
 </thead><tbody><tr>
 <td>1</td>
 <td>Trình duyệt</td>
-<td><code>bus-list.html:83-86</code></td>
+<td><code>bus-list.html:88-91</code></td>
 <td>thẻ <code>&lt;a&gt;</code> &quot;Xóa&quot;</td>
 <td>—</td>
 <td><code>href</code> = <code>/admin/buses/delete/28</code>; <code>onclick=&quot;return confirm(...)&quot;</code></td>
@@ -1155,7 +1162,7 @@ thành &quot;ghi đè&quot; (lỗi #16/#21, Bài 00b §3.2); (2) chỉ ở luồ
 </tr>
 </thead><tbody><tr>
 <td>Biển số, hãng, loại xe, trạng thái phải có</td>
-<td><code>required</code> (<code>bus-form.html:28-29, :34, :40, :51</code>) + JS <code>checkValidity()</code> <code>:110</code></td>
+<td><code>required</code> (<code>bus-form.html:28-29, :34, :40, :51</code>) + JS <code>checkValidity()</code> <code>:121</code></td>
 <td><strong>Không có</strong> — cố ý, javadoc <code>BusService.java:109-114</code></td>
 <td>Lọt: xe lưu được với biển số/hãng/loại rỗng. <strong>Chỉ một lớp</strong>, theo quyết định ghi ở #16 (i)</td>
 </tr>
@@ -1191,7 +1198,7 @@ thành &quot;ghi đè&quot; (lỗi #16/#21, Bài 00b §3.2); (2) chỉ ở luồ
 </tr>
 <tr>
 <td>Không xóa xe có chuyến / có sự cố</td>
-<td>Nút Xóa <strong>luôn hiện</strong>; <code>confirm()</code> chỉ hỏi lại, không lọc (<code>bus-list.html:83-86</code>)</td>
+<td>Nút Xóa <strong>luôn hiện</strong>; <code>confirm()</code> chỉ hỏi lại, không lọc (<code>bus-list.html:88-91</code>)</td>
 <td><code>deleteBus()</code> <code>:244-261</code></td>
 <td>Bị chặn</td>
 </tr>
@@ -1392,7 +1399,7 @@ có cho luật quan trọng; lớp không-mời có thì tốt. Ở màn này, c
 </tr>
 <tr>
 <td>Gán vào chuyến tuyến 600 km?</td>
-<td><code>isNearMaintenance(600)</code> — gọi trong <code>validateBusForTrip</code> (<code>TripService.java:1189</code>)</td>
+<td><code>isNearMaintenance(600)</code> — trong <code>validateBusForTrip</code> nay viết <code>reachesNearMaintenance(km từ lần bảo trì + 600)</code> (<code>TripService.java:1193</code>; từ CT7d km này bằng 0 cho chuyến sau ngày bảo trì dự kiến)</td>
 <td>4.000 + 600 = 4.600 ≥ 4.500 ⇒ <strong>bị chặn</strong> &quot;sẽ SẮP/QUÁ ngưỡng bảo trì&quot;</td>
 </tr>
 <tr>
@@ -1782,7 +1789,7 @@ phiên mở lúc render (Bài 00b §2.4, §4.5).</li>
 </ol>
 <p><strong>Bài tự trace</strong></p>
 <ul>
-<li><code>[JS]</code> <code>bus-form.html:107-112</code>: <code>checkValidity()</code> — các ô <code>required</code> đều có, 1000 và 2000 đều ≥ <code>min</code>
+<li><code>[JS]</code> <code>bus-form.html:118-123</code>: <code>checkValidity()</code> — các ô <code>required</code> đều có, 1000 và 2000 đều ≥ <code>min</code>
 0, ô ngưỡng rỗng hợp lệ (không <code>required</code>) ⇒ <strong>cho gửi</strong>.</li>
 <li>POST <code>/admin/buses/create</code> → Spring bind <code>new Bus()</code>: odometer 1000.0, lastMaintenanceOdometer
 2000.0, maintenanceThreshold <code>null</code>, <code>id = null</code>.</li>
@@ -1804,7 +1811,8 @@ sai sự thật và không lưu được bất kỳ thay đổi nào khi để t
 <p>(a) Km kể từ bảo trì = 12.000 − 8.000 = 4.000 ≥ ngưỡng 4.000 ⇒ <code>needsMaintenance()</code> đúng ⇒ huy hiệu
 đỏ &quot;Cần bảo trì gấp!&quot;; cột hiện &quot;4000 / 4000 km&quot;.
 (b) Không — <code>validateBusForTrip</code> chặn ngay ở <code>needsMaintenance()</code> (<code>TripService.java:1173</code>), chưa
-cần xét 100 km.
+cần xét 100 km. (Từ CT7d chỉ trừ một trường hợp: Lịch thường lệ đã xếp cho xe một ngày bảo trì
+trước chuyến — xe trong bài không có ngày đó.)
 (c) Gõ <strong>12000</strong> vào ô &quot;Km Lần Bảo Trì Cuối&quot; (bằng odometer) ⇒ km kể từ bảo trì = 0 ⇒ hết cảnh
 báo. Để trống ô Odometer (giữ nguyên) hoặc gõ đúng 12000; đặt lại trạng thái nếu cần.</p>
 </details>

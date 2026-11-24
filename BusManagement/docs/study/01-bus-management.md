@@ -61,7 +61,7 @@ sang bảo trì thay vì xóa.
 | Repository (mượn) | `…/repository/TripRepository.java:233, :350, :367-369` | Ba câu hỏi về chuyến của xe, phục vụ các guard |
 | Repository (mượn) | `…/repository/IncidentRepository.java:56` | "Xe có bản ghi sự cố nào không" — guard xóa |
 | Entity | `…/domain/Bus.java` | Bảng `buses` + 3 method nghiệp vụ về bảo trì; **bến nhà** `homeStation` (cột `home_station_id`, CT5a) đặt ở cuối lớp |
-| Luật thuần | `…/domain/LocationRule.java` | Xe đang ở bến nào, nhận thêm chuyến có vừa chuỗi không (QĐ-23). Từ CT5b gắn vào việc chọn xe (`TripService.java:1937`) |
+| Luật thuần | `…/domain/LocationRule.java` | Xe đang ở bến nào, nhận thêm chuyến có vừa chuỗi không (QĐ-23). Từ CT5b gắn vào việc chọn xe (`TripService.java:1941`) |
 | Entity | `…/domain/BusType.java` | Bảng `bus_types`: tên loại + số ghế |
 | Enum | `…/domain/BusStatus.java` | `READY`, `TRAVELING`, `REPAIRING` |
 | Test | `test/service/BusServiceTest.java` | 21 test ghim tạo/sửa, ba con số bảo trì, hai guard, bến nhà bắt buộc |
@@ -80,9 +80,9 @@ riêng. Chỉ có 6 endpoint HTTP.
 | GET | `/admin/buses` | `listBuses()` `:19-23` | nút "Quản lý xe" `dashboard.html:83`; link "Xem tất cả" `dashboard-analytics.html:177`; link trong `incident-form.html:109`, `incident-list.html:149`; mọi redirect của màn này | `findAllWithBusType()` | view `admin/bus/bus-list` |
 | GET | `/admin/buses/create` | `showCreateForm()` `:25-31` | nút "Thêm Xe Mới" `bus-list.html:20`; nút trên `dashboard.html:88` | `findAllBusTypes()` | view `admin/bus/bus-form` với `new Bus()` |
 | POST | `/admin/buses/create` | `createBus()` `:33-42` | nút "Lưu Xe" khi `bus.id == null` (`bus-form.html:22`) | `saveBus()` | redirect `/admin/buses` + flash |
-| GET | `/admin/buses/edit/{id}` | `showEditForm()` `:44-57` | nút "Sửa" `bus-list.html:81-82` | `findById()`, `findAllBusTypes()` | view `bus-form`, hoặc redirect + flash `error` nếu không thấy xe |
+| GET | `/admin/buses/edit/{id}` | `showEditForm()` `:44-57` | nút "Sửa" `bus-list.html:86-87` | `findById()`, `findAllBusTypes()` | view `bus-form`, hoặc redirect + flash `error` nếu không thấy xe |
 | POST | `/admin/buses/edit/{id}` | `updateBus()` `:59-70` | nút "Lưu Xe" khi `bus.id != null` (`bus-form.html:22`) | `updateBus(id, form)` | redirect `/admin/buses` + flash |
-| GET | `/admin/buses/delete/{id}` | `deleteBus()` `:72-81` | nút "Xóa" + `confirm()` `bus-list.html:83-86` | `deleteBus()` | redirect `/admin/buses` + flash |
+| GET | `/admin/buses/delete/{id}` | `deleteBus()` `:72-81` | nút "Xóa" + `confirm()` `bus-list.html:88-91` | `deleteBus()` | redirect `/admin/buses` + flash |
 
 (Số dòng controller thuộc `…/controller/admin/AdminBusController.java`.)
 
@@ -167,6 +167,11 @@ stateDiagram-v2
    - Vị trí của xe = bến cuối của chuyến gần nhất; chưa chạy chuyến nào thì là bến nhà (`LocationRule`).
    - Từ CT5b (2026-11-17) vị trí được **dùng**. Máy (job 10 giây, màn Đề xuất) chỉ chọn xe đang đứng ở bến xuất phát và có chuyến kế tiếp đi từ bến tới (`TripService.java:327`). Ô chọn tay (Duyệt, Sửa, Tạo) vẫn mời mọi xe hợp lệ, xe đúng bến lên đầu, xe khác ghi "⚠ đang ở …". Validator không chặn theo vị trí.
    - Trên DB thật, cả 20 xe có bến nhà Miền Đông.
+7. **Ngày bảo trì dự kiến** (CT7d, CM-25, 2026-11-23): cột `planned_maintenance_date`, ở cuối `Bus.java`.
+   - Chỉ Lịch thường lệ đặt, khi xe sắp chạm mốc 90% theo các chuyến đã xếp; màn này chỉ hiển thị ("🔧 Bảo trì dự kiến dd/MM/yyyy" dưới cột cảnh báo, khung xanh trên form sửa).
+   - Ngày đó xe nằm ở bến nhà, không chạy chuyến nào; chuyến từ hôm sau tính km từ 0.
+   - Ghi nhận bảo trì như cũ — gõ odometer vào "Km Lần Bảo Trì Cuối" rồi lưu — thì ngày dự kiến tự xoá (`BusService.recordMaintenance`, cuối lớp). Tạo xe mới không bao giờ có ngày này.
+   - Ví dụ: xe 4.430 km tính cả lịch, một vòng Đà Lạt nữa là 600 km → 5.030 ≥ 4.500, nên lịch xếp cho nó một ngày bảo trì; hôm sau nó chạy lại từ 0 km.
 
 ---
 
@@ -235,7 +240,7 @@ sequenceDiagram
 
 | # | Tầng | Vị trí | Method / thành phần | Nhận vào | Làm gì | Trả về / gọi tiếp | Nhãn |
 |---|---|---|---|---|---|---|---|
-| 1 | Trình duyệt | `bus-list.html:81-82` | link "Sửa" | — | `th:href="@{/admin/buses/edit/{id}(id=${bus.id})}"` sinh ra `/admin/buses/edit/5` | GET | [CODE] |
+| 1 | Trình duyệt | `bus-list.html:86-87` | link "Sửa" | — | `th:href="@{/admin/buses/edit/{id}(id=${bus.id})}"` sinh ra `/admin/buses/edit/5` | GET | [CODE] |
 | 2 | Spring | — | DispatcherServlet | URL | Ghép `@RequestMapping("/admin/buses")` + `@GetMapping("/edit/{id}")`; lấy `5` từ đường dẫn vào `@PathVariable Long id` | `showEditForm(5, model, ra)` | [SPRING] |
 | 3 | Controller | `AdminBusController.java:47-48` | `showEditForm()` | `id = 5` | `busService.findById(id).orElseThrow(...)` — không thấy thì ném `RuntimeException` | `Bus` | [CODE] |
 | 4 | Service → Repo | `BusService.java:46-48` | `findById()` | 5 | chuyển tiếp, **không** `@Transactional` ở service | `Optional<Bus>` | [CODE] |
@@ -246,7 +251,7 @@ sequenceDiagram
 | 9 | View | `bus-form.html:28-76` | `th:object="${bus}"` + `th:field` | xe 5 | điền sẵn giá trị hiện tại vào từng ô; `th:field` sinh luôn thuộc tính `name` trùng tên field | HTML | [CODE]+[SPRING] |
 | 10 | View | `:40-44`, `:51-54` | hai `<select>` | `busTypes`, `statuses` | liệt kê **mọi** loại xe và **cả 3** trạng thái | HTML | [CODE] |
 | 11 | Admin | — | — | — | đổi hãng, **xoá trắng** ô Odometer, bấm "Lưu Xe" | sự kiện `submit` | — |
-| 12 | JavaScript | `bus-form.html:107-112` | listener `submit` | form | `form.checkValidity()`: ô `required` trống hoặc số `< min` ⇒ `preventDefault()` (hủy gửi) và tô đỏ; ở đây hợp lệ vì ô Odometer **không** `required` | cho gửi | [CODE] |
+| 12 | JavaScript | `bus-form.html:118-123` | listener `submit` | form | `form.checkValidity()`: ô `required` trống hoặc số `< min` ⇒ `preventDefault()` (hủy gửi) và tô đỏ; ở đây hợp lệ vì ô Odometer **không** `required` | cho gửi | [CODE] |
 | 13 | Trình duyệt | — | — | — | POST `/admin/buses/edit/5` với body `licensePlate=…&brand=…&busType=1&status=READY&odometer=&lastMaintenanceOdometer=4000&maintenanceThreshold=5000` | HTTP | [SUY LUẬN] |
 | 14 | Spring | `AdminBusController.java:60` | `@ModelAttribute Bus bus` | body | tạo **`new Bus()`** rồi gọi setter theo tên ô; ô `odometer` rỗng ⇒ `null` | object rời, `id = null` | [SPRING] |
 | 15 | Spring | — | `DomainClassConverter` | `busType=1` | đổi chuỗi "1" thành entity: gọi `BusTypeRepository.findById(1)` (Bài 00a §4.3) | `BusType` | [SPRING] |
@@ -264,7 +269,7 @@ sequenceDiagram
 | 27 | Controller | `:69` | return | — | `"redirect:/admin/buses"` ⇒ HTTP 302 (mẫu PRG, Bài 00a §4.4) | — | [CODE]+[SPRING] |
 | 28 | Trình duyệt → Controller | `:19-23` | `listBuses()` | — | GET mới; flash `success` được Spring chép vào Model của request này | `bus-list` | [SPRING] |
 | 29 | DB | `BusRepository.java:16-17` | `findAllWithBusType()` | — | JPQL `SELECT DISTINCT b FROM Bus b LEFT JOIN FETCH b.busType` — một câu duy nhất, không N+1 (Bài 00b §2.4) | `List<Bus>` | [CODE] |
-| 30 | View | `bus-list.html:24-27`, `:53-88` | `th:if="${success}"`, `th:each` | `success`, `buses` | hiện khung xanh; mỗi xe một dòng, cột "Chạy Từ Lần Bảo Trì Cuối" gọi thẳng `bus.getKmSinceLastMaintenance()` (`:64`), cột cảnh báo gọi `bus.needsMaintenance()` (`:74-77`) | HTML | [CODE] |
+| 30 | View | `bus-list.html:24-27`, `:53-93` | `th:if="${success}"`, `th:each` | `success`, `buses` | hiện khung xanh; mỗi xe một dòng, cột "Chạy Từ Lần Bảo Trì Cuối" gọi thẳng `bus.getKmSinceLastMaintenance()` (`:64`), cột cảnh báo gọi `bus.needsMaintenance()` (`:74-77`) | HTML | [CODE] |
 
 **Ranh giới transaction.** Có đúng **một** transaction ghi: mở ở bước 17, đóng ở bước 25, bao trọn
 `updateBus()`. Controller gọi **một** method service ghi dữ liệu, nên không có chuyện "hai
@@ -384,7 +389,7 @@ sequenceDiagram
 
 | # | Tầng | Vị trí | Method / thành phần | Nhận vào | Làm gì | Trả về / gọi tiếp | Nhãn |
 |---|---|---|---|---|---|---|---|
-| 1 | Trình duyệt | `bus-list.html:83-86` | thẻ `<a>` "Xóa" | — | `href` = `/admin/buses/delete/28`; `onclick="return confirm(...)"` | — | [CODE] |
+| 1 | Trình duyệt | `bus-list.html:88-91` | thẻ `<a>` "Xóa" | — | `href` = `/admin/buses/delete/28`; `onclick="return confirm(...)"` | — | [CODE] |
 | 2 | JavaScript | `:83` | `confirm()` | — | hộp hỏi lại; `return false` (Cancel) hủy việc đi theo link, `true` (OK) cho đi | GET | [CODE]+[SPRING — hành vi chuẩn của trình duyệt] |
 | 3 | Spring | — | DispatcherServlet | URL | khớp `@GetMapping("/delete/{id}")`, `id = 28` | `deleteBus(28, ra)` | [SPRING] |
 | 4 | Controller | `AdminBusController.java:75` | `deleteBus()` | 28 | gọi service trong `try` | → proxy | [CODE] |
@@ -485,13 +490,13 @@ Lưu ý: lỗi của `validate()` ném **sau** các setter (`:197`). Vẫn an to
 
 | Luật | Lớp không-mời (UI) | Lớp chặn thật (server) | POST tự chế vượt lớp đầu thì sao |
 |---|---|---|---|
-| Biển số, hãng, loại xe, trạng thái phải có | `required` (`bus-form.html:28-29, :34, :40, :51`) + JS `checkValidity()` `:110` | **Không có** — cố ý, javadoc `BusService.java:109-114` | Lọt: xe lưu được với biển số/hãng/loại rỗng. **Chỉ một lớp**, theo quyết định ghi ở #16 (i) |
+| Biển số, hãng, loại xe, trạng thái phải có | `required` (`bus-form.html:28-29, :34, :40, :51`) + JS `checkValidity()` `:121` | **Không có** — cố ý, javadoc `BusService.java:109-114` | Lọt: xe lưu được với biển số/hãng/loại rỗng. **Chỉ một lớp**, theo quyết định ghi ở #16 (i) |
 | Odometer, km bảo trì cuối không âm | `min="0"` `:65`, `:70` | `validate()` `BusService.java:220-225` | Bị chặn: "Lỗi: Odometer không được âm!" |
 | Ngưỡng bảo trì > 0 | `min="1"` `:75` | `validate()` `:230-232` | Bị chặn: "Lỗi: Ngưỡng cảnh báo bảo trì phải lớn hơn 0 km!" |
 | Odometer ≥ km bảo trì cuối | **Không có** (HTML không so được hai ô) | `validate()` `:225-229` | Người dùng thường cũng đi tới đây; bị chặn kèm hai con số |
 | Không `REPAIRING` khi còn chuyến chưa kết thúc | **Không có** — dropdown mời cả 3 trạng thái cho mọi xe (`:51-54`) | `updateBus()` `:135-142` | Bị chặn, không field nào bị ghi |
 | Không hạ loại xe dưới ghế đang bán | **Không có** — dropdown mời mọi loại xe (`:40-44`) | `updateBus()` `:168-180` | Bị chặn, không field nào bị ghi |
-| Không xóa xe có chuyến / có sự cố | Nút Xóa **luôn hiện**; `confirm()` chỉ hỏi lại, không lọc (`bus-list.html:83-86`) | `deleteBus()` `:244-261` | Bị chặn |
+| Không xóa xe có chuyến / có sự cố | Nút Xóa **luôn hiện**; `confirm()` chỉ hỏi lại, không lọc (`bus-list.html:88-91`) | `deleteBus()` `:244-261` | Bị chặn |
 | "Tạo" không được ghi đè xe có sẵn | Form tạo không có ô `id` | tripwire `saveBus()` `:70-73` | Bị chặn: "saveBus() chỉ dùng để tạo xe mới…" |
 | "Sửa" chỉ sửa đúng xe trên URL | — | `updateBus(id, form)` lấy id từ URL, bỏ qua `id` trong form (`AdminBusController.java:62-64`) | `id` gửi kèm bị lờ đi |
 
@@ -551,7 +556,7 @@ Xe có: odometer = **8.000**, lastMaintenanceOdometer = **4.000**, maintenanceTh
 | Quá hạn chưa? | `km >= threshold` (`Bus.java:48-52`) | 4.000 ≥ 5.000? **Không** → huy hiệu "An Toàn" |
 | Cột "Chạy Từ Lần Bảo Trì Cuối" | `bus-list.html:64` | "4000 / 5000 km" |
 | Sắp đến hạn (không tính chuyến)? | `km + 0 >= threshold × 0,9` (`Bus.java:72-76`) | 4.000 ≥ 4.500? **Không** |
-| Gán vào chuyến tuyến 600 km? | `isNearMaintenance(600)` — gọi trong `validateBusForTrip` (`TripService.java:1189`) | 4.000 + 600 = 4.600 ≥ 4.500 ⇒ **bị chặn** "sẽ SẮP/QUÁ ngưỡng bảo trì" |
+| Gán vào chuyến tuyến 600 km? | `isNearMaintenance(600)` — trong `validateBusForTrip` nay viết `reachesNearMaintenance(km từ lần bảo trì + 600)` (`TripService.java:1193`; từ CT7d km này bằng 0 cho chuyến sau ngày bảo trì dự kiến) | 4.000 + 600 = 4.600 ≥ 4.500 ⇒ **bị chặn** "sẽ SẮP/QUÁ ngưỡng bảo trì" |
 | Gán vào chuyến tuyến 300 km? | `isNearMaintenance(300)` | 4.300 ≥ 4.500? Không ⇒ **được** |
 
 **Vì sao `validate()` cấm odometer < km bảo trì cuối** — tính lại đúng ca lỗi #16 cũ: ô odometer
@@ -864,7 +869,7 @@ cảnh báo gì? (b) Gán vào chuyến tuyến 100 km được không? (c) Sau 
 
 **Bài tự trace**
 
-- `[JS]` `bus-form.html:107-112`: `checkValidity()` — các ô `required` đều có, 1000 và 2000 đều ≥ `min`
+- `[JS]` `bus-form.html:118-123`: `checkValidity()` — các ô `required` đều có, 1000 và 2000 đều ≥ `min`
   0, ô ngưỡng rỗng hợp lệ (không `required`) ⇒ **cho gửi**.
 - POST `/admin/buses/create` → Spring bind `new Bus()`: odometer 1000.0, lastMaintenanceOdometer
   2000.0, maintenanceThreshold `null`, `id = null`.
@@ -890,7 +895,8 @@ sai sự thật và không lưu được bất kỳ thay đổi nào khi để t
 (a) Km kể từ bảo trì = 12.000 − 8.000 = 4.000 ≥ ngưỡng 4.000 ⇒ `needsMaintenance()` đúng ⇒ huy hiệu
 đỏ "Cần bảo trì gấp!"; cột hiện "4000 / 4000 km".
 (b) Không — `validateBusForTrip` chặn ngay ở `needsMaintenance()` (`TripService.java:1173`), chưa
-cần xét 100 km.
+cần xét 100 km. (Từ CT7d chỉ trừ một trường hợp: Lịch thường lệ đã xếp cho xe một ngày bảo trì
+trước chuyến — xe trong bài không có ngày đó.)
 (c) Gõ **12000** vào ô "Km Lần Bảo Trì Cuối" (bằng odometer) ⇒ km kể từ bảo trì = 0 ⇒ hết cảnh
 báo. Để trống ô Odometer (giữ nguyên) hoặc gõ đúng 12000; đặt lại trạng thái nếu cần.
 

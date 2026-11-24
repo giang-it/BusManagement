@@ -621,7 +621,7 @@ flowchart LR
 | Chỉ đổi trạng thái theo FSM | select trạng thái ở form Sửa chỉ liệt kê `allowedTransitionsFrom()` | pre-check `:373` + `canTransition()` trong `updateTripStatus()` (`:642`) |
 | Bảng điều phối không được kích hoạt chuyến | chỉ có 3 nút Xuất phát / Hủy / Hoàn thành | `BOARD_ACTIONS` (`DispatchController.java:59`, kiểm ở `:108`) |
 | Chỉ duyệt chuyến đang chờ duyệt | `showApproveForm()` không mở form cho chuyến khác `PENDING_APPROVAL` (`AdminTripController.java:75`) | `requirePendingApproval()` (`TripService.java:892`) |
-| Không trùng nhân sự trên một chuyến | `validateNoDriverConflict()` ở JS (`trip-create-form.html:721`) | "Nhân sự trùng lặp" trong `validateStaffForTrip()` (`TripService.java:1283`) |
+| Không trùng nhân sự trên một chuyến | `validateNoDriverConflict()` ở JS (`trip-create-form.html:721`) | "Nhân sự trùng lặp" trong `validateStaffForTrip()` (`TripService.java:1287`) |
 
 **Quy tắc một chiều** của dự án (roadmap §8, nhắc trong nhiều javadoc): lớp không-mời được phép mời
 **ít hơn** thứ server chấp nhận, nhưng **không bao giờ được mời thứ server sẽ từ chối** — vì mời rồi

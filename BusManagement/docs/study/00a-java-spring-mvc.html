@@ -477,7 +477,7 @@ if (bus == null) throw new RuntimeException("Không tìm thấy xe với ID: " +
 <code>ForecastService.java:401</code> gom các chuyến theo <code>new SlotKey(routeId, giờ)</code>. <code>SlotKey</code> còn
 <code>implements Comparable</code> để làm khóa của <code>TreeMap</code>, giữ các chuỗi theo thứ tự tuyến rồi giờ.</p>
 <h3 id="2-6-switch-expression-va-vi-sao-co-y-khong-co-default">2.6. Switch expression — và vì sao cố ý <strong>không có <code>default</code></strong></h3>
-<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1874-1895</code> (rút gọn):</p>
+<p><span class="tag tag-code">CODE</span> <code>…/service/TripService.java:1878-1899</code> (rút gọn):</p>
 <div class="code-wrap"><pre class="code"><code class="language-java">public String deleteRefusalReason(Trip trip) {
     return switch (trip.getStatus()) {                 // switch TRẢ VỀ một giá trị
         case DEPARTED  -&gt; "Chuyến ... đang trên đường ...";
@@ -801,7 +801,7 @@ của dự án báo lỗi (không có <code>@ControllerAdvice</code> tập trung
 </thead><tbody><tr>
 <td>Xe, tài xế, bến, tuyến, sự cố</td>
 <td><strong>GET</strong> <code>/.../delete/{id}</code> qua thẻ <code>&lt;a href&gt;</code> + <code>confirm()</code> của JS</td>
-<td><code>AdminBusController.java:72</code> (<code>@GetMapping</code>), <code>bus-list.html:83-85</code></td>
+<td><code>AdminBusController.java:72</code> (<code>@GetMapping</code>), <code>bus-list.html:88-90</code></td>
 </tr>
 <tr>
 <td>Chuyến (xóa, hủy), duyệt/từ chối</td>
@@ -911,13 +911,13 @@ chỗ phải sửa nhiều file. Máy demo phải có internet thì giao diện 
 <td><code>th:href=&quot;@{...}&quot;</code></td>
 <td>64</td>
 <td>Tạo link</td>
-<td><code>bus-list.html:81</code></td>
+<td><code>bus-list.html:86</code></td>
 </tr>
 <tr>
 <td><code>@{/admin/buses/edit/{id}(id=${bus.id})}</code></td>
 <td>—</td>
 <td>Link có biến đường dẫn</td>
-<td><code>bus-list.html:81</code></td>
+<td><code>bus-list.html:86</code></td>
 </tr>
 <tr>
 <td><code>th:action</code></td>
@@ -965,7 +965,7 @@ chỗ phải sửa nhiều file. Máy demo phải có internet thì giao diện 
 <td><code>#lists.isEmpty(...)</code> / <code>#lists.size</code></td>
 <td>33 / 13</td>
 <td>Tiện ích danh sách</td>
-<td><code>bus-list.html:89</code></td>
+<td><code>bus-list.html:94</code></td>
 </tr>
 <tr>
 <td><code>#numbers.formatDecimal(x, 1, 0)</code></td>
@@ -1042,7 +1042,7 @@ nghĩa là &quot;đợi kết quả về rồi mới chạy dòng tiếp theo tr
 <li><code>addEventListener(&#39;change&#39; | &#39;submit&#39; | &#39;DOMContentLoaded&#39;, hàm)</code> — &quot;khi chuyện X xảy ra thì chạy
 hàm này&quot;. <code>DOMContentLoaded</code> = trang vừa dựng xong.</li>
 <li><code>confirm(&#39;Bạn có chắc...&#39;)</code> — hộp hỏi Có/Không; <code>onclick=&quot;return confirm(...)&quot;</code> ở
-<code>bus-list.html:85</code>: bấm &quot;Không&quot; thì link không được mở.</li>
+<code>bus-list.html:90</code>: bấm &quot;Không&quot; thì link không được mở.</li>
 <li><strong>Kiểm tra trùng nhân sự trước khi gửi form</strong> — <span class="tag tag-code">CODE</span> <code>trip-create-form.html:704-716</code>: lúc
 submit, gọi <code>validateNoDriverConflict()</code> (<code>:721</code>); nếu một người vừa là tài xế chính vừa là phụ
 xe thì <code>e.preventDefault()</code> chặn gửi form và tô đỏ ô sai.</li>
@@ -1271,7 +1271,7 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td>Switch expression</td>
 <td>switch trả về giá trị, dùng <code>-&gt;</code></td>
-<td><code>TripService.java:1874-1895</code></td>
+<td><code>TripService.java:1878-1899</code></td>
 </tr>
 <tr>
 <td>Text block <code>&quot;&quot;&quot;</code></td>
@@ -1426,12 +1426,12 @@ class + <code>@EqualsAndHashCode.Include</code> trên field id;</li>
 <tr>
 <td><code>@{...}</code></td>
 <td>Cú pháp tạo URL</td>
-<td><code>bus-list.html:81</code></td>
+<td><code>bus-list.html:86</code></td>
 </tr>
 <tr>
 <td><code>#numbers</code> / <code>#temporals</code> / <code>#lists</code></td>
 <td>Tiện ích định dạng số / ngày / danh sách</td>
-<td><code>bus-list.html:62</code>, <code>:89</code></td>
+<td><code>bus-list.html:62</code>, <code>:94</code></td>
 </tr>
 <tr>
 <td>CDN</td>

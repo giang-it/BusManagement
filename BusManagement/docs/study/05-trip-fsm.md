@@ -11,7 +11,7 @@
 > `TS` = `…/service/TripService.java`.
 >
 > **Phạm vi.** Bài này **không có màn hình riêng**. Nó là một **bộ luật** sống trong `TripService`
-> (khoảng `TS:574-695`, cộng `:892-899`, `:1451-1455`, `:1929-1934`) mà bốn màn khác gọi vào: Bảng
+> (khoảng `TS:574-695`, cộng `:892-899`, `:1455-1459`, `:1933-1938`) mà bốn màn khác gọi vào: Bảng
 > điều hành (Bài 10), Danh sách / Sửa chuyến (Bài 07), Duyệt chuyến (Bài 09), và job AI (Bài 08). Ở
 > đây chỉ trace **phần FSM** của các màn đó; phần còn lại (validate, form, JS) thuộc bài của chúng.
 
@@ -59,9 +59,9 @@ hủy: Lỗi luồng vận hành: Không thể chuyển trạng thái chuyến x
 | Service — luật | `TS:575-585` `canTransition()` | Bảng whitelist (private) |
 | Service — luật | `TS:602-606` `allowedTransitionsFrom()` | Cửa sổ **public** duy nhất nhìn vào bảng, cho UI hỏi |
 | Service — thực thi | `TS:636-695` `updateTripStatus()` | Kiểm bảng → guard cùng trạng thái → đổi trạng thái → đồng bộ xe |
-| Service — helper | `TS:1929-1934` `changeStatusToActive()` | Đặt `ACTIVE` + đóng dấu `saleOpenedAt` nếu chưa có |
+| Service — helper | `TS:1933-1938` `changeStatusToActive()` | Đặt `ACTIVE` + đóng dấu `saleOpenedAt` nếu chưa có |
 | Service — guard | `TS:892-899` `requirePendingApproval()` | Hai lối duyệt chỉ nhận chuyến `PENDING_APPROVAL` (lỗi #20) |
-| Service | `TS:1451-1455` `rejectTrip()` | Từ chối chuyến đề xuất = `updateTripStatus(id, CANCELLED)` |
+| Service | `TS:1455-1459` `rejectTrip()` | Từ chối chuyến đề xuất = `updateTripStatus(id, CANCELLED)` |
 | Controller | `…/controller/admin/DispatchController.java` | Lối vào chính của `DEPARTED`/`COMPLETED`; allow-list `BOARD_ACTIONS` (`:59-60`) |
 | Controller | `…/controller/admin/AdminTripManagementController.java` | Hủy (`:470-482`), Sửa đổi trạng thái (`:355-460`), quyết định nút Hủy (`:96-117`) |
 | Controller | `…/controller/admin/AdminTripController.java:215-225` | Từ chối chuyến đề xuất |
@@ -80,7 +80,7 @@ nào trong luồng. `DC` = `DispatchController.java`, `ATM` = `AdminTripManageme
 
 | HTTP / trigger | URL | Controller method | Được gọi từ đâu | Service chính | Kết quả |
 |---|---|---|---|---|---|
-| GET | `/admin/dispatch` | `DC.viewBoard()` `:62-92` | menu; mọi redirect của `changeStatus()` | `getDispatchBoardTrips(now + 48h)` (`TS:1765-1768`) | view `admin/dispatch-board` — quyết định chuyến nào có nút gì (chi tiết: Bài 10) |
+| GET | `/admin/dispatch` | `DC.viewBoard()` `:62-92` | menu; mọi redirect của `changeStatus()` | `getDispatchBoardTrips(now + 48h)` (`TS:1769-1772`) | view `admin/dispatch-board` — quyết định chuyến nào có nút gì (chi tiết: Bài 10) |
 | POST | `/admin/dispatch/status` | `DC.changeStatus()` `:104-125` | 3 nút trên `dispatch-board.html` (hidden `newStatus` = `DEPARTED` / `CANCELLED` / `COMPLETED`) | `updateTripStatus(tripId, newStatus)` | redirect `/admin/dispatch` + `success`/`error` |
 | POST | `/admin/trip-management/trips/cancel/{id}` | `ATM.cancelTrip()` `:470-482` | nút Hủy + `confirm()` `trip-list.html:474-482` | `updateTripStatus(id, CANCELLED)` | redirect `/admin/trip-management/trips` |
 | POST | `/admin/trip-management/trips/update` | `ATM.updateTrip()` `:355-460` | select `status` `trip-edit-form.html:201` (chi tiết: Bài 07) | pre-check `allowedTransitionsFrom` → `updateManualTrip` → `updateTripStatus` nếu trạng thái đổi | redirect danh sách / form sửa |
@@ -258,7 +258,7 @@ sequenceDiagram
 | 15 | Service | `TS:691`, `:694` | `busRepository.save(bus)`, `tripRepository.save(trip)` | entity managed | cả hai đã managed, nên dirty checking đã đủ — `save()` chỉ để rõ ý (Bài 00b §4.3) | — | [SPRING] |
 | 16 | Proxy | — | **commit** | — | Hibernate so bản chụp ⇒ hai câu ghi. [SUY LUẬN — SQL tương đương] `UPDATE buses SET status = 'READY', odometer = 1120, … WHERE id = 6` và `UPDATE trips SET status = 'COMPLETED', … WHERE id = 7` (Hibernate mặc định ghi đủ các cột của entity). **Đóng transaction** | — | [SPRING] |
 | 17 | Controller | `DC:117-118`, `:124` | flash + redirect | — | `success` = "Đã cập nhật chuyến #7 sang trạng thái COMPLETED." → `redirect:/admin/dispatch` | 302 | [CODE] |
-| 18 | Controller → DB | `DC:62-66` → `TS:1765-1768` → `TripRepository.java:301-315` | `viewBoard()` → `getDispatchBoardTrips(now + 48h)` | — | JPQL `SELECT DISTINCT t FROM Trip t LEFT JOIN FETCH t.route … WHERE t.status IN (ACTIVE, DEPARTED) AND t.departureTime <= :until` — chuyến #7 giờ là `COMPLETED` nên **không** còn trong kết quả | `List<Trip>` | [CODE] |
+| 18 | Controller → DB | `DC:62-66` → `TS:1769-1772` → `TripRepository.java:301-315` | `viewBoard()` → `getDispatchBoardTrips(now + 48h)` | — | JPQL `SELECT DISTINCT t FROM Trip t LEFT JOIN FETCH t.route … WHERE t.status IN (ACTIVE, DEPARTED) AND t.departureTime <= :until` — chuyến #7 giờ là `COMPLETED` nên **không** còn trong kết quả | `List<Trip>` | [CODE] |
 | 19 | Controller | `DC:69-90` | chia nhóm bằng Stream | danh sách | `inProgress` = `DEPARTED`; `overdue` = `ACTIVE` đã tới giờ; `upcoming` = `ACTIVE` chưa tới giờ; mỗi nhóm sắp theo giờ khởi hành; đưa vào Model các key `inProgressTrips`, `overdueTrips`, `upcomingTrips`, `windowHours`, `now` | view `admin/dispatch-board` | [CODE] |
 | 20 | View | `dispatch-board.html:31-34` | khung xanh | `success` | hiện câu ở bước 17; chuyến #7 biến khỏi bảng | HTML | [CODE] |
 
@@ -396,7 +396,7 @@ sequenceDiagram
 
 | # | Tầng | Vị trí | Method / thành phần | Nhận vào | Làm gì | Trả về / gọi tiếp | Nhãn |
 |---|---|---|---|---|---|---|---|
-| 1 | Controller | `ATM:44-48` | `listAllTrips()` | — | `showTripList(model, null, 30)` (`:66-71`) tính `since` = 0 giờ của 30 ngày trước rồi gọi `tripService.getTripsForList(null, since)` (`TS:1806-1812`) → `TripRepository.findForTripList()`: mọi chuyến chưa kết thúc, cộng chuyến đã kết thúc khởi hành từ `since` (QĐ-12, từ GĐ2 2026-10-21). Controller vẫn **inject thẳng repository** (`:23`) cho form tạo/sửa — anti-pattern đã biết của roadmap §3; phần FSM thì vẫn đi qua service | `List<Trip>` | [CODE] |
+| 1 | Controller | `ATM:44-48` | `listAllTrips()` | — | `showTripList(model, null, 30)` (`:66-71`) tính `since` = 0 giờ của 30 ngày trước rồi gọi `tripService.getTripsForList(null, since)` (`TS:1810-1816`) → `TripRepository.findForTripList()`: mọi chuyến chưa kết thúc, cộng chuyến đã kết thúc khởi hành từ `since` (QĐ-12, từ GĐ2 2026-10-21). Controller vẫn **inject thẳng repository** (`:23`) cho form tạo/sửa — anti-pattern đã biết của roadmap §3; phần FSM thì vẫn đi qua service | `List<Trip>` | [CODE] |
 | 2 | Controller | `ATM:96-111` | `populateTripList()` | danh sách | vòng `for` trên danh sách đã nạp, **không** truy vấn thêm; với mỗi chuyến: `status != CANCELLED` **và** `allowedTransitionsFrom(status).contains(CANCELLED)` ⇒ thêm id vào `cancellableIds` (`:104-107`) | 3 tập id | [CODE] |
 | 3 | Service | `TS:602-606` | `allowedTransitionsFrom(ACTIVE)` | `ACTIVE` | duyệt `TripStatus.values()` theo thứ tự khai báo, giữ `to` nào `canTransition(ACTIVE, to)` đúng ⇒ `[ACTIVE, DEPARTED, CANCELLED]` (§8.2). Không có `@Transactional`, không chạm DB | `List<TripStatus>` | [CODE] |
 | 4 | Controller | `ATM:112-116` | Model | — | key `trips`, `statuses`, `editableIds`, `cancellableIds`, `deletableIds` | `admin/trip-list` | [CODE] |
@@ -411,13 +411,13 @@ sequenceDiagram
 | 13 | Service | `TS:676-693` | khối đồng bộ | `newStatus = CANCELLED` | không phải `DEPARTED` cũng không phải `COMPLETED` ⇒ **không làm gì với xe**. Xe #5 vẫn `READY` (nó chưa từng bị đánh `TRAVELING`, vì chuyến chưa xuất phát). Vì `getBus()` có được gọi ở `:676` nhưng chỉ so với `null`, [SUY LUẬN] Hibernate không cần nạp xe (chưa kiểm chứng) | — | [CODE] |
 | 14 | Proxy | — | commit | — | [SUY LUẬN — SQL tương đương] `UPDATE trips SET status = 'CANCELLED', … WHERE id = 8`. `tickets_sold` **giữ nguyên 12** — không có hoàn vé | — | [SPRING] |
 | 15 | Controller | `ATM:474`, `:481` | flash + redirect | — | `success` = "Hủy chuyến thành công!" → `redirect:/admin/trip-management/trips` | 302 | [CODE] |
-| 16 | View | `trip-list.html` | danh sách | — | chuyến #8 hiện nhãn `CANCELLED` (`:440-441`), **mất** nút Hủy (bước 2: `status == CANCELLED` bị loại). Nút Sửa và Xóa vẫn còn — sửa được (`editRefusalReason` cho `CANCELLED`, `ATM:260`), xóa được dù có vé (`deleteRefusalReason`, `TS:1894`) | HTML | [CODE] |
+| 16 | View | `trip-list.html` | danh sách | — | chuyến #8 hiện nhãn `CANCELLED` (`:440-441`), **mất** nút Hủy (bước 2: `status == CANCELLED` bị loại). Nút Sửa và Xóa vẫn còn — sửa được (`editRefusalReason` cho `CANCELLED`, `ATM:260`), xóa được dù có vé (`deleteRefusalReason`, `TS:1898`) | HTML | [CODE] |
 
 **Ranh giới transaction:** bước 1–4 là request GET (đọc). Bước 9–14 là **một** transaction; không có
 gì khác được ghi.
 
 **Hệ quả xa (Bài 08).** Nếu #8 là **chuyến tăng cường** AI tạo, `CANCELLED` không nằm trong tập "đã
-đề xuất rồi" của `hasAlreadySuggested()` (`TS:1735-1742`; `trip_lifecycle_fsm.md` §6.1), nên lần quét
+đề xuất rồi" của `hasAlreadySuggested()` (`TS:1739-1746`; `trip_lifecycle_fsm.md` §6.1), nên lần quét
 10 giây kế tiếp có thể đề xuất một chuyến tăng cường mới cho cùng chuyến gốc — có chủ đích.
 
 **(c) Code then chốt**
@@ -600,7 +600,7 @@ chỉ nhắc khi có điểm **mới** ở đây.
 | Allow-list ở controller | "Màn hình chỉ nhận những đích nó thật sự hiển thị" | `DC:108-114` | Lỗi #10: kích hoạt chuyến qua bảng điều hành mà không validate |
 | `@Transactional` bao cả trip lẫn bus | "Trạng thái chuyến và trạng thái xe cùng thành hoặc cùng hỏng" | `TS:636` | [SUY LUẬN] Mỗi `save()` tự là một transaction riêng (Bài 00b §4.1): có thể chuyến `COMPLETED` mà xe vẫn `TRAVELING` nếu lỗi giữa chừng |
 | LAZY + truy cập trong transaction | "Chưa cần thì chưa nạp; chạm tới thì nạp, miễn transaction còn mở" | `trip.getBus()`, `trip.getRoute()` `TS:676-688` | Ngoài transaction sẽ gặp `LazyInitializationException` (Bài 00b §2.4) |
-| Self-invocation | "Gọi nội bộ thì không qua proxy" (Bài 00b §4.2) | `rejectTrip()` → `updateTripStatus()` `TS:1453` | Bỏ `@Transactional` ở `rejectTrip`: [SUY LUẬN] lời gọi nội bộ chạy **không có** transaction — LAZY `bus` sẽ lỗi nếu nhánh đồng bộ cần nó (nhánh `CANCELLED` thì không) |
+| Self-invocation | "Gọi nội bộ thì không qua proxy" (Bài 00b §4.2) | `rejectTrip()` → `updateTripStatus()` `TS:1457` | Bỏ `@Transactional` ở `rejectTrip`: [SUY LUẬN] lời gọi nội bộ chạy **không có** transaction — LAZY `bus` sẽ lỗi nếu nhánh đồng bộ cần nó (nhánh `CANCELLED` thì không) |
 | `IllegalStateException` | "Thao tác sai thời điểm / sai trạng thái" — quy ước của dự án (Bài 00b §5.1) | `TS:643`, `:896` | Controller có `catch` riêng cho nó (`DC:119`, `ATM:475`) để in câu nghiệp vụ khác với lỗi hệ thống |
 
 ---
@@ -626,7 +626,7 @@ Sổ lỗi không ghi odometer **trước** lần hoàn thành hợp lệ, nên 
 `maintenanceThreshold = 5000` ⇒ ngưỡng "sắp đến hạn" = 5000 × 0,9 = **4500** (`Bus.java:59`, `:72-76`).
 Trước chuyến, `kmSinceLastMaintenance = 4200`. Tuyến 120 km.
 
-| | Sau khi hoàn thành | Xét chuyến kế tiếp 120 km: `isNearMaintenance(120)` = (kmSince + 120) ≥ 4500? | AI có chọn xe? (`TS:328-329`) |
+| | Sau khi hoàn thành | Xét chuyến kế tiếp 120 km: `isNearMaintenance(120)` = (kmSince + 120) ≥ 4500? | AI có chọn xe? (`TS:328-329`; từ CT7d máy còn cộng km đã xếp và quãng về bến nhà) |
 |---|---|---|---|
 | Đúng (một lần) | 4200 + 120 = **4320** | 4320 + 120 = 4440 ≥ 4500? **Không** | **Có** |
 | Sai (hai lần) | 4200 + 240 = **4440** | 4440 + 120 = 4560 ≥ 4500? **Có** | **Không** — xe tốt bị loại |
@@ -674,7 +674,7 @@ phải "trạng thái hiện tại trước".
 | "Set lại cùng trạng thái" **hợp lệ** nhưng là no-op | Giữ hợp đồng cũ "Same state set again → Always allowed" (không biến double-click thành lỗi) mà vẫn không chạy lại tác dụng phụ | Cấm hẳn `from == to` sẽ đổi hợp đồng đã ghi trong tài liệu | lỗi #6; `trip_lifecycle_fsm.md` §3 |
 | FSM **không** validate xe/người; lối gọi tự lo | Không trộn "bước có hợp lệ không" với "tài nguyên có hợp lệ không"; `validateBusForTrip` cần `bus != null`; `updateTrip` sẽ validate hai lần | Validate trong `updateTripStatus` (phương án b) — bị loại | lỗi #10 (phương án a, chủ dự án duyệt) |
 | Allow-list `BOARD_ACTIONS` ở **controller** | Bảng điều hành phơi ra bước nó không định phơi | Câu hỏi "màn hình phơi đích nào" là việc của controller | lỗi #10; javadoc `DC:44-58` |
-| `requirePendingApproval()` ở **service**, đứng **trước** `setBus()` | Duyệt lại chuyến `CANCELLED`/`COMPLETED`/`DEPARTED`; dời xe của chuyến đang chạy | Câu hỏi về **trạng thái nguồn** là bất biến vòng đời ⇒ thuộc `TripService`. **Không** dồn guard vào `changeStatusToActive()`: lối tạo mới đến đó với trạng thái đã là `ACTIVE` ⇒ sẽ vỡ toàn bộ chức năng tạo chuyến | lỗi #20; roadmap §9 (Developer Note #20); javadoc `TS:1918-1922` |
+| `requirePendingApproval()` ở **service**, đứng **trước** `setBus()` | Duyệt lại chuyến `CANCELLED`/`COMPLETED`/`DEPARTED`; dời xe của chuyến đang chạy | Câu hỏi về **trạng thái nguồn** là bất biến vòng đời ⇒ thuộc `TripService`. **Không** dồn guard vào `changeStatusToActive()`: lối tạo mới đến đó với trạng thái đã là `ACTIVE` ⇒ sẽ vỡ toàn bộ chức năng tạo chuyến | lỗi #20; roadmap §9 (Developer Note #20); javadoc `TS:1922-1926` |
 | Không gộp hai lối duyệt vào `updateTripStatus(id, ACTIVE)` | — | Đó là "sửa tận gốc", nhưng tái cấu trúc đường bán vé, trái §3 "minimize changes to TripService", cho một lỗ có khả năng chạm từ UI = 0 | roadmap §9 (đã xét và từ chối, 2026-08-12) |
 | `allowedTransitionsFrom()` public, `canTransition()` vẫn private | UI chép bảng luật bằng tay rồi lệch (lỗi #23/#24) | Lật `canTransition` thành public thì ai cũng gọi được, nhưng không ai nhận danh sách đích để dựng select | javadoc `TS:587-601`; lỗi #23 |
 | Giữ **một** cột `Bus.status` cho hai người ghi (FSM ghi `TRAVELING`/`READY`, Admin ghi `REPAIRING`) | — | Tách cột là cách "chuẩn", nhưng cần đổi schema + 12 chỗ đọc ⇒ trái §3. Thay vào đó cho mỗi người ghi một **cửa sổ độc quyền** (#14, #15) | roadmap §9 (Developer Note `Bus.status`, chủ dự án duyệt) |
@@ -758,7 +758,7 @@ trong `updateTripStatus()` là bản sửa của lỗi đó; Bug #3 *"`cancelTri
 7. **Mâu thuẫn tài liệu / comment ↔ code (code thắng):**
    - Nhiều **số dòng** trong comment đã lệch: javadoc `changeStatusToActive()` ghi `canTransition:541`,
      `requirePendingApproval()` ghi `canTransition:536-546` — thật ra `TS:575-585`; javadoc
-     `TS:1915-1916` và `trip_lifecycle_fsm.md` §5.1 ghi `createTrip():117` — dòng `setStatus(ACTIVE)`
+     `TS:1919-1920` và `trip_lifecycle_fsm.md` §5.1 ghi `createTrip():117` — dòng `setStatus(ACTIVE)`
      thật ở `ATM:177`; javadoc `editRefusalReason()` ghi `TripService:621-627` (đoạn cộng odometer) —
      thật ở `TS:684-689`. Bảng §5.1 của `trip_lifecycle_fsm.md` (`updateTripStatus():579/:605`,
      `:869`, `:931`, `:953`) cũng lệch. Logic mô tả vẫn đúng.
@@ -800,7 +800,8 @@ repository, `@Transactional` để rollback).
 
 - **FSM ảnh hưởng tới:**
   - Xếp xe của AI (Bài 08): chỉ xe `READY` là ứng viên (`busRepository.findByStatus(READY)`, `TS:318`);
-    lọc bảo trì theo km (`TS:328-329`) đọc odometer mà FSM cộng.
+    lọc bảo trì theo km (`TS:328-329`; từ CT7d là km thật + km mọi chuyến chưa xong + quãng về — mục
+    "BẢO TRÌ TRONG LỊCH" cuối `TripService`) đọc odometer mà FSM cộng.
   - Validator (Bài 06): xe `TRAVELING` không chuyến `DEPARTED` nào giải thích thì bị từ chối
     (`TS:1146`); tập "bận" `PENDING_APPROVAL/ACTIVE/DEPARTED` là phần bù của hai trạng thái cuối.
   - Guard khoá tài xế (Bài 04) và guard `REPAIRING` (Bài 01) dùng đúng tập "chưa kết thúc" đó
@@ -810,7 +811,7 @@ repository, `@Transactional` để rollback).
   - Dashboard (Bài 12): đếm xe `READY`/`TRAVELING` (`DashboardService.java:156-157`).
   - Đề Xuất Thay Xe (Bài 16): xếp hạng 70% theo odometer.
   - Dự báo, Recommendation (Bài 14, 17): chỉ đọc chuyến `COMPLETED` (`ForecastService.java:228`,
-    `RecommendationService.java:584`).
+    `RecommendationService.java:594`).
 - **FSM bị ảnh hưởng bởi:** km của tuyến (Bài 03 — sửa km khi có chuyến `DEPARTED` thì **cảnh báo**,
   vì FSM đọc km lúc hoàn thành); chính sách sửa chuyến (Bài 07); màn Duyệt (Bài 09).
 
@@ -967,7 +968,7 @@ if (newStatus == TripStatus.ACTIVE) {
    truyền được `ACTIVE`: `AdminTripManagementController.updateTrip()` — và nó chạy `updateManualTrip()`
    (validate đầy đủ) **trước**. `DispatchController.changeStatus()` nhận tham số tuỳ ý nhưng bị allow-list
    `BOARD_ACTIONS` cấm `ACTIVE` (lỗi #10). `cancelTrip()` và `rejectTrip()` chỉ truyền hằng `CANCELLED`.
-6. `CANCELLED` không nằm trong tập chặn của `hasAlreadySuggested()` (`TS:1735-1742`), nên lần quét kế
+6. `CANCELLED` không nằm trong tập chặn của `hasAlreadySuggested()` (`TS:1739-1746`), nên lần quét kế
    tiếp có thể tạo **một chuyến tăng cường mới** `PENDING_APPROVAL` cho cùng chuyến gốc — có chủ đích
    (`trip_lifecycle_fsm.md` §6.1: lời đề xuất cũ bị từ chối không có nghĩa nhu cầu đã hết).
 7. Không. Bảng luật cho qua, trạng thái đổi; khối đồng bộ có `if (trip.getBus() != null)` (`TS:676`) nên

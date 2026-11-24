@@ -1033,7 +1033,7 @@ existing.setExperienceYears(formDriver.getExperienceYears());
 existing.setIsActive(Boolean.TRUE.equals(formDriver.getIsActive())); // null cũng thành false</code></pre></div>
 <p><code>Boolean.TRUE.equals(x)</code> — so sánh &quot;an toàn với null&quot;: <code>x</code> là <code>null</code> thì ra <code>false</code> chứ không ném
 <code>NullPointerException</code> như khi viết <code>x == true</code> với <code>Boolean</code>. Dự án dùng mẫu này ở mọi chỗ đọc
-<code>isActive</code> (<code>TripService.java:484</code>, <code>:1302</code>…).</p>
+<code>isActive</code> (<code>TripService.java:484</code>, <code>:1306</code>…).</p>
 <hr>
 <h2 id="4-luong-loi-xoa-tai-xe-da-co-lich-su">§4. Luồng lỗi — xoá tài xế đã có lịch sử</h2>
 <div class="table-wrap"><table><thead><tr>
@@ -1282,7 +1282,7 @@ model.addAttribute("roles", roles);   // còn ROLE_ADMIN, ROLE_USER</code></pre>
 <tr>
 <td>Khoá tài xế</td>
 <td><code>drivers.is_active</code></td>
-<td><code>1 → 0</code>. Từ lúc đó người này biến khỏi mọi dropdown xếp chuyến và bị validator từ chối (<code>TripService.java:1302-1305</code>)</td>
+<td><code>1 → 0</code>. Từ lúc đó người này biến khỏi mọi dropdown xếp chuyến và bị validator từ chối (<code>TripService.java:1306-1309</code>)</td>
 </tr>
 <tr>
 <td>Xoá tài xế</td>
@@ -1614,7 +1614,7 @@ hề được băm; đúng ra là &quot;giữ nguyên mật khẩu cũ&quot;.</l
 <ul>
 <li><strong>Màn này ảnh hưởng tới:</strong><ul>
 <li>Validator và mọi đường xếp người (Bài 06–09): <code>isActive</code> và <code>isLicenseValid(ngày khởi hành)</code> ở
-<code>TripService.java:484-492</code> (AI chọn tài xế), <code>:1302-1310</code>, <code>:1326-1330</code>, <code>:1350-1357</code> (validator
+<code>TripService.java:484-492</code> (AI chọn tài xế), <code>:1306-1314</code>, <code>:1330-1334</code>, <code>:1354-1361</code> (validator
 tài xế chính / phụ / phụ xe), <code>:1531-1532</code>, <code>:1560-1561</code>, <code>:1632-1633</code>, <code>:1680-1681</code> (các dropdown).</li>
 <li>Giờ lái trong ngày: <code>totalDrivingHours24h</code> cộng vào khi xét <strong>hôm nay</strong> (<code>TripService.java:827-831</code>).</li>
 <li>Gợi ý tài xế (Bài 15): <code>DriverRecommendationService.java:85-93</code>.</li>

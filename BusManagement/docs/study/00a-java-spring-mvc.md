@@ -299,7 +299,7 @@ Vì `record` có sẵn `equals/hashCode` theo các field, nó dùng được là
 
 ### 2.6. Switch expression — và vì sao cố ý **không có `default`**
 
-[CODE] `…/service/TripService.java:1874-1895` (rút gọn):
+[CODE] `…/service/TripService.java:1878-1899` (rút gọn):
 
 ```java
 public String deleteRefusalReason(Trip trip) {
@@ -530,7 +530,7 @@ public String createBus(@ModelAttribute Bus bus, RedirectAttributes redirectAttr
 
 | Màn | Cách xóa | Vị trí |
 |---|---|---|
-| Xe, tài xế, bến, tuyến, sự cố | **GET** `/.../delete/{id}` qua thẻ `<a href>` + `confirm()` của JS | `AdminBusController.java:72` (`@GetMapping`), `bus-list.html:83-85` |
+| Xe, tài xế, bến, tuyến, sự cố | **GET** `/.../delete/{id}` qua thẻ `<a href>` + `confirm()` của JS | `AdminBusController.java:72` (`@GetMapping`), `bus-list.html:88-90` |
 | Chuyến (xóa, hủy), duyệt/từ chối | **POST** qua `<form method="post">` | `AdminTripManagementController` `@PostMapping("/trips/delete/{id}")`, `/trips/cancel/{id}` |
 
 Theo quy ước HTTP, **GET chỉ nên đọc**, thay đổi dữ liệu nên dùng POST (hoặc DELETE). Rủi ro của
@@ -632,8 +632,8 @@ Số lần xuất hiện đếm bằng grep trên toàn bộ `tpl/` (2026-09-26)
 | `th:text="${x}"` | 357 | In giá trị ra (tự chống chèn mã HTML) | `bus-list.html:54` in `bus.id` |
 | `th:if` / `th:unless` | 126 / 25 | Hiện khối nếu đúng / nếu sai | `bus-list.html:74-76` nhãn bảo trì |
 | `th:each="bus : ${buses}"` | 47 | Lặp | `bus-list.html:53` |
-| `th:href="@{...}"` | 64 | Tạo link | `bus-list.html:81` |
-| `@{/admin/buses/edit/{id}(id=${bus.id})}` | — | Link có biến đường dẫn | `bus-list.html:81` |
+| `th:href="@{...}"` | 64 | Tạo link | `bus-list.html:86` |
+| `@{/admin/buses/edit/{id}(id=${bus.id})}` | — | Link có biến đường dẫn | `bus-list.html:86` |
 | `th:action` | 23 | URL gửi form | `bus-form.html:22` |
 | `th:object` + `th:field="*{...}"` | 4 / 16 | Gắn form với một object; mỗi ô gắn một field | `bus-form.html:23`, `:28` |
 | `th:value`, `th:selected` | 50 / 13 | Giá trị ô / option được chọn | `bus-form.html:42` |
@@ -641,7 +641,7 @@ Số lần xuất hiện đếm bằng grep trên toàn bộ `tpl/` (2026-09-26)
 | `th:switch` / `th:case` | 1 / 5 | Rẽ nhánh hiển thị | — |
 | `th:attr="data-x=${...}"` | 1 | Gắn thuộc tính tùy ý | `trip-create-form.html:148` gắn `data-duration`, `data-type` cho JS đọc |
 | `th:inline="javascript"` | 3 | Đẩy dữ liệu vào `<script>` | §7.1 |
-| `#lists.isEmpty(...)` / `#lists.size` | 33 / 13 | Tiện ích danh sách | `bus-list.html:89` |
+| `#lists.isEmpty(...)` / `#lists.size` | 33 / 13 | Tiện ích danh sách | `bus-list.html:94` |
 | `#numbers.formatDecimal(x, 1, 0)` | 58 | Định dạng số | `bus-list.html:62` |
 | `#temporals.format(t, 'dd/MM/yyyy HH:mm')` | 33 | Định dạng ngày giờ Java 8 | nhiều trang chuyến |
 
@@ -726,7 +726,7 @@ sequenceDiagram
 - `addEventListener('change' | 'submit' | 'DOMContentLoaded', hàm)` — "khi chuyện X xảy ra thì chạy
   hàm này". `DOMContentLoaded` = trang vừa dựng xong.
 - `confirm('Bạn có chắc...')` — hộp hỏi Có/Không; `onclick="return confirm(...)"` ở
-  `bus-list.html:85`: bấm "Không" thì link không được mở.
+  `bus-list.html:90`: bấm "Không" thì link không được mở.
 - **Kiểm tra trùng nhân sự trước khi gửi form** — [CODE] `trip-create-form.html:704-716`: lúc
   submit, gọi `validateNoDriverConflict()` (`:721`); nếu một người vừa là tài xế chính vừa là phụ
   xe thì `e.preventDefault()` chặn gửi form và tô đỏ ô sai.
@@ -874,7 +874,7 @@ Test canh quy ước này: `src/test/.../domain/EntityEqualsHashCodeCycleTest.ja
 | `Optional` | Hộp có thể rỗng | `AdminBusController.java:47-48` |
 | `orElseThrow` | Hộp rỗng thì ném lỗi | như trên |
 | `record` | Class chở dữ liệu viết một dòng | `ForecastService.java:186` |
-| Switch expression | switch trả về giá trị, dùng `->` | `TripService.java:1874-1895` |
+| Switch expression | switch trả về giá trị, dùng `->` | `TripService.java:1878-1899` |
 | Text block `"""` | Chuỗi nhiều dòng | `TripRepository.java:54-67` |
 | `BigDecimal` | Số thập phân chính xác, dùng cho tiền | `Trip.price` |
 | `LocalDateTime` / `Duration` | Ngày giờ / khoảng thời gian | `Trip.getTripDurationHours()` |
@@ -905,8 +905,8 @@ Test canh quy ước này: `src/test/.../domain/EntityEqualsHashCodeCycleTest.ja
 | Thymeleaf | Bộ trộn khuôn HTML với dữ liệu, chạy ở server | 27 template |
 | `th:text` / `th:if` / `th:each` | In / điều kiện / lặp | `bus-list.html:53-76` |
 | `th:object` / `th:field` | Gắn form với object / ô với field | `bus-form.html:23`, `:28` |
-| `@{...}` | Cú pháp tạo URL | `bus-list.html:81` |
-| `#numbers` / `#temporals` / `#lists` | Tiện ích định dạng số / ngày / danh sách | `bus-list.html:62`, `:89` |
+| `@{...}` | Cú pháp tạo URL | `bus-list.html:86` |
+| `#numbers` / `#temporals` / `#lists` | Tiện ích định dạng số / ngày / danh sách | `bus-list.html:62`, `:94` |
 | CDN | Nơi tải thư viện CSS/JS qua internet | `dashboard-analytics.html:463-464` |
 | `th:inline="javascript"` + `/*[[...]]*/` | Đẩy dữ liệu server vào JS | `trip-edit-form.html:252-256` |
 | `fetch` / `async` / `await` | JS gọi server không chặn trang / đợi kết quả | `trip-create-form.html:470-495` |

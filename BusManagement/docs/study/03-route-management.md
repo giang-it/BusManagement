@@ -627,7 +627,7 @@ minh hoạ.)* Tuyến 1: 120 km, 2 chuyến `DEPARTED`. Admin sửa thành 500 k
 **8.3. Thời lượng tuyến ⇒ số tài xế.** `estimatedDuration` không tự quyết định số tài xế, nhưng nó
 sinh ra giờ đến dự kiến của chuyến (JS form tạo chuyến `trip-create-form.html:438`:
 `arrMs = depMs + routeDurationMinutes × 60 × 1000`), và `validateStaffForTrip()` tính từ đó
-(`TripService.java:1226-1236`):
+(`TripService.java:1230-1240`):
 - Tuyến 120 phút: 2 giờ ⇒ `ceil(2 / 8) = 1` tài xế.
 - Tuyến 1800 phút (tuyến Hà Nội → Sài Gòn của seed, `DataInitializer.java:194`): 30 giờ ⇒
   `ceil(30 / 8) = ceil(3,75) = 4` tài xế.
@@ -759,7 +759,7 @@ was blocked"*).
     (roadmap §9, `project_report.md` Warn #4), không đi qua `RouteService`.
   - Chuyến tăng cường (Bài 08): giờ đến = khởi hành + `estimatedDuration` (`TripService.java:157-160`).
   - Dashboard, Dự báo, Đề xuất, What-if (Bài 12, 14, 17, 18): đều đọc `findAllWithStations()`
-    (`DashboardService.java:201`, `ForecastService.java:257`, `RecommendationService.java:171`,
+    (`DashboardService.java:201`, `ForecastService.java:257`, `RecommendationService.java:179`,
     `WhatIfSimulationService.java:211`); chi phí nhiên liệu = đơn giá × `distanceKm`.
 - **Màn này bị ảnh hưởng bởi:** bến xe (Bài 02 — nguồn của dropdown, và guard xoá bến đọc
   `route_stations`); loại xe (Bài 01 — `BusService.findAllBusTypes()`); chuyến (quyết định tuyến có

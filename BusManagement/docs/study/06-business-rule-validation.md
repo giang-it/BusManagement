@@ -11,8 +11,8 @@
 > `TS` = `…/service/TripService.java`, `TR` = `…/repository/TripRepository.java`.
 >
 > **Phạm vi.** Giống Bài 05, chức năng này **không có màn hình riêng**: nó là hai method private
-> trong `TripService` — `validateBusForTrip()` (`TS:1106-1211`) và `validateStaffForTrip()`
-> (`TS:1226-1367`) — cùng hai "vỏ bọc" public không ném lỗi (`TS:1407-1443`, Phase 3). Năm nơi gọi
+> trong `TripService` — `validateBusForTrip()` (`TS:1106-1215`) và `validateStaffForTrip()`
+> (`TS:1230-1371`) — cùng hai "vỏ bọc" public không ném lỗi (`TS:1411-1447`, Phase 3). Năm nơi gọi
 > vào chúng thuộc Bài 07 (tạo/sửa), Bài 09 (duyệt) và Bài 17 (Recommendation). Bài này có 🧮: §8
 > bắt buộc tính tay.
 
@@ -49,17 +49,17 @@ buộc: Xe … sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này�
 
 | Loại | File | Trách nhiệm (1 dòng) |
 |---|---|---|
-| Service — luật xe | `TS:1106-1211` `validateBusForTrip()` | 6 luật xe, ném `IllegalArgumentException` ở luật đầu tiên bị vi phạm; trả `String` cảnh báo (luôn `null`) |
-| Service — luật người | `TS:1226-1367` `validateStaffForTrip()` | Số tài xế, phụ xe, trùng vai, rồi từng người: hoạt động / bằng lái / bận / giờ lái |
-| Service — dry-run | `TS:1407-1413`, `:1436-1443` | Bọc hai validator trong `try/catch (IllegalArgumentException)`, trả `ValidationResult` |
+| Service — luật xe | `TS:1106-1215` `validateBusForTrip()` | 6 luật xe, ném `IllegalArgumentException` ở luật đầu tiên bị vi phạm; trả `String` cảnh báo (luôn `null`) |
+| Service — luật người | `TS:1230-1371` `validateStaffForTrip()` | Số tài xế, phụ xe, trùng vai, rồi từng người: hoạt động / bằng lái / bận / giờ lái |
+| Service — dry-run | `TS:1411-1417`, `:1440-1447` | Bọc hai validator trong `try/catch (IllegalArgumentException)`, trả `ValidationResult` |
 | Kết quả | `…/service/ValidationResult.java` | Bất biến: `valid`, `failureReason` (tối đa **một**), `warning`; tạo qua `pass()` / `pass(w)` / `fail(r)` |
 | Service — hàm phụ | `TS:352-377` `isBusBusy()`; `:701-735` `isDriverBusyInWindow()`; `:740-835` `getDrivingHoursForDate()` + `sumDrivingHours()`; `:397-434` ba predicate | Xe bận? người bận? giờ lái trong ngày? |
 | Service — hằng số | `TS:33` `MIN_REST_BETWEEN_TRIPS_MINUTES = 30`; `:39` `BUS_PREP_BUFFER_HOURS = 1` | Đệm 30 phút cho người, 1 giờ cho xe |
 | Repository | `TR:131-142`, `:150-160`, `:171-179`, `:186-197`; `:393` | 3 câu "có trùng lịch không", 1 câu "chuyến của tài xế trong ngày", 1 câu "xe có chuyến DEPARTED không" |
 | Entity | `…/domain/Bus.java:42-76`; `…/domain/Driver.java:47-61` | `getKmSinceLastMaintenance()`, `needsMaintenance()`, `isNearMaintenance(km)`; `isLicenseValid(LocalDate)` |
-| Lớp "không-mời" | `TS:1483-1685` (dropdown), `:308-332` + `:472-523` (AI), `TripRestController.java:47-88` (API form Tạo) | Lọc trước những gì validator sẽ từ chối |
+| Lớp "không-mời" | `TS:1487-1689` (dropdown), `:308-332` + `:472-523` (AI), `TripRestController.java:47-88` (API form Tạo) | Lọc trước những gì validator sẽ từ chối |
 | Người gọi (throw) | `TS:929-930`, `:1007-1008`, `:1051-1052`, `:1076-1077` | `confirmAutoAssignedTrip`, `approveTrip`, `createManualTrip`, `updateManualTrip` |
-| Người gọi (dry-run) | `…/service/RecommendationService.java:500-510` (gọi ở `:382` và cho mỗi lượt đi kèm) | Cổng xác nhận cuối của thẻ gợi ý |
+| Người gọi (dry-run) | `…/service/RecommendationService.java:510-520` (gọi ở `:366` cho từng lượt của vòng — CT7c) | Cổng xác nhận cuối của thẻ gợi ý |
 | Test | `test/service/TripServiceValidationDryRunTest.java` (12), `TripServiceSeatCapacityTest` (9), `TripServiceDriverShareTest` (9), `TripServiceAssistantAvailabilityTest` (4), `TripServiceAvailabilityContextTest` (4) | §9.4 |
 
 ### 2.2. Bảng endpoint — đủ mọi điểm bắt đầu
@@ -73,7 +73,7 @@ Validator không có endpoint riêng. Đây là mọi lối **dẫn tới** nó.
 | POST | `/admin/trip-management/trips/update` | `ATM.updateTrip()` `:355-460` | nút Lưu ở `trip-edit-form.html` (Bài 07) | `updateManualTrip()` → cả hai, `excludeTripId = id chuyến` (`TS:1076-1077`) | lỗi: redirect form sửa + "Lỗi: …" |
 | POST | `/admin/trips/approve` | `ATC.processManualApproval()` `:166-201` | MANUAL MODE ở `approve-form.html` (Bài 09) | `approveTrip()` → cả hai, `excludeTripId = tripId` (`TS:1007-1008`) | lỗi: `catch (IllegalArgumentException)` → "⛔ Vi phạm ràng buộc: …" → `/admin/trips/approve/{id}` |
 | POST | `/admin/trips/confirm` | `ATC.confirmAutoAssigned()` `:135-156` | nút Xác nhận AUTO MODE (Bài 09) | `confirmAutoAssignedTrip()` → cả hai (`TS:929-930`) | lỗi validator: `catch (Exception)` → "Lỗi xác nhận: …" → `/admin/trips/approve/{id}` |
-| GET | `/admin/analytics/recommendation` | `RecommendationController` `:35-38` | menu Analytics (Bài 17) | `buildRecommendations()` → `buildCard()` → **hai bản dry-run** (`RecommendationService.java:504`, `:508`) | thẻ `RECOMMENDED` (màn ghi "Đủ điều kiện") hoặc `STALE` kèm lý do (`recommendation.html:211`, `:276`) |
+| GET | `/admin/analytics/recommendation` | `RecommendationController` `:35-38` | menu Analytics (Bài 17) | `buildRecommendations()` → `buildCard()` → **hai bản dry-run** (`RecommendationService.java:514`, `:518`) | thẻ `RECOMMENDED` (màn ghi "Đủ điều kiện") hoặc `STALE` kèm lý do (`recommendation.html:211`, `:276`) |
 | GET (`fetch`) | `/api/admin/trips/available-resources` | `TripRestController.getAvailableResources()` `:47-86` | JS form Tạo (`trip-create-form.html:482-484`) | 3 bộ lọc `…ForTimeRange` — **lớp không-mời**, không gọi validator | JSON `buses`, `drivers`, `assistants` |
 | `@Scheduled` | — | `TS.scanAndSuggestExtraTrips()` `:76-78` | job 10 giây (Bài 08) | AI chọn bằng `findBestAvailableBus/Driver` — **không** gọi validator; validator chạy lại lúc Admin xác nhận | chuyến `PENDING_APPROVAL` |
 
@@ -133,7 +133,7 @@ sau** (`TS:929-930`, `:1007-1008`, `:1051-1052`, `:1076-1077`).
 ### 2.4. Điều cốt lõi cần nhớ
 
 1. **Một nơi giữ luật, nhiều nơi hỏi.** Bốn lối lưu chuyến cùng gọi hai validator; màn Gợi ý gọi
-   qua bản dry-run — bản này **không chép** luật, chỉ bắt exception (`TS:1407-1413`). Đổi luật ở
+   qua bản dry-run — bản này **không chép** luật, chỉ bắt exception (`TS:1411-1417`). Đổi luật ở
    validator thì mọi lối đổi theo.
 2. **Ném `IllegalArgumentException` ở luật đầu tiên bị vi phạm.** Nên mỗi lần chỉ báo **một** lý do,
    kể cả bản dry-run (chủ dự án duyệt, roadmap §9).
@@ -214,22 +214,22 @@ sequenceDiagram
 | 6 | Service | `TS:1146-1155` | luật 2 — cờ `TRAVELING` | `READY` | không phải `TRAVELING` ⇒ **bỏ qua cả nhánh**, không truy vấn | — | [CODE] |
 | 7 | Service | `TS:1157-1163` | cửa sổ xe | 06:00, 16:00 | giờ đến `null` thì lấy `departure + 5h`; `windowStart = 05:00`, `windowEnd = 17:00` (`BUS_PREP_BUFFER_HOURS = 1`, `TS:39`) | — | [CODE] |
 | 8 | Service → DB | `TS:1165` → `:352-371` → `TR:171-179` | luật 3 — `isBusBusy` → `existsOverlappingTripForBus` | xe #5, trạng thái bận `ACTIVE, DEPARTED, PENDING_APPROVAL` | [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) > 0 FROM trips t WHERE t.bus_id = 5 AND t.status IN ('ACTIVE','DEPARTED','PENDING_APPROVAL') AND t.departure_time < '…17:00' AND t.arrival_time_expected > '…05:00' AND t.is_deleted = false` (vế `excludeTripId` luôn đúng vì tham số `null`) | `false` | [CODE]+[SPRING] |
-| 9 | Service | `TS:1173-1178` → `Bus.java:48-52` | luật 4 — `needsMaintenance()` | kmSince = 9000 − 5000 = 4000 | 4000 ≥ 5000? Không | — | [CODE] |
-| 10 | Service | `TS:1186-1194` → `Bus.java:72-76` | luật 5 — `isNearMaintenance(450)` | — | 4000 + 450 = 4450 ≥ 5000 × 0,9 = 4500? Không | — | [CODE] |
-| 11 | Service | `TS:1203-1208` → `:1219-1221` | luật 6 — sức chứa | `capacity = 40` | 40 > 40? Không (lỗi #22). Xe chưa gán loại ⇒ `capacity = null` ⇒ bỏ qua | `return null` | [CODE] |
-| 12 | Service | `TS:1052` → `:1227-1235` | `validateStaffForTrip(trip, null)` | — | `durationHours = 600 phút / 60 = 10.0`; `requiredDrivers = ceil(10/8) = 2` | — | [CODE] |
-| 13 | Service | `TS:1238-1253` | có tài xế chính? đủ người? | — | `driver != null`; `assigned = 1 + coDrivers.size() = 2` ≥ 2 | — | [CODE] |
-| 14 | Service | `TS:1256-1259` | phụ xe cho chuyến dài | — | `10.0 > 8.0` và có Chi ⇒ qua | — | [CODE] |
-| 15 | Service | `TS:1262-1292` | trùng vai | — | `HashSet` id: An; Bình khác An và chưa có ⇒ thêm; Chi khác An và chưa có ⇒ thêm. Chỉ ghi vào biến cục bộ | — | [CODE] |
-| 16 | Service | `TS:1296-1299` | cửa sổ người + phần chia | — | `windowStart = 05:30`, `windowEnd = 16:30` (`TS:33`); `shareDuration = 10/2 = 5.0`; `effectiveHours = min(5.0, 8.0) = 5.0` | — | [CODE] |
-| 17 | Service | `TS:1302-1310` → `Driver.java:47-49` | An: hoạt động, bằng lái | — | `Boolean.TRUE.equals(isActive)`; `isLicenseValid(ngày mai)` = hạn bằng **sau hẳn** ngày khởi hành (Bài 04 §8.1) | — | [CODE] |
-| 18 | Service → DB | `TS:1311` → `:714-728` → `TR:131-142`, `:150-160` | An bận? | trạng thái bận `PENDING_APPROVAL, ACTIVE, DEPARTED` | hai câu: [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) > 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = An OR cd.user_id = An) AND t.status IN (…) AND t.departure_time < '…16:30' AND t.arrival_time_expected > '…05:30' AND t.is_deleted = false`, rồi câu tương tự với `t.assistant_id = An` | `false`, `false` | [CODE]+[SPRING] |
-| 19 | Service → DB | `TS:1315` → `:752-772` → `TR:186-197` | giờ lái của An ngày mai | thêm `COMPLETED` vào tập trạng thái (`TS:756-757`) | [SUY LUẬN — SQL tương đương] `SELECT DISTINCT t.*, cd.* FROM trips t LEFT JOIN trip_co_drivers cd … WHERE (t.driver_id = An OR cd.user_id = An OR t.assistant_id = An) AND t.status IN (4 trạng thái) AND t.departure_time >= 'mai 00:00' AND t.departure_time < 'mốt 00:00' AND t.is_deleted = false` | danh sách rỗng | [CODE]+[SPRING] |
+| 9 | Service | `TS:1173-1178` → `Bus.java:48-52` | luật 4 — `needsMaintenance()` (CT7d: trừ chuyến sau ngày bảo trì dự kiến) | kmSince = 9000 − 5000 = 4000 | 4000 ≥ 5000? Không | — | [CODE] |
+| 10 | Service | `TS:1190-1198` → `Bus.java:72-76` | luật 5 — `isNearMaintenance(450)` | — | 4000 + 450 = 4450 ≥ 5000 × 0,9 = 4500? Không | — | [CODE] |
+| 11 | Service | `TS:1207-1212` → `:1223-1225` | luật 6 — sức chứa | `capacity = 40` | 40 > 40? Không (lỗi #22). Xe chưa gán loại ⇒ `capacity = null` ⇒ bỏ qua | `return null` | [CODE] |
+| 12 | Service | `TS:1052` → `:1231-1239` | `validateStaffForTrip(trip, null)` | — | `durationHours = 600 phút / 60 = 10.0`; `requiredDrivers = ceil(10/8) = 2` | — | [CODE] |
+| 13 | Service | `TS:1242-1257` | có tài xế chính? đủ người? | — | `driver != null`; `assigned = 1 + coDrivers.size() = 2` ≥ 2 | — | [CODE] |
+| 14 | Service | `TS:1260-1263` | phụ xe cho chuyến dài | — | `10.0 > 8.0` và có Chi ⇒ qua | — | [CODE] |
+| 15 | Service | `TS:1266-1296` | trùng vai | — | `HashSet` id: An; Bình khác An và chưa có ⇒ thêm; Chi khác An và chưa có ⇒ thêm. Chỉ ghi vào biến cục bộ | — | [CODE] |
+| 16 | Service | `TS:1300-1303` | cửa sổ người + phần chia | — | `windowStart = 05:30`, `windowEnd = 16:30` (`TS:33`); `shareDuration = 10/2 = 5.0`; `effectiveHours = min(5.0, 8.0) = 5.0` | — | [CODE] |
+| 17 | Service | `TS:1306-1314` → `Driver.java:47-49` | An: hoạt động, bằng lái | — | `Boolean.TRUE.equals(isActive)`; `isLicenseValid(ngày mai)` = hạn bằng **sau hẳn** ngày khởi hành (Bài 04 §8.1) | — | [CODE] |
+| 18 | Service → DB | `TS:1315` → `:714-728` → `TR:131-142`, `:150-160` | An bận? | trạng thái bận `PENDING_APPROVAL, ACTIVE, DEPARTED` | hai câu: [SUY LUẬN — SQL tương đương] `SELECT COUNT(t.id) > 0 FROM trips t LEFT JOIN trip_co_drivers cd ON cd.trip_id = t.id WHERE (t.driver_id = An OR cd.user_id = An) AND t.status IN (…) AND t.departure_time < '…16:30' AND t.arrival_time_expected > '…05:30' AND t.is_deleted = false`, rồi câu tương tự với `t.assistant_id = An` | `false`, `false` | [CODE]+[SPRING] |
+| 19 | Service → DB | `TS:1319` → `:752-772` → `TR:186-197` | giờ lái của An ngày mai | thêm `COMPLETED` vào tập trạng thái (`TS:756-757`) | [SUY LUẬN — SQL tương đương] `SELECT DISTINCT t.*, cd.* FROM trips t LEFT JOIN trip_co_drivers cd … WHERE (t.driver_id = An OR cd.user_id = An OR t.assistant_id = An) AND t.status IN (4 trạng thái) AND t.departure_time >= 'mai 00:00' AND t.departure_time < 'mốt 00:00' AND t.is_deleted = false` | danh sách rỗng | [CODE]+[SPRING] |
 | 20 | Service | `TS:782-834` `sumDrivingHours()` | — | rỗng | tổng 0; ngày mai ≠ hôm nay ⇒ **không** cộng giờ nền mock | `0.0` | [CODE] |
-| 21 | Service | `TS:1316` | luật 8h của An | 0.0 + 5.0 | `> 8.0`? Không | — | [CODE] |
-| 22 | Service | `TS:1324-1346` | Bình: như bước 17–21 | — | bận? chuyến 18:00–21:00: `18:00 < 16:30`? **Không** ⇒ không giao ⇒ không bận. Giờ lái: chuyến đó khởi hành ngày mai, Bình lái một mình ⇒ `min(3/1, 8) = 3.0` | 3.0 + 5.0 = **8.0** `> 8.0`? **Không** ⇒ qua đúng ở biên | [CODE] |
-| 23 | Service | `TS:1349-1366` | Chi (phụ xe) | — | hoạt động, bằng lái, hai câu kiểm bận; **không** có luật giờ lái | — | [CODE] |
-| 24 | Service | `TS:1054` → `:1929-1934` | `changeStatusToActive()` | — | `ACTIVE` + `saleOpenedAt = now()` (Bài 05) | — | [CODE] |
+| 21 | Service | `TS:1320` | luật 8h của An | 0.0 + 5.0 | `> 8.0`? Không | — | [CODE] |
+| 22 | Service | `TS:1328-1350` | Bình: như bước 17–21 | — | bận? chuyến 18:00–21:00: `18:00 < 16:30`? **Không** ⇒ không giao ⇒ không bận. Giờ lái: chuyến đó khởi hành ngày mai, Bình lái một mình ⇒ `min(3/1, 8) = 3.0` | 3.0 + 5.0 = **8.0** `> 8.0`? **Không** ⇒ qua đúng ở biên | [CODE] |
+| 23 | Service | `TS:1353-1370` | Chi (phụ xe) | — | hoạt động, bằng lái, hai câu kiểm bận; **không** có luật giờ lái | — | [CODE] |
+| 24 | Service | `TS:1054` → `:1933-1938` | `changeStatusToActive()` | — | `ACTIVE` + `saleOpenedAt = now()` (Bài 05) | — | [CODE] |
 | 25 | Service → DB | `TS:1055` | `tripRepository.save(trip)` | `id = null` | `persist`; `IDENTITY` ⇒ `INSERT INTO trips …` chạy **ngay**; dòng `trip_co_drivers (trip_id, user_id = Bình)` ghi khi flush/commit | — | [SPRING] |
 | 26 | Proxy | — | commit | — | đóng transaction | `warning = null` | [SPRING] |
 | 27 | Controller | `ATM:183-187` | flash + redirect | — | `success` = "Tạo chuyến xe thành công!"; `warning` chỉ thêm khi khác `null` (không bao giờ, §9.3) → `redirect:/admin/trip-management/trips` | 302 | [CODE] |
@@ -241,14 +241,14 @@ wrappers are genuinely side-effect free", đã kiểm). Số truy vấn của lu
 
 **Nếu chuyến tối của Bình là 17:00–21:00** (4h): bước 22 thành 4.0 + 5.0 = 9.0 > 8.0 ⇒ ném
 *"Tài xế phụ Bình đã được phân công lái 4.0h trong ngày …, thêm chuyến này (5.0h) sẽ vượt 8h/ngày!"*
-(`TS:1340-1345`) → rollback (chưa ghi gì) → `catch (Exception)` `ATM:189-191` → flash "Lỗi: …" →
+(`TS:1344-1349`) → rollback (chưa ghi gì) → `catch (Exception)` `ATM:189-191` → flash "Lỗi: …" →
 `redirect:/admin/trip-management/trips/create` → khung đỏ `trip-create-form.html:93-94`. Form trở về
 **trống** — dữ liệu vừa gõ mất (cùng hạn chế Bài 03, 04). Để ý: 17:00 vẫn **không** đụng cửa sổ bận
 (`17:00 < 16:30` sai) — Bình không bận, chỉ quá giờ.
 
 **(c) Code then chốt**
 
-`TS:1296-1321` — phần quan trọng nhất của luật người:
+`TS:1300-1325` — phần quan trọng nhất của luật người:
 
 ```java
 LocalDateTime windowStart = departure.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES); // −30 phút
@@ -360,14 +360,14 @@ sequenceDiagram
 | # | Tầng | Vị trí | Method / thành phần | Nhận vào | Làm gì | Trả về / gọi tiếp | Nhãn |
 |---|---|---|---|---|---|---|---|
 | 1 | Controller | `RecommendationController.java:35-38` | GET | — | gọi `buildRecommendations()`, đưa kết quả vào Model key `view` | view `admin/recommendation` | [CODE] |
-| 2 | Proxy | `RecommendationService.java:164` | `@Transactional(readOnly = true)` | — | mở transaction **chỉ đọc** — bắt buộc, vì validator đọc quan hệ LAZY (javadoc `TS:1397-1398`) | — | [SPRING] |
-| 3 | Service | `RecommendationService.java:319-320`, `:513-518` | dựng `candidate` | một chuyến thêm của khung dự báo đông | `new Trip()`: route, giờ đi, giờ đến = giờ đi + `estimatedDuration`. **Không lưu** | Trip tạm, `id = null` | [CODE] |
+| 2 | Proxy | `RecommendationService.java:172` | `@Transactional(readOnly = true)` | — | mở transaction **chỉ đọc** — bắt buộc, vì validator đọc quan hệ LAZY (javadoc `TS:1401-1402`) | — | [SPRING] |
+| 3 | Service | `RecommendationService.java:328-329`, `:523-528` | dựng `candidate` | một chuyến thêm của khung dự báo đông | `new Trip()`: route, giờ đi, giờ đến = giờ đi + `estimatedDuration`. **Không lưu** | Trip tạm, `id = null` | [CODE] |
 | 4 | Service | `:278-291`, `:303-314` | chọn tài nguyên | — | `selectBestAvailableBus/Driver` (lớp không-mời, dùng `AvailabilityContext` nạp sẵn, kể cả các chuyến đã giữ chỗ). Không có ⇒ thẻ `NO_RESOURCE`, **không** tới cổng. Giữa hai bước, `:293-301` ước tính khách tràn, doanh thu, lợi nhuận (GĐ6) | `bus`, `driver` | [CODE] |
 | 5 | Service | `:317-319` | gắn tài nguyên | — | `setBus`, `setDriver`, `setTotalSeats(capacity)` — để luật #22 có số mà so | — | [CODE] |
-| 6 | Service | `:320` → `TS:1407-1413` | `validateBusForTripDryRun(bus, candidate, null)` | — | `try { return ValidationResult.pass(validateBusForTrip(...)); }` — gọi **đúng** validator gốc, **đi đường DB** (không dùng context nạp sẵn) | — | [CODE] |
-| 7 | Service | `TS:1410-1411` | `catch (IllegalArgumentException e)` | — | vi phạm luật ⇒ `ValidationResult.fail(e.getMessage())` — **nguyên văn** câu của validator | `busGate` | [CODE] |
+| 6 | Service | `:320` → `TS:1411-1417` | `validateBusForTripDryRun(bus, candidate, null)` | — | `try { return ValidationResult.pass(validateBusForTrip(...)); }` — gọi **đúng** validator gốc, **đi đường DB** (không dùng context nạp sẵn) | — | [CODE] |
+| 7 | Service | `TS:1414-1415` | `catch (IllegalArgumentException e)` | — | vi phạm luật ⇒ `ValidationResult.fail(e.getMessage())` — **nguyên văn** câu của validator | `busGate` | [CODE] |
 | 8 | — | — | exception loại khác | vd `bus == null` | **không** bắt: `NullPointerException` bay ra ngoài, làm hỏng cả request — có chủ đích (§9.1) | ↑ | [CODE] |
-| 9 | Service | `:321` → `TS:1436-1443` | `validateStaffForTripDryRun(candidate, null)` | — | như trên; validator trả `void` nên hợp lệ là `pass()` rỗng | `staffGate` | [CODE] |
+| 9 | Service | `:321` → `TS:1440-1447` | `validateStaffForTripDryRun(candidate, null)` | — | như trên; validator trả `void` nên hợp lệ là `pass()` rỗng | `staffGate` | [CODE] |
 | 10 | Service | `:323-333` | quyết định thẻ | hai kết quả | cả hai `isValid()` ⇒ `RECOMMENDED`, note "Đủ điều kiện phân công…", và chuyến tạm được giữ chỗ (`availability.reserve`, trạng thái `PENDING_APPROVAL`) — cổng chạy SQL nên không thấy chỗ giữ này, việc tránh trùng là của bước 4; ngược lại `STALE`, note = lý do của **cổng xe** nếu xe hỏng, không thì của cổng người | thẻ | [CODE] |
 | 11 | Proxy | — | kết thúc transaction chỉ đọc | — | không có gì để ghi | — | [SPRING] |
 | 12 | View | `recommendation.html:211`, `:276` | nhãn + ghi chú | `view` | `STALE` hiện badge vàng; cột ghi chú in `c.note` — chính câu tiếng Việt của validator | HTML | [CODE] |
@@ -378,7 +378,7 @@ Business Rule Validation gate reuses validateBusForTrip/validateStaffForTrip…"
 dùng, vì trạng thái có thể đổi giữa lúc chọn và lúc dùng; một thẻ gợi ý có thể nằm đó nhiều giờ.
 Ngoài ra bộ chọn **không** kiểm sức chứa (#22) — chỉ validator có luật đó.
 
-**(c) Code then chốt** — `TS:1407-1413`, `:1436-1443`:
+**(c) Code then chốt** — `TS:1411-1417`, `:1440-1447`:
 
 ```java
 public ValidationResult validateBusForTripDryRun(Bus bus, Trip trip, Long excludeTripId) {
@@ -418,25 +418,25 @@ kmSince = 4000, ngưỡng 5000.
 | 1 | `POST /admin/trips/approve` `tripId=50&busId=9&driverId=…` → `approveTrip(...)` trong `try` | `ATC:166-174` | [CODE] |
 | 2 | Proxy mở transaction; `findById(50)` ⇒ `trip` **managed**; `requirePendingApproval` qua | `TS:955-961` | [SPRING]+[CODE] |
 | 3 | Nạp xe, tài xế; **sửa entity**: `setBus(xe 9)`, `setDriver`, `setTotalSeats(sức chứa xe 9)`, xoá rồi gắn lại `coDrivers`, đặt `assistant` | `TS:963-1005` | [CODE] |
-| 4 | `validateBusForTrip(xe 9, trip, 50)`: không `REPAIRING`, không `TRAVELING`, không bận, `needsMaintenance` 4000 ≥ 5000? không | `TS:1007` → `:1106-1178` | [CODE] |
-| 5 | `isNearMaintenance(520)`: 4000 + 520 = 4520 ≥ 4500 ⇒ **ném** `IllegalArgumentException("Xe … (Odo: 4000km) sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này — vui lòng chọn xe khác hoặc đưa xe đi bảo trì trước!")` | `TS:1189-1194` | [CODE] |
+| 4 | `validateBusForTrip(xe 9, trip, 50)`: không `REPAIRING`, không `TRAVELING`, không bận, `needsMaintenance` 4000 ≥ 5000? không | `TS:1007` → `:1106-1182` | [CODE] |
+| 5 | `reachesNearMaintenance(4000 + 520)` (CT7d; trước đó `isNearMaintenance(520)`): 4520 ≥ 4500 ⇒ **ném** `IllegalArgumentException("Xe … (Odo: 4000km) sẽ SẮP/QUÁ ngưỡng bảo trì (5000km) sau chuyến này — vui lòng chọn xe khác hoặc đưa xe đi bảo trì trước!")` | `TS:1193-1198` | [CODE] |
 | 6 | Exception unchecked ⇒ proxy **rollback**: mọi thay đổi ở bước 3 không xuống DB. [SUY LUẬN — chưa kiểm chứng] Trước câu truy vấn ở bước 4, Hibernate có thể đã *auto-flush* (tự đẩy) `UPDATE trips SET bus_id = 9 …` vì câu truy vấn đụng bảng `trips`; rollback hoàn tác cả câu đó | — | [SPRING] |
 | 7 | `catch (IllegalArgumentException e)` ⇒ flash `error` = "⛔ Vi phạm ràng buộc: " + câu bước 5 | `ATC:180-183` | [CODE] |
 | 8 | `redirect:/admin/trips/approve/50` → khung đỏ `approve-form.html:56-57`; chuyến vẫn `PENDING_APPROVAL`, xe cũ (hoặc chưa có xe) | `ATC:183` | [CODE] |
 
-Để ý chữ "**Odo**" trong câu báo thật ra in `getKmSinceLastMaintenance()` (km kể từ lần bảo dưỡng),
-**không** phải đồng hồ tổng (`TS:1191`) — dễ hiểu nhầm khi đọc.
+Để ý chữ "**Odo**" trong câu báo thật ra in km kể từ lần bảo dưỡng (`kmSinceMaintenanceAt` — từ CT7d bằng 0
+cho chuyến sau ngày bảo trì dự kiến), **không** phải đồng hồ tổng (`TS:1195`) — dễ hiểu nhầm khi đọc.
 
 **Các lỗi khác và đường về:**
 
 | Nguyên nhân | Ném ở | Loại | Quay về đâu |
 |---|---|---|---|
-| Bất kỳ luật nào khi **tạo** | `TS:1106-1366` | `IllegalArgumentException` | `ATM:189-191` "Lỗi: …" → form Tạo trống |
+| Bất kỳ luật nào khi **tạo** | `TS:1106-1370` | `IllegalArgumentException` | `ATM:189-191` "Lỗi: …" → form Tạo trống |
 | Bất kỳ luật nào khi **sửa** | như trên | như trên | `ATM:456-458` "Lỗi: …" → form Sửa nạp lại từ DB. Bước sửa là transaction 1; chưa chạm bước đổi trạng thái (Bài 05 §5) |
 | Bất kỳ luật nào khi **xác nhận AUTO** | như trên | như trên | `ATC:151-153` gộp chung `catch (Exception)`: "Lỗi xác nhận: …" → `/approve/{id}` |
 | Chuyến AUTO chưa có xe / tài xế | `TS:920-926` — kiểm **trước** validator | `IllegalStateException` | `ATC:145-150` "⛔ …" → `/admin/trips/pending` |
 | Dry-run được gọi với `bus = null` | `TS:1107` (`bus.getStatus()`) | `NullPointerException` | **không** bắt — lỗi kỹ thuật bay ra, có test chốt (§9.4) |
-| Xe chưa gán loại | — | không lỗi | luật sức chứa **bỏ qua** (`TS:1203-1204`) |
+| Xe chưa gán loại | — | không lỗi | luật sức chứa **bỏ qua** (`TS:1207-1208`) |
 | Xe không có ngưỡng bảo dưỡng | — | không lỗi | `needsMaintenance()`/`isNearMaintenance()` trả `false` (`Bus.java:49`, `:73`) |
 
 ---
@@ -456,11 +456,11 @@ kmSince = 4000, ngưỡng 5000.
   "✅ Chuyến xe #… đã được phân công và kích hoạt thành công!" → `/admin/trips/pending`.
 - **Lấy danh sách cho form Tạo** — `[JS trip-create-form.html:482-484, fetch GET
   /api/admin/trips/available-resources?departure=…&arrival=…]` → `TripRestController` `:47-86`: giờ
-  đến ≤ giờ đi ⇒ 400 JSON `error` → ba bộ lọc `getAvailable…ForTimeRange` (`TS:1590-1685`) → Jackson
+  đến ≤ giờ đi ⇒ 400 JSON `error` → ba bộ lọc `getAvailable…ForTimeRange` (`TS:1594-1689`) → Jackson
   trả JSON `buses`/`drivers`/`assistants` → JS đổ vào dropdown. **Không** gọi validator; dùng lại
   `isBusBusy`, `isDriverBusyInWindow`, `getDrivingHoursForDate`, `driverShareHours` (Bài 07).
 - **Dropdown màn Duyệt / Sửa** — `getAvailableBusesForTrip`, `…DriversForTrip`, `…AssistantsForTrip`
-  (`TS:1483-1565`), có `excludeTripId = tripId`. Màn Sửa **cưỡng bức thêm** xe đang gán vào danh sách
+  (`TS:1487-1569`), có `excludeTripId = tripId`. Màn Sửa **cưỡng bức thêm** xe đang gán vào danh sách
   dù nó không còn hợp lệ (`ATM:282-286`) — để Admin thấy mình đang dùng xe nào.
 - **AI tự phân công** — `@Scheduled` → `createExtraTrip()` → `autoAssignResources()` →
   `findBestAvailableBus()` `TS:308-332` (xe `READY`, không bận, không chạm ngưỡng bảo dưỡng; đúng loại
@@ -479,21 +479,22 @@ mời rồi bị từ chối lúc lưu.
 
 | Luật | Lớp không-mời | Lớp chặn thật | Một chiều có giữ không |
 |---|---|---|---|
-| Xe không `REPAIRING` | mọi bộ lọc chỉ lấy xe `READY` (`TS:318`, `:1500`, `:1596`) | `TS:1107-1110` | Giữ — mời hẹp hơn (loại cả `TRAVELING`) |
+| Xe không `REPAIRING` | mọi bộ lọc chỉ lấy xe `READY` (`TS:318`, `:1504`, `:1600`) | `TS:1107-1110` | Giữ — mời hẹp hơn (loại cả `TRAVELING`) |
 | Cờ `TRAVELING` phải có chuyến `DEPARTED` giải thích | (như trên — không mời `TRAVELING` nào) | `TS:1146-1155` | Giữ. Màn Sửa cưỡng bức thêm xe hiện tại — lý do #19 chọn "giữ tín hiệu" thay vì chặn mọi xe `TRAVELING` |
 | Xe không trùng lịch ±1h | `isBusBusy` trong mọi bộ lọc | `TS:1165-1167` | Giữ — cùng một hàm |
 | Xe chưa quá hạn bảo dưỡng | `!needsMaintenance()` | `TS:1173-1178` | Giữ |
-| Xe không chạm 90% ngưỡng sau chuyến | AI và dropdown Duyệt/Sửa: `isNearMaintenance(km tuyến)`; **API form Tạo: `isNearMaintenance(0)`** (`TS:1599`) | `TS:1189-1194` | **Không giữ ở form Tạo** — lỗi #30 (chưa sửa): API mời xe mà bước lưu chắc chắn từ chối với tuyến dài |
-| Số ghế ≤ sức chứa (#22) | form Tạo điền sẵn và khoá ô số ghế theo `data-capacity`; AI và màn Duyệt **đặt** số ghế = sức chứa (`TS:985`) | `TS:1203-1208` | Giữ |
-| Có tài xế chính | form bắt buộc `driverId` | `TS:1238-1241` | Giữ |
-| Đủ `ceil(h/8)` tài xế | JS form (Bài 07) | `TS:1248-1253` | — |
-| Trên 8h phải có phụ xe | — | `TS:1256-1259` | Chỉ có lớp chặn thật |
-| Không một người hai vai | AI loại trừ người đã chọn (`TS:486-487`) | `TS:1262-1292` | — |
-| Người đang hoạt động, bằng còn hạn **vào ngày khởi hành** | mọi bộ lọc (`TS:484-492`, `:1531-1532`, `:1560-1561`, `:1632-1633`, `:1680-1681`) | `TS:1302-1310`, `:1326-1334`, `:1350-1361` | Giữ (lỗi #1 đã đưa cả hai về ngày khởi hành) |
-| Người không trùng lịch ±30' ở mọi vai | `isDriverBusyInWindow` trong mọi bộ lọc | `TS:1311-1314`, `:1335-1338`, `:1362-1365` | Giữ |
-| Tài xế ≤ 8h/ngày | dropdown dùng `driverShareHours()` — phần chia ở **số người tối thiểu** (`TS:1718-1721`); AI chia cho số người nó định gán | `TS:1316-1321`, `:1340-1345` | Giữ — lỗi #12 đã sửa; test quét 9 thời lượng × 6 mức nhân sự |
-| Phụ xe **không** chịu luật 8h | danh sách phụ xe riêng, không lọc giờ (`TS:1549-1565`, `:1675-1685`) | validator không kiểm giờ phụ xe | Giữ — lỗi #13 đã sửa (trước đó mời **hẹp** hơn) |
-| Xe / người đang ở bến xuất phát, và chuyến kế tiếp đi từ bến tới (QĐ-23, CT5b) | AI **lọc cứng** (`TS:327`, `:499`; luật `LocationRule.fits`); dropdown Duyệt/Sửa/Tạo **mời tất cả**, đúng bến xếp đầu (`TS:1504`, `:1535`, `:1563`), người/xe khác kèm "⚠ đang ở …" | **Không có** — cố ý (CM-5 cách B) | Giữ — dropdown mời đúng bằng validator, AI hẹp hơn |
+| Không chạm ngày bảo trì dự kiến của xe (CT7d) | mọi ô chọn và AI: `onPlannedMaintenanceDay` (`TS:1506`, `:1602`) | `TS:1180-1182` | Giữ — cùng một hàm |
+| Xe không chạm 90% ngưỡng sau chuyến | AI và dropdown Duyệt/Sửa: km từ lần bảo trì + km tuyến (từ CT7d `reachesNearMaintenance`, km tính từ 0 sau ngày bảo trì dự kiến; AI cộng thêm km đã xếp và quãng về); **API form Tạo: chỉ km tại giờ đi** (`TS:1603`) | `TS:1193-1198` | **Không giữ ở form Tạo** — lỗi #30 (chưa sửa): API mời xe mà bước lưu chắc chắn từ chối với tuyến dài |
+| Số ghế ≤ sức chứa (#22) | form Tạo điền sẵn và khoá ô số ghế theo `data-capacity`; AI và màn Duyệt **đặt** số ghế = sức chứa (`TS:985`) | `TS:1207-1212` | Giữ |
+| Có tài xế chính | form bắt buộc `driverId` | `TS:1242-1245` | Giữ |
+| Đủ `ceil(h/8)` tài xế | JS form (Bài 07) | `TS:1252-1257` | — |
+| Trên 8h phải có phụ xe | — | `TS:1260-1263` | Chỉ có lớp chặn thật |
+| Không một người hai vai | AI loại trừ người đã chọn (`TS:486-487`) | `TS:1266-1296` | — |
+| Người đang hoạt động, bằng còn hạn **vào ngày khởi hành** | mọi bộ lọc (`TS:484-492`, `:1535-1536`, `:1564-1565`, `:1636-1637`, `:1684-1685`) | `TS:1306-1314`, `:1330-1338`, `:1354-1365` | Giữ (lỗi #1 đã đưa cả hai về ngày khởi hành) |
+| Người không trùng lịch ±30' ở mọi vai | `isDriverBusyInWindow` trong mọi bộ lọc | `TS:1315-1318`, `:1339-1342`, `:1366-1369` | Giữ |
+| Tài xế ≤ 8h/ngày | dropdown dùng `driverShareHours()` — phần chia ở **số người tối thiểu** (`TS:1722-1725`); AI chia cho số người nó định gán | `TS:1320-1325`, `:1344-1349` | Giữ — lỗi #12 đã sửa; test quét 9 thời lượng × 6 mức nhân sự |
+| Phụ xe **không** chịu luật 8h | danh sách phụ xe riêng, không lọc giờ (`TS:1553-1569`, `:1679-1689`) | validator không kiểm giờ phụ xe | Giữ — lỗi #13 đã sửa (trước đó mời **hẹp** hơn) |
+| Xe / người đang ở bến xuất phát, và chuyến kế tiếp đi từ bến tới (QĐ-23, CT5b) | AI **lọc cứng** (`TS:327`, `:499`; luật `LocationRule.fits`); dropdown Duyệt/Sửa/Tạo **mời tất cả**, đúng bến xếp đầu (`TS:1508`, `:1539`, `:1567`), người/xe khác kèm "⚠ đang ở …" | **Không có** — cố ý (CM-5 cách B) | Giữ — dropdown mời đúng bằng validator, AI hẹp hơn |
 | Giờ đến bắt buộc, ghế ≥ 1, giá ≥ 0 | chỉ `required`/`min` của HTML | **Không có** ở service | Lỗi #28 (chưa sửa) — §9.3 |
 | Giờ khởi hành không ở quá khứ | — | **Không có** | Sổ lỗi ghi là "cần ruling" (2026-09-24) |
 
@@ -513,16 +514,16 @@ mời rồi bị từ chối lúc lưu.
 |---|---|---|---|
 | `IllegalArgumentException` làm tín hiệu nghiệp vụ | "Đầu vào vi phạm luật" — quy ước dự án (Bài 00b §5.1); khác `IllegalStateException` = "sai trạng thái" | mọi `throw` trong hai validator | Không phân biệt được "luật nói không" với "code hỏng" — chính điều bản dry-run dựa vào |
 | Fail-fast | "Gặp lỗi đầu tiên thì dừng" | mỗi luật một `throw` | Muốn báo đủ mọi lỗi phải viết lại validator gom lỗi vào danh sách — roadmap cấm ở Phase 3 |
-| Wrapper `try/catch` hẹp | "Bọc lại, chỉ hứng đúng loại lỗi mình hiểu" | `TS:1408-1412`, `:1437-1442` | `catch (Exception)` sẽ biến `NullPointerException` thành một câu tiếng Việt hợp lý — Phase 7 âm thầm bỏ một xe tốt |
+| Wrapper `try/catch` hẹp | "Bọc lại, chỉ hứng đúng loại lỗi mình hiểu" | `TS:1412-1416`, `:1441-1446` | `catch (Exception)` sẽ biến `NullPointerException` thành một câu tiếng Việt hợp lý — Phase 7 âm thầm bỏ một xe tốt |
 | Static factory + constructor `private` + field `final` | "Chỉ tạo qua cửa có tên; tạo xong không sửa" | `ValidationResult.java:39-58` | Ai cũng `new` được với tổ hợp vô lý (`valid = true` kèm `failureReason`) |
 | Lombok `@Getter` | "Sinh sẵn hàm `getX()`" (Bài 00a §9) | `ValidationResult.java:22` — với `boolean valid` Lombok sinh `isValid()` | Phải viết tay ba getter |
-| Cửa sổ có đệm | "Kiểm rộng hơn khoảng chạy thật" | `TS:1162-1163` (±1h xe), `:1296-1297` (±30' người) | Hai chuyến nối đuôi sát nhau được chấp nhận, không có thời gian dọn xe / nghỉ |
+| Cửa sổ có đệm | "Kiểm rộng hơn khoảng chạy thật" | `TS:1162-1163` (±1h xe), `:1300-1301` (±30' người) | Hai chuyến nối đuôi sát nhau được chấp nhận, không có thời gian dọn xe / nghỉ |
 | So sánh chặt `<` / `>` trong JPQL | "Chạm mép không phải trùng" | `TR:136`, `:154`, `:172` | Dùng `<=` thì một chuyến khởi hành đúng lúc đệm kết thúc bị coi là trùng |
 | `:excludeTripId IS NULL OR t.id <> :excludeTripId` | "Bỏ qua chính chuyến đang sửa" | `TR:135`, `:153`, `:173`, `:190` | Sửa một chuyến sẽ luôn báo "đang bận" — vì nó trùng với chính nó |
 | `LEFT JOIN t.coDrivers cd` | "Ghép thêm bảng tài xế phụ, giữ cả chuyến không có ai" | `TR:132`, `:187` | `JOIN` thường làm mất các chuyến không có tài xế phụ — tài xế chính của chúng thành "không bận" |
-| `@Transactional(readOnly = true)` bao quanh dry-run | "Mở phiên đọc để chạm được quan hệ LAZY" | `RecommendationService.java:164` | Validator đọc `trip.getRoute()`, `bus.getBusType()`… ngoài phiên ⇒ `LazyInitializationException` — bản dry-run **không** bắt lỗi này (đúng ý) |
-| `Math.ceil` + ép `(int)` | "Làm tròn lên rồi bỏ phần thập phân" | `TS:1233`, `:1719` | `(int)(10/8)` = 1 — chuyến 10h chỉ đòi 1 tài xế |
-| `Boolean.TRUE.equals(x)` | "So an toàn với null" (Bài 04) | `TS:1302`, `:1326`, `:1350` | `isActive` null ⇒ `NullPointerException` |
+| `@Transactional(readOnly = true)` bao quanh dry-run | "Mở phiên đọc để chạm được quan hệ LAZY" | `RecommendationService.java:172` | Validator đọc `trip.getRoute()`, `bus.getBusType()`… ngoài phiên ⇒ `LazyInitializationException` — bản dry-run **không** bắt lỗi này (đúng ý) |
+| `Math.ceil` + ép `(int)` | "Làm tròn lên rồi bỏ phần thập phân" | `TS:1237`, `:1723` | `(int)(10/8)` = 1 — chuyến 10h chỉ đòi 1 tài xế |
+| `Boolean.TRUE.equals(x)` | "So an toàn với null" (Bài 04) | `TS:1306`, `:1330`, `:1354` | `isActive` null ⇒ `NullPointerException` |
 
 ---
 
@@ -532,8 +533,8 @@ Chức năng có 🧮 — bắt buộc. Mọi số là **minh hoạ** trừ ch�
 
 ### 8.1. Cần bao nhiêu người, mỗi người lái bao nhiêu
 
-Công thức validator (`TS:1232-1235`, `:1298-1299`): `requiredDrivers = max(1, ceil(h / 8))`;
-`effectiveHours = min(h / assigned, 8)`. Công thức dropdown (`TS:1718-1721`):
+Công thức validator (`TS:1236-1239`, `:1302-1303`): `requiredDrivers = max(1, ceil(h / 8))`;
+`effectiveHours = min(h / assigned, 8)`. Công thức dropdown (`TS:1722-1725`):
 `driverShareHours(h) = min(h / requiredDrivers, 8)`.
 
 | Thời lượng `h` | `h / 8` | `requiredDrivers` | Cần phụ xe? (`h > 8`) | Phần chia validator nếu gán đúng tối thiểu | Phần chia dropdown |
@@ -561,7 +562,7 @@ Tài xế Dũng. Xét chuyến mới **hôm nay** 13:00–19:00 (6h), Dũng lái
 | Giờ nền mock `totalDrivingHours24h = 1,5` | ngày xét là **hôm nay** (`TS:827`) | cộng thẳng | 1,5 |
 | **Đã có** | | 2 + 0 + 0 + 1,5 | **3,5** |
 | Chuyến mới | 6h / 2 người | min(3, 8) | 3,0 |
-| **Kiểm** (`TS:1316`) | | 3,5 + 3,0 = 6,5 > 8? | **Qua** |
+| **Kiểm** (`TS:1320`) | | 3,5 + 3,0 = 6,5 > 8? | **Qua** |
 
 Cửa sổ bận của chuyến mới: `[12:30, 19:30]`. Chuyến B (08:00–10:00) không giao; chuyến A không giao —
 Dũng không bận.
@@ -690,7 +691,7 @@ màn Duyệt đánh ★ cho xe mà #22 chắc chắn từ chối, vì số ghế
    một tài xế phụ cho khung làm họ lên 8,5 giờ/ngày, và từ chối nhầm một ngày đúng 8 giờ (sổ lỗi #36).
 7. **Chữ "Odo" trong câu báo bảo dưỡng** in km **kể từ lần bảo dưỡng**, không phải đồng hồ tổng (§4).
 8. **Mâu thuẫn comment ↔ code (code thắng):**
-   - Comment `TS:1180-1185` nói `findBestAvailableBus()` dùng xe sắp/quá hạn "làm fallback cuối cùng kèm
+   - Comment `TS:1184-1189` nói `findBestAvailableBus()` dùng xe sắp/quá hạn "làm fallback cuối cùng kèm
      log cảnh báo". Code `TS:326-331` **không có** fallback nào — xe chạm ngưỡng bị lọc hẳn. (Ví dụ đã
      biết trong LUẬT CHUNG.) `findBestAvailableDriver()` thì **có** fallback, nhưng về bằng lái sắp hết
      hạn, không phải bảo dưỡng.
@@ -754,7 +755,7 @@ hai luật bảo dưỡng qua validator (grep không thấy "SẮP/QUÁ" hay "QU
 ### 10.2. Câu hỏi hội đồng + gợi ý trả lời
 
 **1. (Cái gì) Hệ thống kiểm những luật nào khi xếp xe?**
-Sáu luật theo thứ tự trong `validateBusForTrip` (`TS:1106-1211`): không `REPAIRING`; nếu mang cờ
+Sáu luật theo thứ tự trong `validateBusForTrip` (`TS:1106-1215`): không `REPAIRING`; nếu mang cờ
 `TRAVELING` thì phải có chuyến `DEPARTED` giải thích; không trùng lịch trong `[đi − 1h, đến + 1h]`;
 chưa quá hạn bảo dưỡng; km kể từ bảo dưỡng cộng km tuyến chưa chạm 90% ngưỡng; số ghế không vượt sức
 chứa loại xe. Gặp luật đầu tiên bị vi phạm là ném `IllegalArgumentException`.
@@ -763,7 +764,7 @@ chứa loại xe. Gặp luật đầu tiên bị vi phạm là ném `IllegalArgu
 Lấy mọi chuyến **khởi hành trong ngày** của tài xế ở trạng thái chờ duyệt / đang bán / đang chạy / đã
 xong; mỗi chuyến tài xế lái được tính bằng thời lượng chia số người lái, tối đa 8h; chuyến làm phụ xe
 tính 0 (`TS:782-813`). Nếu ngày đó là hôm nay thì cộng giờ nền mock. Cộng phần chia của chuyến mới, lớn
-hơn 8 thì từ chối (`TS:1316`). Đúng 8.0 vẫn được.
+hơn 8 thì từ chối (`TS:1320`). Đúng 8.0 vẫn được.
 
 **3. (Vì sao) Sao không gom thành một hằng `MAX_HOURS = 8`?**
 Vì số 8 mang ba nghĩa khác nhau: ngân sách giờ lái mỗi ngày, trần phần chia của mỗi người trên một
@@ -772,7 +773,7 @@ kia (roadmap §9).
 
 **4. (Thế nào) Dry-run là gì, khác validator gốc ở đâu?**
 Hai method public bọc validator gốc trong `try/catch (IllegalArgumentException)`, trả `ValidationResult`
-(`TS:1407-1443`). Không thêm, không sửa luật nào — nên test có thể khẳng định câu báo của hai đường
+(`TS:1411-1447`). Không thêm, không sửa luật nào — nên test có thể khẳng định câu báo của hai đường
 giống hệt nhau. Màn gợi ý dùng nó vì "không hợp lệ" ở đó là kết quả bình thường.
 
 **5. (Vì sao) Sao bản dry-run không bắt mọi `Exception` cho chắc?**
@@ -806,7 +807,7 @@ Nói thật: service chưa kiểm giờ đến bắt buộc, ghế ≥ 1, giá �
 
 **11. (Thế nào) Cửa sổ ±1h và ±30 phút có ý nghĩa gì? Chạm mép có tính là trùng?**
 Xe cần một giờ dọn dẹp, người cần ba mươi phút nghỉ, nên khoảng kiểm rộng hơn khoảng chạy thật
-(`TS:1162-1163`, `:1296-1297`). So sánh trong JPQL là `<`/`>` chặt: một chuyến đến đúng lúc khoảng đệm
+(`TS:1162-1163`, `:1300-1301`). So sánh trong JPQL là `<`/`>` chặt: một chuyến đến đúng lúc khoảng đệm
 bắt đầu thì **không** coi là trùng (§8.3).
 
 ### 10.3. Điểm phải nói thật
@@ -841,7 +842,7 @@ bắt đầu thì **không** coi là trùng (§8.3).
 `Controller → Service → Repository → view`, nói rõ `excludeTripId` bằng mấy, câu nào chặn, câu báo và
 màn hình Admin thấy.
 
-**Câu đọc code.** `TS:1233-1235`:
+**Câu đọc code.** `TS:1237-1239`:
 
 ```java
 int requiredDrivers = (int) Math.ceil(durationHours / 8.0);
@@ -861,19 +862,19 @@ Qua luật 8h không? (d) Chuyến mới có cần phụ xe không?
 
 **Câu hỏi ngắn**
 
-1. Không cần phụ xe: luật là `h > 8.0` (`TS:1257`), 8 > 8 sai. `ceil(8/8) = 1` tài xế.
+1. Không cần phụ xe: luật là `h > 8.0` (`TS:1261`), 8 > 8 sai. `ceil(8/8) = 1` tài xế.
 2. Xe trước: mọi lối gọi `validateBusForTrip` rồi mới `validateStaffForTrip`. Thấy *"Xe … đang được bảo
    trì/sửa chữa, không thể gán vào chuyến!"* — fail-fast nên không tới luật người.
 3. Giờ lái là lượng **đã lái hoặc sẽ lái trong ngày** — chuyến xong sáng nay vẫn là giờ đã lái
    (`TS:756-757`). Bận là câu hỏi **có đang chiếm khoảng thời gian này không** — chuyến đã xong không
    chiếm gì nữa (`TS:716-717`).
 4. Được, nếu không trùng lịch, đang hoạt động và còn bằng: validator **không** kiểm giờ lái của phụ xe
-   (`TS:1349-1366`), và chuyến làm phụ xe tính 0h.
+   (`TS:1353-1370`), và chuyến làm phụ xe tính 0h.
 5. Không trả gì — ném `NullPointerException` ở `bus.getStatus()` (`TS:1107`); wrapper chỉ bắt
    `IllegalArgumentException` (test `:371`).
 6. Cửa sổ xe `[05:00, 17:00]`. Chuyến 17:00–20:00: `17:00 < 17:00` sai ⇒ không trùng. Chuyến 16:30–20:00:
    `16:30 < 17:00` và `20:00 > 05:00` ⇒ **trùng** ("Xe … đang bận trong khoảng thời gian này!").
-7. Không — mọi nhánh hoặc ném, hoặc `return null` (`TS:1210`).
+7. Không — mọi nhánh hoặc ném, hoặc `return null` (`TS:1214`).
 
 **Bài tự trace**
 
