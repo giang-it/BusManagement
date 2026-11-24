@@ -66,6 +66,7 @@ class RecommendationLoopTest {
     private static final LocalDate TOMORROW = LocalDate.now().plusDays(1);
 
     @Autowired private RecommendationService recommendationService;
+    @Autowired private TripService tripService;
     @Autowired private WhatIfSimulationService whatIfSimulationService;
     @Autowired private ForecastService forecastService;
     @Autowired private TripRepository tripRepository;
@@ -197,6 +198,87 @@ class RecommendationLoopTest {
         assertEquals(TOMORROW.plusDays(1).atTime(6, 0), first.getCompanion().getDeparture(),
                 "18:00 cùng ngày bị luật 8 giờ loại");
         assertEquals("Driver vl-solo", first.getCompanion().getDriverName());
+    }
+
+    // =====================================================================
+    // Cả vòng một lần — một xe, một tài xế (CT7c, CM-24 PA-A)
+    // =====================================================================
+
+    /**
+     * Đúng ca CM-24. Tài xế DUY NHẤT đã có chuyến thường lệ ngày mai 18:00 đi từ bến nhà (bằng xe khác).
+     * Xét RIÊNG chuyến thêm 06:00 → 08:00 thì luật vị trí hai phía loại người đó: chuyến kế tiếp đi từ bến
+     * nhà, còn chuyến thêm kết thúc ở bến xa — trước CT7c thẻ này "có xe nhưng không có tài xế". Xét CẢ
+     * VÒNG — chuyến thêm rồi về 12:00, tới 14:00 — thì người đó về kịp chuyến 18:00, và ngày mai lái
+     * 2 + 2 + 2 = 6 giờ ≤ 8. Cùng xe, cùng tài xế cho cả vòng.
+     */
+    @Test
+    void theOnlyDriver_whoseNextTripLeavesHome_runsTheWholeLoop_becauseTheReturnBringsThemBackInTime() {
+        Route out = route(home, far, 120, HolidayFlow.LEAVING_HUB);
+        Route back = route(far, home, 120, HolidayFlow.TOWARD_HUB);
+        history(out, Map.of(6, 30, 12, 10, 18, 10));
+        history(back, Map.of(6, 10, 12, 10, 18, 10));
+        bus("VL-A", home);
+        Bus other = bus("VL-B", home);
+        Driver only = driver("vl-only", home);
+        Trip regular = bare(out, TOMORROW.atTime(18, 0), TripStatus.ACTIVE, 22);
+        regular.setBus(other);
+        regular.setDriver(only);
+        tripRepository.save(regular);
+        flushAndClear();
+
+        Trip alone = new Trip();
+        alone.setRoute(tripService.routeForLocation(out.getId()));
+        alone.setDepartureTime(TOMORROW.atTime(6, 0));
+        alone.setArrivalTimeExpected(TOMORROW.atTime(8, 0));
+        AvailabilityContext ctx = tripService.buildAvailabilityContext(LocalDate.now().atStartOfDay(),
+                TOMORROW.plusDays(3).atStartOfDay());
+        assertNull(tripService.selectBestAvailableDriver(alone.getDepartureTime(), alone.getArrivalTimeExpected(),
+                2.0, 1, java.util.List.of(), false, ctx, alone.getRoute()),
+                "xét riêng chuyến thêm: chuyến kế tiếp của người đó đi từ bến nhà, không từ bến xa");
+
+        RecommendationViewDto view = recommendationService.buildRecommendations();
+
+        RecommendationCardDto first = view.getCards().stream()
+                .filter(c -> c.getDate().equals(TOMORROW)).findFirst().orElseThrow();
+        assertEquals(RecommendationStatus.RECOMMENDED, first.getStatus(), first.getNote());
+        assertEquals("Driver vl-only", first.getDriverName());
+        RecommendationCardDto.CompanionLeg leg = first.getCompanion();
+        assertEquals(LoopLegKind.RETURN, leg.getKind());
+        assertEquals(TOMORROW.atTime(12, 0), leg.getDeparture(), "về ngay bằng khung 12:00");
+        assertTrue(leg.isReserved());
+        assertEquals(first.getBusPlate(), leg.getBusPlate(), "cùng một xe cho cả vòng");
+        assertEquals("Driver vl-only", leg.getDriverName(), "cùng một tài xế cho cả vòng");
+    }
+
+    /**
+     * Không xếp được CẢ VÒNG thì thẻ thiếu tài nguyên, không còn "tính như về rỗng" (CT7c) — như lịch sử
+     * không chạy chuyến thêm khi không có lượt về (QĐ-21 (d)). Tuyến 6 giờ, một xe, một tài xế có bằng lái
+     * hết hạn ngày kia. Chuyến thêm 06:00 ngày mai chạy được một mình, nhưng lượt về thì không: 18:00 cùng
+     * ngày là 6 + 6 = 12 giờ > 8; từ sáng ngày kia bằng lái đã hết hạn.
+     */
+    @Test
+    void whenNoBusAndDriverCanRunTheWholeLoop_theCardHasNoResource_insteadOfAnEmptyReturn() {
+        Route out = route(home, far, 360, HolidayFlow.LEAVING_HUB);
+        Route back = route(far, home, 360, HolidayFlow.TOWARD_HUB);
+        out.setDistanceKm(300.0);
+        back.setDistanceKm(300.0);
+        history(out, Map.of(6, 30, 12, 10, 18, 10));
+        history(back, Map.of(6, 10, 12, 10, 18, 10));
+        bus("VL-A", home);
+        Driver expiring = driver("vl-exp", home);
+        expiring.setLicenseExpiryDate(TOMORROW.plusDays(1));
+        flushAndClear();
+
+        RecommendationViewDto view = recommendationService.buildRecommendations();
+
+        RecommendationCardDto first = view.getCards().stream()
+                .filter(c -> c.getDate().equals(TOMORROW)).findFirst().orElseThrow();
+        assertEquals(RecommendationStatus.NO_RESOURCE, first.getStatus(), first.getNote());
+        assertTrue(first.getNote().startsWith("Không xếp được cả vòng"), first.getNote());
+        assertEquals("VL-A", first.getBusPlate(), "có xe cho cả vòng, chỉ thiếu tài xế");
+        assertNull(first.getDriverName());
+        assertEquals(LoopLegKind.RETURN, first.getCompanion().getKind(), "tiền theo kế hoạch: về ngay");
+        assertFalse(first.getCompanion().isReserved());
     }
 
     // =====================================================================

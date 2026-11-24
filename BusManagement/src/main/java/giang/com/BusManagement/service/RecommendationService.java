@@ -59,7 +59,8 @@ import java.util.stream.Collectors;
  *       khách tràn đều thuộc về dự báo; engine chỉ tiêu thụ chúng.</li>
  *   <li><b>Chọn tài nguyên:</b> {@code TripService.selectBestAvailableBus/Driver}
  *       — chính các bộ lọc rule+availability đã kiểm chứng (kể cả luật vị trí CT5b), không nhân bản.
- *       Mọi lượt của một vòng — chuyến thêm, lượt về, lượt đưa xe tới — đều chọn bằng hai hàm này.</li>
+ *       Vòng có lượt đi kèm (chuyến thêm + lượt về, hay lượt đưa xe tới + chuyến thêm) được chọn một lần
+ *       bằng {@code TripService.selectLoop} — cùng các luật đó, áp cho cả vòng (CT7c).</li>
  *   <li><b>Cổng validation (Phase 3):</b> {@code validateBusForTripDryRun} /
  *       {@code validateStaffForTripDryRun} xác nhận lần cuối, đúng khuôn
  *       confirmAutoAssignedTrip (chọn xong rồi validate lại).</li>
@@ -81,17 +82,17 @@ import java.util.stream.Collectors;
  * ====================================================================
  * Xe tăng cường rời bến nhà thì phải về; xe đến bến đi từ đầu kia thì phải được đưa tới. Vì vậy mỗi
  * thẻ gồm chuyến thêm và LƯỢT ĐI KÈM của nó ({@link LoopLegKind}), cùng giờ một chuyến thường lệ của
- * chiều ngược:
+ * chiều ngược. Từ CT7c (CM-24, PA-A) cả vòng được chọn MỘT LẦN, cho MỘT xe và MỘT tài xế
+ * ({@link TripService#selectLoop}) — đúng luật H1 của lịch sử (QĐ-21 (d)) và "kíp ở lại cùng xe" (QĐ-26):
  * <ul>
- *   <li>có xe rảnh ngay ở bến đi → chọn xe đó; nếu chuyến thêm làm xe rời bến nhà thì nó "về ngay"
- *       (RETURN) bằng khung chiều ngược sớm nhất có xe và tài xế — đúng luật H1 của lịch sử (QĐ-21 (d));
- *       nếu chuyến thêm đưa xe về đúng bến nhà thì không cần lượt đi kèm (NONE);</li>
- *   <li>không có xe ở bến đi → "đưa xe tới trước" (BRING): một xe ở đầu kia đi cùng khung chiều ngược
- *       muộn nhất còn kịp, rồi chạy chuyến thêm;</li>
- *   <li>tuyến không có đúng một tuyến chiều ngược, hay trong 2 ngày không xếp được lượt về → tính như
- *       một lượt về rỗng (ASSUMED_RETURN).</li>
+ *   <li>chuyến thêm rời bến nhà → "về ngay" (RETURN): khung chiều ngược sớm nhất mà cùng xe và cùng tài
+ *       xế chạy được cả vòng;</li>
+ *   <li>chuyến thêm về bến nhà → xe đang đứng ở bến xa thì không cần lượt đi kèm (NONE); không có thì
+ *       "đưa xe tới trước" (BRING): khung chiều đi muộn nhất còn kịp, cùng xe và cùng tài xế;</li>
+ *   <li>tuyến không có đúng một tuyến chiều ngược → tính như một lượt về rỗng (ASSUMED_RETURN).</li>
  * </ul>
- * Lãi của thẻ = tiền vé chuyến thêm + tiền vé lượt đi kèm − chi phí hai lượt. Hai thẻ ngược chiều KHÔNG
+ * Không xếp được cả vòng thì thẻ "thiếu tài nguyên" — như lịch sử không chạy chuyến thêm khi không có lượt
+ * về. Lãi của thẻ = tiền vé chuyến thêm + tiền vé lượt đi kèm − chi phí hai lượt. Hai thẻ ngược chiều KHÔNG
  * được ghép thành một vòng (để CT9, cùng luật giữ–về).
  *
  * ====================================================================
@@ -157,8 +158,15 @@ public class RecommendationService {
             BigDecimal plannedProfit) {
     }
 
-    /** Kết quả chọn cho một lượt: xe, tài xế, và chuyến tạm đã giữ chỗ. */
-    private record Assigned(Trip trip, Bus bus, Driver driver) {
+    /**
+     * Một vòng của thẻ (CT7c, CM-24 PA-A): loại lượt đi kèm, các lượt theo giờ (chuyến thêm và lượt đi kèm,
+     * nếu có), và MỘT xe + MỘT tài xế cho cả vòng. bus null = không có xe; driver null = có xe mà không có
+     * tài xế.
+     */
+    private record Loop(LoopLegKind kind, List<Trip> legs, Trip companion, Bus bus, Driver driver) {
+        boolean isComplete() {
+            return bus != null && driver != null;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -306,8 +314,9 @@ public class RecommendationService {
      * Dựng thẻ cho một chuyến thêm và lượt đi kèm của nó.
      *
      * Chuyến ứng viên là một Trip TẠM (không lưu), đúng khuôn createExtraTrip():
-     * route + giờ khởi hành + giờ đến suy từ estimatedDuration. Nó chạy qua bộ chọn
-     * tài nguyên và cổng validation; qua cổng thì được giữ chỗ trong availability, cùng lượt đi kèm.
+     * route + giờ khởi hành + giờ đến suy từ estimatedDuration. Cả vòng của nó — chuyến thêm và lượt đi
+     * kèm — được chọn MỘT LẦN cho một xe và một tài xế (CT7c, CM-24 PA-A), mọi lượt qua cổng validation,
+     * rồi cả vòng được giữ chỗ trong availability.
      *
      * @param seatsBefore ghế khung đã có trước chuyến này: các chuyến đã có và các chuyến thêm trước nó
      */
@@ -323,29 +332,16 @@ public class RecommendationService {
         card.setTicketPrice(extra.price());
         card.setTripCost(extra.cost());
 
-        // ── Bước: chọn xe, rồi tài xế, ở chính bến đi ─────────────────────────
-        Bus bus = tripService.selectBestAvailableBus(candidate, departure, candidate.getArrivalTimeExpected(),
-                availability);
-        Driver driver = bus != null ? driverFor(candidate, availability) : null;
-
-        // ── Không có xe ở bến đi: thử đưa một xe từ đầu kia tới trước (BRING) ──
-        Assigned bring = null;
-        if (bus == null && extra.reverse() != null) {
-            bring = bringBefore(extra, candidate, availability, now);
-            if (bring != null) {
-                bus = tripService.selectBestAvailableBus(candidate, departure, candidate.getArrivalTimeExpected(),
-                        availability);
-                driver = driverFor(candidate, availability);
-            }
-        }
+        // ── Bước: chọn cả vòng — một xe, một tài xế (CT7c) ─────────────────────
+        Loop loop = chooseLoop(extra, candidate, availability, now);
 
         int capacity = 0;
-        if (bus != null) {
-            card.setBusPlate(bus.getLicensePlate());
-            capacity = capacityOf(bus);
+        if (loop.bus() != null) {
+            card.setBusPlate(loop.bus().getLicensePlate());
+            capacity = capacityOf(loop.bus());
             card.setBusCapacity(capacity > 0 ? capacity : null);
-            if (driver != null) {
-                card.setDriverName(driverName(driver));
+            if (loop.driver() != null) {
+                card.setDriverName(driverName(loop.driver()));
             }
         }
 
@@ -358,132 +354,146 @@ public class RecommendationService {
         card.setExpectedPassengers(passengers);
         card.setTripRevenue(LoopEconomics.revenue(extra.price(), passengers));
 
-        if (bus == null) {
-            setLoop(card, extra.plannedLeg(), null);
+        if (!loop.isComplete()) {
+            setLoop(card, extra.plannedLeg(), null, null);
             card.setStatus(RecommendationStatus.NO_RESOURCE);
-            card.setNote("Không có xe rảnh, đang ở bến xuất phát và chưa tới ngưỡng bảo dưỡng cho khung giờ này"
-                    + (extra.reverse() != null
-                            ? ", và trong " + LoopEconomics.COMPANION_SEARCH_DAYS + " ngày trước không đưa được xe"
-                                    + " nào tới kịp cùng một tài xế lái được chuyến thêm"
-                            : "")
-                    + " — số khách tính với xe chuẩn " + series.getStandardSeats() + " chỗ, chiều đi kèm theo kế hoạch");
-            return card;
-        }
-        if (driver == null) {
-            // Chỉ tới được đây khi xe đứng sẵn ở bến đi: lượt đưa xe tới chỉ được giữ khi đã có tài xế.
-            setLoop(card, extra.plannedLeg(), null);
-            card.setStatus(RecommendationStatus.NO_RESOURCE);
-            card.setNote("Có xe " + bus.getLicensePlate()
-                    + " nhưng không có tài xế nào hợp lệ, rảnh và đang ở bến xuất phát cho khung giờ này");
+            card.setNote(noResourceNote(extra, loop, series.getStandardSeats()));
             return card;
         }
 
-        // ── Cổng Business Rule Validation (Phase 3) — xác nhận lần cuối ──────────
-        String refused = gate(candidate, bus, driver);
-        if (refused != null) {
-            if (bring != null) {
-                availability.release(bring.trip());
+        // ── Cổng Business Rule Validation (Phase 3) — xác nhận lần cuối, từng lượt của vòng ──
+        for (Trip leg : loop.legs()) {
+            String refused = gate(leg, loop.bus(), loop.driver());
+            if (refused != null) {
+                setLoop(card, extra.plannedLeg(), null, null);
+                card.setStatus(RecommendationStatus.STALE);
+                card.setNote(leg == candidate ? refused : "Lượt đi kèm " + label(leg.getRoute()) + " "
+                        + leg.getDepartureTime().format(LEG_TIME) + ": " + refused);
+                return card;
             }
-            setLoop(card, extra.plannedLeg(), null);
-            card.setStatus(RecommendationStatus.STALE);
-            card.setNote(refused);
-            return card;
         }
-        // ── Giữ chỗ tạm (G6-3): như một chuyến tăng cường vừa tạo, đang chờ duyệt ──
-        candidate.setStatus(TripStatus.PENDING_APPROVAL);
-        availability.reserve(candidate);
+        // ── Giữ chỗ tạm cả vòng (G6-3): như các chuyến tăng cường vừa tạo, đang chờ duyệt ──
+        for (Trip leg : loop.legs()) {
+            leg.setStatus(TripStatus.PENDING_APPROVAL);
+            availability.reserve(leg);
+        }
         card.setStatus(RecommendationStatus.RECOMMENDED);
 
-        // ── Lượt đi kèm thật của vòng (CT7) ─────────────────────────────────────
-        if (bring != null) {
-            setLoop(card, economics.companion(LoopLegKind.BRING, extra.reverse(),
-                    bring.trip().getDepartureTime(), capacity), bring);
-            card.setNote("Đủ điều kiện — bến đi không có xe rảnh, nên xe " + bus.getLicensePlate()
-                    + " được đưa tới trước bằng khung " + label(extra.reverse()) + " "
-                    + bring.trip().getDepartureTime().format(LEG_TIME)
-                    + "; xe và tài xế được giữ cho cả vòng, các thẻ khác không dùng lại");
-            return card;
+        // ── Lượt đi kèm và tiền cả vòng ─────────────────────────────────────────
+        String crew = "xe " + loop.bus().getLicensePlate() + " và tài xế " + driverName(loop.driver());
+        switch (loop.kind()) {
+            case RETURN -> {
+                setLoop(card, economics.companion(LoopLegKind.RETURN, extra.reverse(),
+                        loop.companion().getDepartureTime(), capacity), loop.bus(), loop.driver());
+                card.setNote("Đủ điều kiện — " + crew + " chạy cả vòng: chuyến thêm rồi về ngay bằng khung "
+                        + label(extra.reverse()) + " " + loop.companion().getDepartureTime().format(LEG_TIME)
+                        + "; cả vòng được giữ cho đúng xe và tài xế này, các thẻ khác không dùng lại");
+            }
+            case BRING -> {
+                setLoop(card, economics.companion(LoopLegKind.BRING, extra.reverse(),
+                        loop.companion().getDepartureTime(), capacity), loop.bus(), loop.driver());
+                card.setNote("Đủ điều kiện — bến đi không có xe rảnh, nên " + crew + " lên trước bằng khung "
+                        + label(extra.reverse()) + " " + loop.companion().getDepartureTime().format(LEG_TIME)
+                        + " rồi chạy chuyến thêm về; cả vòng được giữ cho đúng xe và tài xế này, các thẻ khác không"
+                        + " dùng lại");
+            }
+            case NONE -> {
+                setLoop(card, LoopEconomics.none(), null, null);
+                card.setNote("Đủ điều kiện — xe " + loop.bus().getLicensePlate()
+                        + " đang ở bến xa, chuyến thêm đưa xe về bến nhà nên không cần lượt đi kèm");
+            }
+            default -> {
+                setLoop(card, economics.assumedReturn(extra.route()), null, null);
+                card.setNote("Đủ điều kiện — tuyến chưa có đúng một tuyến chiều ngược, nên chiều về tính như một"
+                        + " lượt rỗng cùng quãng đường; xe và tài xế này được giữ cho chuyến này");
+            }
         }
-        if (extra.reverse() == null) {
-            setLoop(card, economics.assumedReturn(extra.route()), null);
-            card.setNote("Đủ điều kiện — tuyến chưa có đúng một tuyến chiều ngược, nên chiều về tính như một"
-                    + " lượt rỗng cùng quãng đường; xe và tài xế này được giữ cho chuyến này");
-            return card;
-        }
-        if (endsAtHome(bus, extra.route())) {
-            setLoop(card, LoopEconomics.none(), null);
-            card.setNote("Đủ điều kiện — xe " + bus.getLicensePlate()
-                    + " đang ở bến xa, chuyến thêm đưa xe về bến nhà nên không cần lượt đi kèm");
-            return card;
-        }
-        Assigned back = returnAfter(extra, candidate, availability);
-        if (back == null) {
-            setLoop(card, economics.assumedReturn(extra.reverse()), null);
-            card.setNote("Đủ điều kiện cho chuyến thêm, nhưng trong " + LoopEconomics.COMPANION_SEARCH_DAYS
-                    + " ngày không xếp được lượt về (xe hay tài xế) — chiều về tính như một lượt rỗng");
-            return card;
-        }
-        setLoop(card, economics.companion(LoopLegKind.RETURN, extra.reverse(), back.trip().getDepartureTime(),
-                capacityOf(back.bus())), back);
-        card.setNote("Đủ điều kiện — xe về ngay bằng khung " + label(extra.reverse()) + " "
-                + back.trip().getDepartureTime().format(LEG_TIME)
-                + "; xe và tài xế được giữ cho cả vòng, các thẻ khác không dùng lại");
         return card;
     }
 
     /**
-     * "Đưa xe tới trước" (BRING): thử các khung chiều ngược, muộn trước. Mỗi khung chọn xe + tài xế ở
-     * đầu kia bằng đúng bộ chọn, qua cổng, rồi giữ chỗ THỬ — để luật vị trí thấy xe đã tới bến đi của
-     * chuyến thêm — và chỉ giữ hẳn khi chính chuyến thêm cũng chọn được xe và tài xế. Trả null nếu
-     * không khung nào được; khi đó không còn gì bị giữ chỗ.
+     * Vòng của một chuyến thêm (CT7c, CM-24 PA-A). Một vòng là một khối bến nhà → bến nhà, chọn MỘT LẦN cho
+     * một xe và một tài xế ({@link TripService#selectLoop}):
+     * <ul>
+     *   <li>chuyến thêm rời bến nhà → "về ngay" (RETURN): khung chiều ngược sớm nhất mà cùng xe và cùng tài
+     *       xế chạy được cả vòng — đúng luật H1 của lịch sử (QĐ-21 (d));</li>
+     *   <li>chuyến thêm về bến nhà → xe đang đứng ở bến xa thì chỉ một lượt (NONE); không có thì "đưa xe
+     *       tới trước" (BRING): khung chiều đi muộn nhất còn kịp, cùng xe và cùng tài xế;</li>
+     *   <li>tuyến không có đúng một tuyến chiều ngược → chỉ chọn cho chuyến thêm, chiều về tính như một
+     *       lượt rỗng (ASSUMED_RETURN).</li>
+     * </ul>
+     * Không xếp được cả vòng thì trả vòng thiếu (bus hay driver null) — thẻ "thiếu tài nguyên", như luật
+     * H1 không chạy chuyến thêm khi không có lượt về. Không có gì bị giữ chỗ ở đây.
      */
-    private Assigned bringBefore(ExtraTrip extra, Trip candidate, AvailabilityContext availability,
-            LocalDateTime now) {
-        Route reverse = extra.reverse();
-        for (LocalDateTime time : LoopEconomics.bringTimes(candidate.getDepartureTime(),
-                LoopEconomics.durationMinutes(reverse), now)) {
-            Assigned leg = assignLeg(reverse, time, availability);
-            if (leg == null) {
-                continue;
-            }
-            Bus bus = tripService.selectBestAvailableBus(candidate, candidate.getDepartureTime(),
-                    candidate.getArrivalTimeExpected(), availability);
-            if (bus != null && driverFor(candidate, availability) != null) {
-                return leg;
-            }
-            availability.release(leg.trip());
+    private Loop chooseLoop(ExtraTrip extra, Trip candidate, AvailabilityContext availability, LocalDateTime now) {
+        if (extra.reverse() == null) {
+            return single(LoopLegKind.ASSUMED_RETURN, candidate, availability);
         }
-        return null;
-    }
-
-    /** "Về ngay" (RETURN): khung chiều ngược sớm nhất có xe + tài xế ở bến đến, qua cổng; giữ chỗ luôn. */
-    private Assigned returnAfter(ExtraTrip extra, Trip candidate, AvailabilityContext availability) {
-        for (LocalDateTime time : LoopEconomics.returnTimes(candidate.getArrivalTimeExpected())) {
-            Assigned leg = assignLeg(extra.reverse(), time, availability);
-            if (leg != null) {
-                return leg;
-            }
+        if (extra.plannedLeg().kind() == LoopLegKind.RETURN) {
+            return firstLoop(LoopLegKind.RETURN, candidate, extra.reverse(),
+                    LoopEconomics.returnTimes(candidate.getArrivalTimeExpected()), availability);
         }
-        return null;
+        Loop home = single(LoopLegKind.NONE, candidate, availability);
+        if (home.isComplete() && endsAtHome(home.bus(), extra.route())) {
+            return home;
+        }
+        Loop bring = firstLoop(LoopLegKind.BRING, candidate, extra.reverse(),
+                LoopEconomics.bringTimes(candidate.getDepartureTime(), LoopEconomics.durationMinutes(extra.reverse()),
+                        now), availability);
+        return bring.isComplete() || bring.bus() != null ? bring : home;
     }
 
     /**
-     * Một lượt đi kèm trên tuyến route lúc departure: chọn xe, rồi tài xế (đúng bộ chọn, có luật vị trí),
-     * qua cổng, rồi giữ chỗ. Trả null nếu thiếu gì — khi đó không có gì bị giữ chỗ.
+     * Vòng có lượt đi kèm cụ thể: thử các giờ theo thứ tự (về ngay: sớm trước; đưa xe tới: muộn trước), giờ
+     * đầu tiên mà cả vòng có xe + tài xế thì lấy. Không giờ nào được thì trả vòng thiếu, giữ xe của giờ đầu
+     * tiên có xe (để ghi vào thẻ).
      */
-    private Assigned assignLeg(Route route, LocalDateTime departure, AvailabilityContext availability) {
-        Trip leg = candidate(route, departure);
-        Bus bus = tripService.selectBestAvailableBus(leg, departure, leg.getArrivalTimeExpected(), availability);
-        if (bus == null) {
-            return null;
+    private Loop firstLoop(LoopLegKind kind, Trip candidate, Route reverse, List<LocalDateTime> times,
+            AvailabilityContext availability) {
+        Loop partial = new Loop(kind, List.of(candidate), null, null, null);
+        for (LocalDateTime time : times) {
+            Trip companion = candidate(reverse, time);
+            List<Trip> legs = kind == LoopLegKind.BRING ? List.of(companion, candidate) : List.of(candidate, companion);
+            TripService.LoopChoice choice = tripService.selectLoop(legs, availability);
+            if (choice.isComplete()) {
+                return new Loop(kind, legs, companion, choice.bus(), choice.driver());
+            }
+            if (choice.bus() != null && partial.bus() == null) {
+                partial = new Loop(kind, legs, companion, choice.bus(), null);
+            }
         }
-        Driver driver = driverFor(leg, availability);
-        if (driver == null || gate(leg, bus, driver) != null) {
-            return null;
+        return partial;
+    }
+
+    /** Vòng một lượt: chỉ chuyến thêm, chọn bằng đúng bộ chọn một chuyến của TripService. */
+    private Loop single(LoopLegKind kind, Trip candidate, AvailabilityContext availability) {
+        Bus bus = tripService.selectBestAvailableBus(candidate, candidate.getDepartureTime(),
+                candidate.getArrivalTimeExpected(), availability);
+        Driver driver = bus != null ? driverFor(candidate, availability) : null;
+        return new Loop(kind, List.of(candidate), null, bus, driver);
+    }
+
+    /** Lý do thẻ thiếu tài nguyên: thiếu xe hay thiếu tài xế, cho một chuyến hay cho cả vòng. */
+    private static String noResourceNote(ExtraTrip extra, Loop loop, int standardSeats) {
+        String money = " — số khách tính với xe chuẩn " + standardSeats + " chỗ, chiều đi kèm theo kế hoạch";
+        if (extra.reverse() == null) {
+            return (loop.bus() == null
+                    ? "Không có xe rảnh, đang ở bến xuất phát và chưa tới ngưỡng bảo dưỡng cho khung giờ này"
+                    : "Có xe " + loop.bus().getLicensePlate()
+                            + " nhưng không có tài xế nào hợp lệ, rảnh và đang ở bến xuất phát cho khung giờ này")
+                    + money;
         }
-        leg.setStatus(TripStatus.PENDING_APPROVAL);
-        availability.reserve(leg);
-        return new Assigned(leg, bus, driver);
+        String what = extra.plannedLeg().kind() == LoopLegKind.RETURN
+                ? "chuyến thêm rồi về ngay trong " + LoopEconomics.COMPANION_SEARCH_DAYS + " ngày"
+                : "đưa xe tới trong " + LoopEconomics.COMPANION_SEARCH_DAYS + " ngày trước rồi chạy chuyến thêm,"
+                        + " và bến đi không có xe nào sẵn để chỉ chạy một lượt về bến nhà";
+        return (loop.bus() == null
+                ? "Không xếp được cả vòng (" + what + "): không có xe rảnh, đang ở bến nhà và chưa tới ngưỡng bảo"
+                        + " dưỡng cho cả vòng"
+                : "Không xếp được cả vòng (" + what + "): có xe " + loop.bus().getLicensePlate()
+                        + " nhưng không có tài xế nào rảnh, đang đứng đúng bến và còn đủ giờ lái (≤ 8 giờ/ngày) cho"
+                        + " mọi lượt của vòng")
+                + money;
     }
 
     /** Tài xế chính cho một lượt, đúng bộ chọn của TripService (luật 8 giờ, nghỉ 30 phút, vị trí). */
@@ -519,19 +529,19 @@ public class RecommendationService {
     }
 
     /**
-     * Ghi lượt đi kèm và tiền cả vòng vào thẻ. assigned != null khi lượt đã chọn được xe + tài xế và được
-     * giữ chỗ; null khi lượt chỉ là kế hoạch, hay không có lượt cụ thể.
+     * Ghi lượt đi kèm và tiền cả vòng vào thẻ. bus/driver khác null khi lượt đã chọn được xe + tài xế và
+     * được giữ chỗ; null khi lượt chỉ là kế hoạch, hay không có lượt cụ thể.
      */
-    private void setLoop(RecommendationCardDto card, LoopEconomics.Leg leg, Assigned assigned) {
+    private void setLoop(RecommendationCardDto card, LoopEconomics.Leg leg, Bus bus, Driver driver) {
         RecommendationCardDto.CompanionLeg companion = new RecommendationCardDto.CompanionLeg();
         companion.setKind(leg.kind());
         companion.setRouteId(leg.route() != null ? leg.route().getId() : null);
         companion.setRouteLabel(leg.route() != null ? label(leg.route()) : null);
         companion.setDeparture(leg.departure());
-        companion.setReserved(assigned != null);
-        if (assigned != null) {
-            companion.setBusPlate(assigned.bus().getLicensePlate());
-            companion.setDriverName(driverName(assigned.driver()));
+        companion.setReserved(bus != null);
+        if (bus != null) {
+            companion.setBusPlate(bus.getLicensePlate());
+            companion.setDriverName(driverName(driver));
         }
         companion.setPassengers(leg.passengers());
         companion.setRevenue(leg.revenue());

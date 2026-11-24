@@ -2340,4 +2340,117 @@ public class TripService {
     private boolean travelingFlagExplained(Bus bus) {
         return tripRepository.existsByBusIdAndStatusIn(bus.getId(), List.of(TripStatus.DEPARTED));
     }
+
+    // =========================================================================
+    // CẢ VÒNG MỘT LẦN — route pairs CT7c (CM-24, phương án PA-A)
+    // =========================================================================
+    //
+    // Màn Đề xuất coi mỗi chuyến thêm là một VÒNG bến nhà → bến nhà (QĐ-22, PA-B): chuyến thêm rồi "về
+    // ngay", hay "đưa xe tới" rồi chuyến thêm. Trước CT7c mỗi lượt được chọn riêng, nên luật vị trí hai
+    // phía (CT5b) xét chuyến thêm MỘT MÌNH: một tài xế đang ở bến nhà mà chuyến kế tiếp cũng đi từ bến nhà
+    // bị loại khỏi chuyến thêm rời bến nhà, dù lượt về của chính vòng đó đưa họ về kịp (CM-24: lịch thường
+    // lệ phủ cả tuần thì chỉ 2/25 thẻ đủ điều kiện). Ở đây cả vòng được chọn MỘT LẦN, cho MỘT xe và MỘT
+    // tài xế chính — đúng luật H1 của bộ sinh lịch sử (HistoricalDataBackfill.addOuting / findReturn) và
+    // "kíp ở lại cùng xe" của QĐ-26 — bằng chính các luật của findBestAvailableBus / findBestAvailableDriver,
+    // áp cho cả khối:
+    //   - bận: xe không có chuyến nào trong [đầu khối − 1 giờ, cuối khối + 1 giờ], tài xế trong
+    //     [đầu − 30 phút, cuối + 30 phút] — xe và kíp chờ nhau ở bến xa;
+    //   - vị trí: LocationRule.fits, cả khối coi như MỘT lượt từ bến đầu tới bến cuối;
+    //   - giờ lái: mỗi lượt cộng vào ngày khởi hành của nó (như sumDrivingHours), mỗi ngày ≤ 8 giờ;
+    //   - bảo trì: km của mọi lượt trong khối;
+    //   - bằng lái còn hạn vào ngày của mọi lượt; thứ tự ưu tiên như hai hàm gốc.
+    // Không có luật mới. Cổng cuối vẫn là validateBusForTrip / validateStaffForTrip cho TỪNG lượt.
+
+    /** Xe và tài xế cho cả một vòng. bus null = không có xe; driver null = có xe mà không có tài xế. */
+    public record LoopChoice(Bus bus, Driver driver) {
+        public boolean isComplete() {
+            return bus != null && driver != null;
+        }
+    }
+
+    /**
+     * Chọn MỘT xe và MỘT tài xế chính cho cả vòng (xem đầu mục). legs: các lượt theo thứ tự giờ, mỗi lượt
+     * có tuyến, giờ đi, giờ đến; lượt sau xuất phát từ bến đến của lượt trước. Không giữ chỗ — nơi gọi cho
+     * từng lượt qua cổng rồi mới reserve.
+     */
+    public LoopChoice selectLoop(List<Trip> legs, AvailabilityContext ctx) {
+        Trip first = legs.get(0);
+        Trip last = legs.get(legs.size() - 1);
+        LocalDateTime start = first.getDepartureTime();
+        LocalDateTime end = arrivalOf(last);
+        LocationRule.Leg block = blockLeg(first, last, start, end);
+        double km = legs.stream().mapToDouble(TripService::distanceOf).sum();
+        BusType preferredType = first.getRoute().getSuitableBusType();
+        List<Bus> candidates = ctx != null && ctx.isLookAhead() ? ctx.schedulableBuses()
+                : busRepository.findByStatus(BusStatus.READY);
+        LocalDateTime busFrom = start.minusHours(BUS_PREP_BUFFER_HOURS);
+        LocalDateTime busTo = end.plusHours(BUS_PREP_BUFFER_HOURS);
+        Bus bus = candidates.stream()
+                .filter(b -> !isBusBusy(b, busFrom, busTo, null, ctx))
+                .filter(b -> block == null
+                        || LocationRule.fits(busLegsAround(b, start, end, ctx), idOf(b.getHomeStation()), block))
+                .filter(b -> !b.needsMaintenance())
+                .filter(b -> !b.isNearMaintenance(km + (ctx != null ? ctx.committedKm(b.getId()) : 0.0)))
+                .min(preferredTypeThenLeastWorn(preferredType))
+                .orElse(null);
+        return new LoopChoice(bus, bus != null ? driverForLoop(legs, block, start, end, ctx) : null);
+    }
+
+    /**
+     * Tài xế chính cho cả vòng: các luật của findBestAvailableDriver, áp cho cả khối. Phần giờ lái của một
+     * lượt là phần của tài xế chính khi lượt có ⌈giờ ÷ 8⌉ tài xế, như màn Đề xuất vẫn truyền vào hàm gốc.
+     */
+    private Driver driverForLoop(List<Trip> legs, LocationRule.Leg block, LocalDateTime start, LocalDateTime end,
+            AvailabilityContext ctx) {
+        LocalDateTime windowStart = start.minusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        LocalDateTime windowEnd = end.plusMinutes(MIN_REST_BETWEEN_TRIPS_MINUTES);
+        java.util.Map<java.time.LocalDate, Double> loopHours = new java.util.TreeMap<>();
+        for (Trip leg : legs) {
+            double hours = Duration.between(leg.getDepartureTime(), arrivalOf(leg)).toMinutes() / 60.0;
+            int drivers = Math.max(1, (int) Math.ceil(hours / 8.0));
+            loopHours.merge(leg.getDepartureTime().toLocalDate(), Math.min(hours / drivers, 8.0), Double::sum);
+        }
+        List<Driver> able = driverRepository.findAll().stream()
+                .filter(d -> Boolean.TRUE.equals(d.getIsActive()))
+                .filter(d -> legs.stream().allMatch(leg -> d.isLicenseValid(leg.getDepartureTime().toLocalDate())))
+                .filter(d -> loopHours.entrySet().stream().allMatch(day ->
+                        getDrivingHoursForDate(d, day.getKey().atStartOfDay(), null, ctx) + day.getValue() <= 8.0))
+                .filter(d -> !isDriverBusyInWindow(d, windowStart, windowEnd, null, ctx))
+                .filter(d -> block == null
+                        || LocationRule.fits(personLegsAround(d, start, end, ctx), idOf(d.getHomeStation()), block))
+                .collect(Collectors.toList());
+
+        // Ít giờ lái nhất trong các ngày của vòng trước — nhớ theo người, như drivingHoursKey.
+        java.util.Map<Driver, Double> memo = new java.util.IdentityHashMap<>();
+        Comparator<Driver> leastHours = Comparator.comparingDouble(d -> memo.computeIfAbsent(d,
+                person -> loopHours.keySet().stream()
+                        .mapToDouble(day -> getDrivingHoursForDate(person, day.atStartOfDay(), null, ctx)).sum()));
+        Driver best = able.stream()
+                .filter(d -> d.getLicenseExpiryDate() != null
+                        && d.getLicenseExpiryDate().isAfter(start.toLocalDate().plusDays(7)))
+                .min(leastHours)
+                .orElse(null);
+        if (best != null) {
+            return best;
+        }
+        Driver fallback = able.stream().min(leastHours).orElse(null);
+        if (fallback != null) {
+            log.warn("⚠️ [AI] Tài xế {} được chọn cho cả vòng nhưng bằng lái SẮP HẾT HẠN (vào {})!",
+                    fallback.getUser().getFullName(), fallback.getLicenseExpiryDate());
+        }
+        return fallback;
+    }
+
+    /** Cả khối như MỘT lượt, từ bến đầu của lượt đầu tới bến cuối của lượt cuối; null khi thiếu bến (không xét vị trí). */
+    private static LocationRule.Leg blockLeg(Trip first, Trip last, LocalDateTime start, LocalDateTime end) {
+        Long from = idOf(first.getRoute().getDepartureStation());
+        Long to = idOf(last.getRoute().getDestinationStation());
+        return from == null || to == null || end.isBefore(start) ? null : new LocationRule.Leg(from, to, start, end);
+    }
+
+    /** Quãng đường của một chuyến theo tuyến; tuyến thiếu số km thì 0, như các luật bảo trì. */
+    private static double distanceOf(Trip trip) {
+        return trip.getRoute() != null && trip.getRoute().getDistanceKm() != null ? trip.getRoute().getDistanceKm()
+                : 0.0;
+    }
 }
