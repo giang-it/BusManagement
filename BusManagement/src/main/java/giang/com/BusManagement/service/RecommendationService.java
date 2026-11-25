@@ -92,8 +92,17 @@ import java.util.stream.Collectors;
  *   <li>tuyến không có đúng một tuyến chiều ngược → tính như một lượt về rỗng (ASSUMED_RETURN).</li>
  * </ul>
  * Không xếp được cả vòng thì thẻ "thiếu tài nguyên" — như lịch sử không chạy chuyến thêm khi không có lượt
- * về. Lãi của thẻ = tiền vé chuyến thêm + tiền vé lượt đi kèm − chi phí hai lượt. Hai thẻ ngược chiều KHÔNG
- * được ghép thành một vòng (để CT9, cùng luật giữ–về).
+ * về. Lãi của thẻ = tiền vé chuyến thêm + tiền vé lượt đi kèm − chi phí hai lượt.
+ *
+ * ====================================================================
+ * VÒNG GIỮ XE (route pairs CT9; QĐ-25, QĐ-26, CM-29…CM-32)
+ * ====================================================================
+ * Một chuyến thêm ĐI (rời bến nhà) và một chuyến thêm VỀ sau đó của cùng cặp có thể chạy bằng MỘT xe và MỘT
+ * kíp: xe chờ ở bến xa giữa hai lượt (kíp ở lại cùng xe), thay cho hai vòng riêng mà mỗi vòng có một lượt đi
+ * kèm gần như rỗng. Phép ghép ở mức kế hoạch là của {@link LoopEconomics#pairHolds} (What-if dùng chung): chỉ
+ * ghép khi lãi cả vòng giữ − tiền chờ lớn hơn lãi của hai vòng riêng. Một vòng giữ là MỘT thẻ (gánh hai chuyến
+ * thêm), được xét theo lãi của cả vòng; không xếp được bằng một xe + một tài xế thì hai chuyến thêm quay về
+ * hai thẻ riêng như trước.
  *
  * ====================================================================
  * GIỮ CHỖ GIỮA CÁC THẺ, LÃI CAO XÉT TRƯỚC (G6-3, G6-4; đóng M-14)
@@ -155,8 +164,37 @@ public class RecommendationService {
     private record ExtraTrip(ForecastSeriesDto series, ForecastPointDto point, Route route, Route reverse,
             int index, int count, LoopEconomics.SlotTrips inSlot, boolean slotAssumed, int durationMinutes,
             int requiredDrivers, BigDecimal price, BigDecimal cost, LoopEconomics.Leg plannedLeg,
-            BigDecimal plannedProfit) {
+            BigDecimal plannedProfit, BigDecimal plannedTripRevenue) {
+
+        LocalDateTime departure() {
+            return point.getDate().atTime(series.getDepartureHour(), 0);
+        }
+
+        String slot() {
+            return LoopEconomics.slotKey(route.getId(), point.getDate(), series.getDepartureHour());
+        }
     }
+
+    /**
+     * Route pairs CT9: một đơn vị xét theo lãi — một chuyến thêm (in null), hay một vòng giữ xe ghép chuyến thêm
+     * đi với chuyến thêm về (hold khác null, CM-29). Lãi kế hoạch của vòng giữ là lãi cả vòng giữ.
+     */
+    private record Unit(ExtraTrip out, ExtraTrip in, LoopEconomics.Hold hold) {
+        BigDecimal plannedProfit() {
+            return hold != null ? hold.profit() : out.plannedProfit();
+        }
+    }
+
+    /**
+     * Thứ tự xét: lãi cả vòng kỳ vọng giảm dần, rồi ngày, tuyến, giờ, thứ tự chuyến thêm — như trước CT9 khi
+     * không có vòng giữ nào.
+     */
+    private static final Comparator<Unit> UNIT_ORDER = Comparator
+            .comparing(Unit::plannedProfit, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(u -> u.out().point().getDate())
+            .thenComparing(u -> u.out().series().getRouteLabel(), Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparingInt(u -> u.out().series().getDepartureHour())
+            .thenComparingInt(u -> u.out().index());
 
     /**
      * Một vòng của thẻ (CT7c, CM-24 PA-A): loại lượt đi kèm, các lượt theo giờ (chuyến thêm và lượt đi kèm,
@@ -171,6 +209,16 @@ public class RecommendationService {
 
     @Transactional(readOnly = true)
     Plan buildPlan() {
+        return buildPlan(Set.of());
+    }
+
+    /**
+     * @param unpairable khung không được ghép thành vòng giữ xe (CT9) — job đêm truyền các khung mà Admin đã từ
+     *                   chối vòng dự báo, để chuyến thêm còn lại của đôi vẫn được xét như một thẻ riêng; trang
+     *                   truyền tập rỗng.
+     */
+    @Transactional(readOnly = true)
+    Plan buildPlan(Set<String> unpairable) {
         // Gọi ĐÚNG MỘT LẦN: buildForecast() nạp lịch sử và khớp (hoặc dùng lại) mô hình,
         // gọi lặp sẽ vừa phí vừa rủi ro hai ảnh chụp lệch nhau. Độ tươi dữ liệu của trang
         // cũng lấy từ chính DTO này.
@@ -203,7 +251,8 @@ public class RecommendationService {
 
         LoopEconomics economics = new LoopEconomics(loadLatestPrices(), LoopEconomics.demandBySlot(forecast),
                 LoopEconomics.slotTrips(tripRepository.findSlotSeatsBetween(SLOT_STATUSES, spanStart, spanEnd)),
-                nbSize, 1.0, cost.getFuelCostPerKm(), cost.getDriverWagePerHour());
+                nbSize, 1.0, cost.getFuelCostPerKm(), cost.getDriverWagePerHour(), cost.getWaitingWagePerDay(),
+                cost.getBusParkingPerDay());
 
         // ── Lập danh sách chuyến thêm: mỗi khung đông còn thiếu (số chuyến cần − số chuyến đã có) ──
         List<ExtraTrip> extras = new ArrayList<>();
@@ -242,37 +291,76 @@ public class RecommendationService {
                 for (int k = 1; k <= stillNeeded; k++) {
                     double planned = ForecastService.extraTripPassengers(point.getPredictedDemand(),
                             inSlot.seats() + (k - 1) * seats, seats, nbSize);
-                    BigDecimal plannedProfit = profitOf(
-                            LoopEconomics.plus(LoopEconomics.revenue(slotPrice, planned), plannedLeg.revenue()),
+                    BigDecimal plannedTripRevenue = LoopEconomics.revenue(slotPrice, planned);
+                    BigDecimal plannedProfit = profitOf(LoopEconomics.plus(plannedTripRevenue, plannedLeg.revenue()),
                             LoopEconomics.plus(tripCost, plannedLeg.cost()));
                     extras.add(new ExtraTrip(series, point, route, reverse, inSlot.trips() - 1 + k,
                             point.getTripsNeeded() - 1, inSlot, assumed, durationMinutes, requiredDrivers,
-                            slotPrice, tripCost, plannedLeg, plannedProfit));
+                            slotPrice, tripCost, plannedLeg, plannedProfit, plannedTripRevenue));
                 }
+            }
+        }
+
+        // ── Vòng giữ xe (CT9, CM-29…CM-32): ghép chuyến thêm đi với chuyến thêm về, ở mức kế hoạch ──
+        // id = vị trí trong danh sách theo thứ tự dựng (chuỗi → ngày → k), nên chuyến thêm thứ nhất của một khung
+        // có id nhỏ hơn chuyến thứ hai — phép ghép dùng điều đó để hoà, và What-if dựng đúng cùng danh sách.
+        List<LoopEconomics.PlannedExtra> plannedExtras = new ArrayList<>();
+        for (int id = 0; id < extras.size(); id++) {
+            ExtraTrip extra = extras.get(id);
+            plannedExtras.add(new LoopEconomics.PlannedExtra(id, extra.route(), extra.reverse(), extra.departure(),
+                    extra.departure().plusMinutes(extra.durationMinutes()), extra.plannedLeg().kind(),
+                    extra.plannedTripRevenue(), extra.cost(), extra.plannedProfit()));
+        }
+        List<Unit> work = new ArrayList<>();
+        Set<Integer> paired = new java.util.HashSet<>();
+        for (LoopEconomics.Hold hold : economics.pairHolds(plannedExtras, unpairable)) {
+            work.add(new Unit(extras.get(hold.outId()), extras.get(hold.inId()), hold));
+            paired.add(hold.outId());
+            paired.add(hold.inId());
+        }
+        for (int id = 0; id < extras.size(); id++) {
+            if (!paired.contains(id)) {
+                work.add(new Unit(extras.get(id), null, null));
             }
         }
 
         // Xét theo lãi cả vòng kỳ vọng giảm dần: vòng đáng chạy nhất được giữ xe + tài xế trước.
         // Trong một khung, các chuyến thêm có cùng lượt đi kèm theo kế hoạch, và chuyến thêm sau chở
-        // ít khách tràn hơn chuyến trước, nên lãi của nó không cao hơn; bằng nhau thì k nhỏ trước. Vì
-        // vậy các chuyến thêm của một khung luôn được xét theo thứ tự — điều seatsBefore bên dưới dựa vào.
-        extras.sort(Comparator.comparing(ExtraTrip::plannedProfit, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(e -> e.point().getDate())
-                .thenComparing(e -> e.series().getRouteLabel(), Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparingInt(e -> e.series().getDepartureHour())
-                .thenComparingInt(ExtraTrip::index));
+        // ít khách tràn hơn chuyến trước, nên lãi của nó không cao hơn; bằng nhau thì k nhỏ trước. Từ CT9,
+        // thứ tự chuyến thêm trong khung (và ghế đã có trước nó) đếm theo thứ tự xét thật, vì một vòng giữ có
+        // thể được xét trước một chuyến thêm khác của cùng khung.
+        work.sort(UNIT_ORDER);
 
         // Ghế khung đã có trước chuyến thêm đang xét: các chuyến đã có (hay xe chuẩn giả định) cộng các
-        // chuyến thêm trước nó.
+        // chuyến thêm đã xét trước nó; và số chuyến thêm đã xét của khung, cho thứ tự "chuyến thêm k".
         Map<String, Integer> seatsSoFar = new HashMap<>();
+        Map<String, Integer> extrasSoFar = new HashMap<>();
         List<RecommendationCardDto> cards = new ArrayList<>();
         Map<RecommendationCardDto, Loop> loops = new java.util.IdentityHashMap<>(); // vòng của thẻ đủ điều kiện (CT8b)
-        for (ExtraTrip extra : extras) {
-            String slot = LoopEconomics.slotKey(extra.route().getId(), extra.point().getDate(),
-                    extra.series().getDepartureHour());
-            int seatsBefore = seatsSoFar.getOrDefault(slot, extra.inSlot().seats());
-            RecommendationCardDto card = buildCard(extra, seatsBefore, nbSize, availability, economics, now, loops);
-            seatsSoFar.put(slot, seatsBefore + tripSeats(card, extra));
+        for (int u = 0; u < work.size(); u++) {
+            Unit unit = work.get(u);
+            if (unit.in() != null) {
+                RecommendationCardDto held = buildHeldCard(unit, seatsSoFar, extrasSoFar, nbSize, availability,
+                        loops);
+                if (held != null) {
+                    cards.add(held);
+                } else {
+                    // Không xếp được cả vòng giữ bằng một xe + một tài xế (hay cổng trượt): hai chuyến thêm quay
+                    // về hai thẻ riêng như trước CT9, xếp lại vào phần còn lại theo lãi riêng của chúng.
+                    List<Unit> rest = new ArrayList<>(work.subList(u + 1, work.size()));
+                    rest.add(new Unit(unit.out(), null, null));
+                    rest.add(new Unit(unit.in(), null, null));
+                    rest.sort(UNIT_ORDER);
+                    work = new ArrayList<>(work.subList(0, u + 1));
+                    work.addAll(rest);
+                }
+                continue;
+            }
+            ExtraTrip extra = unit.out();
+            int seatsBefore = seatsSoFar.getOrDefault(extra.slot(), extra.inSlot().seats());
+            RecommendationCardDto card = buildCard(extra, nextIndex(extrasSoFar, extra), seatsBefore, nbSize,
+                    availability, economics, now, loops);
+            seatsSoFar.put(extra.slot(), seatsBefore + tripSeats(card, extra));
             cards.add(card);
         }
 
@@ -294,6 +382,9 @@ public class RecommendationService {
         int loss = (int) cards.stream()
                 .filter(c -> c.getEstimatedProfit() != null && c.getEstimatedProfit().signum() < 0).count();
 
+        int held = (int) cards.stream()
+                .filter(c -> c.getCompanion() != null && c.getCompanion().getKind() == LoopLegKind.HOLD).count();
+
         return new Plan(new RecommendationViewDto(
                 cards,
                 forecast.getHistoryEnd(),
@@ -301,14 +392,124 @@ public class RecommendationService {
                 forecast.getForecastFrom(),
                 forecast.getHorizonDays(),
                 hotSlots,
-                cards.size(),
+                extras.size(),
                 recommended,
                 noResource,
                 profitable,
                 loss,
                 cost.getFuelCostPerKm(),
                 cost.getDriverWagePerHour(),
-                alreadyInSlots), loops);
+                alreadyInSlots,
+                held,
+                cost.getWaitingWagePerDay(),
+                cost.getBusParkingPerDay()), loops);
+    }
+
+    /** Thứ tự "chuyến thêm k" của chuyến này trong khung, theo thứ tự xét thật (tính cả chuyến thêm đã có). */
+    private static int nextIndex(Map<String, Integer> extrasSoFar, ExtraTrip extra) {
+        return extra.inSlot().trips() - 1 + extrasSoFar.merge(extra.slot(), 1, Integer::sum);
+    }
+
+    /**
+     * Route pairs CT9 (CM-29) — thẻ của một vòng giữ xe: MỘT xe và MỘT tài xế cho chuyến thêm đi, thời gian chờ
+     * ở bến xa và chuyến thêm về, chọn một lần bằng {@link TripService#selectLoop} (bận phủ cả khối, nên xe và
+     * kíp được giữ suốt lúc chờ), mỗi lượt qua cổng, rồi giữ chỗ cả hai. Trả null — không giữ gì — khi không xếp
+     * được cả vòng hay một cổng trượt: nơi gọi xét lại hai chuyến thêm như hai thẻ riêng.
+     */
+    private RecommendationCardDto buildHeldCard(Unit unit, Map<String, Integer> seatsSoFar,
+            Map<String, Integer> extrasSoFar, double nbSize, AvailabilityContext availability,
+            Map<RecommendationCardDto, Loop> loops) {
+        ExtraTrip out = unit.out();
+        ExtraTrip in = unit.in();
+        LoopEconomics.Hold hold = unit.hold();
+        Trip outTrip = candidate(out.route(), out.departure());
+        Trip inTrip = candidate(in.route(), in.departure());
+        List<Trip> legs = List.of(outTrip, inTrip);
+        TripService.LoopChoice choice = tripService.selectLoop(legs, availability);
+        if (!choice.isComplete()) {
+            return null;
+        }
+        for (Trip leg : legs) {
+            if (gate(leg, choice.bus(), choice.driver()) != null) {
+                return null;
+            }
+        }
+        for (Trip leg : legs) {
+            leg.setStatus(TripStatus.PENDING_APPROVAL);
+            availability.reserve(leg);
+        }
+
+        // Khách của từng chuyến thêm: khách tràn rơi vào ghế của xe được chọn, sau ghế đã có của khung nó.
+        int capacity = capacityOf(choice.bus());
+        int outSeats = capacity > 0 ? capacity : out.series().getStandardSeats();
+        int inSeats = capacity > 0 ? capacity : in.series().getStandardSeats();
+        int outSeatsBefore = seatsSoFar.getOrDefault(out.slot(), out.inSlot().seats());
+        int inSeatsBefore = seatsSoFar.getOrDefault(in.slot(), in.inSlot().seats());
+        seatsSoFar.put(out.slot(), outSeatsBefore + outSeats);
+        seatsSoFar.put(in.slot(), inSeatsBefore + inSeats);
+        double outPassengers = ForecastService.extraTripPassengers(out.point().getPredictedDemand(), outSeatsBefore,
+                outSeats, nbSize);
+        double inPassengers = ForecastService.extraTripPassengers(in.point().getPredictedDemand(), inSeatsBefore,
+                inSeats, nbSize);
+
+        RecommendationCardDto card = baseCard(out, nextIndex(extrasSoFar, out));
+        card.setTicketPrice(out.price());
+        card.setTripCost(out.cost());
+        card.setBusPlate(choice.bus().getLicensePlate());
+        card.setBusCapacity(capacity > 0 ? capacity : null);
+        card.setDriverName(driverName(choice.driver()));
+        card.setExpectedPassengers(outPassengers);
+        card.setTripRevenue(LoopEconomics.revenue(out.price(), outPassengers));
+
+        RecommendationCardDto.CompanionLeg leg = new RecommendationCardDto.CompanionLeg();
+        leg.setKind(LoopLegKind.HOLD);
+        leg.setRouteId(in.route().getId());
+        leg.setRouteLabel(label(in.route()));
+        leg.setDeparture(inTrip.getDepartureTime());
+        leg.setReserved(true);
+        leg.setBusPlate(choice.bus().getLicensePlate());
+        leg.setDriverName(driverName(choice.driver()));
+        leg.setPassengers(inPassengers);
+        leg.setRevenue(LoopEconomics.revenue(in.price(), inPassengers));
+        leg.setCost(in.cost());
+        leg.setWaitStation(in.route().getDeparturePointDisplay());
+        leg.setWaitFrom(hold.returnFrom());
+        leg.setWaitHours(hold.waitHours());
+        leg.setWaitCost(hold.waitCost());
+        leg.setServedDemand(in.point().getPredictedDemand());
+        leg.setServedStandardSeats(in.series().getStandardSeats());
+        leg.setServedExtraIndex(nextIndex(extrasSoFar, in));
+        leg.setServedExtraCount(in.count());
+        leg.setSeparateProfit(hold.separate());
+        card.setCompanion(leg);
+        card.setEstimatedRevenue(LoopEconomics.plus(card.getTripRevenue(), leg.getRevenue()));
+        card.setEstimatedCost(LoopEconomics.plus(LoopEconomics.plus(card.getTripCost(), leg.getCost()),
+                hold.waitCost()));
+        card.setEstimatedProfit(profitOf(card.getEstimatedRevenue(), card.getEstimatedCost()));
+        card.setStatus(RecommendationStatus.RECOMMENDED);
+        card.setNote("Đủ điều kiện — vòng giữ xe: xe " + choice.bus().getLicensePlate() + " và tài xế "
+                + driverName(choice.driver()) + " chạy chuyến thêm này, "
+                + (hold.waitHours() > 0
+                        ? "chờ ở " + leg.getWaitStation() + " thêm " + hours(hold.waitHours()) + " giờ (từ "
+                                + hold.returnFrom().format(LEG_TIME) + ", lúc về ngay sớm nhất; tiền chờ "
+                                + money(hold.waitCost()) + ")"
+                        : "không phải chờ thêm (chuyến thêm về đi đúng lúc về ngay sớm nhất)")
+                + ", rồi chạy chuyến thêm " + label(in.route()) + " " + inTrip.getDepartureTime().format(LEG_TIME)
+                + " về bến nhà — thay cho hai vòng riêng "
+                + (hold.separate().signum() > 0 ? "có lãi theo kế hoạch " + money(hold.separate())
+                        : "đều lỗ theo kế hoạch (không vòng nào đáng chạy riêng)")
+                + "; cả vòng được giữ cho đúng xe và tài xế này, các thẻ khác không dùng lại");
+        loops.put(card, new Loop(LoopLegKind.HOLD, legs, inTrip, choice.bus(), choice.driver()));
+        return card;
+    }
+
+    private static String hours(double value) {
+        return value == Math.rint(value) ? String.valueOf((long) value)
+                : String.format(java.util.Locale.US, "%.1f", value).replace('.', ',');
+    }
+
+    private static String money(BigDecimal value) {
+        return String.format(java.util.Locale.US, "%,.0f", value).replace(',', '.') + "đ";
     }
 
     /**
@@ -319,9 +520,10 @@ public class RecommendationService {
      * kèm — được chọn MỘT LẦN cho một xe và một tài xế (CT7c, CM-24 PA-A), mọi lượt qua cổng validation,
      * rồi cả vòng được giữ chỗ trong availability.
      *
+     * @param index       thứ tự "chuyến thêm k" của chuyến này trong khung, theo thứ tự xét
      * @param seatsBefore ghế khung đã có trước chuyến này: các chuyến đã có và các chuyến thêm trước nó
      */
-    private RecommendationCardDto buildCard(ExtraTrip extra, int seatsBefore, double nbSize,
+    private RecommendationCardDto buildCard(ExtraTrip extra, int index, int seatsBefore, double nbSize,
             AvailabilityContext availability, LoopEconomics economics, LocalDateTime now, Map<RecommendationCardDto, Loop> loops) {
 
         ForecastSeriesDto series = extra.series();
@@ -329,7 +531,7 @@ public class RecommendationService {
         LocalDateTime departure = point.getDate().atTime(series.getDepartureHour(), 0);
         Trip candidate = candidate(extra.route(), departure);
 
-        RecommendationCardDto card = baseCard(extra);
+        RecommendationCardDto card = baseCard(extra, index);
         card.setTicketPrice(extra.price());
         card.setTripCost(extra.cost());
 
@@ -556,7 +758,7 @@ public class RecommendationService {
     }
 
     /** Phần khung dùng chung, chưa gắn tài nguyên/kết cục. */
-    private RecommendationCardDto baseCard(ExtraTrip extra) {
+    private RecommendationCardDto baseCard(ExtraTrip extra, int index) {
         ForecastSeriesDto series = extra.series();
         ForecastPointDto point = extra.point();
         RecommendationCardDto card = new RecommendationCardDto();
@@ -570,7 +772,7 @@ public class RecommendationService {
         card.setPredictedDemand(point.getPredictedDemand());
         card.setStandardSeats(series.getStandardSeats());
         card.setDemandRatio(point.getDemandRatio());
-        card.setExtraIndex(extra.index());
+        card.setExtraIndex(index);
         card.setExtraCount(extra.count());
         card.setExistingTrips(extra.inSlot().trips());
         card.setExistingSeats(extra.inSlot().seats());

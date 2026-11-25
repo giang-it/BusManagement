@@ -24,7 +24,8 @@ import java.util.List;
 public class RecommendationViewDto {
 
     /**
-     * Mỗi chuyến thêm một thẻ, xếp theo lợi nhuận ước tính GIẢM DẦN (chuyến có lãi lên đầu).
+     * Mỗi chuyến thêm một thẻ — trừ thẻ giữ xe (CT9), gánh hai chuyến thêm — xếp theo lợi nhuận ước tính
+     * GIẢM DẦN (chuyến có lãi lên đầu).
      * Xe + tài xế đã được giữ chỗ giữa các thẻ, nên các thẻ "đủ điều kiện" chạy được cùng lúc
      * (GĐ6, QĐ-17).
      */
@@ -39,7 +40,10 @@ public class RecommendationViewDto {
     // --- Số liệu tổng hợp ---
     /** Số ngày-khung được dự báo vượt ngưỡng tăng cường. */
     private int hotSlotCount;
-    /** Số chuyến thêm các khung đó còn cần (đã trừ chuyến có sẵn trong khung, CT7) = số thẻ. */
+    /**
+     * Số chuyến thêm các khung đó còn cần (đã trừ chuyến có sẵn trong khung, CT7). Từ CT9 có thể lớn hơn số
+     * thẻ: một thẻ giữ xe gánh hai chuyến thêm.
+     */
     private int totalCandidates;
     private int recommendedCount;
     private int noResourceCount;
@@ -61,4 +65,11 @@ public class RecommendationViewDto {
      * nên không có thẻ. Ví dụ khung cần 2 chuyến thêm, đã có 1 → 1 ở đây, và 1 thẻ.
      */
     private int alreadyInSlotCount;
+
+    // --- Route pairs CT9 (CM-8, CM-29) ---
+    /** Số thẻ giữ xe: một xe và một kíp chạy chuyến thêm đi, chờ ở bến xa, rồi chạy chuyến thêm về. */
+    private int heldLoopCount;
+    /** Lương chờ đồng/người/ngày và phí xe nằm bến đồng/ngày đang dùng cho tiền chờ. */
+    private BigDecimal costWaitingWagePerDay;
+    private BigDecimal costParkingPerDay;
 }

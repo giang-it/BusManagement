@@ -153,9 +153,17 @@ public class WhatIfSimulationService {
      * chiếu theo từng ngày (xem javadoc của lớp), nên mất ngày là mất luôn khả năng
      * biết một chuyến thuộc ngày cao điểm hay ngày vắng.
      */
-    private record ExtraTrip(LocalDate date, BigDecimal revenue, BigDecimal cost) {
+    private record ExtraTrip(LocalDate date, BigDecimal revenue, BigDecimal cost, BigDecimal heldLoopProfit) {
         BigDecimal profit() {
             return revenue != null && cost != null ? revenue.subtract(cost) : null;
+        }
+
+        /**
+         * Lãi dùng để xếp và để hỏi "có lãi không": của riêng chuyến thêm, hay — chuyến thêm thuộc một vòng giữ
+         * xe (CT9) — lãi của CẢ vòng giữ, để hai chuyến thêm của vòng được xếp và tính như một khối.
+         */
+        BigDecimal rankProfit() {
+            return heldLoopProfit != null ? heldLoopProfit : profit();
         }
     }
 
@@ -235,7 +243,7 @@ public class WhatIfSimulationService {
         // --- Cột HIỆN TRẠNG: nguồn lực thật, nhu cầu 100%, chi phí mặc định ---
         view.setBaseline(computeOutcome(forecast, routesById, prices, pairing, der,
                 readyBuses, activeDrivers, baselineSeats,
-                100, costDefaults.getFuelCostPerKm(), costDefaults.getDriverWagePerHour()));
+                100, costDefaults.getFuelCostPerKm(), costDefaults.getDriverWagePerHour(), costDefaults));
 
         // --- Cột KỊCH BẢN: áp các cần gạt ---
         int scenarioBuses = Math.max(0, readyBuses + lever.getDeltaBuses());
@@ -249,7 +257,7 @@ public class WhatIfSimulationService {
 
         view.setScenarioOutcome(computeOutcome(forecast, routesById, prices, pairing, der,
                 scenarioBuses, scenarioDrivers, scenarioSeats,
-                lever.getDemandFactorPercent(), fuelRate, wageRate));
+                lever.getDemandFactorPercent(), fuelRate, wageRate, costDefaults));
 
         return view;
     }
@@ -261,14 +269,15 @@ public class WhatIfSimulationService {
     private WhatIfOutcomeDto computeOutcome(DemandForecastViewDto forecast, Map<Long, Route> routesById,
             Map<Long, Map<Integer, BigDecimal>> prices, Pairing pairing, Derivation der,
             int buses, int drivers, long totalSeats,
-            int demandFactorPercent, BigDecimal fuelRate, BigDecimal wageRate) {
+            int demandFactorPercent, BigDecimal fuelRate, BigDecimal wageRate, CostParameters waiting) {
 
         double factor = demandFactorPercent / 100.0;
         // Độ phân tán nhu cầu của lần khớp — cùng con số màn Đề xuất dùng để tính khách tràn.
         double nbSize = forecast.getModel() != null ? forecast.getModel().getNegativeBinomialSize() : 0.0;
-        // Tiền theo tham số và hệ số nhu cầu của CỘT này; cùng lớp tính tiền với màn Đề xuất (CT7).
+        // Tiền theo tham số và hệ số nhu cầu của CỘT này; cùng lớp tính tiền với màn Đề xuất (CT7). Tiền chờ
+        // của vòng giữ xe (CT9) theo tham số đang cấu hình — màn này không có cần gạt cho nó.
         LoopEconomics economics = new LoopEconomics(prices, pairing.demandBySlot(), pairing.tripsBySlot(), nbSize,
-                factor, fuelRate, wageRate);
+                factor, fuelRate, wageRate, waiting.getWaitingWagePerDay(), waiting.getBusParkingPerDay());
         LocalDateTime now = LocalDateTime.now();
 
         // Năng lực: trần theo xe và trần theo tài xế, lấy cái nhỏ hơn.
@@ -281,6 +290,7 @@ public class WhatIfSimulationService {
         // Nhu cầu: nhân hệ số vào số khách rồi hỏi dự báo khung cần mấy chuyến, trừ các chuyến khung đã
         // có (CT7, cách 2a) — mỗi chuyến thêm còn thiếu một phần tử, kèm tiền CẢ VÒNG của nó (G6-5, W1).
         List<ExtraTrip> extras = new ArrayList<>();
+        List<LoopEconomics.PlannedExtra> planned = new ArrayList<>(); // cho phép ghép vòng giữ xe (CT9)
         int hotSlots = 0;
         for (ForecastSeriesDto series : forecast.getSeries()) {
             Route route = routesById.get(series.getRouteId());
@@ -314,12 +324,28 @@ public class WhatIfSimulationService {
                     if (route != null) {
                         double passengers = ForecastService.extraTripPassengers(demand,
                                 inSlot.seats() + (k - 1) * seats, seats, nbSize);
-                        revenue = LoopEconomics.plus(LoopEconomics.revenue(price, passengers), leg.revenue());
+                        BigDecimal tripRevenue = LoopEconomics.revenue(price, passengers);
+                        revenue = LoopEconomics.plus(tripRevenue, leg.revenue());
                         cost = LoopEconomics.plus(tripCost, leg.cost());
+                        LocalDateTime departure = point.getDate().atTime(hour, 0);
+                        planned.add(new LoopEconomics.PlannedExtra(extras.size(), route, reverse, departure,
+                                departure.plusMinutes(LoopEconomics.durationMinutes(route)), leg.kind(), tripRevenue,
+                                tripCost, revenue != null && cost != null ? revenue.subtract(cost) : null));
                     }
-                    extras.add(new ExtraTrip(point.getDate(), revenue, cost));
+                    extras.add(new ExtraTrip(point.getDate(), revenue, cost, null));
                 }
             }
+        }
+        // Vòng giữ xe (CT9): cùng phép ghép với màn Đề xuất. Hai chuyến thêm của một vòng giữ vẫn là hai phần
+        // tử (độ phủ đếm theo chuyến thêm, W1), nhưng tiền là của cả vòng: chuyến đi mang tiền vé và chi phí của
+        // nó cộng tiền chờ, chuyến về mang tiền vé và chi phí của nó, cả hai xếp theo lãi của cả vòng.
+        for (LoopEconomics.Hold hold : economics.pairHolds(planned, Set.of())) {
+            LoopEconomics.PlannedExtra out = planned.stream().filter(p -> p.id() == hold.outId()).findFirst().orElseThrow();
+            LoopEconomics.PlannedExtra in = planned.stream().filter(p -> p.id() == hold.inId()).findFirst().orElseThrow();
+            extras.set(out.id(), new ExtraTrip(out.departure().toLocalDate(), out.tripRevenue(),
+                    out.tripCost().add(hold.waitCost()), hold.profit()));
+            extras.set(in.id(), new ExtraTrip(in.departure().toLocalDate(), in.tripRevenue(), in.tripCost(),
+                    hold.profit()));
         }
         int needed = extras.size();
 
@@ -347,7 +373,7 @@ public class WhatIfSimulationService {
                 anyRevenue = true;
             }
             BigDecimal profit = trip.profit();
-            if (profit != null && profit.signum() > 0) {
+            if (profit != null && trip.rankProfit() != null && trip.rankProfit().signum() > 0) {
                 profitableTrips++;
                 profitableProfit = profitableProfit.add(profit);
             }
@@ -414,7 +440,7 @@ public class WhatIfSimulationService {
                 break;
             }
             tripsOfDay.stream()
-                    .sorted(Comparator.comparing(ExtraTrip::profit, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .sorted(Comparator.comparing(ExtraTrip::rankProfit, Comparator.nullsLast(Comparator.reverseOrder())))
                     .limit(budget)
                     .forEach(covered::add);
         }

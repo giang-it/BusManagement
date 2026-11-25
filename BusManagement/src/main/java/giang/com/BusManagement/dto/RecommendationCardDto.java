@@ -31,6 +31,10 @@ import java.time.LocalDateTime;
  *   <li>mỗi thẻ là MỘT VÒNG: chuyến thêm cộng lượt đi kèm ({@link CompanionLeg}). Doanh thu, chi phí
  *       và lợi nhuận ước tính là của CẢ VÒNG; phần riêng của chuyến thêm ở tripRevenue / tripCost.</li>
  * </ul>
+ *
+ * Từ route pairs CT9 (CM-29), một thẻ "giữ xe" ({@link LoopLegKind#HOLD}) gánh HAI chuyến thêm: chuyến thêm
+ * đi của thẻ và chuyến thêm về ở lượt đi kèm (khung, nhu cầu, thứ tự của nó ghi trong CompanionLeg); chi phí
+ * cả vòng cộng thêm tiền chờ. Vì vậy số thẻ có thể nhỏ hơn số chuyến thêm.
  */
 @Data
 @NoArgsConstructor
@@ -155,5 +159,30 @@ public class RecommendationCardDto {
         private BigDecimal revenue;
 
         private BigDecimal cost;
+
+        // --- Route pairs CT9: chỉ có ở lượt giữ xe (kind = HOLD); null ở mọi loại khác ---
+
+        /** Bến xa nơi xe và kíp chờ (bến đi của chuyến thêm về). */
+        private String waitStation;
+
+        /** Lần về ngay sớm nhất — mốc của tiền chờ (CM-30). */
+        private LocalDateTime waitFrom;
+
+        /** Số giờ chờ THÊM so với lần về ngay sớm nhất, và tiền chờ của chừng ấy giờ (CM-8). */
+        private Double waitHours;
+
+        private BigDecimal waitCost;
+
+        /** Khung của chuyến thêm về: nhu cầu dự báo, ghế xe chuẩn, thứ tự chuyến thêm trong khung. */
+        private Double servedDemand;
+
+        private Integer servedStandardSeats;
+
+        private Integer servedExtraIndex;
+
+        private Integer servedExtraCount;
+
+        /** Lãi theo kế hoạch của hai vòng riêng mà vòng giữ thay (chỉ phần dương), để so (CM-32). */
+        private BigDecimal separateProfit;
     }
 }

@@ -10,11 +10,13 @@ import giang.com.BusManagement.dto.LoopLegKind;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,6 +74,14 @@ final class LoopEconomics {
      */
     static final int COMPANION_SEARCH_DAYS = 2;
 
+    /**
+     * Route pairs CT9 (CM-31): xe tăng cường được giữ ở bến xa tối đa bấy nhiêu ngày (tính phần chờ THÊM so
+     * với lần về ngay sớm nhất) — bằng chân trời dự báo, vì thẻ chỉ có trong 7 ngày đó. Với tiền chờ mặc
+     * định (~663.000đ/ngày) chờ chỉ đáng khi ngắn hơn 2 × chi phí một chiều: Đà Lạt ≈ 6,3 ngày, Cần Thơ
+     * ≈ 3,8, Vũng Tàu ≈ 2,1. Mốc 35 ngày của QĐ-25 để dành cho cặp dài (QĐ-27).
+     */
+    static final int MAX_HOLD_DAYS = ForecastService.FORECAST_HORIZON_DAYS;
+
     /** Số chuyến và tổng số ghế đã có trong một khung. */
     record SlotTrips(int trips, int seats) {
     }
@@ -95,13 +105,16 @@ final class LoopEconomics {
     private final double demandFactor;
     private final BigDecimal fuelCostPerKm;
     private final BigDecimal driverWagePerHour;
+    private final BigDecimal waitingWagePerDay;
+    private final BigDecimal busParkingPerDay;
 
     /**
      * @param demandFactor hệ số nhân vào nhu cầu dự báo (1.0 ở màn Đề xuất; kịch bản What-if thì khác)
+     * @param waitingWagePerDay lương chờ đồng/người/ngày, busParkingPerDay phí xe nằm bến đồng/ngày (CT9, CM-8)
      */
     LoopEconomics(Map<Long, Map<Integer, BigDecimal>> prices, Map<String, SlotDemand> demandBySlot,
             Map<String, SlotTrips> tripsBySlot, double nbSize, double demandFactor, BigDecimal fuelCostPerKm,
-            BigDecimal driverWagePerHour) {
+            BigDecimal driverWagePerHour, BigDecimal waitingWagePerDay, BigDecimal busParkingPerDay) {
         this.prices = prices;
         this.demandBySlot = demandBySlot;
         this.tripsBySlot = tripsBySlot;
@@ -109,6 +122,8 @@ final class LoopEconomics {
         this.demandFactor = demandFactor;
         this.fuelCostPerKm = fuelCostPerKm;
         this.driverWagePerHour = driverWagePerHour;
+        this.waitingWagePerDay = waitingWagePerDay;
+        this.busParkingPerDay = busParkingPerDay;
     }
 
     // =========================================================================
@@ -250,6 +265,154 @@ final class LoopEconomics {
         }
         times.sort(Comparator.reverseOrder());
         return times;
+    }
+
+    // =========================================================================
+    // VÒNG GIỮ XE — route pairs CT9 (QĐ-25, QĐ-26; CM-8, CM-29…CM-32)
+    // =========================================================================
+    //
+    // Hai thẻ ngược chiều của cùng một cặp — chuyến thêm ĐI (rời bến nhà, kế hoạch "về ngay") và một chuyến
+    // thêm VỀ sau đó (về bến nhà, kế hoạch "đưa xe tới trước") — có thể chạy bằng MỘT xe và MỘT kíp: xe đi
+    // chuyến thêm đi, CHỜ ở bến xa, rồi chạy chuyến thêm về. Thay vì bốn lượt (hai trong đó gần như rỗng: lượt
+    // về ngay và lượt đưa xe tới chỉ chở khách còn tràn), vòng giữ chạy hai lượt đều có khách, đổi lại tiền chờ.
+    // Quyết bằng tiền, ở mức KẾ HOẠCH (xe chuẩn, chưa chọn xe), để màn Đề xuất và What-if ghép đúng như nhau:
+    //   - tiền chờ (CM-30, W-b) = phần chờ THÊM so với lần về ngay sớm nhất (earliestReturn) × (lương chờ ×
+    //     số người của kíp + phí xe nằm bến) ÷ 24 giờ;
+    //   - lãi vòng giữ = tiền vé hai chuyến thêm − chi phí hai lượt − tiền chờ;
+    //   - lãi tăng thêm = lãi vòng giữ − lãi của hai vòng riêng mà nó thay (chỉ phần dương: vòng lỗ thì không
+    //     chạy riêng). Chỉ ghép khi lãi tăng thêm > 0, đôi tăng nhiều nhất trước (CM-32);
+    //   - điều kiện: chuyến về xuất phát sau khi xe tới + 1 giờ chuẩn bị; một tài xế lái ≤ 8 giờ mỗi ngày
+    //     khởi hành; chờ thêm ≤ MAX_HOLD_DAYS ngày (CM-31).
+    // Lợi ích tối đa "2 × chi phí một chiều" của QĐ-25 tự có trong phép so: thứ vòng giữ tiết kiệm được chính
+    // là hai lượt đi kèm của hai vòng riêng.
+
+    /**
+     * Một chuyến thêm ở mức kế hoạch (xe chuẩn), đủ cho phép ghép. id: chỉ số do nơi gọi đặt; plannedKind:
+     * lượt đi kèm theo kế hoạch ({@link #planned}); tripRevenue / tripCost: của riêng chuyến thêm;
+     * plannedProfit: lãi cả vòng khi chạy RIÊNG, cùng lượt đi kèm theo kế hoạch.
+     */
+    record PlannedExtra(int id, Route route, Route reverse, LocalDateTime departure, LocalDateTime arrival,
+            LoopLegKind plannedKind, BigDecimal tripRevenue, BigDecimal tripCost, BigDecimal plannedProfit) {
+
+        String slot() {
+            return slotKey(route.getId(), departure.toLocalDate(), departure.getHour());
+        }
+
+        private boolean priced() {
+            return tripRevenue != null && tripCost != null && plannedProfit != null;
+        }
+    }
+
+    /**
+     * Một vòng giữ xe: chuyến thêm đi (outId) rồi chuyến thêm về (inId). returnFrom: lần về ngay sớm nhất, mốc
+     * của tiền chờ; waitHours / waitCost: phần chờ thêm; profit: lãi cả vòng giữ; separate: lãi của hai vòng
+     * riêng mà nó thay (chỉ phần dương); gain = profit − separate.
+     */
+    record Hold(int outId, int inId, LocalDateTime returnFrom, double waitHours, BigDecimal waitCost,
+            BigDecimal profit, BigDecimal separate, BigDecimal gain) {
+    }
+
+    /**
+     * Các vòng giữ xe đáng làm trong danh sách chuyến thêm (xem đầu mục): mọi đôi (đi, về) hợp lệ có lãi tăng
+     * thêm dương, xếp tăng nhiều nhất trước, rồi lấy lần lượt các đôi không trùng chuyến nào. Thứ tự hoà: chuyến
+     * đi sớm trước, rồi id nhỏ trước — nơi gọi đặt id theo thứ tự chuyến thêm trong khung, nên chuyến thêm thứ
+     * nhất của một khung được ghép trước chuyến thứ hai. excludedSlots: khung không được ghép (job đêm: khung
+     * Admin đã từ chối).
+     */
+    List<Hold> pairHolds(List<PlannedExtra> extras, Set<String> excludedSlots) {
+        Map<Integer, PlannedExtra> byId = new HashMap<>();
+        extras.forEach(extra -> byId.put(extra.id(), extra));
+        List<Hold> candidates = new ArrayList<>();
+        for (PlannedExtra out : extras) {
+            if (out.plannedKind() != LoopLegKind.RETURN || out.reverse() == null || !out.priced()
+                    || excludedSlots.contains(out.slot())) {
+                continue;
+            }
+            LocalDateTime returnFrom = earliestReturn(out.route(), out.reverse(), out.departure(), out.arrival());
+            if (returnFrom == null) {
+                continue;
+            }
+            LocalDateTime ready = out.arrival().plusMinutes(Math.round(PREP_BUFFER_HOURS * 60));
+            for (PlannedExtra in : extras) {
+                if (in.plannedKind() != LoopLegKind.BRING || !in.priced() || !in.route().getId().equals(out.reverse().getId())
+                        || excludedSlots.contains(in.slot()) || in.departure().isBefore(ready)) {
+                    continue;
+                }
+                if (in.departure().toLocalDate().equals(out.departure().toLocalDate())
+                        && driverShare(out.route()) + driverShare(in.route()) > MAX_DAILY_DRIVING_HOURS) {
+                    continue;
+                }
+                double waitHours = Math.max(0.0, Duration.between(returnFrom, in.departure()).toMinutes() / 60.0);
+                if (waitHours > MAX_HOLD_DAYS * 24.0) {
+                    continue;
+                }
+                int crew = Math.max(requiredDrivers(durationMinutes(out.route()) / 60.0),
+                        requiredDrivers(durationMinutes(in.route()) / 60.0));
+                BigDecimal wait = waitCost(waitHours, crew);
+                BigDecimal profit = out.tripRevenue().add(in.tripRevenue()).subtract(out.tripCost())
+                        .subtract(in.tripCost()).subtract(wait);
+                BigDecimal separate = positive(out.plannedProfit()).add(positive(in.plannedProfit()));
+                BigDecimal gain = profit.subtract(separate);
+                if (gain.signum() > 0) {
+                    candidates.add(new Hold(out.id(), in.id(), returnFrom, waitHours, wait, profit, separate, gain));
+                }
+            }
+        }
+        candidates.sort(Comparator.comparing(Hold::gain, Comparator.reverseOrder())
+                .thenComparing(hold -> byId.get(hold.outId()).departure())
+                .thenComparingInt(Hold::outId)
+                .thenComparing(hold -> byId.get(hold.inId()).departure())
+                .thenComparingInt(Hold::inId));
+        Set<Integer> used = new HashSet<>();
+        List<Hold> chosen = new ArrayList<>();
+        for (Hold hold : candidates) {
+            if (!used.contains(hold.outId()) && !used.contains(hold.inId())) {
+                used.add(hold.outId());
+                used.add(hold.inId());
+                chosen.add(hold);
+            }
+        }
+        return chosen;
+    }
+
+    /**
+     * Tiền chờ của hours giờ (CM-8, CM-30): (lương chờ × số người của kíp + phí xe nằm bến) × giờ ÷ 24, làm
+     * tròn tới đồng. Tham số thiếu thì bỏ thành phần đó, như tripCost.
+     */
+    BigDecimal waitCost(double hours, int crew) {
+        BigDecimal perDay = BigDecimal.ZERO;
+        if (waitingWagePerDay != null) {
+            perDay = perDay.add(waitingWagePerDay.multiply(BigDecimal.valueOf(crew)));
+        }
+        if (busParkingPerDay != null) {
+            perDay = perDay.add(busParkingPerDay);
+        }
+        return perDay.multiply(BigDecimal.valueOf(hours)).divide(BigDecimal.valueOf(24), 0, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Lần "về ngay" sớm nhất của chuyến thêm [departure, arrival] trên route (CM-30): giờ thường lệ đầu tiên
+     * của {@link #returnTimes} mà một tài xế lái được cả hai lượt (mỗi ngày khởi hành ≤ 8 giờ). Ví dụ đi Đà Lạt
+     * 06:00, tới 12:00: 18:00 cùng ngày là 12 giờ lái nên không được, về ngay sớm nhất là 06:00 hôm sau.
+     */
+    static LocalDateTime earliestReturn(Route route, Route reverse, LocalDateTime departure, LocalDateTime arrival) {
+        boolean sameDayFits = driverShare(route) + driverShare(reverse) <= MAX_DAILY_DRIVING_HOURS;
+        for (LocalDateTime time : returnTimes(arrival)) {
+            if (sameDayFits || !time.toLocalDate().equals(departure.toLocalDate())) {
+                return time;
+            }
+        }
+        return null;
+    }
+
+    /** Phần giờ lái của tài xế chính trên một lượt của tuyến — như TripService.driverForLoop: min(giờ ÷ số tài xế, 8). */
+    private static double driverShare(Route route) {
+        double hours = durationMinutes(route) / 60.0;
+        return Math.min(hours / requiredDrivers(hours), MAX_DAILY_DRIVING_HOURS);
+    }
+
+    private static BigDecimal positive(BigDecimal value) {
+        return value.signum() > 0 ? value : BigDecimal.ZERO;
     }
 
     // =========================================================================

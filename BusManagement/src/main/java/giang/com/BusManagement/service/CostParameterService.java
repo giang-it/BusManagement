@@ -33,19 +33,50 @@ public class CostParameterService {
     static final BigDecimal DEFAULT_DRIVER_WAGE_PER_HOUR = new BigDecimal("50000");
 
     /**
+     * Route pairs CT9 (CM-8) — tiền chờ của vòng giữ xe:
+     * - Lương chờ 333.000đ/người/ngày: cùng nguồn ~10 triệu đồng/tháng của lương/giờ ở trên, ÷ 30 ngày.
+     * - Phí xe nằm bến 330.000đ/xe/ngày: số tạm dùng khi bàn CT9, CHƯA có nguồn — Admin chỉnh theo thực tế.
+     */
+    static final BigDecimal DEFAULT_WAITING_WAGE_PER_DAY = new BigDecimal("333000");
+    static final BigDecimal DEFAULT_BUS_PARKING_PER_DAY = new BigDecimal("330000");
+
+    /**
      * Dòng cấu hình hiện hành, hoặc một object mặc định (CHƯA lưu) nếu Admin chưa
      * từng đặt. KHÔNG ghi-khi-đọc: giá trị mặc định chỉ nằm trong bộ nhớ cho tới
      * khi Admin bấm lưu, nên trang đề xuất vẫn tính được chi phí ngay từ đầu mà
      * không tạo bản ghi ngầm.
+     *
+     * Dòng đã lưu từ trước CT9 chưa có hai cột tiền chờ (null): trả một BẢN SAO chưa lưu, điền giá trị mặc
+     * định vào đúng hai ô thiếu — cùng nguyên tắc không ghi-khi-đọc; Admin bấm Lưu thì cả bốn ô được lưu.
      */
     @Transactional(readOnly = true)
     public CostParameters getOrDefault() {
-        return repository.findAll().stream().findFirst().orElseGet(() -> {
-            CostParameters d = new CostParameters();
-            d.setFuelCostPerKm(DEFAULT_FUEL_COST_PER_KM);
-            d.setDriverWagePerHour(DEFAULT_DRIVER_WAGE_PER_HOUR);
-            return d;
-        });
+        return repository.findAll().stream().findFirst().map(CostParameterService::withWaitingDefaults)
+                .orElseGet(() -> {
+                    CostParameters d = new CostParameters();
+                    d.setFuelCostPerKm(DEFAULT_FUEL_COST_PER_KM);
+                    d.setDriverWagePerHour(DEFAULT_DRIVER_WAGE_PER_HOUR);
+                    d.setWaitingWagePerDay(DEFAULT_WAITING_WAGE_PER_DAY);
+                    d.setBusParkingPerDay(DEFAULT_BUS_PARKING_PER_DAY);
+                    return d;
+                });
+    }
+
+    /** Dòng đã lưu còn thiếu ô tiền chờ (CT9) → bản sao có giá trị mặc định ở ô thiếu; đủ thì trả chính dòng đó. */
+    private static CostParameters withWaitingDefaults(CostParameters saved) {
+        if (saved.getWaitingWagePerDay() != null && saved.getBusParkingPerDay() != null) {
+            return saved;
+        }
+        CostParameters copy = new CostParameters();
+        copy.setId(saved.getId());
+        copy.setFuelCostPerKm(saved.getFuelCostPerKm());
+        copy.setDriverWagePerHour(saved.getDriverWagePerHour());
+        copy.setUpdatedAt(saved.getUpdatedAt());
+        copy.setWaitingWagePerDay(saved.getWaitingWagePerDay() != null ? saved.getWaitingWagePerDay()
+                : DEFAULT_WAITING_WAGE_PER_DAY);
+        copy.setBusParkingPerDay(saved.getBusParkingPerDay() != null ? saved.getBusParkingPerDay()
+                : DEFAULT_BUS_PARKING_PER_DAY);
+        return copy;
     }
 
     /**
@@ -63,11 +94,14 @@ public class CostParameterService {
         CostParameters target = repository.findAll().stream().findFirst().orElseGet(CostParameters::new);
         target.setFuelCostPerKm(form.getFuelCostPerKm());
         target.setDriverWagePerHour(form.getDriverWagePerHour());
+        target.setWaitingWagePerDay(form.getWaitingWagePerDay());
+        target.setBusParkingPerDay(form.getBusParkingPerDay());
         repository.save(target);
     }
 
     /**
-     * Cả hai suất phí bắt buộc phải LỚN HƠN 0.
+     * Mọi suất phí bắt buộc phải LỚN HƠN 0 — hai suất tiền chờ của CT9 cũng vậy, cùng lý do: nhập 0 là
+     * nói "chờ không tốn gì", và luật giữ–về sẽ giữ xe ở bến xa vô hạn mà không cảnh báo.
      *
      * ====================================================================
      * VÌ SAO 0 KHÔNG PHẢI ĐẦU VÀO HỢP LỆ
@@ -98,6 +132,8 @@ public class CostParameterService {
     private void validate(CostParameters form) {
         requirePositive(form.getFuelCostPerKm(), "Chi phí nhiên liệu mỗi km");
         requirePositive(form.getDriverWagePerHour(), "Lương tài xế mỗi giờ");
+        requirePositive(form.getWaitingWagePerDay(), "Lương chờ mỗi người mỗi ngày");
+        requirePositive(form.getBusParkingPerDay(), "Phí xe nằm bến mỗi ngày");
     }
 
     private void requirePositive(BigDecimal value, String label) {

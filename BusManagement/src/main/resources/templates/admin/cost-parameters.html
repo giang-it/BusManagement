@@ -66,6 +66,41 @@
                                 </div>
                             </div>
 
+                            <!-- Route pairs CT9 (QĐ-26, CM-8): tiền chờ của vòng giữ xe -->
+                            <div class="fw-semibold mt-4 mb-1">Tiền chờ khi xe tăng cường được giữ ở bến xa</div>
+                            <div class="small text-muted mb-2">
+                                Màn Đề xuất có thể giữ một xe tăng cường (cùng kíp lái) ở bến xa để chở khách chiều về
+                                thay vì cho xe về rỗng — chỉ khi tiền chờ nhỏ hơn tiền tiết kiệm được. Tiền chờ tính theo
+                                giờ, cho phần chờ THÊM so với lần về ngay sớm nhất.
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Lương Chờ (đồng / người / ngày)
+                                        <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="1" min="1" class="form-control"
+                                            th:field="*{waitingWagePerDay}" required placeholder="Ví dụ: 333000">
+                                        <span class="input-group-text">đ/người/ngày</span>
+                                    </div>
+                                    <div class="form-text text-muted">
+                                        Kíp lái ở lại cùng xe và vẫn nhận lương cơ bản. Mặc định 333.000đ
+                                        (~10 triệu/tháng ÷ 30 ngày).
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Phí Xe Nằm Bến (đồng / xe / ngày)
+                                        <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input type="number" step="1" min="1" class="form-control"
+                                            th:field="*{busParkingPerDay}" required placeholder="Ví dụ: 330000">
+                                        <span class="input-group-text">đ/xe/ngày</span>
+                                    </div>
+                                    <div class="form-text text-muted">
+                                        Mặc định 330.000đ — số tạm, chưa có nguồn; hãy chỉnh theo thực tế của nhà xe.
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="small text-muted mt-3" th:if="${params.updatedAt != null}">
                                 <i class="bi bi-clock-history"></i> Cập nhật gần nhất:
                                 <span th:text="${#temporals.format(params.updatedAt, 'dd/MM/yyyy HH:mm')}">—</span>

@@ -56,4 +56,17 @@ public class CostParameters {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /**
+     * Route pairs CT9 (QĐ-26, CM-8) — TIỀN CHỜ khi xe tăng cường được giữ ở bến xa chờ chở khách chiều về
+     * (vòng giữ xe, CM-29): lương chờ của mỗi người trong kíp (đồng/người/ngày; kíp ở lại cùng xe và vẫn nhận
+     * lương cơ bản) và phí xe nằm bến (đồng/xe/ngày). Tính theo giờ chờ. Hai cột cho phép null, thêm bằng
+     * ddl-auto=update: dòng cấu hình có từ trước đọc ra giá trị mặc định cho tới khi Admin bấm Lưu
+     * (CostParameterService.getOrDefault).
+     */
+    @Column(name = "waiting_wage_per_day", precision = 12, scale = 2)
+    private BigDecimal waitingWagePerDay;
+
+    @Column(name = "bus_parking_per_day", precision = 12, scale = 2)
+    private BigDecimal busParkingPerDay;
 }

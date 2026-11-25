@@ -319,16 +319,21 @@
                         <li><strong>Nhu cầu tính bằng số khách</strong>: hệ số nhu cầu nhân thẳng vào số khách dự báo
                             (không kẹp ở 100%); mỗi khung cần (số chuyến cần − số chuyến đã có trong khung) chuyến
                             thêm, theo đúng quy tắc 90% xe chuẩn của màn Dự báo. Khung chưa có chuyến nào thì coi như
-                            có một xe chuẩn. Ở 100%, số chuyến thêm bằng số thẻ của màn Đề xuất.</li>
+                            có một xe chuẩn. Ở 100%, số chuyến thêm bằng số chuyến thêm còn thiếu của màn Đề xuất
+                            (số thẻ cộng số vòng giữ xe — mỗi thẻ giữ xe gánh hai chuyến thêm).</li>
                         <li><strong>Tiền tính theo khách tràn, cả vòng</strong>: mỗi chuyến thêm (xe chuẩn của tuyến)
                             chỉ chở phần khách mà các chuyến trước nó không chở hết, nhân giá vé lịch sử; cộng thêm
                             <strong>lượt đi kèm</strong> theo kế hoạch — xe dự phòng giả định ở bến nhà, nên chuyến thêm
                             rời bến nhà thì xe về bằng khung chiều ngược sớm nhất, chuyến thêm tới bến nhà thì xe được
                             đưa tới bằng khung chiều ngược muộn nhất còn kịp — cả tiền vé lẫn chi phí. Màn Đề xuất chọn
-                            xe thật nên có thể khác kế hoạch này. Trong mỗi ngày, kế hoạch phủ được lấy chuyến có lãi
-                            cao trước — cùng thứ tự màn Đề xuất.</li>
+                            xe thật nên có thể khác kế hoạch này. Một chuyến thêm đi và một chuyến thêm về sau đó của
+                            cùng cặp được ghép thành <strong>vòng giữ xe</strong> bằng đúng phép ghép của màn Đề xuất
+                            (CT9): xe chờ ở bến xa thay cho hai lượt đi kèm, chuyến đi mang thêm tiền chờ, và hai chuyến
+                            được xếp theo lãi của cả vòng. Trong mỗi ngày, kế hoạch phủ được lấy chuyến có lãi cao
+                            trước — cùng thứ tự màn Đề xuất.</li>
                         <li><strong>Giới hạn</strong>: độ phủ vẫn tính mỗi chuyến thêm là <em>một</em> lượt xe, dù vòng
-                            của nó chạy hai lượt (lượt đi kèm không được trừ vào năng lực).</li>
+                            của nó chạy hai lượt (lượt đi kèm không được trừ vào năng lực; xe nằm chờ ở bến xa của vòng
+                            giữ xe cũng không).</li>
                         <li><strong>Độ phủ đối chiếu theo TỪNG NGÀY</strong>, không gộp cả chân trời: mỗi ngày chỉ
                             phủ được tối đa <em>năng lực một ngày</em>, phần nhàn rỗi của ngày vắng
                             <strong>không</strong> chuyển sang ngày cao điểm được — một xe rảnh hôm thứ Ba không chạy

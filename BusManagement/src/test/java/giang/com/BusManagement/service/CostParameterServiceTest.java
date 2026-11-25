@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,18 +61,48 @@ class CostParameterServiceTest {
         CostParameters first = new CostParameters();
         first.setFuelCostPerKm(new BigDecimal("6000"));
         first.setDriverWagePerHour(new BigDecimal("50000"));
+        first.setWaitingWagePerDay(new BigDecimal("333000"));
+        first.setBusParkingPerDay(new BigDecimal("330000"));
         costParameterService.save(first);
         assertEquals(1, repository.count(), "lần lưu đầu tạo đúng 1 dòng");
 
         CostParameters second = new CostParameters();
         second.setFuelCostPerKm(new BigDecimal("9999"));
         second.setDriverWagePerHour(new BigDecimal("77777"));
+        second.setWaitingWagePerDay(new BigDecimal("250000"));
+        second.setBusParkingPerDay(new BigDecimal("120000"));
         costParameterService.save(second);
 
         assertEquals(1, repository.count(), "lần lưu thứ hai KHÔNG được đẻ dòng mới");
         CostParameters current = costParameterService.getOrDefault();
         assertEquals(0, new BigDecimal("9999").compareTo(current.getFuelCostPerKm()));
         assertEquals(0, new BigDecimal("77777").compareTo(current.getDriverWagePerHour()));
+        assertEquals(0, new BigDecimal("250000").compareTo(current.getWaitingWagePerDay()));
+        assertEquals(0, new BigDecimal("120000").compareTo(current.getBusParkingPerDay()));
+    }
+
+    /**
+     * Route pairs CT9 (CM-8): dòng cấu hình lưu từ trước CT9 chưa có hai cột tiền chờ — đọc ra giá trị mặc định
+     * ở đúng hai ô đó, giữ nguyên hai ô đã lưu, và vẫn không ghi gì xuống DB.
+     */
+    @Test
+    @DisplayName("CT9: dòng cũ chưa có tiền chờ → đọc ra mặc định ở hai ô đó, không ghi gì")
+    void aRowSavedBeforeCt9_readsTheWaitingDefaults_withoutWriting() {
+        repository.deleteAll();
+        CostParameters old = new CostParameters();
+        old.setFuelCostPerKm(new BigDecimal("7000"));
+        old.setDriverWagePerHour(new BigDecimal("60000"));
+        repository.saveAndFlush(old);
+
+        CostParameters read = costParameterService.getOrDefault();
+
+        assertEquals(0, new BigDecimal("7000").compareTo(read.getFuelCostPerKm()));
+        assertEquals(0, new BigDecimal("60000").compareTo(read.getDriverWagePerHour()));
+        assertEquals(0, CostParameterService.DEFAULT_WAITING_WAGE_PER_DAY.compareTo(read.getWaitingWagePerDay()));
+        assertEquals(0, CostParameterService.DEFAULT_BUS_PARKING_PER_DAY.compareTo(read.getBusParkingPerDay()));
+        CostParameters stored = repository.findAll().get(0);
+        assertNull(stored.getWaitingWagePerDay(), "đọc không được ghi giá trị mặc định xuống dòng đã lưu");
+        assertNull(stored.getBusParkingPerDay());
     }
 
     // =========================================================================
@@ -88,10 +119,29 @@ class CostParameterServiceTest {
     // chặn nhầm cả đầu vào hợp lệ.
 
     private static CostParameters form(String fuel, String wage) {
+        return form(fuel, wage, "333000", "330000");
+    }
+
+    private static CostParameters form(String fuel, String wage, String waiting, String parking) {
         CostParameters p = new CostParameters();
         p.setFuelCostPerKm(fuel == null ? null : new BigDecimal(fuel));
         p.setDriverWagePerHour(wage == null ? null : new BigDecimal(wage));
+        p.setWaitingWagePerDay(waiting == null ? null : new BigDecimal(waiting));
+        p.setBusParkingPerDay(parking == null ? null : new BigDecimal(parking));
         return p;
+    }
+
+    @Test
+    @DisplayName("CT9: hai suất tiền chờ cũng phải > 0 — chặn 0, âm, trống")
+    void save_rejectsAWaitingRateThatIsNotPositive() {
+        repository.deleteAll();
+        for (String bad : new String[] { "0", "-1", null }) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> costParameterService.save(form("6000", "50000", bad, "330000")));
+            assertThrows(IllegalArgumentException.class,
+                    () -> costParameterService.save(form("6000", "50000", "333000", bad)));
+        }
+        assertEquals(0, repository.count());
     }
 
     @Test

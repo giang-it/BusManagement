@@ -29,6 +29,15 @@ public enum LoopLegKind {
     BRING,
 
     /**
+     * Route pairs CT9 (CM-29) — "giữ xe": xe rời bến nhà bằng chuyến thêm, CHỜ ở bến xa cùng kíp lái, rồi
+     * chạy một chuyến thêm khác về bến nhà — chuyến thêm của một khung chiều về cũng đang cần tăng cường. Lượt
+     * "đi kèm" ở đây chính là chuyến thêm về đó: chở khách tràn của khung nó như một chuyến thêm, không phải
+     * khách còn tràn sau khi khung đã đủ chuyến. Cả vòng cộng thêm tiền chờ (lương chờ + phí xe nằm bến) cho
+     * phần chờ thêm so với lần về ngay sớm nhất.
+     */
+    HOLD,
+
+    /**
      * Chưa xếp được lượt đi kèm cụ thể — tuyến không có đúng một tuyến chiều ngược, hay trong 2 ngày
      * không có khung nào xe và tài xế kịp — nên tính như MỘT LƯỢT VỀ RỖNG: cộng chi phí một lượt, không
      * tiền vé. Không bao giờ nói lãi quá tay.

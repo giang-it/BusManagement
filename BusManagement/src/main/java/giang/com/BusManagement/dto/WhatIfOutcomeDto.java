@@ -36,7 +36,10 @@ public class WhatIfOutcomeDto {
     // --- Nhu cầu vs độ phủ (đơn vị: chuyến thêm, từ GĐ6 — QĐ-17) ---
     /** Số ngày-khung vượt ngưỡng tăng cường tại hệ số nhu cầu của kịch bản. */
     private int hotSlots;
-    /** Số chuyến thêm các khung đó cần = Σ (số chuyến cần − 1). Ở 100% bằng số thẻ màn Đề Xuất. */
+    /**
+     * Số chuyến thêm các khung đó cần = Σ (số chuyến cần − 1). Ở 100% bằng số chuyến thêm còn thiếu của màn Đề Xuất
+     * (số thẻ + số vòng giữ xe, CT9).
+     */
     private int extraTripsNeeded;
     /**
      * Số chuyến thêm phủ được, cộng dồn THEO TỪNG NGÀY:
