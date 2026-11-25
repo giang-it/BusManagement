@@ -115,13 +115,8 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        // KIỂM TRA TRÙNG LỊCH (dùng bởi AI auto-assign)
        // =========================================================================
 
-       /**
-        * Kiểm tra xem chuyến gốc đã có chuyến tăng cường với BẤT KỲ trạng thái nào
-        * trong danh sách cho trước.
-        * Dùng SQL IN clause — 1 truy vấn duy nhất thay vì nhiều lần gọi OR.
-        * Dùng bởi hasAlreadySuggested() để tránh tạo trùng chuyến tăng cường.
-        */
-       boolean existsByOriginalTripAndStatusIn(Trip originalTrip, Collection<TripStatus> statuses);
+       // Chống trùng chuyến tăng cường của job 10 giây: từ route pairs CT8c xét theo KHUNG —
+       // existsPendingExtraInSlot (cuối file) thay cho existsByOriginalTripAndStatusIn theo chuyến gốc.
 
        /**
         * Kiểm tra tài xế có đang bận với tư cách TÀI XẾ CHÍNH (cột driver) trong khoảng
@@ -711,5 +706,11 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                      "WHERE t.bus = :bus AND t.status IN :statuses " +
                      "AND (:from IS NULL OR t.departureTime >= :from) AND (:to IS NULL OR t.departureTime < :to)")
        Double sumCommittedKmOfBus(@Param("bus") Bus bus, @Param("statuses") Collection<TripStatus> statuses,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+       /** CT8c: khung [from, to) của tuyến đã có một chuyến tăng cường đang chờ duyệt (ai tạo cũng vậy) chưa. */
+       @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.isExtraTrip = true AND t.route.id = :routeId " +
+                     "AND t.status = :pending AND t.departureTime >= :from AND t.departureTime < :to")
+       boolean existsPendingExtraInSlot(@Param("routeId") Long routeId, @Param("pending") TripStatus pending,
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

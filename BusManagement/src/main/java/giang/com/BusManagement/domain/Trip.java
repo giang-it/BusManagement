@@ -135,7 +135,7 @@ public class Trip {
 
     // Kiểm tra có cần tăng cường không (> 90% ghế)
     public boolean needsReinforcement() {
-        return getOccupancyRate() > 0.90;
+        return exceedsReinforcementThreshold(ticketsSold, totalSeats);
     }
 
     // Tính thời gian chuyến (giờ)
@@ -157,6 +157,14 @@ public class Trip {
         if (departureTime == null)
             return 0;
         return java.time.Duration.between(LocalDateTime.now(), departureTime).toHours();
+    }
+
+    /**
+     * Ngưỡng "cần tăng cường" (> 90% ghế) — định nghĩa DUY NHẤT, cho một chuyến (needsReinforcement) và cho
+     * cả một khung (job 10 giây từ route pairs CT8c: tổng vé ÷ tổng ghế của mọi chuyến đang bán trong khung).
+     */
+    public static boolean exceedsReinforcementThreshold(int sold, int seats) {
+        return seats > 0 && (double) sold / seats > 0.90;
     }
 
 }

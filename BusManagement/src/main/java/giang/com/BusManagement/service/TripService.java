@@ -62,9 +62,15 @@ public class TripService {
     // =========================================================================
 
     /**
-     * AI Scheduling Job: Mỗi 10 giây quét các chuyến ACTIVE có tỉ lệ lấp đầy > 90%.
+     * AI Scheduling Job: Mỗi 10 giây quét các KHUNG (tuyến × ngày × giờ) đang mở bán có tỉ lệ lấp đầy > 90%.
      * Khi phát hiện, tự động tạo chuyến tăng cường VÀ phân công đầy đủ
      * (xe + tài xế + phụ xe) theo ràng buộc hệ thống.
+     *
+     * Route pairs CT8c (QĐ-24 mục 6): job chỉ còn lo phần BẤT NGỜ mà dự báo không thấy — tổng vé thật ÷ tổng
+     * ghế của MỌI chuyến đang bán trong khung (chuyến chính, chuyến tăng cường đã duyệt, vòng dự báo đã duyệt),
+     * chuyến gốc luôn là chuyến chính của khung (không bao giờ là một chuyến tăng cường — hết nối chuỗi +30
+     * phút, P5), và khung đang có một chuyến tăng cường chờ duyệt (ai tạo cũng vậy) thì không tạo thêm.
+     * Chuyến tăng cường đã bị hủy/từ chối KHÔNG chặn (TC_AI_009, như trước).
      *
      * @Transactional BẮT BUỘC ở đây vì:
      *                1. Giữ Hibernate session mở suốt vòng lặp → trip.getRoute()
@@ -76,32 +82,37 @@ public class TripService {
     @Scheduled(fixedRate = 10_000)
     @Transactional
     public void scanAndSuggestExtraTrips() {
-        List<Trip> activeTrips = tripRepository.findByStatusWithRoute(TripStatus.ACTIVE);
-
-        for (Trip trip : activeTrips) {
-            if (isHotTrip(trip) && !hasAlreadySuggested(trip)) {
-                createExtraTrip(trip);
+        java.util.Map<String, List<Trip>> slots = new java.util.LinkedHashMap<>();
+        for (Trip trip : tripRepository.findByStatusWithRoute(TripStatus.ACTIVE)) {
+            if (trip.getRoute() != null && trip.getDepartureTime() != null) {
+                slots.computeIfAbsent(scanSlotKey(trip), key -> new java.util.ArrayList<>()).add(trip);
+            }
+        }
+        for (List<Trip> slot : slots.values()) {
+            Trip main = slotMainTrip(slot);
+            if (main != null && isHotTrip(main, slot) && !hasPendingExtra(main)) {
+                createExtraTrip(main);
             }
         }
     }
 
     /**
-     * Returns true when a trip genuinely needs an extra trip right now.
+     * Returns true when a slot genuinely needs an extra trip right now.
      *
-     * Three time-based guards (on top of the existing occupancy check):
+     * Three time-based guards (on top of the slot occupancy check), asked of the slot's main trip:
      * 1. Departure must still be in the future.
-     * 2. Enough lead time left for customers to actually buy tickets on the new
-     * trip.
-     * 3. Trip has been on sale long enough for its occupancy to be meaningful
-     * signal,
-     * unless it's already past the instant-hot threshold.
+     * 2. Enough lead time left for customers to actually buy tickets on the new trip.
+     * 3. The main trip has been on sale long enough for the occupancy to be a meaningful signal,
+     * unless the slot is already past the instant-hot threshold.
      */
-    private boolean isHotTrip(Trip trip) {
+    private boolean isHotTrip(Trip trip, List<Trip> slot) {
         // ── Occupancy gate: hỏi Trip, không so số ───────────────────────────────
-        // Ngưỡng "chuyến đông" (> 0,90) sống ở Trip.needsReinforcement(). Các màn
-        // Decision Support phải khai lại con số vì không có entity Trip trong tay;
-        // ở đây có, nên gọi thẳng — đổi ngưỡng ở Trip thì scanner đổi theo.
-        if (!trip.needsReinforcement()) {
+        // Ngưỡng "chuyến đông" (> 0,90) sống ở Trip.exceedsReinforcementThreshold() — cùng định nghĩa với
+        // Trip.needsReinforcement(), áp cho tổng vé ÷ tổng ghế của cả khung (CT8c).
+        int sold = slot.stream().mapToInt(Trip::getTicketsSold).sum();
+        int seats = slot.stream().mapToInt(Trip::getTotalSeats).sum();
+        double occupancy = seats > 0 ? (double) sold / seats : 0.0;
+        if (!Trip.exceedsReinforcementThreshold(sold, seats)) {
             return false;
         }
 
@@ -124,7 +135,7 @@ public class TripService {
 
         // ── Gate 5: sale-velocity sanity check ──────────────────────────────────
         // Skip wait if occupancy is already above the instant-hot threshold.
-        if (trip.getOccupancyRate() < INSTANT_HOT_THRESHOLD) {
+        if (occupancy < INSTANT_HOT_THRESHOLD) {
             long hoursOnSale = trip.getHoursOnSale();
             if (hoursOnSale < MIN_SALE_OPEN_HOURS) {
                 log.debug(
@@ -135,9 +146,9 @@ public class TripService {
         }
 
         log.debug(
-                "🔥 [AI] Chuyến #{} HOT: {}% ghế, còn {} giờ, đã mở bán {} giờ.",
+                "🔥 [AI] Khung của chuyến #{} HOT: {}% ghế, còn {} giờ, đã mở bán {} giờ.",
                 trip.getId(),
-                String.format("%.1f", trip.getOccupancyRate() * 100),
+                String.format("%.1f", occupancy * 100),
                 hoursUntilDeparture,
                 trip.getHoursOnSale());
         return true;
@@ -1725,24 +1736,26 @@ public class TripService {
     }
 
     /**
-     * Kiểm tra xem chuyến gốc đã có một chuyến tăng cường đang "sống" hay không.
-     *
-     * Các trạng thái bị chặn (không cho tạo thêm):
-     * - PENDING_APPROVAL : đang chờ Admin duyệt
-     * - ACTIVE : đã được kích hoạt, đang bán vé
-     * - DEPARTED : đã xuất phát (nếu không chặn → AI sẽ tạo lại liên tục)
-     * - COMPLETED : đã hoàn thành (sự kiện đã xảy ra, không cần thêm nữa)
-     *
-     * CANCELLED bị loại khỏi danh sách chặn để AI được phép đề xuất lại khi
-     * chuyến tăng cường cũ bị hủy (ví dụ: xe hỏng, tài xế ốm).
+     * Khung của chuyến chính đã có một chuyến tăng cường đang CHỜ DUYỆT chưa (route pairs CT8c) — ai tạo cũng
+     * vậy: job 10 giây hay vòng dự báo của job đêm. Chuyến tăng cường đã duyệt (ACTIVE) không chặn mà góp ghế
+     * vào tỉ lệ của khung; chuyến đã hủy / bị từ chối cũng không chặn, để AI được đề xuất lại (TC_AI_009).
      */
-    private boolean hasAlreadySuggested(Trip originalTrip) {
-        List<TripStatus> blockingStatuses = List.of(
-                TripStatus.PENDING_APPROVAL,
-                TripStatus.ACTIVE,
-                TripStatus.DEPARTED,
-                TripStatus.COMPLETED);
-        return tripRepository.existsByOriginalTripAndStatusIn(originalTrip, blockingStatuses);
+    private boolean hasPendingExtra(Trip main) {
+        LocalDateTime hour = main.getDepartureTime().truncatedTo(java.time.temporal.ChronoUnit.HOURS);
+        return tripRepository.existsPendingExtraInSlot(main.getRoute().getId(), TripStatus.PENDING_APPROVAL, hour,
+                hour.plusHours(1));
+    }
+
+    /** Khoá khung (tuyến × ngày × giờ) — cùng cách gom HOUR(departureTime) của dự báo và màn Đề xuất. */
+    private static String scanSlotKey(Trip trip) {
+        LocalDateTime departure = trip.getDepartureTime();
+        return trip.getRoute().getId() + "|" + departure.toLocalDate() + "|" + departure.getHour();
+    }
+
+    /** Chuyến chính của khung: không phải tăng cường, khởi hành sớm nhất; khung chỉ có chuyến tăng cường → null. */
+    private static Trip slotMainTrip(List<Trip> slot) {
+        return slot.stream().filter(t -> !t.isExtraTrip())
+                .min(java.util.Comparator.comparing(Trip::getDepartureTime).thenComparing(Trip::getId)).orElse(null);
     }
 
     public List<Trip> getPendingTrips() {
