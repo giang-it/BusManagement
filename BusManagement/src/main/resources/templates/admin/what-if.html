@@ -66,7 +66,8 @@
                     (<span th:text="${view.historyStaleDays}">0</span> ngày trước), dự báo cho
                     <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày kể từ
                     <span class="fw-semibold" th:text="${#temporals.format(view.forecastFrom, 'dd/MM/yyyy')}">—</span>.
-                    Dữ liệu càng cũ, dự báo càng kém tin cậy — chạy lại profile <code>backfill</code> để cập nhật.
+                    Dữ liệu càng cũ, dự báo càng kém tin cậy — job đêm bổ sung các chuyến đã chạy xong mỗi ngày (vận
+                    hành mô phỏng).
                 </div>
             </div>
 

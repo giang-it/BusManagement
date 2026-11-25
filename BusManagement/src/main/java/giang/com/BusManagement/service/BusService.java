@@ -289,4 +289,16 @@ public class BusService {
         }
         bus.setLastMaintenanceOdometer(lastMaintenanceOdometer);
     }
+
+    /**
+     * Route pairs CT8a (CM-23 cách V4, vận hành mô phỏng): ngày bảo trì dự kiến đã qua, xe đứng ở bến nhà cả ngày
+     * đó như lịch đã xếp — ghi nhận lần bảo trì đúng như Admin làm ở form xe (km lần bảo trì cuối = odometer), và
+     * bỏ ngày dự kiến cả khi xe chưa chạy thêm km nào (ngày đó đã dùng). Chỉ job đêm gọi, khi bật mô phỏng.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void recordPlannedService(Bus bus) {
+        recordMaintenance(bus, bus.getOdometer() != null ? bus.getOdometer() : 0.0);
+        bus.setPlannedMaintenanceDate(null);
+        busRepository.save(bus);
+    }
 }

@@ -46,9 +46,10 @@
         <div class="alert alert-info d-flex align-items-start" role="alert">
             <i class="bi bi-info-circle-fill me-2 mt-1"></i>
             <div>
-                Đây là <strong>đề xuất hỗ trợ quyết định</strong>, không phải phân công tự động. Màn hình
+                Đây là <strong>đề xuất hỗ trợ quyết định</strong>, không phải phân công tự động. Mở màn hình
                 <strong>không tạo chuyến và không phân công ai</strong> — mỗi lần mở, hệ thống tính lại từ dự báo,
-                chọn thử xe + tài xế và ước tính doanh thu/chi phí/lợi nhuận để Admin tự quyết. Mỗi thẻ là
+                chọn thử xe + tài xế và ước tính doanh thu/chi phí/lợi nhuận để Admin tự quyết; chỉ job đêm (khung bên
+                dưới) mới lưu các thẻ đáng chạy thành chuyến <strong>chờ duyệt</strong>. Mỗi thẻ là
                 <strong>một chuyến thêm</strong>; khung cần nhiều chuyến thì có nhiều thẻ ("chuyến thêm 1/2, 2/2").
                 Chuyến <strong>đã có trong khung</strong> (thường lệ, tăng cường, tạo tay) được trừ ra: thẻ chỉ đề xuất
                 phần khung còn thiếu.
@@ -79,7 +80,72 @@
                 (<span th:text="${view.historyStaleDays}">0</span> ngày trước), dự báo cho
                 <span class="fw-semibold" th:text="${view.horizonDays}">7</span> ngày kể từ
                 <span class="fw-semibold" th:text="${#temporals.format(view.forecastFrom, 'dd/MM/yyyy')}">—</span>.
-                Dữ liệu càng cũ, dự báo càng kém tin cậy — chạy lại profile <code>backfill</code> để cập nhật.
+                Dữ liệu càng cũ, dự báo càng kém tin cậy — job đêm bổ sung các chuyến đã chạy xong mỗi ngày (vận
+                hành mô phỏng); lịch sử cũ hơn 7 ngày thì job không tự tạo vòng.
+            </div>
+        </div>
+
+        <!-- ============ JOB ĐÊM (route pairs CT8, QĐ-24) ============ -->
+        <div th:if="${nightlyMessage != null}" class="alert alert-success py-2 small" th:text="${nightlyMessage}"></div>
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body py-3">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div class="small">
+                        <div class="fw-semibold mb-1"><i class="bi bi-moon-stars"></i> Job đêm — tự tạo vòng tăng cường
+                            chờ duyệt</div>
+                        <div class="text-muted">
+                            Mỗi đêm lúc 01:00, và một lần khi app khởi động:
+                            <span th:if="${nightlySimulates}">đóng các chuyến đã chạy xong với số khách mô phỏng, </span>
+                            giữ lịch thường lệ đủ tới 7 ngày tới, rồi biến các thẻ <strong>đủ điều kiện, lãi cả vòng &gt;
+                            0, còn ≥ 72 giờ</strong> thành <strong>vòng chờ duyệt</strong> (chuyến thêm + lượt đi kèm, cùng
+                            xe và tài xế của thẻ) ở Hàng chờ duyệt — Admin vẫn duyệt hay từ chối cả vòng — và rút vòng chờ
+                            duyệt không còn cần hoặc còn dưới 72 giờ.
+                            <span th:unless="${nightlyEnabled}" class="text-warning">Hẹn giờ đang TẮT
+                                (<code>dispatch.nightly.enabled=false</code>) — chỉ chạy khi bấm nút.</span>
+                        </div>
+                        <div th:if="${nightly == null}" class="text-muted mt-1">Chưa chạy lần nào kể từ khi app khởi động.</div>
+                        <div th:if="${nightly != null}" class="mt-1">
+                            Lần gần nhất:
+                            <strong th:text="${#temporals.format(nightly.startedAt, 'HH:mm dd/MM/yyyy')}">—</strong>
+                            (<span th:text="${nightly.trigger}">—</span>, <span th:text="${nightly.elapsedMillis}">0</span> ms) —
+                            <span th:if="${nightly.simulated}">đóng <strong th:text="${nightly.closedTrips}">0</strong>
+                                chuyến (<span th:text="${nightly.simulatedTickets}">0</span> vé mô phỏng)<span
+                                    th:if="${nightly.cancelledPending > 0}">, hủy <span
+                                        th:text="${nightly.cancelledPending}">0</span> chuyến chờ duyệt đã qua giờ</span><span
+                                    th:unless="${#lists.isEmpty(nightly.serviced)}">, ghi nhận bảo trì <span
+                                        th:text="${#strings.listJoin(nightly.serviced, ', ')}">—</span></span>; </span>
+                            lịch thường lệ +<strong th:text="${nightly.timetableCreated}">0</strong> chuyến<span
+                                th:if="${nightly.timetablePending > 0}"> (+<span th:text="${nightly.timetablePending}">0</span>
+                                chờ phân công)</span>;
+                            vòng dự báo: tạo <strong th:text="${#lists.size(nightly.loopsCreated)}">0</strong>, giữ
+                            <span th:text="${nightly.loopsKept}">0</span>, rút
+                            <span th:text="${#lists.size(nightly.loopsWithdrawnByForecast) + #lists.size(nightly.loopsWithdrawnByDeadline)}">0</span>.
+                            <div th:if="${nightly.loopsSkipped != null}" class="text-warning">
+                                Không tự tạo vòng: <span th:text="${nightly.loopsSkipped}">—</span>.
+                            </div>
+                            <div th:if="${nightly.loopsRefusedSkipped > 0}" class="text-muted">
+                                Không đề xuất lại <span th:text="${nightly.loopsRefusedSkipped}">0</span> khung mà Admin
+                                đã từ chối vòng dự báo.
+                            </div>
+                            <ul class="mb-0 ps-3">
+                                <li th:each="loop : ${nightly.loopsCreated}" th:text="'🤖 Tạo vòng ' + ${loop}"></li>
+                                <li th:each="loop : ${nightly.loopsWithdrawnByForecast}"
+                                    th:text="'Rút (dự báo không còn cần) vòng ' + ${loop}"></li>
+                                <li th:each="loop : ${nightly.loopsWithdrawnByDeadline}"
+                                    th:text="'Rút (còn dưới 72 giờ mà chưa duyệt) vòng ' + ${loop}"></li>
+                                <li th:each="error : ${nightly.errors}" class="text-danger" th:text="'Lỗi — ' + ${error}"></li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form th:action="@{/admin/analytics/recommendation/nightly-run}" method="post">
+                            <button type="submit" class="btn btn-outline-dark btn-sm">
+                                <i class="bi bi-play-circle"></i> Chạy ngay</button>
+                        </form>
+                        <a th:href="@{/admin/trips/pending}" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-inbox"></i> Hàng chờ duyệt</a>
+                    </div>
+                </div>
             </div>
         </div>
 
