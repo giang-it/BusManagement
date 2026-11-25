@@ -708,9 +708,27 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
        Double sumCommittedKmOfBus(@Param("bus") Bus bus, @Param("statuses") Collection<TripStatus> statuses,
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+       /**
+        * Route pairs CT8 — chuyến chính (không phải tăng cường, chưa hủy) của một khung [from, to) trên một tuyến,
+        * sớm nhất trước: chuyến gốc của mọi chuyến tăng cường trong khung (job 10 giây CT8c, vòng dự báo CT8b) —
+        * không bao giờ là một chuyến tăng cường, để hết chuyện nối chuỗi +30 phút (P5).
+        */
+       @Query("SELECT t FROM Trip t WHERE t.isExtraTrip = false AND t.route.id = :routeId AND t.status <> :cancelled " +
+                     "AND t.departureTime >= :from AND t.departureTime < :to ORDER BY t.departureTime, t.id")
+       List<Trip> findMainTripsOfSlot(@Param("routeId") Long routeId, @Param("cancelled") TripStatus cancelled,
+                     @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
        /** CT8c: khung [from, to) của tuyến đã có một chuyến tăng cường đang chờ duyệt (ai tạo cũng vậy) chưa. */
        @Query("SELECT COUNT(t) > 0 FROM Trip t WHERE t.isExtraTrip = true AND t.route.id = :routeId " +
                      "AND t.status = :pending AND t.departureTime >= :from AND t.departureTime < :to")
        boolean existsPendingExtraInSlot(@Param("routeId") Long routeId, @Param("pending") TripStatus pending,
                      @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+       /** CT8b (CM-26): các lượt của vòng dự báo ở một trạng thái, kèm tuyến, theo vòng rồi theo giờ khởi hành. */
+       @Query("SELECT t FROM Trip t JOIN FETCH t.route WHERE t.forecastLoopId IS NOT NULL AND t.status = :status " +
+                     "ORDER BY t.forecastLoopId, t.departureTime, t.id")
+       List<Trip> findForecastLoopLegsByStatus(@Param("status") TripStatus status);
+
+       /** CT8b (CM-27): mọi lượt chưa xoá của một vòng dự báo, theo giờ khởi hành. */
+       List<Trip> findByForecastLoopIdOrderByDepartureTimeAsc(Long forecastLoopId);
 }

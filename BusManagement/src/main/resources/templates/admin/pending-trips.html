@@ -84,6 +84,12 @@
                         th:text="${trip.route.departurePointDisplay + ' → ' + trip.route.destinationPointDisplay}">
                     </div>
                     <span th:unless="${trip.extraTrip}" class="badge bg-info text-dark">📅 Chuyến thường lệ</span>
+                    <!-- Route pairs CT8b (CM-27): lượt của một vòng do job đêm tạo từ dự báo — duyệt / từ chối cả vòng -->
+                    <span th:if="${trip.forecastLoopId != null}" class="badge bg-primary"
+                        th:text="${'🤖 Vòng dự báo #' + trip.forecastLoopId + (trip.forecastLoopId == trip.id ? ' · chuyến thêm' : ' · lượt đi kèm')}"></span>
+                    <div th:if="${trip.forecastLoopId != null}" class="text-muted small">
+                        Xác nhận hay từ chối một lượt là xác nhận / hủy cả vòng (cùng xe, cùng tài xế).
+                    </div>
                     <div class="text-muted small"
                         th:text="'Khởi hành: ' + ${#temporals.format(trip.departureTime, 'HH:mm - dd/MM/yyyy')}">
                     </div>
@@ -142,9 +148,14 @@
                     </div>
 
                     <!-- Từ chối (cả 2 mode) -->
-                    <form th:action="@{/admin/trips/reject/{id}(id=${trip.id})}" method="post" class="mt-2"
-                        onsubmit="return confirm('Từ chối chuyến tăng cường này?')">
+                    <form th:unless="${trip.forecastLoopId != null}" th:action="@{/admin/trips/reject/{id}(id=${trip.id})}"
+                        method="post" class="mt-2" onsubmit="return confirm('Từ chối chuyến tăng cường này?')">
                         <button type="submit" class="btn btn-outline-danger btn-sm w-100">Từ chối</button>
+                    </form>
+                    <!-- Vòng dự báo (CT8b, CM-27): từ chối là hủy cả vòng -->
+                    <form th:if="${trip.forecastLoopId != null}" th:action="@{/admin/trips/reject/{id}(id=${trip.id})}"
+                        method="post" class="mt-2" onsubmit="return confirm('Từ chối cả vòng dự báo này (mọi lượt của vòng)?')">
+                        <button type="submit" class="btn btn-outline-danger btn-sm w-100">Từ chối cả vòng</button>
                     </form>
                 </div>
 

@@ -143,7 +143,7 @@ public class AdminTripController {
         try {
             String warning = tripService.confirmAutoAssignedTrip(tripId);
             redirectAttributes.addFlashAttribute("success",
-                    "✅ Chuyến tăng cường #" + tripId + " đã được kích hoạt thành công!");
+                    "✅ Chuyến tăng cường #" + tripId + " đã được kích hoạt thành công!" + loopNote(tripId, "kích hoạt"));
             if (warning != null) {
                 redirectAttributes.addFlashAttribute("warning", warning);
             }
@@ -217,10 +217,20 @@ public class AdminTripController {
         try {
             tripService.rejectTrip(id);
             redirectAttributes.addFlashAttribute("success",
-                    "Đã từ chối chuyến tăng cường #" + id + ".");
+                    "Đã từ chối chuyến tăng cường #" + id + "." + loopNote(id, "hủy"));
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Lỗi: " + e.getMessage());
         }
         return "redirect:/admin/trips/pending";
+    }
+
+    /** Route pairs CT8b (CM-27): chuyến thuộc vòng dự báo thì nói rõ cả vòng đã được kích hoạt / hủy cùng lúc. */
+    private String loopNote(Long tripId, String verb) {
+        List<Long> legs = tripService.forecastLoopLegIds(tripId);
+        if (legs.size() < 2) {
+            return "";
+        }
+        return " Cả vòng dự báo cũng được " + verb + ": "
+                + String.join(", ", legs.stream().map(legId -> "#" + legId).toList()) + ".";
     }
 }

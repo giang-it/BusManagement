@@ -43,7 +43,7 @@ public class TripService {
      * Below this, new tickets can't realistically be sold.
      * 3 days is conservative; bump to 120 for long-haul routes.
      */
-    private static final long MIN_HOURS_BEFORE_DEPARTURE = 72;
+    static final long MIN_HOURS_BEFORE_DEPARTURE = 72; // cũng là mốc tạo / rút vòng dự báo (CT8b, ForecastLoopService)
 
     /**
      * Minimum hours a trip must have been on sale before we trust its occupancy
@@ -942,6 +942,7 @@ public class TripService {
 
         changeStatusToActive(trip);
         tripRepository.save(trip);
+        warning = confirmLoopPartners(trip, warning); // CT8b (CM-27): vòng dự báo được kích hoạt cả vòng
 
         log.info("✅ Admin xác nhận chuyến #{} | Xe: {} | Tài xế chính: {} | Số tài xế phụ: {} | Phụ xe: {}",
                 tripId,
@@ -970,6 +971,7 @@ public class TripService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy chuyến xe #" + tripId));
 
         requirePendingApproval(trip);
+        requireNotForecastLoop(trip); // CT8b (CM-27): vòng dự báo chỉ duyệt bằng nút Xác nhận, cả vòng một lần
 
         Bus bus = busRepository.findById(busId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy xe #" + busId));
@@ -1467,6 +1469,7 @@ public class TripService {
     public void rejectTrip(Long tripId) {
         updateTripStatus(tripId, TripStatus.CANCELLED);
         log.info("❌ Admin từ chối chuyến tăng cường #{}", tripId);
+        cancelLoopPartners(tripId); // CT8b (CM-27): từ chối một lượt của vòng dự báo là hủy cả vòng
     }
 
     // =========================================================================
@@ -2639,5 +2642,80 @@ public class TripService {
             }
         }
         return null;
+    }
+
+    // =========================================================================
+    // VÒNG DỰ BÁO — route pairs CT8b (QĐ-24; CM-26, CM-27)
+    // =========================================================================
+    //
+    // Job đêm (ForecastLoopService) lưu mỗi thẻ Đề xuất đáng chạy thành một VÒNG chờ duyệt: chuyến thêm và lượt
+    // đi kèm của nó, cùng một xe và một tài xế, nối bằng Trip.forecastLoopId. Một nửa vòng không chạy được — xe
+    // không có mặt ở bến đi của chuyến thêm, hay không về được bến nhà — nên Admin duyệt hay từ chối CẢ VÒNG một
+    // lần. Không lối nào bỏ qua FSM: mỗi lượt vẫn đi requirePendingApproval → validate → changeStatusToActive,
+    // hay updateTripStatus(CANCELLED); mọi thứ trong cùng transaction của lần bấm, lượt nào trượt thì cả vòng
+    // không đổi.
+
+    /** Các lượt KHÁC của vòng dự báo chứa chuyến này mà còn chờ duyệt; chuyến không thuộc vòng nào → rỗng. */
+    private List<Trip> pendingLoopPartners(Trip trip) {
+        if (trip.getForecastLoopId() == null) {
+            return List.of();
+        }
+        return tripRepository.findByForecastLoopIdOrderByDepartureTimeAsc(trip.getForecastLoopId()).stream()
+                .filter(leg -> !leg.getId().equals(trip.getId()) && leg.getStatus() == TripStatus.PENDING_APPROVAL)
+                .toList();
+    }
+
+    /** Sau khi chuyến đã được xác nhận: kích hoạt các lượt còn lại của vòng, mỗi lượt qua đủ cổng của chính nó. */
+    private String confirmLoopPartners(Trip trip, String warning) {
+        StringBuilder warnings = new StringBuilder(warning != null ? warning : "");
+        for (Trip leg : pendingLoopPartners(trip)) {
+            if (leg.getBus() == null || leg.getDriver() == null) {
+                throw new IllegalStateException("Lượt #" + leg.getId() + " của vòng dự báo #" + trip.getForecastLoopId()
+                        + " chưa có xe hay tài xế — hãy từ chối cả vòng; job đêm sẽ lập lại nếu dự báo vẫn cần.");
+            }
+            String legWarning = validateBusForTrip(leg.getBus(), leg, leg.getId());
+            validateStaffForTrip(leg, leg.getId());
+            changeStatusToActive(leg);
+            tripRepository.save(leg);
+            log.info("✅ Kích hoạt cùng vòng dự báo #{}: chuyến #{} | Xe: {}", trip.getForecastLoopId(), leg.getId(),
+                    leg.getBus().getLicensePlate());
+            if (legWarning != null) {
+                warnings.append(warnings.length() > 0 ? " " : "").append("Lượt #").append(leg.getId()).append(": ")
+                        .append(legWarning);
+            }
+        }
+        return warnings.length() > 0 ? warnings.toString() : null;
+    }
+
+    /** Đường duyệt tay (chọn xe, tài xế khác) không dùng cho vòng dự báo: đổi xe một lượt là vỡ vòng. */
+    private static void requireNotForecastLoop(Trip trip) {
+        if (trip.getForecastLoopId() != null) {
+            throw new IllegalStateException("Chuyến #" + trip.getId() + " thuộc vòng dự báo #" + trip.getForecastLoopId()
+                    + " (cùng một xe và một tài xế cho cả vòng): hãy bấm Xác nhận để kích hoạt cả vòng, hoặc Từ chối"
+                    + " để hủy cả vòng.");
+        }
+    }
+
+    /** Sau khi chuyến đã bị từ chối: hủy các lượt còn chờ duyệt của vòng, qua FSM. */
+    private void cancelLoopPartners(Long tripId) {
+        Trip trip = tripRepository.findById(tripId).orElse(null);
+        if (trip == null) {
+            return;
+        }
+        for (Trip leg : pendingLoopPartners(trip)) {
+            updateTripStatus(leg.getId(), TripStatus.CANCELLED);
+            log.info("❌ Hủy cùng vòng dự báo #{}: chuyến #{}", trip.getForecastLoopId(), leg.getId());
+        }
+    }
+
+    /** Id các lượt của vòng dự báo chứa chuyến (kể cả chính nó), theo giờ đi; không thuộc vòng → chỉ chính nó. */
+    @Transactional(readOnly = true)
+    public List<Long> forecastLoopLegIds(Long tripId) {
+        Trip trip = tripRepository.findById(tripId).orElse(null);
+        if (trip == null || trip.getForecastLoopId() == null) {
+            return List.of(tripId);
+        }
+        return tripRepository.findByForecastLoopIdOrderByDepartureTimeAsc(trip.getForecastLoopId()).stream()
+                .map(Trip::getId).toList();
     }
 }

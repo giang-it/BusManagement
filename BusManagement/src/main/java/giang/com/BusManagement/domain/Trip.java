@@ -167,4 +167,13 @@ public class Trip {
         return seats > 0 && (double) sold / seats > 0.90;
     }
 
+    /**
+     * Vòng tăng cường do job đêm tạo từ dự báo (route pairs CT8b, CM-26 cách K1): id của chuyến thêm của
+     * vòng — chuyến thêm trỏ vào chính nó, lượt đi kèm (về ngay / đưa xe tới) trỏ vào chuyến thêm. Null =
+     * chuyến do người, lịch thường lệ hay job 10 giây tạo. Cột cho phép null, thêm bằng ddl-auto=update; đặt
+     * ở cuối lớp để không xê dịch số dòng mà các bài học đang trích.
+     */
+    @jakarta.persistence.Column(name = "forecast_loop_id")
+    private Long forecastLoopId;
+
 }

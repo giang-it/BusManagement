@@ -163,14 +163,14 @@ public class RecommendationService {
      * nếu có), và MỘT xe + MỘT tài xế cho cả vòng. bus null = không có xe; driver null = có xe mà không có
      * tài xế.
      */
-    private record Loop(LoopLegKind kind, List<Trip> legs, Trip companion, Bus bus, Driver driver) {
+    record Loop(LoopLegKind kind, List<Trip> legs, Trip companion, Bus bus, Driver driver) {
         boolean isComplete() {
             return bus != null && driver != null;
         }
     }
 
     @Transactional(readOnly = true)
-    public RecommendationViewDto buildRecommendations() {
+    Plan buildPlan() {
         // Gọi ĐÚNG MỘT LẦN: buildForecast() nạp lịch sử và khớp (hoặc dùng lại) mô hình,
         // gọi lặp sẽ vừa phí vừa rủi ro hai ảnh chụp lệch nhau. Độ tươi dữ liệu của trang
         // cũng lấy từ chính DTO này.
@@ -266,11 +266,12 @@ public class RecommendationService {
         // chuyến thêm trước nó.
         Map<String, Integer> seatsSoFar = new HashMap<>();
         List<RecommendationCardDto> cards = new ArrayList<>();
+        Map<RecommendationCardDto, Loop> loops = new java.util.IdentityHashMap<>(); // vòng của thẻ đủ điều kiện (CT8b)
         for (ExtraTrip extra : extras) {
             String slot = LoopEconomics.slotKey(extra.route().getId(), extra.point().getDate(),
                     extra.series().getDepartureHour());
             int seatsBefore = seatsSoFar.getOrDefault(slot, extra.inSlot().seats());
-            RecommendationCardDto card = buildCard(extra, seatsBefore, nbSize, availability, economics, now);
+            RecommendationCardDto card = buildCard(extra, seatsBefore, nbSize, availability, economics, now, loops);
             seatsSoFar.put(slot, seatsBefore + tripSeats(card, extra));
             cards.add(card);
         }
@@ -293,7 +294,7 @@ public class RecommendationService {
         int loss = (int) cards.stream()
                 .filter(c -> c.getEstimatedProfit() != null && c.getEstimatedProfit().signum() < 0).count();
 
-        return new RecommendationViewDto(
+        return new Plan(new RecommendationViewDto(
                 cards,
                 forecast.getHistoryEnd(),
                 forecast.getHistoryStaleDays(),
@@ -307,7 +308,7 @@ public class RecommendationService {
                 loss,
                 cost.getFuelCostPerKm(),
                 cost.getDriverWagePerHour(),
-                alreadyInSlots);
+                alreadyInSlots), loops);
     }
 
     /**
@@ -321,7 +322,7 @@ public class RecommendationService {
      * @param seatsBefore ghế khung đã có trước chuyến này: các chuyến đã có và các chuyến thêm trước nó
      */
     private RecommendationCardDto buildCard(ExtraTrip extra, int seatsBefore, double nbSize,
-            AvailabilityContext availability, LoopEconomics economics, LocalDateTime now) {
+            AvailabilityContext availability, LoopEconomics economics, LocalDateTime now, Map<RecommendationCardDto, Loop> loops) {
 
         ForecastSeriesDto series = extra.series();
         ForecastPointDto point = extra.point();
@@ -378,6 +379,7 @@ public class RecommendationService {
             availability.reserve(leg);
         }
         card.setStatus(RecommendationStatus.RECOMMENDED);
+        loops.put(card, loop);
 
         // ── Lượt đi kèm và tiền cả vòng ─────────────────────────────────────────
         String crew = "xe " + loop.bus().getLicensePlate() + " và tài xế " + driverName(loop.driver());
@@ -635,5 +637,20 @@ public class RecommendationService {
 
     private String driverName(Driver driver) {
         return driver.getUser() != null ? driver.getUser().getFullName() : "Tài xế #" + driver.getUserId();
+    }
+
+    /** Trang Đề xuất (và các màn đọc nó): chỉ phần hiển thị của kế hoạch — vẫn chỉ đọc, không ghi gì. */
+    @Transactional(readOnly = true)
+    public RecommendationViewDto buildRecommendations() {
+        return buildPlan().view();
+    }
+
+    /**
+     * Một lần dựng kế hoạch (route pairs CT8b): phần hiển thị, và vòng đã chọn của từng thẻ "Đủ điều kiện" —
+     * các lượt là chuyến TẠM (không lưu) đã gán xe, tài xế, số ghế theo xe và qua cổng dry-run, đúng như thẻ
+     * ghi. Lớp này vẫn KHÔNG ghi DB: job đêm (ForecastLoopService) là nơi duy nhất lưu một số vòng trong đó
+     * thành chuyến chờ duyệt (QĐ-24). Map theo danh tính thẻ.
+     */
+    record Plan(RecommendationViewDto view, Map<RecommendationCardDto, Loop> loops) {
     }
 }
