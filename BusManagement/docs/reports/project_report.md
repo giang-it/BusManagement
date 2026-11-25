@@ -57,6 +57,7 @@ Còn tồn: chưa có công cụ migration (Flyway/Liquibase) — schema tiến 
 
 ### Incon #2: `hasAlreadySuggested()` thiếu check `DEPARTED`/`COMPLETED` — ✅ ĐÃ FIX
 Đã verify: `blockingStatuses` hiện gồm đủ `PENDING_APPROVAL`, `ACTIVE`, `DEPARTED`, `COMPLETED`. `CANCELLED` cố tình để ngoài danh sách chặn (cho phép AI đề xuất lại nếu chuyến tăng cường cũ bị hủy).
+> *(2026-11-25, route pairs CT8c, commit `fb6bc9b`: `hasAlreadySuggested` đã được thay bằng `hasPendingExtra`, xét theo khung. Chỉ chuyến tăng cường `PENDING_APPROVAL` trong khung mới chặn. Chuyến đã duyệt không chặn nữa mà góp ghế vào tỉ lệ của khung. `CANCELLED` vẫn không chặn. Xem `route_pairs_decisions.md` QĐ-24 mục 6 và `test_case.md` nhóm 4.2.)*
 
 ### Incon #3: `countBusyTripsAnyRole`/`findAllTripsByDriverOnDate` là dead code — ⚠️ **CÒN MỞ**
 Vẫn tồn tại trong `TripRepository`, chưa được gọi ở đâu trong `TripService`. Trùng chức năng với cặp `existsOverlappingTripForDriver`/`findTripsForDriverOnDate` đang dùng thật. Cần xóa hoặc migrate.

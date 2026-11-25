@@ -7,7 +7,7 @@
 > - thêm một dòng vào mục 5 (nhật ký).
 >
 > Tài liệu liên quan:
-> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-25).
+> - Quyết định: [`route_pairs_decisions.md`](route_pairs_decisions.md) (QĐ-18…QĐ-27, các mục chưa chốt CM-1…CM-28).
 > - Đợt trước (dự báo): [`forecast_progress.md`](forecast_progress.md), [`forecast_decisions.md`](forecast_decisions.md).
 > - `THESIS_ROADMAP.md` vẫn là tracker chung của cả dự án. §7 trỏ về file này, §8 ghi một mục ngắn cho mỗi phiên.
 
@@ -112,7 +112,39 @@
   - **Kiểm lại trước khi commit (2026-11-25):** test **294/294** trên đúng bản CT7c (dựng lại từ patch đã chụp, khớp bản chụp) và **303/303** trên bản đủ, trong worktree mới `wt-precommit`; `verify` DB thật chỉ đọc từ worktree đó (cổng 8099): 29 lượt gọi trả 200 (18 trang, 3 form xe, form sửa #51493, trang kế hoạch cho 7 ngày), log sạch; trang xe, form xe, Lịch thường lệ, Kế hoạch cặp tuyến hiện đúng 3 ngày bảo trì; màn Đề xuất 25 thẻ, **15 đủ điều kiện** (7 về ngay, 8 đưa xe tới; cả 15 vòng cùng một xe), 10 thiếu tài nguyên đều ghi "Không xếp được cả vòng …", 0 "tính như về rỗng"; `check_cards.py` 30 lượt (8 xe, 10 người) 0 vi phạm; phép kiểm chuỗi trên 251 chuyến từ 20/11: 0 trùng giờ, 0 đứt chuỗi (xe và người), 0 ngày quá 8 giờ; `check_maint.py` 27/11–03/12: 0 chạm ngày bảo trì, 0 xe kẹt, 1 lượt vượt mốc = #51493 do người chọn (đúng ý); DB thật giống hệt trước và sau.
 
   Chi tiết ở mục 4, CT7c và CT7d.
-- **Việc tiếp theo:** #35/#36 đã commit và push ngày 2026-11-22; CT6 và CT7 ngày 2026-11-23; CT7c + CT7d ngày 2026-11-25. Kế tiếp là **CT8**: vòng thảo luận đầu giai đoạn chốt CM-10 (giờ chạy job đêm, khi dự báo thiếu dữ liệu), CM-15 (giờ khởi hành chuyến tự tạo), câu chữ mới của roadmap §4 "No daily cron job" (QĐ-24 mục 7), có nối "Tạo lịch" thường lệ vào job đêm không (CM-14), và **CM-23** — nay đã thấy trên DB thật: 89 chuyến thường lệ 20–24/11 qua giờ vẫn `ACTIVE`, máy vẫn cộng km của chúng (4.720 km của xe .15 có cả km 20–24/11). Chuyến #51360 (Vũng Tàu → Miền Đông 06:00 20/11, chờ chọn xe) đã được chủ dự án **hủy** ngày 2026-11-22, khi giờ đi đã qua. Còn mở: CM-23 (chuyến thường lệ đã qua giờ mà không ai vận hành, và lần chạy bổ sung lịch sử) — chủ dự án bảo *"bàn sau"* (2026-11-22); ~~**CM-24**, **CM-25**~~ — đã chốt và làm ở CT7c, CT7d (2026-11-23). ~~Xe 29A-001.15 kẹt ở Đà Lạt~~ — đóng ngày 2026-11-25: chủ dự án đưa về bằng tay qua #51493 (xem gạch đầu dòng CT7c/CT7d ở trên). Tuỳ chủ dự án: gộp phép tính vị trí 4 lần/người của CT5b, index ghép. G3-7: xoá các bản sao cũ (`busmanagement_gd2`, `busmanagement_ct3`, `busmanagement_ct6`) khi chủ dự án đồng ý.
+- **CT8 (QĐ-24; CM-10, CM-14, CM-15, CM-23, CM-26, CM-27, CM-28) xong, đã commit và push ngày 2026-11-25.** Chủ dự án nói *"tôi đồng ý tất cả, hãy thực hiện như những gì đã bàn … còn việc tài liệu thì để sau đi"*, rồi sau khi tự test thì bảo *"commit và push đi"*. Ba commit theo thứ tự phụ thuộc: `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a).
+  - **CT8a:** job đêm (01:00, chạy bù khi app khởi động, nút "Chạy ngay") với ba bước:
+    - vận hành mô phỏng: đóng các chuyến đã chạy xong, số khách lấy từ mô hình của lịch sử, qua FSM;
+    - giữ lịch thường lệ tới D+7;
+    - vòng dự báo.
+  - **CT8b:** vòng dự báo chờ duyệt (chuyến thêm + lượt đi kèm, một xe, một tài xế, nối bằng cột mới `trips.forecast_loop_id`). Admin duyệt hay từ chối cả vòng. Job rút vòng khi dự báo giảm hoặc khi còn dưới 72 giờ.
+  - **CT8c:** job 10 giây xét theo khung. Chuyến gốc luôn là chuyến chính; khung đang có chuyến chờ duyệt thì không tạo thêm.
+  - **Test:** `mvnw test` **318/318** (+15). Chạy trên đúng từng commit: 306, 315, 318. Thử làm hỏng 19 chỗ, chỗ nào cũng đúng test cần đỏ.
+  - **Bản sao DB thật** (`busmanagement_ct8`):
+    - lần khởi động đầu đóng 89 chuyến 20–24/11 (2.489 vé mô phỏng) và tạo 4 vòng;
+    - lần chạy thứ hai giữ 3 vòng, rút 1;
+    - xác nhận, từ chối và duyệt tay đều đúng thiết kế; khung Admin đã từ chối không được đề xuất lại;
+    - phép kiểm độc lập (vòng, chuỗi vị trí, giờ lái, bảo trì): 0 vi phạm.
+  - **DB thật:**
+    - sao lưu `ProjectBackup\db\busmanagement_2026-11-25_truoc-CT8.sql`, khôi phục thử khớp;
+    - `verify` chỉ đọc với job tắt: 21 trang trả 200, DB giống hệt, chỉ thêm cột mới còn trống;
+    - sau đó chủ dự án khởi động lại app, và lần chạy bù đầu tiên của job đã ghi vào DB thật. Chuyến 20–25/11 nay có 93 hoàn thành, 14 mở bán, 1 hủy; có 3 vòng chờ duyệt (#51610, #51612, #51614);
+    - `check_loops.py` và phép kiểm chuỗi trên 257 chuyến từ 20/11: 0 vi phạm.
+  - **Từ CT8, khởi động app là ghi vào DB** (lần chạy bù của job đêm). Chạy chỉ đọc trên DB thật thì phải truyền `-Ddispatch.nightly.enabled=false`; điều này đã ghi trong hướng dẫn `verify`.
+
+  Chi tiết ở mục 4, CT8.
+- **Việc tiếp theo:** CT8 đã commit và push ngày 2026-11-25. Đợt tài liệu nhỏ của CT8 làm cùng ngày, gồm `route_pairs_decisions.md`, file này, roadmap, `test_case.md` và hướng dẫn `verify`.
+  - **Kế tiếp là CT9.** Vòng thảo luận đầu giai đoạn chốt CM-8 (lương chờ, phí xe nằm bến), và cách luật giữ–về (QĐ-25) chạy trong job đêm cùng với vòng dự báo.
+  - **Còn lại của tài liệu CT8**, làm ở đợt sau:
+    - spec, summary;
+    - `database_schema.md` (cột `forecast_loop_id`), `trip_lifecycle_fsm.md` (ai bấm các bước của FSM);
+    - ghi chú ở QĐ-17 (`forecast_decisions.md`) và Phase 7 rằng QĐ-24 đã thay quyết định "Đề xuất chỉ đọc": trang vẫn chỉ đọc, nhưng job đêm ghi chuyến chờ duyệt;
+    - trỏ lại số dòng trích trong bài học (CT8 xê dịch dòng trong `TripService`).
+  - **Tuỳ chủ dự án:** gộp phép tính vị trí 4 lần/người của CT5b; index ghép.
+  - **Dọn khi chủ dự án đồng ý:**
+    - worktree `wt-ct8`, `wt-precommit`, `wt-cm24`;
+    - bản sao `busmanagement_ct8`, `busmanagement_cm25a`, `busmanagement_cm25b`;
+    - G3-7: `busmanagement_gd2`, `busmanagement_ct3`, `busmanagement_ct6`.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
   - CT2 đổi loại xe của tuyến 10, 11;
@@ -143,7 +175,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT7 | Màn "Kế hoạch cặp tuyến" (M2), lãi cả vòng, trừ chuyến đã có | QĐ-22 | CT6 | không | ĐÃ COMMIT `fae225d` (CT7a, con số), `3e513f0` (CT7b, màn hình), `deeece9` + commit `docs:` sau đó, đã push | 2026-11-22 → 23 |
 | CT7c | Chọn cả vòng một lần, một xe + một tài xế (CM-24 PA-A) | QĐ-22, QĐ-26 | CT7 | không | ĐÃ COMMIT `f708f44`, `afc27dd` + commit `docs:` sau đó, đã push | 2026-11-23 → 25 |
 | CT7d | Ngày bảo trì trong lịch; máy cộng km đã xếp và quãng về (CM-25 M1) | QĐ-22 | CT7c | **có** (cột mới trên `buses`, khi app khởi động) | ĐÃ COMMIT `eabf985`, `afc27dd` + commit `docs:` sau đó, đã push; DB thật có lịch 27/11–03/12 (chủ dự án tạo 2026-11-25) | 2026-11-23 → 25 |
-| CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7d | **có** (chuyến chờ duyệt) | CHƯA BẮT ĐẦU | |
+| CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7d | **có** (đóng chuyến đã chạy xong, vé mô phỏng, lịch D+7, vòng chờ duyệt, cột mới trên `trips`; mỗi lần job chạy) | ĐÃ COMMIT `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a) + commit `docs:` sau đó, đã push; job đã chạy trên DB thật (2026-11-25) | 2026-11-25 |
 | CT9 | Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe | QĐ-25, QĐ-26 | CT8 | có | CHƯA BẮT ĐẦU | |
 | CT10 | Tài liệu, bài học, chuẩn bị bảo vệ | — | CT9 | không | CHƯA BẮT ĐẦU | |
 
@@ -656,23 +688,50 @@ Làm trong worktree `wt-ct7` ngoài repo (app 8080 của chủ dự án chạy t
 
 ### CT8 — Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây (QĐ-24)
 
-**Mục tiêu:** dự báo tự đề xuất bằng chuyến chờ duyệt thật; job 10 giây chỉ còn lo phần bất ngờ.
+**Mục tiêu:** dự báo tự đề xuất bằng chuyến chờ duyệt thật; job 10 giây chỉ còn lo phần bất ngờ. **Đã chốt 2026-11-25:** CM-10 (T2), CM-14 (nối vào job đêm), CM-15 (đúng giờ khung), CM-23 (V4), CM-26 (K1), CM-27 (cả vòng), CM-28 (rút). Tất cả ghi ở QĐ-24, mục "cách cài ở CT8". Chia làm CT8a (job, vận hành mô phỏng, lịch D+7), CT8b (vòng dự báo), CT8c (job 10 giây).
 
-**Cần chốt:** CM-10, CM-15. **Cần chủ dự án duyệt** việc sửa roadmap §4.
+- [x] **Roadmap §4** "No daily cron job": sửa theo câu chữ chủ dự án duyệt (2026-11-25). ~~Ghi chú ở QĐ-17 và Phase 7 rằng "Đề xuất chỉ đọc" đã được QĐ-24 thay~~: chưa làm, để đợt tài liệu sau. Trang Đề xuất vẫn chỉ đọc; job đêm mới là nơi ghi.
+- [x] **CT8a — job đêm**, `service/NightlyDispatchService` (2026-11-25):
+  - cron `dispatch.nightly.cron` (01:00), một lần chạy bù ở `ApplicationReadyEvent`, `run(trigger)` cho nút `POST /admin/analytics/recommendation/nightly-run`;
+  - ba bước, mỗi bước một transaction và một `try/catch`;
+  - mỗi lúc một lần chạy (`AtomicBoolean`); kết quả gần nhất giữ trong `NightlyRunDto`;
+  - công tắc `dispatch.nightly.enabled` (bật ở `application.properties`, tắt ở cấu hình test) và `dispatch.nightly.simulate-operations`.
+- [x] **CT8a — vận hành mô phỏng** (CM-23 V4), `config/SimulatedOperations`: khung đã tới nơi hết thì đóng với số khách `HistorySimulation.demand` (cùng hạt giống); chuyến chính trước, rồi chuyến tăng cường; qua FSM. Chuyến chờ duyệt đã qua giờ → `CANCELLED`. Ngày bảo trì dự kiến đã qua thì ghi nhận bằng `BusService.recordPlannedService`, đúng thứ tự giữa các chuyến. 2026-11-25.
+- [x] **CT8a — lịch thường lệ tới D+7** (CM-14): job gọi `RegularTimetableService.generate(hôm nay, DEFAULT_DAYS + 1)`. 2026-11-25.
+- [x] **CT8a — màn Đề xuất:** khung "Job đêm" cho thấy job làm gì, lần chạy gần nhất (vòng tạo / giữ / rút và lý do, số khung không đề xuất lại, lỗi), nút "Chạy ngay", nút sang Hàng chờ duyệt. Câu "chạy lại profile `backfill`" ở màn Dự báo, What-if và Đề xuất đã đổi. 2026-11-25.
+- [x] **CT8b — tạo vòng**, `service/ForecastLoopService.reconcile` (2026-11-25):
+  - thẻ "Đủ điều kiện", lãi cả vòng > 0, còn ≥ 72 giờ → chuyến thêm + lượt đi kèm, đúng giờ khung, xe và tài xế của thẻ;
+  - cột `trips.forecast_loop_id` (`Trip.forecastLoopId`, cuối lớp);
+  - chuyến gốc = chuyến chính của khung (`TripRepository.findMainTripsOfSlot`);
+  - `RecommendationService.buildPlan` (package-private) trả cả vòng của từng thẻ; `buildRecommendations()` công khai trả phần hiển thị.
+- [x] **CT8b — rút vòng** (CM-28): khi dự báo giảm (tạm coi vòng của chính job là chưa có rồi dựng lại kế hoạch, vòng cũ nhất giữ trước) và khi còn dưới 72 giờ. Rút = xoá mềm qua `deleteTrip`. Khung Admin đã từ chối thì không đề xuất lại. Lịch sử cũ hơn 7 ngày hay chưa có chuỗi dự báo thì không tạo. 2026-11-25.
+- [x] **CT8b — duyệt cả vòng** (CM-27, cuối `TripService`):
+  - `confirmAutoAssignedTrip` kích hoạt các lượt còn lại, mỗi lượt qua cổng của nó;
+  - `rejectTrip` hủy cả vòng;
+  - `approveTrip` không nhận lượt của vòng;
+  - Hàng chờ duyệt có nhãn "🤖 Vòng dự báo" và nút "Từ chối cả vòng"; màn Duyệt có dòng phụ đề; thông báo kể tên mọi lượt.
+  - 2026-11-25.
+- [x] **CT8c — job 10 giây theo khung** (QĐ-24 mục 6, P5):
+  - tổng vé ÷ tổng ghế của cả khung qua `Trip.exceedsReinforcementThreshold`;
+  - gốc luôn là chuyến chính; khung có chuyến chờ duyệt thì không tạo thêm (`existsPendingExtraInSlot`);
+  - bỏ `existsByOriginalTripAndStatusIn`;
+  - các cổng 72 giờ / 48 giờ / 95 % giữ nguyên;
+  - 2026-11-25.
+- [x] **Test:** `TripServiceScannerSlotTest` (3, mới), `ForecastLoopServiceTest` (9, mới), `SimulatedOperationsTest` (3, mới); `TripServiceScannerHotGateTest` giữ nguyên và vẫn xanh. `mvnw test` **318/318**; trên đúng từng commit: 306 (CT8c), 315 (CT8b), 318 (CT8a), mỗi commit dựng trong một worktree mới.
+- [x] **Thử làm hỏng 19 chỗ** (`sab_ct8.py`): S1–S3 cho CT8c, S4–S12 và S18–S19 cho CT8b, S13–S17 cho CT8a. Mỗi lần gỡ một luật, ca nào cũng đúng test của luật đó đỏ; khôi phục khớp từng byte.
+- [x] **`verify` trên bản sao** `busmanagement_ct8` (bật job), 2026-11-25:
+  - lần khởi động đầu chạy 23 giây: đóng 89 chuyến 20–24/11 (2.489 vé mô phỏng), tạo 4 vòng;
+  - lần chạy thứ hai không tạo trùng: giữ 3, rút #51614 (lãi 20.810đ xuống ≤ 0, xoá mềm);
+  - xác nhận #51612 → cả vòng `ACTIVE`; từ chối #51616 → cả vòng `CANCELLED`; duyệt tay một lượt bị từ chối đúng câu;
+  - "Chạy ngay": khung của #51616 không được đề xuất lại; khung của #51614 được tạo lại thành #51618 (lãi 1.053.981đ);
+  - `check_loops.py`, phép kiểm chuỗi vị trí và giờ lái, `check_maint.py`: 0 vi phạm.
+- [x] **`verify` chỉ đọc trên DB thật** (`-Ddispatch.nightly.enabled=false`), sau sao lưu `ProjectBackup\db\busmanagement_2026-11-25_truoc-CT8.sql` (khôi phục thử khớp): 21 trang 200; DB giống hệt trước và sau, chỉ thêm cột `forecast_loop_id`, còn trống.
+- [x] **Chủ dự án tự test trên DB thật (2026-11-25):** khởi động lại app, job chạy bù. Chuyến 20–25/11 nay có 93 hoàn thành, 14 mở bán, 1 hủy; 3 vòng chờ duyệt: #51610 (Miền Đông → Đà Lạt 18:00 28/11, về 06:00 29/11), #51612 (Đà Lạt → Miền Đông 06:00 30/11, đưa xe lên 18:00 29/11), #51614 (Đà Lạt → Miền Đông 12:00 29/11, đưa xe lên 18:00 28/11). `check_loops.py` 0 vi phạm; phép kiểm chuỗi trên 257 chuyến từ 20/11: 0 vi phạm.
+- [x] Commit `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a) ngày 2026-11-25, đã push.
+- [x] **Tài liệu, đợt nhỏ trước CT9** (2026-11-25): QĐ-24 (cách cài, cách hiểu khi cài, ví dụ), CM-10/14/15/23 (đóng), CM-26/27/28 (thêm và đóng), mục 4 và 5 của `route_pairs_decisions.md`; file này; roadmap §4, §7, §8; `test_case.md` (nhóm 4.2 viết lại, case mới); hướng dẫn `verify` (cờ của job đêm); hai sổ lỗi (`current_bugs_found.md`: hai mục "sửa ở CT8" đánh dấu đã làm; `project_report.md` Incon #2: ghi chú CT8c).
+- [ ] **Tài liệu, đợt sau:** spec, summary, `database_schema.md`, `trip_lifecycle_fsm.md`, QĐ-17 / Phase 7 ("chỉ đọc"), trỏ lại số dòng ở bài học.
 
-- [ ] Sửa câu chữ roadmap §4 "No daily cron job" (có chủ dự án duyệt). Ghi chú QĐ-17 và Phase 7 rằng "Đề xuất chỉ đọc" đã được QĐ-24 thay.
-- [ ] **Job đêm** (`@Scheduled(cron = …)`) gọi một service mới:
-  - lấy các chuyến thêm có lãi cả vòng > 0 cho D+3…D+7;
-  - trừ đi chuyến đã có trong khung;
-  - tạo chuyến `PENDING_APPROVAL` gắn với chuyến thường lệ của khung (`originalTrip`);
-  - tự phân công qua đường có sẵn trong `TripService`.
-- [ ] Khi dự báo giảm: tự rút chuyến tự tạo còn chờ duyệt.
-- [ ] **Job 10 giây:** so vé thật với tổng ghế của cả khung; không lấy chuyến tăng cường làm chuyến gốc (P5). Giữ nguyên các điều kiện 72 giờ, 48 giờ, 95%.
-- [ ] Nối việc tạo chuyến thường lệ (CT6) vào job đêm, nếu CM-14 chọn vậy.
-- [ ] **Test:** `TripServiceScannerHotGateTest` cùng test mới. `verify`, lưu ý khi bật app thì cả job thật cũng chạy.
-- [ ] **Tài liệu:** spec, summary, `trip_lifecycle_fsm.md` nếu luồng trạng thái đổi.
-
-**Xong khi:** sau một đêm (hoặc một lần chạy tay), DB có đúng các chuyến chờ duyệt mong đợi, không trùng; job 10 giây không còn nối chuỗi.
+**Xong khi:** sau một đêm (hoặc một lần chạy tay), DB có đúng các chuyến chờ duyệt mong đợi, không trùng; job 10 giây không còn nối chuỗi. **Đạt 2026-11-25**, trên bản sao và trên DB thật.
 
 ### CT9 — Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe (QĐ-25, QĐ-26)
 
@@ -733,6 +792,7 @@ Làm trong worktree `wt-ct7` ngoài repo (app 8080 của chủ dự án chạy t
 | 2026-11-23 (CT7c, CT7d) | `74613658` | *"tôi duyệt CM24 và CM25 như đã bàn bạc. hãy xem xét kỹ thực hiện nó một cách logic, phù hợp và nhất quán với project"* | CT7c: chọn cả vòng một lần (PA-A). CT7d: ngày bảo trì trong lịch (M1) + máy cộng km đã xếp và quãng về. Test 303/303, thử làm hỏng 11 chỗ. Bản sao A (code cũ) / B (code mới): bản sao DB thật sau "Tạo lịch" 27/11–03/12, cùng dữ liệu, cùng ngày — code trước CT7c/CT7d → code mới: lịch 121 mở bán + 5 chờ phân công → 125 + 1; cặp Đà Lạt 9/42 → 29/42 chuyến giường nằm; xe kẹt ở bến xa 5 → 1; màn Đề xuất 2/25 → 15/25 thẻ đủ điều kiện (chỉ CT7c trên đúng lịch cũ: 19/25, nhưng phép kiểm thấy 12 lượt vượt mốc bảo trì, xe 29A-001.14 tới 5.990 km); DB thật (chỉ đọc) 24/25 → 25/25. Sao lưu DB thật, `verify` chỉ đọc (DB giống hệt, thêm cột). Tài liệu, bài học. Chưa commit |
 | 2026-11-23 (commit CT7) | `7b523bdf` | Cùng lời dặn, sau khi commit CT6 | Rà lại code CT7. Tách CT7a khỏi CT7b: `TripRepository` chưa có truy vấn trang kế hoạch, `recommendation.html` chưa có nút sang trang đó. Test trên đúng từng bản sẽ commit: CT7a 288/288, CT7 292/292. `verify` DB thật chỉ đọc (24 lượt gọi 200; 25 thẻ, 24 đủ điều kiện; kiểm độc lập 45 lượt 0 vi phạm) và bản sao ("Tạo lịch" 27/11–03/12: 121 + 5 chuyến, `ct6_check.sql` 0 vi phạm; màn Đề xuất 2/25 → CM-24). DB thật giống hệt. Mở CM-25 (cặp Đà Lạt chỉ còn 9/42 chuyến giường nằm vì luật bảo trì nhìn trước). Commit `fae225d` (CT7a), `3e513f0` (CT7b), `deeece9` (bài học) + commit `docs:`; đã push |
 | 2026-11-25 (test trên DB thật, commit CT7c/CT7d) | `8ab0b0c8` | *"hướng dẫn test CT7c và CT7d cùng với tạo lịch"*, rồi *"tôi xóa chuyến #51609 rồi, bây giờ giải quyết vđề kia sao"*, rồi *"tôi kích hoạt rồi, commit và push đi"* | Viết hướng dẫn test (sao lưu, khởi động lại app, "Tạo lịch" từ 27/11, câu SQL kiểm). Chủ dự án tự sao lưu và "Tạo lịch" trên DB thật: 125 + 1, đúng 3 ngày bảo trì, khớp bản sao B. Xe .15 kẹt ở Đà Lạt: chuyến tạo tay 06:00 27/11 bị xoá (trùng khung #51487, tài xế 21 ở Miền Đông); thay bằng duyệt #51493 bằng xe .15 + tài xế 18, bỏ phụ xe #51517; kiểm chuỗi 251 chuyến 0 vi phạm. Worktree mới `wt-precommit` (worktree `wt-cm24` cũ còn bản chép, chưa dọn): CT7c 294/294, đủ 303/303; `verify` chỉ đọc 29 lượt 200, màn Đề xuất 15/25, `check_cards.py` 0 vi phạm, DB giống hệt. Commit `f708f44` (CT7c, từ patch vào thẳng index), `eabf985` (CT7d), `afc27dd` (bài học) + commit `docs:`; đã push |
+| 2026-11-25 (CT8) | `8ab0b0c8` | Vòng thảo luận CT8 (*"trình bày vòng thảo luận CT8 đi …"*); *"tôi đồng ý tất cả, hãy thực hiện như những gì đã bàn … còn việc tài liệu thì để sau đi"*; sau khi tự test: *"commit và push đi"*; rồi *"làm đợt tài liệu nhỏ đó đi"* | Chốt CM-10/14/15/23, thêm và chốt CM-26/27/28. CT8a/b/c làm trong worktree `wt-ct8`: test 318/318 (+15), thử làm hỏng 19 chỗ. Bản sao `busmanagement_ct8`: đóng 89 chuyến, 4 vòng, chạy lại không trùng, xác nhận / từ chối / duyệt tay đúng; phát hiện vòng Admin đã từ chối bị lập lại → luật mới (rút = xoá mềm, khung đã từ chối không đề xuất lại), thêm test. DB thật: sao lưu, `verify` chỉ đọc (job tắt), DB giống hệt. Chủ dự án khởi động lại app → job ghi vào DB thật (93 hoàn thành / 14 mở bán / 1 hủy ở 20–25/11, 3 vòng chờ duyệt, 0 vi phạm). Commit `fb6bc9b`, `b34aba3`, `ad75bc6` (mỗi commit test trên đúng bản của nó: 306 / 315 / 318), đã push. Đợt tài liệu nhỏ: quyết định, file này, roadmap, `test_case.md`, hướng dẫn `verify`, hai sổ lỗi. Chưa commit |
 
 ---
 
@@ -742,7 +802,7 @@ Làm trong worktree `wt-ct7` ngoài repo (app 8080 của chủ dự án chạy t
   - Commit không mang trailer Co-Authored-By.
   - Tách commit theo loại: feature / fix / docs / refactor.
 - **Ghi vào DB thật** (CT2, CT4, CT5, CT6, CT8, CT9) luôn phải có sao lưu trước. Thay lịch sử (CT4) còn cần chủ dự án xác nhận lần cuối.
-- **Khi bật app:** job 10 giây (`TripService.java:76`) chạy thật. Từ CT8 có thêm job đêm.
+- **Khi bật app:** job 10 giây (`TripService.scanAndSuggestExtraTrips`) chạy thật. Từ CT8 có thêm job đêm, và nó **chạy bù ngay khi app khởi động**: đóng chuyến, ghi vé mô phỏng, thêm lịch, tạo / rút vòng. Chạy chỉ đọc trên DB thật thì truyền `-Ddispatch.nightly.enabled=false`; đừng bấm "Chạy ngay" trên DB thật khi đang kiểm.
 - **Quyết định mới hay thay đổi quyết định:** ghi vào `route_pairs_decisions.md` mục 5. Không đổi im lặng trong code.
 - **Câu hỏi không phải lệnh làm.** "Nếu làm X thì sao?" nghĩa là giải thích X, không phải bắt tay làm X.
 - **Số dòng** trích trong tài liệu phải được dò lại trên code hiện tại trước khi dùng.

@@ -19,7 +19,7 @@
 | QĐ-21 | Sinh lại dữ liệu: quy luật + nhiễu, chung mức theo cặp, khách về sau lễ ±15%, xe chạy vòng | 2026-11-16 | CT3, CT4 |
 | QĐ-22 | Mức làm M2 + luật giữ–về; "tối ưu" = lãi cả vòng; lãi tính cả chiều về | 2026-11-16 | CT6, CT7, CT7c, CT7d |
 | QĐ-23 | Xe được chọn phải đang ở bến xuất phát; xe dự phòng = xe rảnh tại bến; bến nhà Miền Đông | 2026-11-16 | CT5a (định nghĩa, bến nhà), CT5b (bật vào chọn xe) |
-| QĐ-24 | Dự báo tự tạo chuyến CHỜ DUYỆT (7 điểm); job 10 giây chỉ lo phần bất ngờ | 2026-11-16 | CT8 |
+| QĐ-24 | Dự báo tự tạo chuyến CHỜ DUYỆT (7 điểm); job 10 giây chỉ lo phần bất ngờ | 2026-11-16; cách cài 2026-11-25 | CT8 (CT8a, CT8b, CT8c) |
 | QĐ-25 | Luật giữ–về cho xe tăng cường: một phép so, nhìn trước 35 ngày | 2026-11-13, 2026-11-16 | CT9 |
 | QĐ-26 | Kíp lái ở lại cùng xe, nhận lương cơ bản khi chờ; giữ mức 8 giờ lái/ngày | 2026-11-13, 2026-11-16 | CT9 |
 | QĐ-27 | Để sau: cặp dài, tăng tần suất (loại B3), tối ưu kíp lái | 2026-11-16 | — |
@@ -237,12 +237,72 @@
 7. **Thay hai quyết định cũ:**
    - "màn Đề xuất chỉ đọc, không tạo chuyến" (`RecommendationService.java:84`, Phase 7, QĐ-17);
    - Non-Goal §4 "No daily cron job" (`THESIS_ROADMAP.md:53`). Dòng đó tự ghi rằng thêm bộ hẹn giờ là quyết định riêng của chủ dự án. Sửa câu chữ §4 khi làm CT8, có chủ dự án duyệt.
+   - *(2026-11-25, CT8: §4 đã sửa theo câu chữ chủ dự án duyệt. Trang Đề xuất vẫn chỉ đọc. Job đêm là nơi ghi, và nó dùng chung bộ lập kế hoạch với trang (`RecommendationService.buildPlan`). Ghi chú cho QĐ-17 trong `forecast_decisions.md` chưa thêm, để đợt tài liệu sau.)*
 
 - **Ví dụ** (khung Sài Gòn→Vũng Tàu 06:00 thứ Sáu 27/11, xe Limousine 22):
   - Đêm 20/11: dự báo cần 2 chuyến, đã có 1 → tạo 1 chuyến chờ duyệt.
   - 21/11: Admin duyệt.
   - Các đêm sau: khung đã đủ, không tạo thêm.
   - 23/11 (còn > 72 giờ): vé thật 41/44 = 93% → job 10 giây thêm 1 chuyến. Đây là phần bất ngờ mà dự báo không thấy.
+- **Cách cài ở CT8 (2026-11-25).** Chủ dự án duyệt mọi đề xuất của vòng thảo luận đầu CT8: *"tôi đồng ý tất cả, hãy thực hiện như những gì đã bàn"*. Gồm CM-10, CM-14, CM-15, CM-23, CM-26, CM-27, CM-28, mục 6, câu chữ §4, và cách chia CT8a / CT8b / CT8c.
+  - **Commit:** `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a). Thứ tự commit theo phụ thuộc, vì job của CT8a gọi phần vòng của CT8b.
+  - **Job đêm** (`NightlyDispatchService`, CM-10 cách T2):
+    - chạy lúc 01:00 (`dispatch.nightly.cron`), chạy bù một lần khi app khởi động, và chạy khi bấm nút "Chạy ngay" trên màn Đề xuất;
+    - mỗi lần chạy có ba bước, mỗi bước một transaction riêng; bước nào lỗi thì tự bắt lỗi đó, ghi log và hiện trên khung "Job đêm", không ném ra ngoài:
+      1. vận hành mô phỏng (CM-23 cách V4, `config/SimulatedOperations`), khi bật `dispatch.nightly.simulate-operations`;
+      2. lịch thường lệ tới D+7 (CM-14): `RegularTimetableService.generate(hôm nay, 8 ngày)`; khung đã có chuyến thì bỏ qua;
+      3. vòng dự báo (`ForecastLoopService.reconcile`): rút, giữ, tạo;
+    - bước "dự báo học lại" trong đề xuất không thành bước riêng: `reconcile` gọi `buildForecast`, nên dự báo đọc luôn các chuyến mà bước 1 vừa đóng;
+    - mỗi lúc chỉ có một lần chạy; kết quả lần gần nhất giữ trong bộ nhớ, khởi động lại thì mất;
+    - công tắc `dispatch.nightly.enabled` bật trong `application.properties`, tắt trong cấu hình test. Chạy app để kiểm chỉ đọc trên DB thật thì phải truyền `-Ddispatch.nightly.enabled=false`.
+  - **Vận hành mô phỏng (V4):** xét từng khung (tuyến × ngày × giờ khung) của các tuyến lịch thường lệ, khi **mọi** chuyến đang bán hay đang chạy của khung đã tới nơi.
+    - Số khách = `HistorySimulation.demand` của khung: cùng mô hình, cùng hạt giống 20261021 với lịch sử, tất định theo ngày.
+    - Trừ trước khách của chuyến đã `COMPLETED` trong khung. Lấp chuyến chính trước, rồi chuyến tăng cường theo giờ đi; mỗi chuyến tối đa số ghế của nó, và không thấp hơn số vé đã gõ tay.
+    - Rồi đi `ACTIVE → DEPARTED → COMPLETED` qua `updateTripStatus`: xe về READY, odometer cộng km.
+    - Chuyến chờ duyệt đã qua giờ khởi hành → `CANCELLED`, qua FSM.
+    - Không mô phỏng bão hay hủy. Tuyến khác và giờ ngoài khung không bị đụng tới. Số khách là **mô phỏng**, phải nói rõ khi bảo vệ.
+  - **Vòng dự báo** (CM-26 cách K1, CM-15):
+    - **Điều kiện tạo:** thẻ "Đủ điều kiện", lãi cả vòng > 0, chuyến thêm còn ≥ 72 giờ (`TripService.MIN_HOURS_BEFORE_DEPARTURE`).
+    - **Mỗi vòng** gồm chuyến thêm + lượt đi kèm, `PENDING_APPROVAL`, đi **đúng giờ khung**. Xe và tài xế là đúng cặp thẻ đã chọn và đã qua cổng dry-run; số ghế theo xe; giá lấy từ `loadLatestPrices`.
+    - **Cột mới** `trips.forecast_loop_id` (cho phép null, thêm bằng `ddl-auto=update`): chuyến thêm trỏ vào chính nó, lượt đi kèm trỏ vào chuyến thêm.
+    - **Chuyến gốc** của mỗi lượt là chuyến chính của khung nó (`TripRepository.findMainTripsOfSlot`).
+    - Trang Đề xuất vẫn chỉ đọc: `buildRecommendations()` trả phần hiển thị của `buildPlan()`, và chỉ job lưu chuyến.
+  - **Rút vòng chờ duyệt** (CM-28) trong hai trường hợp:
+    - **(a) dự báo giảm:** máy tạm coi các vòng chờ duyệt của chính nó là chưa có, rồi dựng lại kế hoạch. Mỗi khung giữ tối đa số vòng mà kế hoạch còn muốn (vòng cũ nhất trước, không đổi xe), phần dư bị rút. "Tạm coi là chưa có" nghĩa là đổi tạm các lượt sang `CANCELLED` ngay trong transaction, rồi trả lại `PENDING_APPROVAL` trước khi làm gì khác;
+    - **(b) quá hạn duyệt:** chuyến thêm còn dưới 72 giờ mà chưa ai duyệt.
+    - Vòng đã duyệt là chuyến thật, luôn được giữ.
+  - **Duyệt cả vòng** (CM-27):
+    - Xác nhận một lượt (`confirmAutoAssignedTrip`) thì các lượt còn chờ của vòng cũng được kích hoạt, trong cùng transaction; lượt nào cũng qua cổng xe và kíp của nó.
+    - Từ chối một lượt thì cả vòng bị hủy, qua FSM.
+    - Đường duyệt tay (`approveTrip`, chọn xe khác) không nhận lượt của vòng.
+  - **Khi thiếu dữ liệu** (CM-10): chưa có chuỗi dự báo nào, hay lịch sử cũ hơn 7 ngày, thì job không tạo và không rút theo dự báo, nhưng vẫn rút theo hạn duyệt. Khung "Job đêm" ghi lý do.
+  - **Job 10 giây** (mục 6, CT8c):
+    - gom các chuyến `ACTIVE` theo khung; 06:30 thuộc khung 06:00, như CM-18;
+    - tỉ lệ = tổng vé ÷ tổng ghế của cả khung, tính qua `Trip.exceedsReinforcementThreshold`, định nghĩa duy nhất của "> 90 %";
+    - các cổng 72 giờ / 48 giờ / 95 % hỏi chuyến chính, với tỉ lệ của cả khung;
+    - chuyến gốc luôn là chuyến chính;
+    - khung đang có chuyến tăng cường chờ duyệt, do ai tạo cũng vậy, thì không tạo thêm. Chuyến tăng cường đã duyệt không còn chặn mà góp ghế vào khung; chuyến đã hủy thì vẫn không chặn (TC_AI_009).
+- **Cách hiểu khi cài ở CT8, chủ dự án chưa duyệt từng điểm:**
+  - **Admin đã từ chối vòng của một khung thì job không đề xuất lại khung đó.**
+    - Job tự rút vòng bằng **xoá mềm** (`TripService.deleteTrip`), không chuyển `CANCELLED`, nên khi dự báo tăng lại thì khung vẫn được đề xuất lại.
+    - `CANCELLED` của một vòng dự báo chỉ có một nghĩa: "Admin đã từ chối". Job bỏ qua khung đó từ đó về sau, khác job 10 giây, vốn đề xuất lại theo vé thật (TC_AI_009).
+    - Không có luật này thì đêm sau job lập lại đúng vòng mà Admin vừa từ chối. Khung "Job đêm" đếm số thẻ bị bỏ qua vì lý do này.
+  - **Ngày bảo trì dự kiến đã qua thì vận hành mô phỏng ghi nhận là đã bảo trì** (`BusService.recordPlannedService`: km lần bảo trì cuối = odometer, ngày dự kiến được bỏ). Lần bảo trì được xếp đúng thứ tự thời gian giữa các chuyến của xe.
+    - Lý do: xe đã đứng ở bến nhà cả ngày đó đúng như lịch xếp.
+    - Nếu không ghi nhận, R1 và R2 của CT7d hết tác dụng, trong khi các chuyến sau ngày đó đã được xếp với km tính lại từ 0.
+  - **Một khung chỉ được đóng khi mọi chuyến đang chạy của nó đã tới nơi.** Không đóng nửa khung, vì nhu cầu là của cả khung.
+  - **Vòng dự báo không có phụ xe**, vì tuyến ≤ 8 giờ không bắt buộc phụ xe, như CT7c.
+  - **Hàng chờ duyệt không gom hai lượt thành một nhóm "🤖 Vòng"** như đã đề xuất. Thay vào đó:
+    - mỗi lượt có nhãn "🤖 Vòng dự báo #id · chuyến thêm / lượt đi kèm" và một dòng nhắc rằng xác nhận hay từ chối một lượt là áp cho cả vòng;
+    - nút "Từ chối" của lượt thuộc vòng đổi thành "Từ chối cả vòng";
+    - thông báo sau khi bấm kể tên mọi lượt.
+  - **Lượt lẻ** (lượt đi kèm còn chờ duyệt mà chuyến thêm của nó thì không) bị rút theo hạn duyệt.
+  - **Ba câu "chạy lại profile `backfill`"** trên màn Dự báo, What-if và Đề xuất đổi thành "job đêm bổ sung mỗi ngày".
+- **Ví dụ trên bản sao DB thật** (`busmanagement_ct8`, 2026-11-25):
+  - **Lần khởi động đầu:** đóng 89 chuyến của 20–24/11 (2.489 vé mô phỏng) và tạo 4 vòng #51610, #51612, #51614, #51616.
+  - **Lần chạy thứ hai:** giữ 3 vòng. Rút #51614 (Đà Lạt → Miền Đông 18:00 29/11, đưa xe lên bằng chuyến 18:00 28/11), vì lãi 20.810đ của nó đã xuống ≤ 0. Vòng này bị xoá mềm.
+  - **Admin thao tác:** xác nhận #51612 (cả hai lượt thành `ACTIVE`) và từ chối #51616 (cả hai lượt thành `CANCELLED`). Lượt đưa xe lên của #51616 cũng đi lúc 18:00 28/11.
+  - **Bấm "Chạy ngay":** khung của #51616 không được đề xuất lại. Khung của #51614 thì được đề xuất lại thành #51618, lãi 1.053.981đ: lượt 18:00 28/11 nay không phải chia khách tràn cho #51616 nữa.
 
 ### QĐ-25. Luật giữ–về cho xe tăng cường (chốt 2026-11-13, sửa 2026-11-16)
 
@@ -303,12 +363,12 @@
 | CM-7 | **ĐÃ CHỐT 2026-11-22: W1 — tiền tính cả vòng theo kế hoạch, năng lực giữ nguyên (ghi ở QĐ-22, "cách cài lãi cả vòng ở CT7").** What-if có tính lãi cả vòng không? | Có, để chỉ có một định nghĩa chi phí | CT7 |
 | CM-8 | Giá trị tiền chờ | Chưa có số. Lúc bàn đã dùng tạm: lương chờ 333.000đ/người/ngày, xe nằm bến 330.000đ/ngày | CT9 |
 | CM-9 | **ĐÃ CHỐT 2026-11-22: S1 — trang mới `/admin/analytics/pair-plan` (ghi ở QĐ-22).** Màn M2 đặt ở đâu? | Trang mới "Kế hoạch cặp tuyến" trong nhóm phân tích. Tránh nhầm với "Bảng điều hành" (`/admin/dispatch`), vốn là màn chuyển trạng thái chuyến | CT7 |
-| CM-10 | Job đêm chạy lúc mấy giờ? Làm gì khi dự báo thiếu dữ liệu? | Chốt ở CT8 | CT8 |
+| CM-10 | **ĐÃ CHỐT 2026-11-25: T2 — 01:00 + một lần chạy bù khi app khởi động + nút "Chạy ngay"; chưa có chuỗi dự báo hay lịch sử cũ hơn 7 ngày thì không tự tạo; công tắc `dispatch.nightly.enabled` (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8a, CT8b.** Job đêm chạy lúc mấy giờ? Làm gì khi dự báo thiếu dữ liệu? | **T2.** App chạy trên laptop, ban đêm thường tắt: chỉ hẹn giờ (T1) thì job gần như không chạy; chỉ có nút (T3) thì không còn là "tự tạo" như QĐ-24. Chọn 01:00 vì đã sang ngày mới mà còn trước chuyến 06:00. Mọi bước chạy lại đều an toàn. Có công tắc, vì không có nó thì chỉ việc khởi động app để kiểm tra cũng ghi vào DB thật | CT8 |
 | CM-11 | **ĐÃ CHỐT 2026-11-16 (đã ghi: lỗi #34 và 7 mục có hướng xử lý).** 8 phát hiện phụ ghi vào sổ nào? | `docs/todo/current_bugs_found.md`, sau phép thử ba ngả | CT0 |
 | CM-12 | **ĐÃ CHỐT 2026-11-17: cách (a), cột riêng trên từng xe và từng tài xế (ghi ở QĐ-23).** Bến nhà lưu ở đâu? | Cột mới `Bus.homeStation` (và cột tương tự cho tài xế), cho phép null, thêm bằng `ddl-auto=update` | CT5 |
 | CM-13 | **ĐÃ CHỐT 2026-11-16: có (đã làm ở CT2).** Seed vốn đã có Ghế ngồi 50; chỉ đổi loại xe 2 tuyến, thêm bến Vũng Tàu và 4 tuyến chiều ngược; giữ 6 tuyến cũ. Dữ liệu mẫu (`DataInitializer`) có đổi theo DB thật không? | Có: thêm bến Vũng Tàu, loại Ghế ngồi 50, 3 cặp Sài Gòn với loại xe theo QĐ-20 | CT2 |
-| CM-14 | **ĐÃ CHỐT 2026-11-19: nút ở trang `/admin/timetable`; `ACTIVE` qua `createManualTrip`.** Chuyến thường lệ tương lai: tạo bằng nút hay bằng job đêm? Trạng thái gì? | Nút cho Admin ở CT6, nối vào job đêm ở CT8. Trạng thái `ACTIVE` (vì lịch thường lệ đã được chủ dự án chốt), vẫn đi qua cổng validate | CT6 |
-| CM-15 | Chuyến tự tạo khởi hành đúng giờ khung hay +30 phút? | Đúng giờ khung, như thẻ Đề xuất | CT8 |
+| CM-14 | **ĐÃ CHỐT 2026-11-19: nút ở trang `/admin/timetable`; `ACTIVE` qua `createManualTrip`.** *(CT8, 2026-11-25: đã nối vào job đêm. Bước 2 giữ lịch luôn đủ tới D+7, bình thường chỉ thêm một ngày; nút vẫn giữ.)* Chuyến thường lệ tương lai: tạo bằng nút hay bằng job đêm? Trạng thái gì? | Nút cho Admin ở CT6, nối vào job đêm ở CT8. Trạng thái `ACTIVE` (vì lịch thường lệ đã được chủ dự án chốt), vẫn đi qua cổng validate | CT6 |
+| CM-15 | **ĐÃ CHỐT 2026-11-25: đúng giờ khung (06/12/18). Đã làm ở CT8b.** Chuyến tự tạo khởi hành đúng giờ khung hay +30 phút? | Đúng giờ khung, như thẻ Đề xuất, vì ba lý do. (1) Bộ lập kế hoạch kiểm xe, tài xế và vị trí đúng tại giờ khung, nên lùi 30 phút là chạy một kế hoạch chưa được kiểm. (2) Tránh lỗi #34: chuyến Đà Lạt 18:30 tới nơi 00:30. (3) Nhìn giờ là biết nguồn: +30 phút là chuyến "bất ngờ" của job 10 giây | CT8 |
 | CM-16 | **ĐÃ CHỐT 2026-11-17: giữ 6% (ghi ở QĐ-21).** Bão và 6% hủy ngẫu nhiên vẫn rút theo **từng chiều** (giữ từ QĐ-10). Với xe chạy vòng, tổng duyệt CT3 cho thấy 791 khung chiều về không có xe (chuyến chiều đi đưa xe lên đã bị hủy) và 736 lượt về rỗng (chuyến thường ở bến xa bị hủy). Giữ nguyên hay đổi? | **Giữ 6%**, như QĐ-21 đã chốt ("giữ bão và huỷ chuyến"). Bộ dự báo chỉ đọc chuyến COMPLETED, nên khung thiếu xe cũng như khung bị hủy. Có thể cân nhắc cho **bão đóng cả cặp** (cùng một con đường), nhưng phần do bão rất nhỏ so với 6% hủy | Trước CT4 |
 | CM-17 | **ĐÃ CHỐT 2026-11-19 (điểm A).** Ngày đầu, bến xa chưa có xe: lúc kiểm 17/11, Vũng Tàu và Cần Thơ không có xe nào chọn được, nên máy không xếp được chuyến xuất phát từ đó lúc 06:00 | Vẫn tạo chuyến, nhưng `PENDING_APPROVAL` chưa có xe, như job 10 giây khi không phân công được; Admin chọn tay ở màn Duyệt (dropdown mời mọi xe hợp lệ, kèm ghi chú vị trí). Không thêm "chuyến điều xe rỗng". Số ghế tạm = xe chuẩn của tuyến; `approveTrip` đặt lại theo xe được chọn (#26) | CT6 |
 | CM-18 | **ĐÃ CHỐT 2026-11-19 (điểm B).** Chuyến Admin tạo tay có tính là chuyến thường lệ của khung không? `Trip` chỉ có `isExtraTrip` và `originalTrip` | Có: mọi chuyến **không** phải tăng cường, cùng tuyến, cùng ngày, cùng giờ (06:xx) giữ khung đó. Không đổi schema. **Cách hiểu khi cài:** tính cả chuyến đã hủy, để chuyến Admin đã hủy không bị bấm lại dựng lên; chuyến xóa mềm thì không tính (app không thấy nó) | CT6 |
@@ -316,9 +376,12 @@
 | CM-20 | **ĐÃ CHỐT 2026-11-19 (điểm D).** Giá vé của chuyến thường lệ lấy ở đâu? Bảng `routes` không có cột giá | Giá của chuyến `COMPLETED` gần nhất cùng tuyến, cùng giờ — **cùng hàm** `RecommendationService.loadLatestPrices` của màn Đề xuất (mở từ `private` thành package-private, không chép bản thứ ba như What-if đã chép). Khung chưa có giá thì bỏ qua, có đếm | CT6 |
 | CM-21 | **ĐÃ CHỐT 2026-11-19 (điểm E).** Tạo trước bao nhiêu ngày, và hai cái bẫy của hàm chọn xe khi lập lịch tương lai: km bảo trì không cộng dồn; "READY" là trạng thái lúc bấm nút | Mặc định 7 ngày (= `FORECAST_HORIZON_DAYS`). **Cách hiểu khi cài:** trần 14 ngày một lần bấm. Context lập lịch cộng km mọi chuyến chưa xong của xe vào luật bảo trì, và coi xe `TRAVELING` có chuyến `DEPARTED` giải thích là xếp được (luật #19 của validator); `REPAIRING` không. Chỉ áp trong bộ lập lịch; job 10 giây và màn Đề xuất không đổi. *(Thay một phần 2026-11-23, CM-25 / CT7d: mọi bộ chọn của máy cộng km đã xếp — R3 ở QĐ-22, "cách cài bảo trì trong lịch ở CT7d".)* | CT6 |
 | CM-22 | **ĐÃ CHỐT 2026-11-19 (điểm F).** 9/20 xe trên DB thật không được máy chọn: 5 xe `TRAVELING` vì 5 chuyến demo `DEPARTED` từ tháng 7 chưa bao giờ kết thúc (#3, #6, #11, #12, #13), 1 xe thử `TRAVELING` không chuyến nào giải thích (19), 1 quá bảo trì (17), 1 sát bảo trì (16), 1 đang sửa (18) | Đóng 5 chuyến demo `DEPARTED` bằng nút "Hoàn thành" của Bảng điều hành, có sao lưu trước. Xe 16–19 là xe thử cố ý, giữ nguyên | CT6 |
-| CM-23 | **MỞ (phát hiện 2026-11-19, CT6).** App không có ai vận hành chuyến thật. Chuyến thường lệ qua giờ khởi hành mà không ai bấm "Xuất phát/Hoàn thành" vẫn `ACTIVE`: (a) nó nằm ở nhóm "Trễ giờ" của Bảng điều hành; (b) lần chạy bổ sung lịch sử bỏ qua cả ngày đó, vì `HistoricalDataBackfill.existingGeneratorDays` (`:1229-1241`) coi mọi chuyến lúc 06/12/18:00 là "dạng bộ sinh" — nên dự báo không có quan sát cho những ngày có lịch thật. Làm gì với chuyến thường lệ đã qua? | Chưa đề xuất. Cần bàn cùng M-16 (mở rộng lịch sử trước buổi demo) và CT8 (job đêm). Ví dụ các hướng, chưa chọn: một bước "mô phỏng vận hành" đóng chuyến đã qua bằng FSM; hay để bộ sinh coi chuyến thường lệ chưa xong là chỗ trống cần điền | CT8 |
+| CM-23 | **ĐÃ CHỐT 2026-11-25: V4 — vận hành mô phỏng (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8a.** *(Phát hiện 2026-11-19, CT6.)* App không có ai vận hành chuyến thật. Chuyến thường lệ qua giờ khởi hành mà không ai bấm "Xuất phát/Hoàn thành" vẫn `ACTIVE`: (a) nó nằm ở nhóm "Trễ giờ" của Bảng điều hành; (b) lần chạy bổ sung lịch sử bỏ qua cả ngày đó, vì `HistoricalDataBackfill.existingGeneratorDays` (`:1229-1241`) coi mọi chuyến lúc 06/12/18:00 là "dạng bộ sinh" — nên dự báo không có quan sát cho những ngày có lịch thật. Làm gì với chuyến thường lệ đã qua? | **Đã chọn V4** (đề xuất 2026-11-25). Mỗi đêm, khung đã chạy xong được đóng với số khách lấy từ chính mô hình đã sinh lịch sử, rồi đi qua FSM. Nhờ vậy vòng "dự báo → đề xuất → duyệt → xe chạy → có khách (mô phỏng) → dự báo học lại" khép được, và xe thật sự tăng km nên luồng bảo trì của CT7d chạy thật. Các cách không chọn: V1 đóng với 0 vé (dự báo sẽ học rằng khung có 0 khách); V2 hủy (vị trí xe quay về 16/11, nên lịch đã dựng bị đứt chuỗi); V3 để nguyên (dữ liệu cũ dần, và sau khoảng một tuần job thôi tự tạo). **Còn để ngỏ:** chuyến tương lai vẫn 0 vé, nên job 10 giây chỉ chạy khi Admin gõ số vé; mô phỏng "vé bán dần" không thuộc CT8. Ba ngày trống 17–19/11 vẫn trống. Chuyến cũ tháng 7–9 trên tuyến 1 và 6 không bị đụng tới. M-16 chưa được xét lại | CT8 |
 | CM-24 | **ĐÃ CHỐT 2026-11-23: PA-A — chọn cả vòng một lần, một xe + một tài xế; không xếp được cả vòng thì "thiếu tài nguyên" (ghi ở QĐ-22, "cách cài cả vòng một lần ở CT7c"). Đã làm ở CT7c.** Phát hiện 2026-11-22, `verify` CT7. Khi lịch thường lệ phủ cả tuần, màn Đề xuất gần như không còn tài xế cho chuyến thêm. Đo trên bản sao DB thật sau khi "Tạo lịch" 27/11–03/12: **1/25** thẻ đủ điều kiện, 24 "có xe nhưng không có tài xế" — **bản CT6 (chưa có CT7) trên cùng bản sao cũng 1/25**, nên không do CT7. Nguyên nhân: (a) lịch thường lệ gán cả phụ xe cho mọi chuyến (121/121; mỗi ngày dùng 22–26 trên 33 tài xế), nên ai cũng có chuyến kế tiếp; (b) luật vị trí hai phía (CT5b) xét RIÊNG chuyến thêm: lúc 18:00 ngày 27/11 có 15 tài xế rảnh ở Miền Đông nhưng chuyến kế tiếp của họ lại xuất phát từ Miền Đông, nên bị loại khỏi chuyến Miền Đông → Cần Thơ — dù lượt về của chính vòng đó sẽ đưa họ về kịp. Làm gì? | **Đã chọn PA-A** (đề xuất 2026-11-23; PA-B bỏ phụ xe của lịch thường lệ chỉ nâng 2/25 → 7/25, PA-C nới luật vị trí trái CM-5). Lúc đề xuất: **chọn cả vòng một lần** — một xe và một kíp cho cả chuyến thêm lẫn lượt đi kèm (đúng luật H1 của lịch sử, và "kíp ở lại cùng xe" của QĐ-26); luật vị trí xét cả vòng như một lượt "bến nhà → bến nhà", bận và giờ lái xét từng lượt. Cần thêm một lối chọn mới (cộng thêm) trong `TripService`. Hướng khác: lịch thường lệ không gán phụ xe cho tuyến ≤ 8 giờ (phụ xe vốn tùy chọn) — chỉ nới số người, không gỡ được (b). *Đo lại 2026-11-23, trước khi commit CT7, trên bản sao mới của DB thật: "Tạo lịch" 27/11–03/12 rồi mở màn Đề xuất → **2/25** đủ điều kiện, 16 "có xe nhưng không có tài xế", 7 "không có xe".* | CT7c |
 | CM-25 | **ĐÃ CHỐT 2026-11-23: M1 — lịch có ngày bảo trì ở bến nhà (1 ngày), cột mới trên xe, mọi bộ chọn của máy cộng km đã xếp (ghi ở QĐ-22, "cách cài bảo trì trong lịch ở CT7d"). Đã làm ở CT7d.** Phát hiện 2026-11-23, kiểm lại CT6 trước khi commit. Lịch nhìn trước không có bước bảo trì. Luật bảo trì của context lập lịch (CM-21) cộng km của mọi chuyến chưa xong; ngưỡng mỗi xe 5.000 km, loại khi tới 90 % (4.500 km); một xe giường nằm chạy vòng Đà Lạt đi ~600 km/ngày. Đo trên bản sao DB thật sau "Tạo lịch" 27/11–03/12: cặp Đà Lạt (xe chuẩn Giường nằm 40) có **42/42** chuyến giường nằm ở 20–26/11, nhưng ở 27/11–03/12 chỉ **9** chuyến giường nằm, **26** chuyến Limousine 22, 4 chuyến Ghế ngồi 50, 3 chờ phân công. Ví dụ xe 29A-001.14: 230 km từ lần bảo trì + 4.200 km cam kết (14 chuyến Đà Lạt 20–26/11) + 300 km = 4.730 km ≥ 4.500 → bị loại. Luật làm đúng như CM-21; 53 chuyến 20–22/11 vẫn `ACTIVE` (CM-23) cũng được cộng, nhưng nếu chúng đã hoàn thành thì km vẫn vào odometer như vậy. Hệ quả: khung Đà Lạt bán xe 22 chỗ cho nhu cầu ~37–58 khách. Làm gì? | **Đã chọn M1** (đề xuất 2026-11-23: M0 chỉ cảnh báo và thống nhất một định nghĩa; M1 lịch có ngày bảo trì; M2 = M1 + thêm một xe giường nằm qua form). Không chọn M2: thêm xe là quyết định dữ liệu, không phải code | CT7d |
+| CM-26 | **ĐÃ CHỐT 2026-11-25: K1 — một cột `trips.forecast_loop_id` (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8b.** Mở ở vòng thảo luận CT8. `Trip` không có cách nào biết chuyến do job tạo, cũng không nối được hai lượt của một vòng. Đánh dấu và nối thế nào? | **K1:** thêm một cột cho phép null. Cột có giá trị = chuyến do job đêm tạo; cùng giá trị = cùng một vòng (chuyến thêm trỏ vào chính nó, lượt đi kèm trỏ vào chuyến thêm); chuyến cũ để trống, như cách CT7d thêm cột. Chuyến gốc của mỗi lượt là chuyến chính của khung nó, không bao giờ là một chuyến tăng cường. Không chọn K0 (suy từ "chuyến thêm + phút 00": mong manh, và không biết lượt nào đi với lượt nào), K2 (hai cột, nguồn tạo + lượt cặp: nhiều hơn mức cần) | CT8b |
+| CM-27 | **ĐÃ CHỐT 2026-11-25: duyệt / từ chối cả vòng một lần (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8b.** Mở ở vòng thảo luận CT8. Admin duyệt chuyến thêm Đà Lạt → Miền Đông 06:00 30/11 nhưng từ chối lượt đưa xe lên 18:00 29/11 thì xe không có mặt ở Đà Lạt để chạy, đúng kiểu xe .15. Làm gì? | Duyệt một lượt là duyệt cả vòng, trong một giao dịch, lượt nào cũng qua cổng kiểm tra; từ chối một lượt là hủy cả vòng. Xe và tài xế đã gán sẵn từ kế hoạch, nên màn Duyệt dùng chế độ "✅ Xác nhận" một nút; đường duyệt tay (đổi xe) không nhận lượt của vòng | CT8b |
+| CM-28 | **ĐÃ CHỐT 2026-11-25: rút khi dự báo giảm, hoặc khi còn dưới 72 giờ mà chưa duyệt (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8b.** Mở ở vòng thảo luận CT8. QĐ-24 mục 5 đã chốt "dự báo giảm thì rút". Còn khi nào nữa, và rút thế nào? | (a) Dự báo giảm: máy tạm coi các vòng chờ duyệt của chính nó là chưa có rồi dự báo lại. Khung vẫn cần thì giữ vòng cũ (không tạo thêm, không đổi xe), khung hết cần thì rút; vòng đã duyệt thì giữ. (b) Quá hạn duyệt: còn dưới 72 giờ mà chưa duyệt thì rút, vì không kịp bán vé; cùng mốc 72 giờ của job 10 giây. Ví dụ vòng 06:00 ngày 30/11: lúc 01:00 ngày 27/11 còn 77 giờ thì giữ, lúc 01:00 ngày 28/11 còn 53 giờ thì rút. Rút xong, xe và tài xế được trả lại | CT8b |
 
 ---
 
@@ -336,6 +399,17 @@
 - **Tự tạo chuyến mở bán thẳng**, không qua duyệt.
 - **Cách A:** giữ Ghế ngồi 50 cho Vũng Tàu.
 - **Tăng tần suất B3:** mô phỏng khách chọn giờ.
+- **Chuyến đã qua giờ mà không ai vận hành (CM-23, 2026-11-25):**
+  - V1: đóng với 0 vé, nên dự báo học rằng khung có 0 khách;
+  - V2: hủy, nên vị trí xe quay về 16/11 và lịch đã dựng bị đứt chuỗi;
+  - V3: để nguyên, nên dự báo cũ dần.
+- **Đánh dấu vòng dự báo (CM-26):**
+  - K0: suy từ "chuyến thêm + phút 00";
+  - K2: hai cột.
+- **Giờ chạy job đêm (CM-10):**
+  - T1: chỉ hẹn giờ (laptop tắt đêm thì không chạy);
+  - T3: chỉ có nút (không còn là "tự tạo").
+- **Chuyến tự tạo khởi hành +30 phút (CM-15).**
 
 ---
 
@@ -387,3 +461,11 @@
   - **Thay một "cách hiểu khi cài" của CT7:** xe của lượt về nay luôn là chính xe của chuyến thêm.
   - **Cách hiểu khi cài mới, cần chủ dự án biết:** R4 (máy chỉ cho xe rời bến nhà khi đi rồi về vẫn dưới mốc 90%) — bắt buộc để bảo trì ở bến nhà làm được; R5 (máy xếp xe theo km tính cả lịch); mỗi xe một ngày dự kiến; xe sát / quá hạn theo km thật không được lịch tự đặt; ngày dự kiến chỉ để xem, không sửa tay.
 - **2026-11-25 (sau CT7d, xe kẹt từ lịch cũ):** xe 29A-001.15 kẹt ở Đà Lạt từ lịch 20–26/11 tạo trước CT7d (tính cả lịch 4.420 km, về thêm 300 km là 4.720 ≥ 4.500). Chủ dự án chọn **người chọn tay đưa về**, không thêm luật "lượt về bến nhà được tới 100%": duyệt chuyến chờ #51493 (Đà Lạt → Miền Đông 12:00 27/11) bằng xe .15 + tài xế 18, và bỏ phụ xe của #51517 để chuỗi vị trí của tài xế 18 liền. Không đổi luật nào: R4 vẫn chỉ áp cho máy, cổng kiểm tra vẫn xét km thật (CM-5 cách B, "mềm cho người").
+- **2026-11-25 (CT8):** chủ dự án nghe vòng thảo luận đầu CT8, rồi trả lời: *"tôi đồng ý tất cả, hãy thực hiện như những gì đã bàn … còn việc tài liệu thì để sau đi"*.
+  - **Đóng:** CM-10 (T2), CM-15 (đúng giờ khung), CM-23 (V4). CM-14 thêm phần nối vào job đêm.
+  - **Mở và đóng ngay:** CM-26 (K1), CM-27 (duyệt / từ chối cả vòng), CM-28 (rút khi dự báo giảm hoặc còn dưới 72 giờ).
+  - Mục 6 của QĐ-24 (job 10 giây theo khung) cài đúng như đã ghi. Câu chữ mới của roadmap §4 được duyệt.
+  - Ghi "cách cài ở CT8" và các "cách hiểu khi cài" vào QĐ-24. Điểm cần chủ dự án biết nhất: Admin đã từ chối vòng của một khung thì job không đề xuất lại khung đó; job tự rút thì chỉ xoá mềm bản nháp.
+  - Sau khi tự test, chủ dự án bảo *"commit và push đi"*. Commit `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a), đã push.
+  - Khi chủ dự án khởi động lại app, lần chạy bù đầu tiên của job đã ghi vào DB thật. Trước đó đã có bản sao lưu `ProjectBackup\db\busmanagement_2026-11-25_truoc-CT8.sql`.
+  - Tài liệu của CT8 làm theo hai đợt. Đợt nhỏ (file này, `route_pairs_progress.md`, roadmap, `test_case.md`, hướng dẫn `verify`, hai sổ lỗi) làm trước CT9, theo lời chủ dự án *"làm đợt tài liệu nhỏ đó đi"*. Phần còn lại để sau.

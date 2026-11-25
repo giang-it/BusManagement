@@ -3419,12 +3419,12 @@ không mục nào trùng. Mỗi mục qua phép thử ba ngả.
   có chuyến gốc (`AdminTripManagementController.java:178`), nên job 10 giây vẫn thêm được một chuyến nữa.
   Kết quả có thể là 3 xe cho 40 khách.
   - Hiện chưa xảy ra trên DB thật, vì không có chuyến tương lai nào.
-  - Sửa ở CT7 và CT8 (QĐ-24 điểm 4, 6). **Phần của màn Đề xuất đã làm ở CT7 (2026-11-22, commit `fae225d` ngày 2026-11-23, cách 2a):** số thẻ = số chuyến cần − số chuyến chưa hủy đã có trong khung, khách tính trên ghế thật; What-if đếm cùng cách. Phần job 10 giây còn ở CT8.
+  - Sửa ở CT7 và CT8 (QĐ-24 điểm 4, 6). **Phần của màn Đề xuất đã làm ở CT7 (2026-11-22, commit `fae225d` ngày 2026-11-23, cách 2a):** số thẻ = số chuyến cần − số chuyến chưa hủy đã có trong khung, khách tính trên ghế thật; What-if đếm cùng cách. Phần job 10 giây **đã làm ở CT8c (2026-11-25, commit `fb6bc9b`)**: tỉ lệ = tổng vé ÷ tổng ghế của cả khung, nên chuyến tạo tay cùng khung cũng góp ghế, và job không thêm chuyến khi khung còn chỗ.
 - **Job 10 giây không bỏ qua chuyến tăng cường khi xét chuyến gốc** (`scanAndSuggestExtraTrips`, `:76`):
   - một chuyến tăng cường đã mở bán và bán > 90% sẽ được thêm chuyến tăng cường của chính nó (+30 phút nữa);
   - ví dụ 06:00 → 06:30 → **07:00**. Chuyến 07:00 rời khỏi khung giờ 06, nên vé của nó không còn được tính vào nhu cầu của khung 06:00;
   - chưa xảy ra trên DB thật (đường đi có thật trong code);
-  - sửa ở CT8 (QĐ-24 điểm 6).
+  - sửa ở CT8 (QĐ-24 điểm 6). **Đã sửa ở CT8c (2026-11-25, commit `fb6bc9b`):** chuyến gốc luôn là chuyến chính của khung (`TripServiceScannerSlotTest.aStillHotSlot_getsItsNextExtraFromTheMainTrip_notAChainedOne`; test case `TC_AI_021`).
 - **Tài xế chỉ bị coi là bận ±30 phút quanh chuyến, và không có vị trí.** Một kíp vừa tới bến xa vẫn có thể
   được giao chuyến xuất phát ở bến nhà ngay hôm sau. Sửa ở CT5 và CT9 (QĐ-23, QĐ-26).
   - **Phần vị trí đã sửa ở CT5b (2026-11-17, commit `5f52879`):** máy chỉ chọn người đang ở bến xuất phát, dropdown xếp họ lên đầu. Phần "kíp ở lại cùng xe" và tiền chờ vẫn để CT9.

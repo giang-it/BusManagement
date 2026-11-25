@@ -1267,10 +1267,69 @@
 
 ---
 
+### TC_TRIP_051 — Vận hành mô phỏng: khung đã chạy xong được đóng với số khách mô phỏng, chuyến chính trước, qua FSM (CT8a, CM-23 V4)
+
+- **Mã TC:** TC_TRIP_051
+- **Tên Kịch Bản:** Happy path — job đêm đóng một khung mà mọi chuyến đã tới nơi
+- **Điều kiện tiên quyết:** Tuyến thuộc lịch thường lệ. Khung 06:00 hôm qua có chuyến chính 22 ghế và một chuyến tăng cường 06:30 40 ghế, cả hai `ACTIVE`, đã qua giờ tới. `dispatch.nightly.simulate-operations=true`
+- **Các bước thực hiện:**
+  1. Bấm "Chạy ngay" ở `/admin/analytics/recommendation`, hoặc khởi động app và chờ lần chạy bù
+- **Kết quả mong đợi:**
+  - Số khách của khung = `HistorySimulation.demand`, cùng hạt giống 20261021 với lịch sử. Chạy lại cho cùng ngày thì ra cùng số
+  - Chuyến chính nhận min(khách, 22); phần còn lại sang chuyến tăng cường, tối đa 40. Không chuyến nào thấp hơn số vé đã gõ tay; khách của chuyến đã `COMPLETED` trong khung được trừ trước
+  - Cả hai đi `ACTIVE → DEPARTED → COMPLETED` qua `updateTripStatus`: xe `READY`, odometer cộng quãng đường tuyến
+  - Khung "Job đêm" ghi số chuyến đã đóng và số vé mô phỏng
+- **Đã chạy:** 2026-11-25, bản sao `busmanagement_ct8`: lần khởi động đầu đóng 89 chuyến 20–24/11 với 2.489 vé mô phỏng; phép kiểm chuỗi vị trí và `check_maint.py` 0 vi phạm. DB thật, khi chủ dự án khởi động lại app: chuyến 20–25/11 nay có 93 hoàn thành, 14 mở bán, 1 hủy
+- **Tự động hoá:** `SimulatedOperationsTest.aFinishedSlot_isClosedWithTheSimulatedDemand_mainTripFirst_throughTheStateMachine`
+
+---
+
+### TC_TRIP_052 — Vận hành mô phỏng không đụng tới khung chưa xong, tuyến khác, giờ ngoài khung; chuyến chờ duyệt quá giờ bị hủy (CT8a)
+
+- **Mã TC:** TC_TRIP_052
+- **Tên Kịch Bản:** Error/Edge — những gì job đêm phải để yên
+- **Điều kiện tiên quyết:**
+  - (a) khung 18:00 hôm qua có một chuyến chưa tới nơi (giờ đến sau lúc chạy);
+  - (b) một chuyến hôm qua trên tuyến ngoài lịch thường lệ;
+  - (c) một chuyến hôm qua khởi hành 09:15, giờ 9 không phải giờ khung 06/12/18;
+  - (d) một chuyến `PENDING_APPROVAL` đã qua giờ khởi hành.
+- **Các bước thực hiện:**
+  1. Chạy job (nút "Chạy ngay")
+- **Kết quả mong đợi:**
+  - (a) chuyến giữ `ACTIVE`; khung được đếm là "chờ lần sau" — không đóng nửa khung
+  - (b), (c) giữ `ACTIVE`
+  - (d) → `CANCELLED` qua FSM; khung "Job đêm" ghi số chuyến chờ duyệt đã hủy
+- **Tự động hoá:** `SimulatedOperationsTest.unfinishedSlots_otherRoutes_andOffSlotHours_areLeftAlone_whilePastPendingTripsAreCancelled`
+
+---
+
+### TC_TRIP_053 — Ngày bảo trì dự kiến đã qua: ghi nhận đúng chỗ giữa các chuyến của xe (CT8a, CT7d)
+
+- **Mã TC:** TC_TRIP_053
+- **Tên Kịch Bản:** Happy path — xe đã đứng ở bến nhà cả ngày bảo trì như lịch xếp
+- **Điều kiện tiên quyết:** Xe có odometer 1.000 km, km lần bảo trì cuối 1.000, ngày bảo trì dự kiến = hôm kia. Hai chuyến của xe trước ngày đó (100 km mỗi chuyến) và một chuyến sau, cả ba đã tới nơi
+- **Các bước thực hiện:**
+  1. Chạy job
+- **Kết quả mong đợi:**
+  - Các bước của job xếp theo giờ: hai chuyến trước → odometer 1.200; ghi nhận bảo trì ở 1.200 (`BusService.recordPlannedService`); chuyến sau → odometer 1.300
+  - Km kể từ bảo trì = 100 (chỉ chuyến sau ngày bảo trì); ngày dự kiến bị bỏ
+  - Khung "Job đêm" ghi "ghi nhận bảo trì" kèm biển số
+- **Tự động hoá:** `SimulatedOperationsTest.aPastPlannedMaintenanceDay_isRecordedBetweenTheBusTripsInTimeOrder`
+
+---
+
 <a name="module-4"></a>
 ## MODULE 4: HỆ THỐNG AI ĐỀ XUẤT CHUYẾN TĂNG CƯỜNG (AI Scheduler)
 **Service:** `TripService` — `@Scheduled(fixedRate = 10_000)`  
 **Method chính:** `scanAndSuggestExtraTrips()`, `isHotTrip()`, `createExtraTrip()`, `autoAssignResources()`
+
+> **Từ route pairs CT8c (2026-11-25, QĐ-24 mục 6), job xét theo KHUNG** (tuyến × ngày × giờ; 06:30 thuộc khung 06:00):
+> - tỉ lệ = tổng vé ÷ tổng ghế của mọi chuyến `ACTIVE` trong khung (`Trip.exceedsReinforcementThreshold`);
+> - các cổng thời gian hỏi **chuyến chính** của khung;
+> - chuyến gốc luôn là chuyến chính;
+> - khung đang có chuyến tăng cường chờ duyệt thì không tạo thêm.
+>
+> Nhóm 4.1 (TC_AI_001–006) vẫn đúng như viết với khung chỉ có một chuyến, vì khi đó tỉ lệ của khung là tỉ lệ của chuyến đó; `isHotTrip` nay nhận thêm danh sách chuyến của khung. Nhóm 4.2 đã viết lại theo khung, và có thêm TC_AI_021 (không nối chuỗi).
 
 ---
 
@@ -1374,51 +1433,70 @@
 
 ---
 
-### NHÓM 4.2: CHỐNG TRÙNG LẮP ĐỀ XUẤT (hasAlreadySuggested)
+### NHÓM 4.2: CHỐNG TRÙNG LẮP ĐỀ XUẤT (hasPendingExtra, theo khung — CT8c)
 
-### TC_AI_007 — Chống trùng lắp: Không tạo thêm khi đã có chuyến tăng cường PENDING_APPROVAL
+### TC_AI_007 — Chống trùng lắp: khung đã có chuyến tăng cường PENDING_APPROVAL thì không tạo thêm
 
 - **Mã TC:** TC_AI_007
-- **Tên Kịch Bản:** Chuyến gốc HOT đã có chuyến tăng cường ở trạng thái `PENDING_APPROVAL` — không tạo thêm
+- **Tên Kịch Bản:** Khung HOT đã có một chuyến tăng cường chờ duyệt — do job 10 giây hay do vòng dự báo của job đêm tạo — không tạo thêm
 - **Điều kiện tiên quyết:**
-  - Chuyến gốc ID=1 là "hot"
-  - Tồn tại chuyến tăng cường với `originalTripId=1` và `status=PENDING_APPROVAL`
+  - Khung 08:00 có chuyến chính HOT (37/40, qua đủ các cổng)
+  - Trong khung đó (08:00–08:59) có một chuyến tăng cường `PENDING_APPROVAL`, gốc là chuyến nào cũng được
 - **Các bước thực hiện:**
   1. Chạy `scanAndSuggestExtraTrips()` nhiều lần
 - **Kết quả mong đợi:**
-  - `hasAlreadySuggested(trip)`: `tripRepository.existsByOriginalTripAndStatusIn(trip1, [PENDING_APPROVAL, ACTIVE, DEPARTED, COMPLETED])` → TRUE
-  - `createExtraTrip(trip)` **KHÔNG** được gọi
-  - Không có chuyến tăng cường mới được INSERT vào DB
+  - `hasPendingExtra(main)`: `tripRepository.existsPendingExtraInSlot(route, PENDING_APPROVAL, 08:00, 09:00)` → TRUE
+  - `createExtraTrip(...)` **KHÔNG** được gọi; không có chuyến tăng cường mới được INSERT
+  - Chuyến chờ duyệt không góp ghế vào tỉ lệ của khung (job chỉ đọc chuyến `ACTIVE`)
+- **Tự động hoá:** `TripServiceScannerSlotTest.aPendingExtraInTheSlot_fromAnyone_blocksANewOne`
 
 ---
 
-### TC_AI_008 — Chống trùng lắp: Không tạo thêm khi đã có chuyến tăng cường ACTIVE
+### TC_AI_008 — Chuyến tăng cường đã duyệt (ACTIVE) không chặn nữa mà góp ghế vào khung
 
 - **Mã TC:** TC_AI_008
-- **Tên Kịch Bản:** Chuyến tăng cường đã được Admin phê duyệt và ACTIVE — không tạo lại
-- **Điều kiện tiên quyết:** Chuyến tăng cường với `originalTripId=1`, `status=ACTIVE`
+- **Tên Kịch Bản:** Khung đã có thêm ghế từ một chuyến tăng cường đã duyệt — chuyến chính đầy một mình chưa đủ để tạo thêm
+- **Điều kiện tiên quyết:** Chuyến chính 37/40 (tự nó > 90%). Một chuyến tăng cường cùng khung `ACTIVE`, 22 ghế, 0 vé — ví dụ một vòng dự báo đã được duyệt
 - **Các bước thực hiện:**
   1. Chạy `scanAndSuggestExtraTrips()`
 - **Kết quả mong đợi:**
-  - `existsByOriginalTripAndStatusIn(trip1, [...ACTIVE...])` → TRUE
-  - Không tạo thêm chuyến
+  - Khung 37 / 62 = 60% → không tạo chuyến nào
+  - Trước CT8c, `existsByOriginalTripAndStatusIn(..., ACTIVE)` chặn vì đã có chuyến tăng cường `ACTIVE`. Nay chuyến đó không chặn: ghế của nó được tính. Khi khung nóng trở lại thì job tạo thêm (TC_AI_021)
+- **Tự động hoá:** `TripServiceScannerSlotTest.theSeatsOfApprovedExtrasInTheSlot_count_soAFullMainTripAloneIsNotEnough`
 
 ---
 
 ### TC_AI_009 — Chống trùng lắp: CHO PHÉP tạo lại khi chuyến tăng cường cũ đã CANCELLED
 
 - **Mã TC:** TC_AI_009
-- **Tên Kịch Bản:** Chuyến tăng cường cũ đã bị hủy (CANCELLED) — AI được phép đề xuất lại
+- **Tên Kịch Bản:** Chuyến tăng cường cũ đã bị hủy hay bị từ chối (CANCELLED) — AI được phép đề xuất lại
 - **Điều kiện tiên quyết:**
-  - Chuyến gốc ID=1 vẫn đang HOT
-  - Chuyến tăng cường cũ với `originalTripId=1`, `status=CANCELLED`
-  - Không có chuyến tăng cường nào khác của trip1 ở trạng thái sống
+  - Chuyến chính ID=1 vẫn đang HOT
+  - Chuyến tăng cường cũ của khung đó ở `status=CANCELLED`
+  - Khung không có chuyến tăng cường nào khác đang chờ duyệt
 - **Các bước thực hiện:**
   1. Chạy `scanAndSuggestExtraTrips()`
 - **Kết quả mong đợi:**
-  - `existsByOriginalTripAndStatusIn(trip1, [PENDING_APPROVAL, ACTIVE, DEPARTED, COMPLETED])` → FALSE (CANCELLED **không** nằm trong danh sách chặn)
-  - `createExtraTrip(trip)` được gọi → tạo chuyến tăng cường MỚI
+  - `hasPendingExtra(main)` → FALSE: chỉ `PENDING_APPROVAL` chặn. Chuyến `CANCELLED` không chặn và cũng không góp ghế
+  - `createExtraTrip(main)` được gọi → tạo chuyến tăng cường MỚI
   - DB: INSERT chuyến mới với `original_trip_id=1`, `status=PENDING_APPROVAL`
+  - Khác với vòng dự báo: khung có vòng dự báo mà Admin đã từ chối thì **job đêm** không đề xuất lại (TC_RC_018), còn job 10 giây vẫn đề xuất theo vé thật
+
+---
+
+### TC_AI_021 — Không nối chuỗi: chuyến gốc luôn là chuyến chính của khung (CT8c, P5)
+
+- **Mã TC:** TC_AI_021
+- **Tên Kịch Bản:** Error/Edge — khung vẫn HOT sau khi đã có một chuyến tăng cường đã duyệt và bán gần hết
+- **Điều kiện tiên quyết:** Chuyến chính 08:00 bán 37/40; chuyến tăng cường 08:30 `ACTIVE` bán 21/22, gốc là chuyến chính
+- **Các bước thực hiện:**
+  1. Chạy `scanAndSuggestExtraTrips()`
+  2. Chạy lại
+- **Kết quả mong đợi:**
+  - Bước 1: khung (37 + 21) / 62 = 93,5% → tạo **một** chuyến tăng cường, `original_trip_id` = chuyến chính, khởi hành **08:30** (chuyến chính + 30 phút), không phải 09:00
+  - Trước CT8c, chuyến tăng cường 21/22 = 95,5% được xét riêng và trở thành gốc của một chuyến 09:00. Đó là chuyện nối chuỗi +30 phút (P5)
+  - Bước 2: chuyến mới đang chờ duyệt → không tạo thêm (TC_AI_007)
+- **Tự động hoá:** `TripServiceScannerSlotTest.aStillHotSlot_getsItsNextExtraFromTheMainTrip_notAChainedOne`
 
 ---
 //////////////////////////////////////
@@ -1896,6 +1974,56 @@
   - Bước 2: 11A-111.11 và hai người vừa lên Vũng Tàu **đứng đầu**, không ghi chú; những người khác vẫn được mời, kèm ghi chú
   - Lưu bằng một xe ở bến khác vẫn qua — validator không kiểm vị trí (`TripServiceLocationTest.theValidatorDoesNotBlockByLocation`)
 - **Đã chạy:** 2026-11-17 trên bản sao: bước 1 — 10 xe / 30 người, 10 / 30 ghi chú; bước 2 — 11A-111.11 đầu, 9 / 28 ghi chú. Form Sửa (chuyến 2535) và API form Tạo (6 tuyến) đối chiếu với vị trí tính bằng SQL trên DB thật: 0 chỗ lệch. Khoá thêm bằng `TripServiceLocationTest.theDropdownsOfferEveryValidChoice_standingFirst_withANoteForTheOthers` và `theCreateFormListsKeepEveryChoice_andPutTheStartStationFirst`
+
+
+---
+
+### TC_APR_018 — Vòng dự báo: Xác nhận một lượt là kích hoạt cả vòng (CT8b, CM-27)
+
+- **Mã TC:** TC_APR_018
+- **Tên Kịch Bản:** Happy path — Admin xác nhận chuyến thêm của một vòng do job đêm tạo
+- **Điều kiện tiên quyết:** Hàng chờ duyệt có một vòng dự báo: hai lượt `PENDING_APPROVAL`, cùng xe và cùng tài xế, nhãn "🤖 Vòng dự báo #id · chuyến thêm" và "· lượt đi kèm"
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/pending`, xem hai lượt
+  2. Bấm "✅ Xác nhận" ở một lượt (`POST /admin/trips/confirm`)
+- **Kết quả mong đợi:**
+  - Bước 1: mỗi lượt có nhãn vòng, dòng nhắc *"Xác nhận hay từ chối một lượt là xác nhận / hủy cả vòng (cùng xe, cùng tài xế)."* và nút "Từ chối cả vòng"
+  - Bước 2: cả hai lượt `ACTIVE`, trong cùng một transaction; lượt nào cũng qua cổng xe và kíp của nó. Thông báo: *"✅ Chuyến tăng cường #… đã được kích hoạt thành công! Cả vòng dự báo cũng được kích hoạt: #…, #…."*
+  - Một lượt trượt cổng → không lượt nào đổi
+- **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct8`: xác nhận vòng #51612 → #51612 và #51613 cùng `ACTIVE`
+- **Tự động hoá:** `ForecastLoopServiceTest.confirmingOneLeg_activatesTheWholeLoop_andTheManualApprovalPathRefusesALoopLeg`
+
+---
+
+### TC_APR_019 — Vòng dự báo: Từ chối một lượt là hủy cả vòng (CT8b, CM-27)
+
+- **Mã TC:** TC_APR_019
+- **Tên Kịch Bản:** Happy path — nửa vòng không chạy được, nên từ chối áp cho cả vòng
+- **Điều kiện tiên quyết:** Một vòng dự báo chờ duyệt như TC_APR_018
+- **Các bước thực hiện:**
+  1. Bấm "Từ chối cả vòng" ở một lượt (`POST /admin/trips/reject/{id}`), đồng ý hộp xác nhận
+- **Kết quả mong đợi:**
+  - Cả hai lượt `CANCELLED` qua FSM, xe và tài xế được trả lại
+  - Thông báo: *"Đã từ chối chuyến tăng cường #…. Cả vòng dự báo cũng được hủy: #…, #…."*
+  - Job đêm không đề xuất lại khung đó (TC_RC_018)
+- **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct8`: từ chối vòng #51616 → #51616 và #51617 cùng `CANCELLED`
+- **Tự động hoá:** `ForecastLoopServiceTest.rejectingOneLeg_cancelsTheWholeLoop`
+
+---
+
+### TC_APR_020 — Vòng dự báo: đường duyệt tay (đổi xe, tài xế) không nhận lượt của vòng (CT8b, CM-27)
+
+- **Mã TC:** TC_APR_020
+- **Tên Kịch Bản:** Error/Edge — đổi xe một lượt là vỡ vòng
+- **Điều kiện tiên quyết:** Một vòng dự báo chờ duyệt
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/approve/{id}` của một lượt — đọc phụ đề
+  2. Gửi POST `/admin/trips/approve` cho lượt đó với một xe khác
+- **Kết quả mong đợi:**
+  - Bước 1: phụ đề *"Lượt của một vòng do job đêm tạo từ dự báo (vòng #…) — Xác nhận hay Từ chối áp cho cả vòng, cùng xe và cùng tài xế"*
+  - Bước 2: lỗi *"Chuyến #… thuộc vòng dự báo #… (cùng một xe và một tài xế cho cả vòng): hãy bấm Xác nhận để kích hoạt cả vòng, hoặc Từ chối để hủy cả vòng."*; cả hai lượt vẫn chờ duyệt
+- **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct8`: bị từ chối đúng câu
+- **Tự động hoá:** `ForecastLoopServiceTest.confirmingOneLeg_activatesTheWholeLoop_andTheManualApprovalPathRefusesALoopLeg`
 
 ---
 
@@ -2706,6 +2834,134 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
   - "Tính như về rỗng" chỉ còn ở tuyến không có đúng một tuyến chiều ngược
 - **Tự động hoá:** `RecommendationLoopTest.whenNoBusAndDriverCanRunTheWholeLoop_theCardHasNoResource_insteadOfAnEmptyReturn`
 
+
+---
+
+### TC_RC_014 — Job đêm: thẻ đáng chạy thành vòng chờ duyệt, hai lượt nối với nhau (CT8b, QĐ-24, CM-15, CM-26)
+
+- **Mã TC:** TC_RC_014
+- **Tên Kịch Bản:** Happy path — dự báo tự đề xuất bằng chuyến chờ duyệt thật
+- **Điều kiện tiên quyết:** Dự báo có chuỗi, lịch sử cũ không quá 7 ngày. Có thẻ "Đủ điều kiện", lãi cả vòng > 0, chuyến thêm còn ≥ 72 giờ (D+3…D+7)
+- **Các bước thực hiện:**
+  1. Bấm "Chạy ngay" ở `/admin/analytics/recommendation`
+  2. Mở `/admin/trips/pending`
+- **Kết quả mong đợi:**
+  - Khung "Job đêm" kể từng vòng vừa tạo: tuyến, giờ, xe, lãi cả vòng, lượt đi kèm
+  - Mỗi vòng có hai chuyến `PENDING_APPROVAL`, `is_extra_trip = true`:
+    - chuyến thêm **đúng giờ khung** (06/12/18, không +30 phút);
+    - lượt đi kèm ("về ngay" hay "đưa xe tới");
+    - cùng xe và cùng tài xế mà thẻ ghi, số ghế theo xe;
+    - `forecast_loop_id`: chuyến thêm = id của chính nó, lượt đi kèm = id chuyến thêm;
+    - `original_trip_id` = chuyến chính của khung của từng lượt
+  - Thẻ chưa tới 72 giờ, thẻ lỗ, thẻ thiếu tài nguyên: không tạo
+  - Trang Đề xuất mở bao nhiêu lần cũng không tạo gì (chỉ job ghi)
+- **Đã chạy:** 2026-11-25:
+  - bản sao `busmanagement_ct8`: lần khởi động đầu tạo 4 vòng (#51610, #51612, #51614, #51616);
+  - DB thật, khi chủ dự án khởi động lại app: 3 vòng (#51610, #51612, #51614); `check_loops.py` 0 vi phạm
+- **Tự động hoá:** `ForecastLoopServiceTest.profitableFeasibleCards_atLeast72HoursAhead_becomePendingLoops_ofTwoLinkedLegs`
+
+---
+
+### TC_RC_015 — Job đêm chạy lại không tạo trùng (CT8b)
+
+- **Mã TC:** TC_RC_015
+- **Tên Kịch Bản:** Regression — chạy hai lần một đêm (lần chạy bù khi khởi động + 01:00, hay bấm nút nhiều lần)
+- **Điều kiện tiên quyết:** Sau TC_RC_014, dự báo không đổi
+- **Các bước thực hiện:**
+  1. Bấm "Chạy ngay" lần nữa
+- **Kết quả mong đợi:**
+  - "tạo 0, giữ N": kế hoạch lần hai đã trừ các vòng đang chờ duyệt, vì chúng chiếm chỗ trong khung và giữ xe, tài xế
+  - Không có chuyến nào mới
+- **Đã chạy:** 2026-11-25 trên bản sao: lần hai tạo 0, giữ 3. Vòng còn lại (#51614) bị rút vì lãi 20.810đ của nó đã xuống ≤ 0 (TC_RC_016)
+- **Tự động hoá:** `ForecastLoopServiceTest.runningAgain_keepsEveryLoop_andCreatesNoDuplicate`
+
+---
+
+### TC_RC_016 — Dự báo giảm: vòng còn chờ duyệt bị rút (xoá mềm), vòng đã duyệt được giữ (CT8b, CM-28 (a))
+
+- **Mã TC:** TC_RC_016
+- **Tên Kịch Bản:** Error/Edge — khung hết cần tăng cường
+- **Điều kiện tiên quyết:** Hai vòng của cùng loại khung, một chờ duyệt và một đã được xác nhận. Dự báo của khung giảm xuống dưới số ghế
+- **Các bước thực hiện:**
+  1. Chạy job
+- **Kết quả mong đợi:**
+  - Vòng chờ duyệt: cả hai lượt bị **xoá mềm** (`is_deleted = 1`, vẫn `PENDING_APPROVAL`, biến khỏi app), không thành `CANCELLED`. Khung "Job đêm" ghi "Rút (dự báo không còn cần) vòng #…"
+  - Vòng đã duyệt (đang mở bán) giữ nguyên
+  - Dự báo tăng lại thì khung được đề xuất lại (khác TC_RC_018)
+- **Đã chạy:** 2026-11-25 trên bản sao:
+  - #51614 bị rút ở lần chạy thứ hai;
+  - sau khi #51616 bị từ chối, "Chạy ngay" tạo lại khung đó thành #51618 (lãi 1.053.981đ), vì lượt 18:00 28/11 không còn chia khách tràn cho #51616
+- **Tự động hoá:** `ForecastLoopServiceTest.whenTheForecastDrops_pendingLoopsAreWithdrawn_butAnApprovedLoopIsKept`
+
+---
+
+### TC_RC_017 — Còn dưới 72 giờ mà chưa duyệt: vòng bị rút (CT8b, CM-28 (b))
+
+- **Mã TC:** TC_RC_017
+- **Tên Kịch Bản:** Error/Edge — không kịp bán vé
+- **Điều kiện tiên quyết:** Một vòng chờ duyệt mà chuyến thêm khởi hành sau chưa tới 72 giờ
+- **Các bước thực hiện:**
+  1. Chạy job
+- **Kết quả mong đợi:**
+  - Cả vòng bị xoá mềm, xe và tài xế được trả lại. Khung "Job đêm" ghi "Rút (còn dưới 72 giờ mà chưa duyệt) vòng #…"
+  - Phần rút này chạy cả khi dữ liệu dự báo cũ (TC_RC_019)
+- **Tự động hoá:** `ForecastLoopServiceTest.aPendingLoopWithLessThan72HoursLeft_isWithdrawnByTheDeadline`
+
+---
+
+### TC_RC_018 — Khung mà Admin đã từ chối vòng thì không được đề xuất lại (CT8b, cách hiểu khi cài)
+
+- **Mã TC:** TC_RC_018
+- **Tên Kịch Bản:** Error/Edge — người đã quyết "không" cho khung đó
+- **Điều kiện tiên quyết:** Admin đã từ chối một vòng (TC_APR_019); dự báo của khung vẫn cần tăng cường
+- **Các bước thực hiện:**
+  1. Chạy job
+- **Kết quả mong đợi:**
+  - Khung đó không có vòng mới. Khung "Job đêm" ghi *"Không đề xuất lại 1 khung mà Admin đã từ chối vòng dự báo."*
+  - Các vòng khác vẫn được giữ hay tạo bình thường
+  - Khác job 10 giây (TC_AI_009) và khác vòng bị job tự rút (TC_RC_016)
+- **Đã chạy:** 2026-11-25 trên bản sao: sau khi từ chối #51616, "Chạy ngay" bỏ qua khung đó
+- **Tự động hoá:** `ForecastLoopServiceTest.aSlotWhoseLoopTheAdminRejected_isNotProposedAgain`
+
+---
+
+### TC_RC_019 — Thẻ lỗ và dữ liệu cũ: không tự tạo (CT8b, QĐ-24 mục 2, CM-10)
+
+- **Mã TC:** TC_RC_019
+- **Tên Kịch Bản:** Error/Edge — job chỉ tạo khi đáng chạy và khi dự báo đủ tin
+- **Điều kiện tiên quyết:** (a) thẻ "Đủ điều kiện" nhưng lãi cả vòng ≤ 0; (b) lịch sử dự báo cũ hơn 7 ngày, hay chưa có chuỗi dự báo nào
+- **Các bước thực hiện:**
+  1. Chạy job
+- **Kết quả mong đợi:**
+  - (a) thẻ lỗ vẫn hiện trên màn Đề xuất nhưng không thành vòng
+  - (b) không tạo vòng nào, không rút theo dự báo. Khung "Job đêm" ghi *"Không tự tạo vòng: lịch sử dự báo cũ N ngày (quá 7 ngày)"*; rút theo hạn duyệt vẫn chạy
+- **Tự động hoá:** `ForecastLoopServiceTest.lossMakingCards_stayOnThePage_butAreNeverCreated`, `…staleHistory_createsNothing_andSaysWhy`
+
+---
+
+### TC_RC_020 — Khung "Job đêm" và nút "Chạy ngay" (CT8a, CM-10 cách T2)
+
+- **Mã TC:** TC_RC_020
+- **Tên Kịch Bản:** Happy path — Admin xem job đã làm gì và chạy nó tức thì
+- **Điều kiện tiên quyết:** App vừa khởi động với `dispatch.nightly.enabled=true`. Lần chạy bù chạy ngay khi app sẵn sàng
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/recommendation`
+  2. Bấm "Chạy ngay" (`POST /admin/analytics/recommendation/nightly-run`)
+  3. Khởi động app với `-Ddispatch.nightly.enabled=false`, mở lại trang
+- **Kết quả mong đợi:**
+  - Bước 1: khung "Job đêm" ghi lần chạy gần nhất:
+    - giờ và nguồn: "chạy bù khi khởi động", "hẹn giờ" hay "Admin bấm Chạy ngay";
+    - số chuyến đã đóng, vé mô phỏng, chuyến chờ duyệt đã hủy, bảo trì đã ghi nhận;
+    - lịch thường lệ đã thêm;
+    - vòng tạo / giữ / rút kèm lý do, và lỗi nếu có;
+    - nút sang Hàng chờ duyệt
+  - Bước 2: thông báo *"Đã chạy job đêm (… ms): tạo N vòng chờ duyệt, rút M vòng."*. Đang có một lần chạy khác thì: *"Job đêm đang chạy ở một lần khác — thử lại sau ít phút."*
+  - Bước 3: *"Chưa chạy lần nào kể từ khi app khởi động."*, kèm cảnh báo *"Hẹn giờ đang TẮT (dispatch.nightly.enabled=false) — chỉ chạy khi bấm nút."*. DB không đổi khi chỉ khởi động app
+  - Bước nào lỗi cũng không làm hỏng trang: lỗi hiện thành dòng đỏ, các bước khác vẫn chạy
+- **Đã chạy:** 2026-11-25:
+  - bản sao: lần khởi động đầu mất 23 giây; "Chạy ngay" sau khi xác nhận / từ chối như TC_RC_016, TC_RC_018;
+  - DB thật với cờ tắt (`verify` chỉ đọc): 21 trang 200, DB giống hệt trước và sau
+
 ---
 
 <a name="module-11"></a>
@@ -2827,12 +3083,12 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 |---|---|---|---|
 | Module 1 — Bus Management | 14 | 6 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
-| Module 3 — Trip FSM & CRUD | 32 | 8 | 24 |
-| Module 4 — AI Scheduler | 20 | 6 | 14 |
-| Module 5 — Admin Approval | 14 | 7 | 7 |
+| Module 3 — Trip FSM & CRUD | 35 | 10 | 25 |
+| Module 4 — AI Scheduler | 21 | 6 | 15 |
+| Module 5 — Admin Approval | 17 | 9 | 8 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **112** | **44** | **68** |
+| **TỔNG** | **119** | **48** | **71** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -2841,7 +3097,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)* *(2026-11-23, CT7c + CT7d (CM-24, CM-25): Module 1 +1 — `TC_BUS_014` (Happy Path); Module 3 +2 — `TC_TRIP_049` (Happy Path), `TC_TRIP_050` (Error/Edge); Module 10 +2 — `TC_RC_012` (Happy Path), `TC_RC_013` (Error/Edge) — cộng theo cùng cách. `TC_RC_008` sửa tại chỗ: lượt về là cùng xe, cùng tài xế.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)* *(2026-11-23, CT7c + CT7d (CM-24, CM-25): Module 1 +1 — `TC_BUS_014` (Happy Path); Module 3 +2 — `TC_TRIP_049` (Happy Path), `TC_TRIP_050` (Error/Edge); Module 10 +2 — `TC_RC_012` (Happy Path), `TC_RC_013` (Error/Edge) — cộng theo cùng cách. `TC_RC_008` sửa tại chỗ: lượt về là cùng xe, cùng tài xế.)* *(2026-11-25, CT8 (QĐ-24): Module 3 +3 — `TC_TRIP_051`, `TC_TRIP_053` (Happy Path), `TC_TRIP_052` (Error/Edge); Module 4 +1 — `TC_AI_021` (Error/Edge); Module 5 +3 — `TC_APR_018`, `TC_APR_019` (Happy Path), `TC_APR_020` (Error/Edge); Module 10 +7 — `TC_RC_014`, `TC_RC_020` (Happy Path), `TC_RC_015`…`TC_RC_019` (Error/Edge/Regression) — cộng theo cùng cách. `TC_AI_007`–`TC_AI_009` viết lại tại chỗ theo khung (CT8c); nhóm 4.1 thêm một ghi chú.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

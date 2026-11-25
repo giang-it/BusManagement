@@ -16,12 +16,27 @@ MySQL**, not by `mvnw test`. Follow that.
 The historical dataset is the foundation of Phase 5-7. Always verify on the
 **default** profile, which persists data and seeds nothing.
 
+## ⚠️ Since route pairs CT8 (2026-11-25), starting the app WRITES to the DB
+
+`application.properties` has `dispatch.nightly.enabled=true`. The nightly job
+(`NightlyDispatchService`) then runs once on `ApplicationReadyEvent` (catch-up) and
+again at 01:00. It closes every trip that has run, with simulated tickets, through
+the FSM, so the odometers move. It also cancels past pending trips, extends the
+regular timetable to D+7, and creates or withdraws `PENDING_APPROVAL` forecast loops.
+So **merely booting the app writes**. Every read-only run on the real DB must pass
+`-Ddispatch.nightly.enabled=false`, as the launch command below does.
+- **On a clone**, leave the flag on only when the job itself is what you verify.
+- **The "Chạy ngay" button** (`POST /admin/analytics/recommendation/nightly-run`)
+  runs the job even when the flag is off. Do not press it on the real DB.
+- **`mvnw test`** never runs the job: the test properties set the flag to false.
+
 ## Launch
 
 ```bash
 # from the Maven dir (the inner BusManagement/, where pom.xml lives)
+# -Ddispatch.nightly.enabled=false: read-only — no catch-up run of the nightly job (see above)
 nohup ./mvnw -o spring-boot:run \
-  -Dspring-boot.run.jvmArguments="-Dserver.port=8099" > /tmp/app8099.log 2>&1 &
+  -Dspring-boot.run.jvmArguments="-Dserver.port=8099 -Ddispatch.nightly.enabled=false" > /tmp/app8099.log 2>&1 &
 ```
 
 Boot takes ~20s. Poll rather than sleep blindly:
@@ -84,6 +99,12 @@ nohup ./mvnw -o spring-boot:run -Dspring-boot.run.jvmArguments="-Dserver.port=80
   -Dspring.datasource.url=jdbc:mysql://localhost:3306/busmanagement_test?sessionVariables=foreign_key_checks=0" \
   > /tmp/app8098.log 2>&1 &
 ```
+
+This clone JVM keeps the nightly job on, so its catch-up run writes to the
+**clone** as soon as it boots. That is what you want when the job is under test.
+Otherwise add `-Ddispatch.nightly.enabled=false`, or the clone drifts away from the
+real DB before your first request. On 2026-11-25 the first boot on the clone
+`busmanagement_ct8` closed 89 trips.
 
 Three checks before believing a result from the clone: (1) row counts + an MD5 over
 `trips` match the real DB right after the restore; (2) `information_schema.processlist`
