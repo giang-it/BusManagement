@@ -86,7 +86,11 @@
                     <span th:unless="${trip.extraTrip}" class="badge bg-info text-dark">📅 Chuyến thường lệ</span>
                     <!-- Route pairs CT8b (CM-27): lượt của một vòng do job đêm tạo từ dự báo — duyệt / từ chối cả vòng -->
                     <span th:if="${trip.forecastLoopId != null}" class="badge bg-primary"
-                        th:text="${'🤖 Vòng dự báo #' + trip.forecastLoopId + (trip.forecastLoopId == trip.id ? ' · chuyến thêm' : ' · lượt đi kèm')}"></span>
+                        th:text="${'🤖 Vòng dự báo #' + trip.forecastLoopId + (trip.heldForecastLoop ? (trip.forecastLoopId == trip.id ? ' · giữ xe · chuyến thêm đi' : ' · giữ xe · chuyến thêm về') : (trip.forecastLoopId == trip.id ? ' · chuyến thêm' : ' · lượt đi kèm'))}"></span>
+                    <!-- Route pairs CT9 (CM-29): vòng giữ xe — xe và kíp chờ ở bến xa giữa hai chuyến thêm -->
+                    <div th:if="${trip.heldForecastLoop}" class="text-muted small">
+                        Vòng giữ xe: xe và kíp lái chờ ở bến xa giữa chuyến thêm đi và chuyến thêm về.
+                    </div>
                     <div th:if="${trip.forecastLoopId != null}" class="text-muted small">
                         Xác nhận hay từ chối một lượt là xác nhận / hủy cả vòng (cùng xe, cùng tài xế).
                     </div>

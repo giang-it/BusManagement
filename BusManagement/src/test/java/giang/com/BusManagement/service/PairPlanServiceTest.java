@@ -219,6 +219,73 @@ class PairPlanServiceTest {
         assertEquals(series.size(), groups.stream().mapToInt(g -> g.getSeries().size()).sum(), "không mất chuỗi nào");
     }
 
+    /**
+     * Route pairs CT9 (CM-29): khung đi 06:00 và khung về 18:00 cùng nóng (35 khách) — màn Đề xuất ghép thành
+     * một vòng giữ xe: xe A chạy ★ 06:00, chờ ở bến xa từ 08:00, rồi chạy ★ 18:00 về. Trang đếm hai chuyến thêm
+     * trong ngày, mỗi khung một; không có km lượt đi kèm; và ghi xe đang được giữ kèm phép so tiền.
+     */
+    @Test
+    void aHeldLoop_showsBothExtras_andTheBusBeingHeld() {
+        bus("KH-A", home, 100);
+        driver("kh-1", home);
+        hot(out, 6);
+        hot(back, 18);
+
+        PairPlanViewDto.PairDay day = service.build(TOMORROW).getPairs().get(0);
+
+        assertEquals(1, day.getSlots().get(0).getOut().getExtras(), "★ 06:00 chiều đi");
+        assertEquals(1, day.getSlots().get(2).getBack().getExtras(), "★ 18:00 chiều về của vòng giữ");
+        assertEquals(2, day.getExtras());
+        assertEquals(0.0, day.getCompanionKm(), 1e-9, "vòng giữ không có lượt đi kèm rỗng");
+        PairPlanViewDto.BusRow row = day.getRows().stream().filter(r -> "KH-A".equals(r.getBusPlate())).findFirst()
+                .orElseThrow();
+        assertEquals("STAR", row.getCells().get(0).getLegs().get(0).getKind());
+        assertEquals("STAR", row.getCells().get(2).getLegs().get(0).getKind());
+        assertTrue(row.getSleepsAt().startsWith("Bến nhà KH"), row.getSleepsAt());
+        assertEquals(1, day.getHolds().size(), day.getHolds().toString());
+        assertTrue(day.getHolds().get(0).contains("KH-A") && day.getHolds().get(0).contains("Bến xa KH")
+                && day.getHolds().get(0).contains("hai vòng riêng"), day.getHolds().get(0));
+    }
+
+    /**
+     * Vòng giữ xe ĐÃ LƯU (job đêm tạo, chờ duyệt): xe đi 18:00 ngày mai, về 12:00 ngày kia+1 — ngày ở giữa xe không
+     * chạy lượt nào, nhưng trang vẫn ghi xe đang được giữ ở bến xa.
+     */
+    @Test
+    void aSavedHeldLoop_isListed_onTheDayTheBusDoesNotMove() {
+        Bus a = bus("KH-A", home, 100);
+        Trip go = bare(out, TOMORROW.atTime(18, 0), TripStatus.PENDING_APPROVAL);
+        go.setBus(a);
+        go.setExtraTrip(true);
+        go.setForecastLoopHold(true);
+        Trip saved = tripRepository.save(go);
+        saved.setForecastLoopId(saved.getId());
+        tripRepository.save(saved);
+        Trip homeLeg = bare(back, TOMORROW.plusDays(2).atTime(12, 0), TripStatus.PENDING_APPROVAL);
+        homeLeg.setBus(a);
+        homeLeg.setExtraTrip(true);
+        homeLeg.setForecastLoopHold(true);
+        homeLeg.setForecastLoopId(saved.getId());
+        tripRepository.save(homeLeg);
+        em.flush();
+        em.clear();
+
+        PairPlanViewDto.PairDay middle = service.build(TOMORROW.plusDays(1)).getPairs().get(0);
+
+        String loopTag = "#" + saved.getId();
+        assertTrue(middle.getHolds().stream().anyMatch(h -> h.contains("KH-A") && h.contains(loopTag)
+                && h.contains("chờ duyệt")), middle.getHolds().toString());
+    }
+
+    /** Lịch sử của khung (tuyến, giờ) bán 35/40 vé — khung nóng, chuyến thêm chở ~13 khách tràn. */
+    private void hot(Route route, int hour) {
+        em.flush();
+        em.createNativeQuery("UPDATE trips SET tickets_sold = 35 WHERE route_id = :route AND status = 'COMPLETED'"
+                + " AND HOUR(departure_time) = :hour").setParameter("route", route.getId()).setParameter("hour", hour)
+                .executeUpdate();
+        em.clear();
+    }
+
     // =====================================================================
 
     private void history(Route route, Map<Integer, Integer> soldByHour) {

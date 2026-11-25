@@ -313,6 +313,129 @@ class ForecastLoopServiceTest {
     }
 
     // =====================================================================
+    // Vòng giữ xe — route pairs CT9 (CM-29)
+    // =====================================================================
+    //
+    // Khung VỀ 18:00 nóng thêm (38 khách, chưa có chuyến chính nên giả định 1 xe chuẩn): chuyến thêm đi 06:00 (xe tới
+    // 08:00, về ngay sớm nhất 12:00) ghép với chuyến thêm về 18:00 cùng ngày — chờ thêm 6 giờ (165.750đ), cả vòng
+    // ≈ 1,6 + 1,6 − 1,4 − 0,17 triệu, hơn hai vòng riêng (≈ 0,2 triệu mỗi vòng). Một xe, hai tài xế.
+
+    /**
+     * Thẻ giữ xe thành MỘT vòng chờ duyệt hai lượt — chuyến thêm đi và chuyến thêm về, cả hai là chuyến thêm,
+     * đánh dấu forecastLoopHold, cùng xe và tài xế; chạy lại không tạo trùng (giữ theo cả hai khung); xác nhận một
+     * lượt là kích hoạt cả vòng.
+     */
+    @Test
+    void aHeldCard_becomesOneLoopOfTwoMarkedExtras_keptOnARerun_andConfirmedAsAWhole() {
+        hotReturnAt18();
+        LocalDateTime now = LocalDateTime.now();
+
+        ForecastLoopService.Result result = forecastLoopService.reconcile(now);
+
+        int expected = expectedLoops(now);
+        assertEquals(expected, result.created().size(), String.join("\n", result.created()));
+        assertTrue(result.created().stream().allMatch(label -> label.contains("giữ xe")), String.join("\n", result.created()));
+        Map<Long, List<Trip>> loops = pendingLoops();
+        assertEquals(expected, loops.size());
+        for (Map.Entry<Long, List<Trip>> loop : loops.entrySet()) {
+            List<Trip> legs = loop.getValue();
+            assertEquals(2, legs.size());
+            Trip go = legs.get(0);
+            Trip home = legs.get(1);
+            assertEquals(loop.getKey(), go.getId());
+            assertEquals(out.getId(), go.getRoute().getId());
+            assertEquals(6, go.getDepartureTime().getHour());
+            assertEquals(back.getId(), home.getRoute().getId());
+            assertEquals(go.getDepartureTime().toLocalDate().atTime(18, 0), home.getDepartureTime(),
+                    "chuyến thêm về 18:00 cùng ngày, sau khi xe chờ ở bến xa");
+            for (Trip leg : legs) {
+                assertTrue(leg.isExtraTrip());
+                assertTrue(leg.isHeldForecastLoop(), "cả hai lượt đánh dấu vòng giữ");
+                assertEquals("FL-A", leg.getBus().getLicensePlate());
+                assertEquals(go.getDriver().getUserId(), leg.getDriver().getUserId());
+            }
+            assertNotNull(go.getOriginalTrip(), "chuyến gốc là chuyến chính 06:00 của khung");
+            assertNotNull(home.getOriginalTrip(), "chuyến gốc của chuyến thêm về là chuyến chính 18:00 của khung nó");
+            assertEquals(home.getDepartureTime(), home.getOriginalTrip().getDepartureTime());
+        }
+        flushAndClear();
+
+        ForecastLoopService.Result again = forecastLoopService.reconcile(now);
+        assertTrue(again.created().isEmpty(), String.join("\n", again.created()));
+        assertEquals(expected, again.kept());
+        assertTrue(again.withdrawnByForecast().isEmpty(), String.join("\n", again.withdrawnByForecast()));
+        flushAndClear();
+
+        Long loopId = pendingLoops().keySet().iterator().next();
+        Long homeLegId = pendingLoops().get(loopId).get(1).getId();
+        tripService.confirmAutoAssignedTrip(homeLegId);
+        flushAndClear();
+        for (Trip leg : tripRepository.findByForecastLoopIdOrderByDepartureTimeAsc(loopId)) {
+            assertEquals(TripStatus.ACTIVE, leg.getStatus(), "cả vòng giữ được kích hoạt");
+        }
+    }
+
+    /**
+     * Vòng thường (CT8b) đang chờ duyệt mà kế hoạch nay muốn một vòng giữ thay nó: job rút vòng cũ (xoá mềm) và
+     * tạo vòng giữ — như hai vòng #51610 / #51614 trên DB thật khi CT9 vào.
+     */
+    @Test
+    void pendingSingleLoops_areReplacedByHeldLoops_whenThePlanNowPairsThem() {
+        LocalDateTime now = LocalDateTime.now();
+        int first = forecastLoopService.reconcile(now).created().size();
+        flushAndClear();
+        assertTrue(pendingLoops().values().stream().flatMap(List::stream).noneMatch(Trip::isHeldForecastLoop));
+        hotReturnAt18();
+
+        ForecastLoopService.Result result = forecastLoopService.reconcile(now);
+
+        assertEquals(first, result.withdrawnByForecast().size(), String.join("\n", result.withdrawnByForecast()));
+        assertEquals(first, result.created().size(), String.join("\n", result.created()));
+        assertTrue(pendingLoops().values().stream().flatMap(List::stream).allMatch(Trip::isHeldForecastLoop));
+    }
+
+    /**
+     * Admin từ chối một vòng giữ: cả hai khung của nó không được đề xuất lại — kể cả khi kế hoạch (không được ghép
+     * khung đã bị từ chối) đưa hai chuyến thêm đó ra như hai thẻ riêng.
+     */
+    @Test
+    void aRejectedHeldLoop_keepsBothOfItsSlotsFromBeingProposedAgain() {
+        hotReturnAt18();
+        LocalDateTime now = LocalDateTime.now();
+        int first = forecastLoopService.reconcile(now).created().size();
+        flushAndClear();
+        Long rejected = pendingLoops().keySet().iterator().next();
+        tripService.rejectTrip(rejected);
+        // Thêm một xe: hai chuyến thêm của đôi bị từ chối, nay là hai thẻ riêng, đều có xe và đều đáng chạy —
+        // nên chính luật "không đề xuất lại" (chứ không phải thiếu xe) là thứ chặn cả hai.
+        bus("FL-B");
+        flushAndClear();
+
+        ForecastLoopService.Result again = forecastLoopService.reconcile(now);
+
+        assertTrue(again.created().isEmpty(), String.join("\n", again.created()));
+        assertEquals(2, again.refusedSkipped(), "chuyến thêm đi và chuyến thêm về của khung đã bị từ chối");
+        assertEquals(first - 1, again.kept());
+        for (Trip leg : tripRepository.findByForecastLoopIdOrderByDepartureTimeAsc(rejected)) {
+            assertEquals(TripStatus.CANCELLED, leg.getStatus());
+        }
+    }
+
+    /**
+     * Lịch sử khung về 18:00 bán 38/40 vé — khung đó nóng như khung đi 06:00 — và mỗi ngày tới khung đó có một
+     * chuyến chính, như lịch thường lệ trên DB thật (khung không có chuyến nào thì kế hoạch giả định một xe chuẩn,
+     * rồi coi chuyến thêm về vừa lưu là chuyến chính đó).
+     */
+    private void hotReturnAt18() {
+        em.createNativeQuery("UPDATE trips SET tickets_sold = 38 WHERE route_id = :route AND status = 'COMPLETED'"
+                + " AND HOUR(departure_time) = 18").setParameter("route", back.getId()).executeUpdate();
+        for (int d = 1; d <= 8; d++) {
+            tripRepository.save(bare(back, LocalDate.now().plusDays(d).atTime(18, 0), TripStatus.ACTIVE, 22, false));
+        }
+        flushAndClear();
+    }
+
+    // =====================================================================
     // Helpers
     // =====================================================================
 

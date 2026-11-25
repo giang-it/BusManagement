@@ -176,4 +176,19 @@ public class Trip {
     @jakarta.persistence.Column(name = "forecast_loop_id")
     private Long forecastLoopId;
 
+    /**
+     * Route pairs CT9 (CM-29): true ở mọi lượt của một VÒNG GIỮ XE do job đêm tạo — chuyến thêm đi, xe và kíp
+     * chờ ở bến xa, rồi chuyến thêm về; lượt thứ hai cũng là một chuyến thêm của khung nó, không phải lượt đi
+     * kèm chở khách còn tràn. Job đêm cần biết điều đó để giữ / rút vòng theo cả hai khung và để không đề xuất
+     * lại hai khung khi Admin từ chối; null / false = vòng dự báo thường (CT8b) hay không phải vòng dự báo.
+     * Cột cho phép null, thêm bằng ddl-auto=update, ở cuối lớp như forecastLoopId.
+     */
+    @jakarta.persistence.Column(name = "forecast_loop_hold")
+    private Boolean forecastLoopHold;
+
+    /** Lượt này thuộc một vòng giữ xe do job đêm tạo (CT9). */
+    public boolean isHeldForecastLoop() {
+        return Boolean.TRUE.equals(forecastLoopHold);
+    }
+
 }

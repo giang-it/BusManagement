@@ -204,6 +204,13 @@
                     </table>
                 </div>
             </div>
+            <!-- Route pairs CT9 (CM-29): xe được giữ ở bến xa trong ngày đang xem -->
+            <div class="card-footer bg-white small" th:if="${!#lists.isEmpty(p.holds)}">
+                <div class="fw-semibold text-primary"><i class="bi bi-p-square"></i> Xe được giữ ở bến xa (vòng giữ xe):</div>
+                <ul class="mb-0 text-muted">
+                    <li th:each="h : ${p.holds}" th:text="${h}"></li>
+                </ul>
+            </div>
             <div class="card-footer bg-white small" th:if="${!#lists.isEmpty(p.unserved)}">
                 <div class="fw-semibold text-secondary"><i class="bi bi-x-circle"></i> Chuyến thêm cần nhưng chưa xếp được:</div>
                 <ul class="mb-0 text-muted">
@@ -217,8 +224,9 @@
             cuối trong ngày của xe đó, xét mọi cặp. Hàng <span class="leg-STAR">★</span> có chuyến thêm hay lượt đi kèm
             của màn Đề xuất — chỉ là đề xuất, chưa có trong hệ thống. "Km lượt đi kèm" là km của các lượt về ngay /
             đưa xe tới / về rỗng của chuyến thêm ★ trong ngày: lượt đó chở phần khách còn tràn sau khi khung đã đủ
-            chuyến, nên thường gần 0 khách. Hai chuyến thêm ngược chiều không được ghép thành một vòng (để luật
-            giữ–về sau này).
+            chuyến, nên thường gần 0 khách. Một chuyến thêm đi và một chuyến thêm về sau đó có thể ghép thành một
+            vòng giữ xe (CT9): xe và kíp lái chờ ở bến xa rồi chở chuyến thêm về, thay cho hai lượt đi kèm gần như
+            rỗng — xem mục "Xe được giữ ở bến xa" của từng cặp.
         </div>
 
     </div>

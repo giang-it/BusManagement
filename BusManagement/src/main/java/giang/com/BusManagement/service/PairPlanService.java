@@ -154,8 +154,22 @@ public class PairPlanService {
             }
         }
 
+        // CT9: các vòng giữ xe đã lưu (chờ duyệt hay đã duyệt) — để hiện xe đang được giữ cả những ngày nó không chạy.
+        Map<Long, List<Trip>> heldLoops = new java.util.TreeMap<>();
+        for (giang.com.BusManagement.domain.TripStatus status : RecommendationService.SLOT_STATUSES) {
+            tripRepository.findForecastLoopLegsByStatus(status).stream().filter(Trip::isHeldForecastLoop)
+                    .forEach(leg -> heldLoops.computeIfAbsent(leg.getForecastLoopId(), id -> new ArrayList<>()).add(leg));
+        }
+
         for (Pair pair : pairs) {
-            view.getPairs().add(day(pair, selected, trips, legs, lastOfBus, cards, points, standardSeats, byId));
+            PairPlanViewDto.PairDay day = day(pair, selected, trips, legs, lastOfBus, cards, points, standardSeats, byId);
+            for (List<Trip> loop : heldLoops.values()) {
+                String hold = savedHoldNote(loop, pair, selected);
+                if (hold != null) {
+                    day.getHolds().add(hold);
+                }
+            }
+            view.getPairs().add(day);
         }
         return view;
     }
@@ -169,7 +183,13 @@ public class PairPlanService {
             int unserved = 0;
             BigDecimal profit = null;
             for (RecommendationCardDto card : cards) {
-                if (!pair.has(card.getRouteId()) || !date.equals(card.getDate())) {
+                if (!pair.has(card.getRouteId())) {
+                    continue;
+                }
+                if (heldReturnOn(card, date)) {
+                    extras++; // CT9: chuyến thêm về của một vòng giữ xe, tính vào ngày của nó
+                }
+                if (!date.equals(card.getDate())) {
                     continue;
                 }
                 if (card.getStatus() == RecommendationStatus.RECOMMENDED) {
@@ -238,7 +258,17 @@ public class PairPlanService {
         double companionKm = 0.0;
         int extras = 0;
         for (RecommendationCardDto card : cards) {
-            if (!pair.has(card.getRouteId()) || !date.equals(card.getDate())) {
+            if (!pair.has(card.getRouteId())) {
+                continue;
+            }
+            if (heldReturnOn(card, date)) {
+                extras++; // CT9: chuyến thêm về của một vòng giữ xe; lãi cả vòng tính ở ngày của chuyến thêm đi
+            }
+            String hold = holdNote(card, date, byId);
+            if (hold != null) {
+                day.getHolds().add(hold);
+            }
+            if (!date.equals(card.getDate())) {
                 continue;
             }
             if (card.getStatus() != RecommendationStatus.RECOMMENDED) {
@@ -278,7 +308,11 @@ public class PairPlanService {
         info.setExtras((int) cards.stream()
                 .filter(c -> c.getStatus() == RecommendationStatus.RECOMMENDED && route.getId().equals(c.getRouteId())
                         && date.equals(c.getDate()) && c.getDepartureHour() == hour)
-                .count());
+                .count()
+                + (int) cards.stream() // CT9: chuyến thêm về của vòng giữ xe
+                        .filter(c -> heldReturnOn(c, date) && route.getId().equals(c.getCompanion().getRouteId())
+                                && c.getCompanion().getDeparture().getHour() == hour)
+                        .count());
         return info;
     }
 
@@ -332,9 +366,15 @@ public class PairPlanService {
             RecommendationCardDto.CompanionLeg companion = card.getCompanion();
             if (companion != null && companion.isReserved() && companion.getDeparture() != null
                     && date.equals(companion.getDeparture().toLocalDate()) && byId.containsKey(companion.getRouteId())) {
-                legs.add(new Leg(companion.getBusPlate(), companion.getKind().name(), byId.get(companion.getRouteId()),
-                        companion.getDeparture(), null, companion.getPassengers(),
-                        (companion.getKind() == LoopLegKind.RETURN ? "↩ Lượt về" : "↪ Lượt đưa xe tới") + " "
+                boolean held = companion.getKind() == LoopLegKind.HOLD;
+                legs.add(new Leg(companion.getBusPlate(), held ? "STAR" : companion.getKind().name(),
+                        byId.get(companion.getRouteId()), companion.getDeparture(), null, companion.getPassengers(),
+                        held ? "★ " + TIME.format(companion.getDeparture()) + " " + companion.getRouteLabel()
+                                + ": chuyến thêm " + companion.getServedExtraIndex() + "/" + companion.getServedExtraCount()
+                                + " về bến nhà của vòng giữ xe — xe chờ ở " + companion.getWaitStation() + " từ chuyến thêm ★ "
+                                + card.getRouteLabel() + " " + card.getSlotLabel() + " "
+                                + card.getDate().format(DateTimeFormatter.ofPattern("dd/MM"))
+                        : (companion.getKind() == LoopLegKind.RETURN ? "↩ Lượt về" : "↪ Lượt đưa xe tới") + " "
                                 + TIME.format(companion.getDeparture()) + " của chuyến thêm ★ " + card.getRouteLabel()
                                 + " " + card.getSlotLabel() + " " + card.getDate().format(DateTimeFormatter.ofPattern("dd/MM"))));
             }
@@ -354,6 +394,9 @@ public class PairPlanService {
             note.append("; xe được đưa tới lúc ").append(TIME_DAY.format(leg.getDeparture()));
         } else if (leg != null && leg.getKind() == LoopLegKind.NONE) {
             note.append("; xe về đúng bến nhà, không cần lượt đi kèm");
+        } else if (leg != null && leg.getKind() == LoopLegKind.HOLD && leg.getDeparture() != null) {
+            note.append("; giữ xe ở ").append(leg.getWaitStation()).append(", về bằng chuyến thêm ")
+                    .append(TIME_DAY.format(leg.getDeparture()));
         } else {
             note.append("; chiều về tính như một lượt rỗng");
         }
@@ -367,11 +410,69 @@ public class PairPlanService {
     /** Km của lượt đi kèm một chuyến thêm: về ngay / đưa xe tới / về rỗng chạy trên tuyến chiều ngược. */
     private static double companionKm(RecommendationCardDto card, Pair pair, Map<Long, Route> byId) {
         RecommendationCardDto.CompanionLeg leg = card.getCompanion();
-        if (leg == null || leg.getKind() == LoopLegKind.NONE) {
-            return 0.0;
+        if (leg == null || leg.getKind() == LoopLegKind.NONE || leg.getKind() == LoopLegKind.HOLD) {
+            return 0.0; // CT9: lượt về của vòng giữ là một chuyến thêm có khách, không phải lượt đi kèm
         }
         Route route = leg.getRouteId() != null ? byId.get(leg.getRouteId()) : pair.other(card.getRouteId());
         return route != null && route.getDistanceKm() != null ? route.getDistanceKm() : 0.0;
+    }
+
+    /** CT9: thẻ là một vòng giữ xe đủ điều kiện và chuyến thêm về của nó khởi hành ngày date. */
+    private static boolean heldReturnOn(RecommendationCardDto card, LocalDate date) {
+        RecommendationCardDto.CompanionLeg leg = card.getCompanion();
+        return card.getStatus() == RecommendationStatus.RECOMMENDED && leg != null && leg.getKind() == LoopLegKind.HOLD
+                && leg.getDeparture() != null && date.equals(leg.getDeparture().toLocalDate());
+    }
+
+    /**
+     * CT9 (CM-29): dòng "xe đang giữ" của ngày date — khi xe của một vòng giữ xe nằm ở bến xa trong ngày đó (từ lúc
+     * chuyến thêm đi tới nơi tới lúc chuyến thêm về khởi hành); null khi không.
+     */
+    private static String holdNote(RecommendationCardDto card, LocalDate date, Map<Long, Route> byId) {
+        RecommendationCardDto.CompanionLeg leg = card.getCompanion();
+        Route route = byId.get(card.getRouteId());
+        if (card.getStatus() != RecommendationStatus.RECOMMENDED || leg == null || leg.getKind() != LoopLegKind.HOLD
+                || leg.getDeparture() == null || route == null) {
+            return null;
+        }
+        LocalDateTime arrives = card.getDate().atTime(card.getDepartureHour(), 0)
+                .plusMinutes(LoopEconomics.durationMinutes(route));
+        if (!arrives.isBefore(date.plusDays(1).atStartOfDay()) || leg.getDeparture().isBefore(date.atStartOfDay())) {
+            return null;
+        }
+        return "🅿 " + card.getBusPlate() + " (tài xế " + card.getDriverName() + ") chờ ở " + leg.getWaitStation()
+                + " từ " + TIME_DAY.format(arrives) + " tới " + TIME_DAY.format(leg.getDeparture())
+                + " để chạy chuyến thêm " + leg.getRouteLabel() + " về bến nhà — chờ thêm "
+                + Math.round(leg.getWaitHours()) + " giờ so với lần về ngay sớm nhất " + TIME_DAY.format(leg.getWaitFrom())
+                + " (tiền chờ " + money(leg.getWaitCost()) + "); lãi cả vòng giữ " + money(card.getEstimatedProfit())
+                + ", hai vòng riêng " + money(leg.getSeparateProfit());
+    }
+
+    /**
+     * CT9: dòng "xe đang giữ" của một vòng giữ xe ĐÃ LƯU (job đêm tạo, chờ duyệt hay đã duyệt) khi xe nằm ở bến
+     * xa trong ngày date; null khi không. Vòng đã lưu không mang tiền dự kiến, nên dòng này không có phép so tiền.
+     */
+    private static String savedHoldNote(List<Trip> loop, Pair pair, LocalDate date) {
+        List<Trip> legs = loop.stream().sorted(Comparator.comparing(Trip::getDepartureTime)).toList();
+        Trip go = legs.get(0);
+        Trip home = legs.get(legs.size() - 1);
+        if (legs.size() < 2 || !pair.has(go.getRoute().getId()) || go.getArrivalTimeExpected() == null) {
+            return null;
+        }
+        LocalDateTime arrives = go.getArrivalTimeExpected();
+        if (!arrives.isBefore(date.plusDays(1).atStartOfDay()) || home.getDepartureTime().isBefore(date.atStartOfDay())) {
+            return null;
+        }
+        return "🅿 " + (go.getBus() != null ? go.getBus().getLicensePlate() : "—") + " (vòng dự báo #"
+                + go.getForecastLoopId() + ", " + (home.getStatus() == giang.com.BusManagement.domain.TripStatus.PENDING_APPROVAL
+                        ? "chờ duyệt" : "đã duyệt")
+                + ") chờ ở " + home.getRoute().getDeparturePointDisplay() + " từ " + TIME_DAY.format(arrives) + " tới "
+                + TIME_DAY.format(home.getDepartureTime()) + " để chạy chuyến thêm " + label(home.getRoute())
+                + " về bến nhà";
+    }
+
+    private static String money(BigDecimal value) {
+        return value == null ? "—" : String.format("%,d", value.longValue()).replace(',', '.') + "đ";
     }
 
     /** Cột giờ của một lượt: giờ thường lệ lớn nhất không muộn hơn giờ đi (06:30 → cột 06:00). */

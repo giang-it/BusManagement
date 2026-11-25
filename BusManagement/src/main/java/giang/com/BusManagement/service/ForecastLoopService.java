@@ -4,6 +4,7 @@ import giang.com.BusManagement.domain.Route;
 import giang.com.BusManagement.domain.Trip;
 import giang.com.BusManagement.domain.TripStatus;
 import giang.com.BusManagement.dto.DemandForecastViewDto;
+import giang.com.BusManagement.dto.LoopLegKind;
 import giang.com.BusManagement.dto.RecommendationCardDto;
 import giang.com.BusManagement.dto.RecommendationStatus;
 import giang.com.BusManagement.repository.TripRepository;
@@ -42,6 +43,11 @@ import java.util.Map;
  * không đề xuất lại khung ấy (khác chuyến tăng cường của job 10 giây, vốn được đề xuất lại theo vé thật, TC_AI_009).</li>
  * <li><b>Thiếu dữ liệu</b> (CM-10): chưa có chuỗi dự báo nào, hay lịch sử cũ hơn {@link #MAX_STALE_DAYS} ngày →
  * chỉ rút theo hạn duyệt, không tạo, không rút theo dự báo.</li>
+ * <li><b>Vòng giữ xe</b> (route pairs CT9, CM-29): thẻ giữ xe của kế hoạch thành một vòng hai lượt — chuyến thêm
+ * đi và chuyến thêm về, cùng xe, cùng tài xế, đánh dấu {@link Trip#getForecastLoopHold()} ở cả hai lượt. Một
+ * vòng giữ được giữ / rút theo CẢ HAI khung của nó (kế hoạch đổi đôi ghép thì vòng cũ bị rút, vòng mới được
+ * tạo), và Admin từ chối nó thì không khung nào trong hai khung được đề xuất lại; kế hoạch của job không ghép
+ * khung đã bị từ chối, nên chuyến thêm còn lại của đôi vẫn được xét như một thẻ riêng.</li>
  * </ul>
  *
  * Chạy lại bao nhiêu lần cũng an toàn: kế hoạch dựng lần hai đã trừ các vòng vừa giữ (chúng chiếm chỗ trong
@@ -102,14 +108,18 @@ public class ForecastLoopService {
             return new Result(List.of(), pending.size(), List.of(), withdrawnByDeadline, skipped, 0);
         }
 
+        // Khung Admin đã từ chối: đọc TRƯỚC phép "tạm coi như chưa có" bên dưới — phép đó cũng chuyển tạm các vòng
+        // của chính job sang CANCELLED, mà CANCELLED là dấu của một lần Admin từ chối.
+        java.util.Set<String> refused = refusedSlots();
+
         // ── (a) Dự báo giảm: kế hoạch khi tạm coi như các vòng chờ duyệt của chính job chưa có ──
         pending.values().forEach(legs -> legs.forEach(leg -> leg.setStatus(TripStatus.CANCELLED)));
         tripRepository.flush();
         Map<String, Integer> wanted = new HashMap<>();
-        for (Map.Entry<RecommendationCardDto, RecommendationService.Loop> entry : recommendationService.buildPlan().loops()
-                .entrySet()) {
+        for (Map.Entry<RecommendationCardDto, RecommendationService.Loop> entry : recommendationService
+                .buildPlan(refused).loops().entrySet()) {
             if (qualifies(entry.getKey(), deadline)) {
-                wanted.merge(cardSlot(entry.getKey()), 1, Integer::sum);
+                wanted.merge(loopKey(entry.getKey(), entry.getValue()), 1, Integer::sum);
             }
         }
         pending.values().forEach(legs -> legs.forEach(leg -> leg.setStatus(TripStatus.PENDING_APPROVAL)));
@@ -118,9 +128,9 @@ public class ForecastLoopService {
         int kept = 0;
         List<String> withdrawnByForecast = new ArrayList<>();
         for (Map.Entry<Long, List<Trip>> loop : pending.entrySet()) { // theo id vòng tăng dần: vòng cũ giữ trước
-            String slot = tripSlot(extraOf(loop.getKey(), loop.getValue()));
-            if (wanted.getOrDefault(slot, 0) > 0) {
-                wanted.merge(slot, -1, Integer::sum);
+            String key = pendingKey(loop.getKey(), loop.getValue());
+            if (wanted.getOrDefault(key, 0) > 0) {
+                wanted.merge(key, -1, Integer::sum);
                 kept++;
             } else {
                 withdrawnByForecast.add(withdraw(loop.getValue()));
@@ -128,15 +138,14 @@ public class ForecastLoopService {
         }
 
         // ── Tạo: kế hoạch đã trừ các vòng vừa giữ, nên chỉ còn phần khung vẫn thiếu; khung Admin đã từ chối thì thôi ──
-        java.util.Set<String> refused = refusedSlots();
         Map<Long, Map<Integer, BigDecimal>> prices = recommendationService.loadLatestPrices();
         List<String> created = new ArrayList<>();
         int[] refusedSkipped = { 0 };
-        recommendationService.buildPlan().loops().forEach((card, loop) -> {
+        recommendationService.buildPlan(refused).loops().forEach((card, loop) -> {
             if (!qualifies(card, deadline)) {
                 return;
             }
-            if (refused.contains(cardSlot(card))) {
+            if (loopSlots(card, loop).stream().anyMatch(refused::contains)) {
                 refusedSkipped[0]++;
                 return;
             }
@@ -151,12 +160,14 @@ public class ForecastLoopService {
 
     /**
      * Khung (tuyến × ngày × giờ) có vòng dự báo mà Admin đã từ chối (chuyến thêm của vòng ở CANCELLED — job tự rút
-     * thì xoá mềm, không bao giờ để CANCELLED): người đã quyết "không" cho khung đó, máy không đề xuất lại.
+     * thì xoá mềm, không bao giờ để CANCELLED): người đã quyết "không" cho khung đó, máy không đề xuất lại. Vòng
+     * giữ xe (CT9) có hai chuyến thêm, nên cả hai khung của nó; lượt đi kèm của vòng thường thì không — khung đó
+     * không phải một khung cần tăng cường.
      */
     private java.util.Set<String> refusedSlots() {
         java.util.Set<String> slots = new java.util.HashSet<>();
         for (Trip leg : tripRepository.findForecastLoopLegsByStatus(TripStatus.CANCELLED)) {
-            if (leg.getId().equals(leg.getForecastLoopId())) {
+            if (leg.getId().equals(leg.getForecastLoopId()) || leg.isHeldForecastLoop()) {
                 slots.add(tripSlot(leg));
             }
         }
@@ -180,9 +191,14 @@ public class ForecastLoopService {
         tripRepository.save(extra);
         Trip companion = companionLeg != null ? persist(companionLeg, loop, prices, extra.getId()) : null;
 
+        boolean held = loop.kind() == LoopLegKind.HOLD;
         String label = describe(extra) + " · xe " + loop.bus().getLicensePlate() + " · lãi cả vòng "
                 + String.format(java.util.Locale.US, "%,.0f", card.getEstimatedProfit()).replace(',', '.') + "đ"
-                + (companion != null ? " (kèm " + describe(companion) + ")" : "");
+                + (companion == null ? ""
+                        : held ? " (giữ xe ở " + card.getCompanion().getWaitStation() + " thêm "
+                                + Math.round(card.getCompanion().getWaitHours()) + " giờ, về bằng chuyến thêm "
+                                + describe(companion) + ")"
+                        : " (kèm " + describe(companion) + ")");
         log.info("🌙 [Job đêm] Tạo vòng dự báo #{}: {}", extra.getId(), label);
         return "#" + extra.getId() + " " + label;
     }
@@ -203,6 +219,7 @@ public class ForecastLoopService {
         trip.setExtraTrip(true);
         trip.setOriginalTrip(mainTripOf(route.getId(), departure));
         trip.setForecastLoopId(loopId);
+        trip.setForecastLoopHold(loop.kind() == LoopLegKind.HOLD ? Boolean.TRUE : null); // CT9: vòng giữ xe
         return tripRepository.save(trip);
     }
 
@@ -244,6 +261,30 @@ public class ForecastLoopService {
 
     private static String cardSlot(RecommendationCardDto card) {
         return LoopEconomics.slotKey(card.getRouteId(), card.getDate(), card.getDepartureHour());
+    }
+
+    /**
+     * Khoá để giữ / rút một vòng (CT9): vòng thường theo khung chuyến thêm của nó, như CT8b — lượt đi kèm đổi giờ
+     * thì vòng vẫn được giữ; vòng giữ xe theo CẢ HAI khung, vì hai chuyến thêm đó cùng phục vụ hai khung.
+     */
+    private static String loopKey(RecommendationCardDto card, RecommendationService.Loop loop) {
+        return loop.kind() == LoopLegKind.HOLD ? cardSlot(card) + ">" + tripSlot(loop.companion()) : cardSlot(card);
+    }
+
+    /** Khoá của một vòng đang chờ duyệt, cùng cách với {@link #loopKey}. */
+    private static String pendingKey(Long loopId, List<Trip> legs) {
+        Trip extra = extraOf(loopId, legs);
+        if (legs.stream().noneMatch(Trip::isHeldForecastLoop)) {
+            return tripSlot(extra);
+        }
+        return tripSlot(extra) + ">" + legs.stream().filter(leg -> leg != extra).findFirst()
+                .map(ForecastLoopService::tripSlot).orElse("");
+    }
+
+    /** Các khung mà vòng của thẻ chiếm như chuyến thêm: khung của thẻ, và khung chuyến thêm về của vòng giữ. */
+    private static List<String> loopSlots(RecommendationCardDto card, RecommendationService.Loop loop) {
+        return loop.kind() == LoopLegKind.HOLD ? List.of(cardSlot(card), tripSlot(loop.companion()))
+                : List.of(cardSlot(card));
     }
 
     private static String tripSlot(Trip trip) {

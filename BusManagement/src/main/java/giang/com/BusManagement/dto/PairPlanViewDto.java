@@ -87,6 +87,11 @@ public class PairPlanViewDto {
         private List<BusRow> rows = new ArrayList<>();
         /** Chuyến thêm cần nhưng chưa xếp được, kèm lý do của màn Đề xuất. */
         private List<String> unserved = new ArrayList<>();
+        /**
+         * Route pairs CT9 (CM-29): xe được GIỮ ở bến xa trong ngày đang xem (vòng giữ xe của màn Đề xuất) — xe,
+         * kíp, chờ từ … tới …, vì sao (chuyến thêm về nào) và phép so tiền với hai vòng riêng.
+         */
+        private List<String> holds = new ArrayList<>();
 
         // --- Dòng tóm tắt ---
         /** Số xe khác nhau chạy cặp này trong ngày (chuyến đã có + chuyến thêm ★ + lượt đi kèm). */
