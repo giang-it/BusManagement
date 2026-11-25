@@ -1,4 +1,4 @@
-# route_pairs_research — scripts for replacing the history (route pairs CT3/CT4)
+# route_pairs_research — scripts for replacing the history (route pairs CT3/CT4) and the CT9 hold–return appendix
 
 Scripts for decision QĐ-21 in `docs/development/route_pairs_decisions.md`: take the GĐ3 generator's
 history out of sight — on the real DB it is ARCHIVED, not deleted, as the owner asked — and write the new one — three route pairs around Bến xe Miền Đông, buses and drivers running in
@@ -11,6 +11,8 @@ real DB (CT4). Plan and results: `docs/development/route_pairs_progress.md`, sec
 | `ct4_archive_old_history.sql` | **PART B as run on the real DB (CT4).** The owner: *"KHÔNG XÓA, HÃY SAO LƯU LẠI ĐỂ MỞ LẠI NẾU CẦN"*. Soft-deletes the GĐ3 history (`is_deleted = 1`, the app's own way of deleting a trip, hidden from every query by `@SQLRestriction`) and subtracts its km from both odometer marks. Nothing leaves the table. A second run changes nothing. |
 | `ct4_restore_old_history.sql` | Re-opens the GĐ3 history and archives the CT4 history in its place, km swapped on both marks. **Not run on the real DB**; on a clone it gave back exactly the visible trips and odometers of the real DB before CT4 (same MD5), and a second run changed nothing. |
 | `ct3_delete_old_history.sql` | PART B as used for the CT3 rehearsal on a clone, **destructive**. Deletes the GĐ3 history in one transaction — extra trips first, because they point at their regular trip — and subtracts its km from **both** `odometer` and `last_maintenance_odometer`, so km-since-maintenance does not move. |
+| `ct9_hold_return_simulation.py` | **CT9 (QĐ-25, CM-29), read-only.** "Return at once" against "hold–return" on the same extra trips of a stretch of the history, with the app's own rules (`LoopEconomics.pairHolds`): empty legs and km, waiting hours and cost, revenue, cost, profit, peak extra buses at once. Usage in its header; the MySQL password comes from `MYSQL_PWD`. |
+| `ct9_hold_return_results.md` | The thesis appendix produced by the script on 2026-11-25 (Tết 2026, Giỗ Tổ + 30/4–1/5 2026, October 2026, the whole of 2025), with the method and how to read it. |
 | `ct3_check_new_history.sql` | PART C, read-only, after the new generator has run. Every column ending in `_violations` must be 0: coverage, licences, seats, slot shape, the loops (location, rest ≥ 1 h for a bus and ≥ 30 min for a driver, first trip from the home station), driving ≤ 8 h per calendar day, defect #33, odometer. Then the measurements: unserved slots, sold-out share, extra trips and how many sold 0 tickets, where each bus ends the history. |
 
 ## Backups of CT4 (outside git, `E:\Y4 S2\PRETHESIS\ProjectBackup\db\`)
