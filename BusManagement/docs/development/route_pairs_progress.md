@@ -133,17 +133,42 @@
   - **Từ CT8, khởi động app là ghi vào DB** (lần chạy bù của job đêm). Chạy chỉ đọc trên DB thật thì phải truyền `-Ddispatch.nightly.enabled=false`; điều này đã ghi trong hướng dẫn `verify`.
 
   Chi tiết ở mục 4, CT8.
-- **Việc tiếp theo:** CT8 đã commit và push ngày 2026-11-25. Đợt tài liệu nhỏ của CT8 làm cùng ngày, gồm `route_pairs_decisions.md`, file này, roadmap, `test_case.md` và hướng dẫn `verify`.
-  - **Kế tiếp là CT9.** Vòng thảo luận đầu giai đoạn chốt CM-8 (lương chờ, phí xe nằm bến), và cách luật giữ–về (QĐ-25) chạy trong job đêm cùng với vòng dự báo.
-  - **Còn lại của tài liệu CT8**, làm ở đợt sau:
-    - spec, summary;
-    - `database_schema.md` (cột `forecast_loop_id`), `trip_lifecycle_fsm.md` (ai bấm các bước của FSM);
+- **CT9 (QĐ-25, QĐ-26; CM-8, CM-29…CM-32) xong ngày 2026-11-25, chủ dự án tự test trên DB thật rồi bảo commit và push: `33b61fe` (CT9a), `7003289` (CT9b), `38b9e5d` (CT9c), kèm commit tài liệu sau đó, đã push.** Chủ dự án nói *"tôi đồng ý tất cả. bạn hãy thực hiện đi …"*, rồi *"test xong rồi, bạn hãy commit và push đi"*. Làm trong worktree `wt-ct9`, rồi chép vào cây chính.
+  - **CT9a:** tiền chờ (hai tham số mới), phép ghép vòng giữ xe trong `LoopEconomics`, thẻ giữ xe trên màn Đề xuất, What-if ghép như màn Đề xuất.
+  - **CT9b:** job đêm lưu vòng giữ (cột mới `trips.forecast_loop_hold`), Hàng chờ duyệt và màn Duyệt, trang Kế hoạch cặp tuyến hiện xe được giữ.
+  - **CT9c:** script mô phỏng cho luận văn, kết quả ở `route_pairs_research/ct9_hold_return_results.md`.
+  - **Test:** `mvnw test` **334/334** (+16). Thử làm hỏng 12 chỗ (`sab_ct9.py`), mỗi lần gỡ một luật: chỗ nào cũng đúng test của luật đó đỏ, khôi phục khớp từng byte. Lần đầu ca S5 (bỏ bước quay về hai thẻ riêng) không đỏ: test của nó không có xe, nên không có bến nhà, không có đôi nào để ghép — đã sửa test (xe ở bến nhà, không tài xế), S5 đỏ.
+  - **Bản sao DB thật** (`busmanagement_ct9`, bật job):
+    - lần khởi động đầu đóng 2 chuyến; rút #51610 + #51614; tạo vòng giữ #51616 (xe 11A-111.11 chờ ở Đà Lạt thêm 6 giờ, lãi cả vòng 6.174.074đ, so với 2,21 triệu của hai vòng cũ) và #51618 (Cần Thơ);
+    - chạy lại: tạo 0, giữ 3, rút 0;
+    - xác nhận #51617 → cả vòng #51616 `ACTIVE`; từ chối #51618 → cả vòng `CANCELLED`, chạy lại thì không đề xuất lại;
+    - form tham số đọc ra 333.000 / 330.000 từ dòng cũ, lưu được 400.000 / 200.000, nhập 0 bị chặn;
+    - `check_loops.py` và phép kiểm chuỗi (vị trí, giờ, 8 giờ lái): 0 vi phạm.
+  - **DB thật** (chỉ đọc, `-Ddispatch.nightly.enabled=false`):
+    - sao lưu `ProjectBackup\db\busmanagement_2026-11-25_truoc-CT9.sql`, khôi phục thử: `CHECKSUM TABLE` khớp cả 11 bảng;
+    - 25 trang trả 200, log sạch;
+    - màn Đề xuất: 15 thẻ, 3 vòng giữ;
+    - DB giống hệt trước và sau trên mọi cột cũ (CHECKSUM 9 bảng + CRC các cột cũ của `trips`, `cost_parameters`); chỉ thêm ba cột mới, còn trống.
+  - **Ảnh chụp DB của các phiên trước yếu hơn đã ghi.** `snap.sh` dùng `GROUP_CONCAT` mà không nâng `group_concat_max_len` (mặc định 1.024 ký tự), nên mã MD5 chỉ phủ phần đầu của mỗi bảng; số dòng thì vẫn đủ. Câu "DB giống hệt" của các lần `verify` chỉ đọc trước (job tắt) vì vậy dựa trên phép so yếu hơn. Từ CT9 dùng `CHECKSUM TABLE` / CRC trên mọi dòng; đã ghi vào hướng dẫn `verify`.
+
+  Chi tiết ở mục 4, CT9.
+- **Việc tiếp theo:**
+  - **Chủ dự án đã test CT9 trên DB thật** (25/11): xác nhận vòng giữ #51616 (hai lượt ACTIVE, mở bán), từ chối #51618 (hai lượt CANCELLED).
+  - **Kiểm trước commit:** `mvnw test` 329/329 ở trạng thái chỉ có CT9a (worktree `wt-ct9a`), 334/334 ở trạng thái cuối; `verify` chỉ đọc trên DB thật (job tắt): 26 trang 200, `CHECKSUM TABLE` 11 bảng giống hệt trước và sau; job chạy trên bản sao của trạng thái đó: tạo 0, giữ 1, rút 0, không đề xuất lại hai khung đã từ chối, không xe hay tài xế nào trùng giờ.
+  - **Đã commit và push:** `33b61fe` (CT9a), `7003289` (CT9b), `38b9e5d` (CT9c), rồi commit tài liệu; `824b00d` được push cùng.
+  - **Job đã chạy trên DB thật với code CT9** lúc 15:32 ngày 25/11, khi app 8080 khởi động: tạo vòng giữ #51616 và #51618, rút (xoá mềm) #51610 và #51614, giữ #51612, đóng 6 chuyến đã chạy. Kết quả khớp bản sao. Bản sao lưu trước lần đó: `busmanagement_2026-11-25_truoc-CT9.sql` (14:03).
+  - Rà lúc viết hướng dẫn test: ba câu trên giao diện còn nói theo trước CT9, đã sửa (vào CT9a và CT9b): chú thích cuối trang Kế hoạch cặp tuyến ("hai chuyến thêm ngược chiều không được ghép"), và hai câu của What-if ("số chuyến thêm bằng số thẻ", phần tính tiền chưa nhắc vòng giữ xe); sửa javadoc `WhatIfOutcomeDto.extraTripsNeeded` cho khớp.
+  - **Mở: tiền của What-if lệch màn Đề xuất trên DB thật.** Ở 100%, What-if ghi lãi các chuyến có lãi 4.192.152đ (8 chuyến; màn Đề xuất có 4 thẻ có lãi, đều là thẻ giữ xe, gánh đúng 8 chuyến thêm), còn bốn thẻ giữ xe của màn Đề xuất cộng lại 3.979.167đ: lệch 212.985đ. Trước khi từ chối #51618 là 4.158.427đ so với 3.945.442đ, cùng độ lệch. Số chuyến thêm thì khớp (20 = 16 thẻ + 4 vòng giữ). `RecommendationHoldTest` chỉ chứng minh hai màn khớp trên dữ liệu dựng sẵn, khi xe thật đi đúng kế hoạch (giới hạn đã ghi từ CT7, QĐ-22). Chưa truy nguyên — xét ở vòng thảo luận CT10.
+  - Sao lưu sau lần job 15:32: `busmanagement_2026-11-25_sau-job-CT9.sql` (15:59, khôi phục thử khớp mọi bảng).
+  - **Sau CT9 là CT10** (tài liệu, bài học, chuẩn bị bảo vệ). Tài liệu còn lại của CT8 + CT9:
+    - spec, summary (`Proj_functions_summary.md` còn hai câu cũ: "hai thẻ ngược chiều không được ghép thành một vòng (để CT9)" và "ở 100%, số chuyến thêm bằng số thẻ màn Đề xuất"; bài 14 cũng có câu thứ hai);
+    - `database_schema.md` (cột `forecast_loop_id`, `forecast_loop_hold`, hai cột tiền chờ), `trip_lifecycle_fsm.md` (ai bấm các bước của FSM);
     - ghi chú ở QĐ-17 (`forecast_decisions.md`) và Phase 7 rằng QĐ-24 đã thay quyết định "Đề xuất chỉ đọc": trang vẫn chỉ đọc, nhưng job đêm ghi chuyến chờ duyệt;
-    - trỏ lại số dòng trích trong bài học (CT8 xê dịch dòng trong `TripService`).
+    - trỏ lại số dòng trích trong bài học (CT8 và CT9 xê dịch dòng trong `TripService`, `RecommendationService`, `LoopEconomics`, `CostParameterService`).
   - **Tuỳ chủ dự án:** gộp phép tính vị trí 4 lần/người của CT5b; index ghép.
   - **Dọn khi chủ dự án đồng ý:**
-    - worktree `wt-ct8`, `wt-precommit`, `wt-cm24`;
-    - bản sao `busmanagement_ct8`, `busmanagement_cm25a`, `busmanagement_cm25b`;
+    - worktree `wt-ct9` (sau khi commit), `wt-ct8`, `wt-precommit`, `wt-cm24`;
+    - bản sao `busmanagement_ct9`, `busmanagement_bk9`, `busmanagement_ct8`, `busmanagement_cm25a`, `busmanagement_cm25b`;
     - G3-7: `busmanagement_gd2`, `busmanagement_ct3`, `busmanagement_ct6`.
 - **Dữ liệu:**
   - DB thật: 4 tuyến 10–13 và bến Vũng Tàu do chủ dự án tạo ngày 2026-11-16;
@@ -176,7 +201,7 @@ Nhãn trạng thái: `CHƯA BẮT ĐẦU` / `ĐÃ CHỐT THIẾT KẾ` / `ĐANG 
 | CT7c | Chọn cả vòng một lần, một xe + một tài xế (CM-24 PA-A) | QĐ-22, QĐ-26 | CT7 | không | ĐÃ COMMIT `f708f44`, `afc27dd` + commit `docs:` sau đó, đã push | 2026-11-23 → 25 |
 | CT7d | Ngày bảo trì trong lịch; máy cộng km đã xếp và quãng về (CM-25 M1) | QĐ-22 | CT7c | **có** (cột mới trên `buses`, khi app khởi động) | ĐÃ COMMIT `eabf985`, `afc27dd` + commit `docs:` sau đó, đã push; DB thật có lịch 27/11–03/12 (chủ dự án tạo 2026-11-25) | 2026-11-23 → 25 |
 | CT8 | Tự tạo chuyến chờ duyệt mỗi đêm; sửa job 10 giây | QĐ-24 | CT7d | **có** (đóng chuyến đã chạy xong, vé mô phỏng, lịch D+7, vòng chờ duyệt, cột mới trên `trips`; mỗi lần job chạy) | ĐÃ COMMIT `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a) + commit `docs:` sau đó, đã push; job đã chạy trên DB thật (2026-11-25) | 2026-11-25 |
-| CT9 | Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe | QĐ-25, QĐ-26 | CT8 | có | CHƯA BẮT ĐẦU | |
+| CT9 | Luật giữ–về (vòng giữ xe), tiền chờ, kíp lái ở lại cùng xe | QĐ-25, QĐ-26 | CT8 | **có** (vòng giữ chờ duyệt khi job chạy; ba cột mới, trống) | XONG, COMMIT `33b61fe` + `7003289` + `38b9e5d` + tài liệu, ĐÃ PUSH | 2026-11-25 |
 | CT10 | Tài liệu, bài học, chuẩn bị bảo vệ | — | CT9 | không | CHƯA BẮT ĐẦU | |
 
 ---
@@ -735,23 +760,31 @@ Làm trong worktree `wt-ct7` ngoài repo (app 8080 của chủ dự án chạy t
 
 ### CT9 — Luật giữ–về, tiền chờ, kíp lái ở lại cùng xe (QĐ-25, QĐ-26)
 
-**Mục tiêu:** xe tăng cường ở bến xa được giữ hay cho về theo đúng một phép so; kíp lái ở lại cùng xe.
+**Mục tiêu:** xe tăng cường ở bến xa được giữ hay cho về theo đúng một phép so; kíp lái ở lại cùng xe. **Đã chốt 2026-11-25:** CM-8, CM-29 (G1, vòng giữ xe lúc lập kế hoạch), CM-30 (W-b), CM-31 (7 ngày), CM-32 (ghép đôi tăng lãi nhiều nhất trước). Tất cả ghi ở QĐ-25, mục "cách cài ở CT9".
 
-**Cần chốt:** CM-8.
+- [x] **`CostParameters`** thêm lương chờ (đ/người/ngày) và phí xe nằm bến (đ/ngày). `CostParameterService` có mặc định 333.000 / 330.000, đọc dòng cũ ra mặc định, bắt buộc > 0. Form `cost-parameters.html` có hai ô mới. `CostParameterServiceTest` +2. 2026-11-25.
+- [x] **Phép ghép** `LoopEconomics.pairHolds`, `earliestReturn`, `waitCost`, `MAX_HOLD_DAYS` (CM-30…CM-32). `LoopEconomicsTest` +5. 2026-11-25.
+- [x] **Màn Đề xuất:**
+  - thẻ giữ xe (`LoopLegKind.HOLD`), một xe + một tài xế qua `selectLoop`, quay về hai thẻ riêng khi không xếp được;
+  - "chuyến thêm k" đếm theo thứ tự xét; `RecommendationViewDto` có số vòng giữ và tiền chờ đang dùng;
+  - trang hiện "Giữ xe ở bến xa", giờ chờ thêm, tiền chờ, lãi của hai vòng riêng.
+  - `RecommendationHoldTest` (4, mới). 2026-11-25.
+- [x] **What-if** ghép như màn Đề xuất; ở 100% tiền khớp tổng thẻ trên dữ liệu dựng sẵn (`RecommendationHoldTest`). Trên DB thật số chuyến khớp, tiền lệch 212.985đ, chưa truy (mục 1). 2026-11-25.
+- [x] **Job đêm** (`ForecastLoopService`): vòng giữ hai lượt, cột `trips.forecast_loop_hold`, khoá giữ / rút theo hai khung, từ chối chặn cả hai khung, kế hoạch của job không ghép khung đã bị từ chối. `ForecastLoopServiceTest` +3. 2026-11-25.
+- [x] **Hàng chờ duyệt, màn Duyệt:** nhãn vòng giữ. **Trang Kế hoạch cặp tuyến:** chuyến thêm về tính vào khung và ngày của nó; mục "xe được giữ ở bến xa" (vòng của màn Đề xuất và vòng đã lưu). `PairPlanServiceTest` +2. 2026-11-25.
+- [x] **Kíp lái ở lại cùng xe (P6):** không thêm luật khoá; luật vị trí hai phía đã chặn máy chèn chuyến vào khoảng chờ. Khoá bằng `RecommendationHoldTest.theHeldBusAndCrew_cannotBeGivenAnotherTripWhileTheyWait` (có đối chứng). 2026-11-25.
+- [x] **Cho luận văn:** `route_pairs_research/ct9_hold_return_simulation.py` (chỉ đọc), kết quả ở `ct9_hold_return_results.md`:
+  - Tết 2026: 5 vòng giữ, bớt 10 lượt rỗng (2.520 km), lãi +7,1 triệu;
+  - Giỗ Tổ + 30/4 2026: 5 vòng, bớt 10 lượt rỗng, lãi +12,1 triệu;
+  - tháng 10/2026: 0 vòng;
+  - cả năm 2025: 11 vòng, bớt 22 lượt rỗng (5.640 km), lãi +18,6 triệu (+10,2 %);
+  - số xe tăng cường cùng lúc không đổi ở cả bốn khoảng.
+- [x] **Test:** `mvnw test` **334/334**. Thử làm hỏng 12 chỗ (`sab_ct9.py`), mỗi lần gỡ một luật: chỗ nào cũng đúng test của luật đó đỏ, khôi phục khớp từng byte. Lần đầu ca S5 (bỏ bước quay về hai thẻ riêng) không đỏ: test của nó không có xe, nên không có bến nhà, không có đôi nào để ghép — đã sửa test (xe ở bến nhà, không tài xế), S5 đỏ.
+- [x] **`verify`** trên bản sao `busmanagement_ct9` và chỉ đọc trên DB thật — kết quả ở mục 1.
+- [x] Commit 2026-11-25 sau khi chủ dự án test trên DB thật: `33b61fe` (CT9a, 329/329 trên đúng trạng thái đó), `7003289` (CT9b, 334/334), `38b9e5d` (CT9c), rồi commit tài liệu; đã push.
+- [ ] Tài liệu, đợt sau: spec, summary, `database_schema.md`, `test_case.md` phần thống kê tổng, bài học.
 
-- [ ] **`CostParameters`:** thêm lương chờ (người/ngày) và phí xe nằm bến (ngày). Sửa form `cost-parameters.html`, `CostParameterService` (giá trị mặc định), `CostParameterServiceTest`.
-- [ ] **Service quyết định giữ/về** cho từng xe tăng cường đang ở bến xa:
-  - dự báo 35 ngày;
-  - lợi ích = min(tiền vé chiều về kỳ vọng, 2 × chi phí một chiều), so với tiền chờ còn lại;
-  - các bước gọi về / bỏ chuyến tăng cường;
-  - xe tới trước về trước;
-  - kiểm lại mỗi đêm (job của CT8).
-- [ ] Giữ kíp lái ở bến xa cùng xe: tài xế bận tới khi xe về (P6).
-- [ ] Màn "Kế hoạch cặp tuyến" hiện xe đang được giữ, lý do, ngày dự kiến về, và phép so tiền.
-- [ ] **Cho luận văn:** mô phỏng "về ngay" so với "giữ–về" trên một dịp lễ trong lịch sử. So km rỗng, số xe phải dùng, lãi.
-- [ ] Test, `verify`, tài liệu.
-
-**Xong khi:** quyết định giữ/về của từng xe khớp phép tính tay trên vài ca; có bảng mô phỏng cho luận văn.
+**Xong khi:** quyết định giữ / về của từng xe khớp phép tính tay trên vài ca; có bảng mô phỏng cho luận văn. **Đạt 2026-11-25** — phép tính tay ở `LoopEconomicsTest` (165.750đ cho 6 giờ, 1.134.250đ lãi vòng giữ…), bảng ở `ct9_hold_return_results.md`.
 
 ### CT10 — Tài liệu, bài học, chuẩn bị bảo vệ
 
@@ -793,6 +826,7 @@ Làm trong worktree `wt-ct7` ngoài repo (app 8080 của chủ dự án chạy t
 | 2026-11-23 (commit CT7) | `7b523bdf` | Cùng lời dặn, sau khi commit CT6 | Rà lại code CT7. Tách CT7a khỏi CT7b: `TripRepository` chưa có truy vấn trang kế hoạch, `recommendation.html` chưa có nút sang trang đó. Test trên đúng từng bản sẽ commit: CT7a 288/288, CT7 292/292. `verify` DB thật chỉ đọc (24 lượt gọi 200; 25 thẻ, 24 đủ điều kiện; kiểm độc lập 45 lượt 0 vi phạm) và bản sao ("Tạo lịch" 27/11–03/12: 121 + 5 chuyến, `ct6_check.sql` 0 vi phạm; màn Đề xuất 2/25 → CM-24). DB thật giống hệt. Mở CM-25 (cặp Đà Lạt chỉ còn 9/42 chuyến giường nằm vì luật bảo trì nhìn trước). Commit `fae225d` (CT7a), `3e513f0` (CT7b), `deeece9` (bài học) + commit `docs:`; đã push |
 | 2026-11-25 (test trên DB thật, commit CT7c/CT7d) | `8ab0b0c8` | *"hướng dẫn test CT7c và CT7d cùng với tạo lịch"*, rồi *"tôi xóa chuyến #51609 rồi, bây giờ giải quyết vđề kia sao"*, rồi *"tôi kích hoạt rồi, commit và push đi"* | Viết hướng dẫn test (sao lưu, khởi động lại app, "Tạo lịch" từ 27/11, câu SQL kiểm). Chủ dự án tự sao lưu và "Tạo lịch" trên DB thật: 125 + 1, đúng 3 ngày bảo trì, khớp bản sao B. Xe .15 kẹt ở Đà Lạt: chuyến tạo tay 06:00 27/11 bị xoá (trùng khung #51487, tài xế 21 ở Miền Đông); thay bằng duyệt #51493 bằng xe .15 + tài xế 18, bỏ phụ xe #51517; kiểm chuỗi 251 chuyến 0 vi phạm. Worktree mới `wt-precommit` (worktree `wt-cm24` cũ còn bản chép, chưa dọn): CT7c 294/294, đủ 303/303; `verify` chỉ đọc 29 lượt 200, màn Đề xuất 15/25, `check_cards.py` 0 vi phạm, DB giống hệt. Commit `f708f44` (CT7c, từ patch vào thẳng index), `eabf985` (CT7d), `afc27dd` (bài học) + commit `docs:`; đã push |
 | 2026-11-25 (CT8) | `8ab0b0c8` | Vòng thảo luận CT8 (*"trình bày vòng thảo luận CT8 đi …"*); *"tôi đồng ý tất cả, hãy thực hiện như những gì đã bàn … còn việc tài liệu thì để sau đi"*; sau khi tự test: *"commit và push đi"*; rồi *"làm đợt tài liệu nhỏ đó đi"* | Chốt CM-10/14/15/23, thêm và chốt CM-26/27/28. CT8a/b/c làm trong worktree `wt-ct8`: test 318/318 (+15), thử làm hỏng 19 chỗ. Bản sao `busmanagement_ct8`: đóng 89 chuyến, 4 vòng, chạy lại không trùng, xác nhận / từ chối / duyệt tay đúng; phát hiện vòng Admin đã từ chối bị lập lại → luật mới (rút = xoá mềm, khung đã từ chối không đề xuất lại), thêm test. DB thật: sao lưu, `verify` chỉ đọc (job tắt), DB giống hệt. Chủ dự án khởi động lại app → job ghi vào DB thật (93 hoàn thành / 14 mở bán / 1 hủy ở 20–25/11, 3 vòng chờ duyệt, 0 vi phạm). Commit `fb6bc9b`, `b34aba3`, `ad75bc6` (mỗi commit test trên đúng bản của nó: 306 / 315 / 318), đã push. Đợt tài liệu nhỏ: quyết định, file này, roadmap, `test_case.md`, hướng dẫn `verify`, hai sổ lỗi. Chưa commit |
+| 2026-11-25 (CT9) | `8ab0b0c8` | Vòng thảo luận CT9 (*"hãy xem xét các chức năng ảnh hưởng khi thực hiện CT9 …"*); *"tôi đồng ý tất cả. bạn hãy thực hiện đi …"* | Chốt CM-8, thêm và chốt CM-29…CM-32. CT9a/b/c trong worktree `wt-ct9`: test 334/334 (+16). Thử làm hỏng 12 chỗ (`sab_ct9.py`), mỗi lần gỡ một luật: chỗ nào cũng đúng test của luật đó đỏ, khôi phục khớp từng byte. Lần đầu ca S5 (bỏ bước quay về hai thẻ riêng) không đỏ: test của nó không có xe, nên không có bến nhà, không có đôi nào để ghép — đã sửa test (xe ở bến nhà, không tài xế), S5 đỏ. Bản sao `busmanagement_ct9`: vòng giữ #51616 thay #51610 + #51614 (6,17 so với 2,21 triệu), chạy lại không trùng, duyệt / từ chối cả vòng, 0 vi phạm. DB thật: sao lưu (CHECKSUM khớp), `verify` chỉ đọc, DB giống hệt, ba cột mới trống. Mô phỏng: năm 2025 +18,6 triệu, −22 lượt rỗng. Chủ dự án test trên DB thật (job chạy lúc app khởi động 15:32; xác nhận #51616, từ chối #51618), *"test xong rồi, bạn hãy commit và push đi"*: kiểm trước commit (329 / 334, `verify` chỉ đọc giống hệt, job trên bản sao tạo 0), commit `33b61fe` (CT9a), `7003289` (CT9b), `38b9e5d` (CT9c) + tài liệu, đã push. Mở: tiền What-if lệch màn Đề xuất 212.985đ trên DB thật |
 
 ---
 

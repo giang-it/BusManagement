@@ -20,7 +20,7 @@
 | QĐ-22 | Mức làm M2 + luật giữ–về; "tối ưu" = lãi cả vòng; lãi tính cả chiều về | 2026-11-16 | CT6, CT7, CT7c, CT7d |
 | QĐ-23 | Xe được chọn phải đang ở bến xuất phát; xe dự phòng = xe rảnh tại bến; bến nhà Miền Đông | 2026-11-16 | CT5a (định nghĩa, bến nhà), CT5b (bật vào chọn xe) |
 | QĐ-24 | Dự báo tự tạo chuyến CHỜ DUYỆT (7 điểm); job 10 giây chỉ lo phần bất ngờ | 2026-11-16; cách cài 2026-11-25 | CT8 (CT8a, CT8b, CT8c) |
-| QĐ-25 | Luật giữ–về cho xe tăng cường: một phép so, nhìn trước 35 ngày | 2026-11-13, 2026-11-16 | CT9 |
+| QĐ-25 | Luật giữ–về cho xe tăng cường: một phép so, nhìn trước 35 ngày (3 cặp ngắn: 7 ngày, CM-31) | 2026-11-13, 2026-11-16; cách cài 2026-11-25 | CT9 |
 | QĐ-26 | Kíp lái ở lại cùng xe, nhận lương cơ bản khi chờ; giữ mức 8 giờ lái/ngày | 2026-11-13, 2026-11-16 | CT9 |
 | QĐ-27 | Để sau: cặp dài, tăng tần suất (loại B3), tối ưu kíp lái | 2026-11-16 | — |
 
@@ -326,6 +326,43 @@
   - Đà Lạt: 4,2 triệu.
 
   Luật này hiện rõ nhất ở Đà Lạt vào cuối tuần.
+- **Cách cài ở CT9 (2026-11-25).** Chủ dự án duyệt mọi đề xuất của vòng thảo luận đầu CT9: *"tôi đồng ý tất cả. bạn hãy thực hiện đi"*. Gồm CM-8, CM-29…CM-32. Chủ dự án test trên DB thật rồi bảo commit: `33b61fe` (CT9a), `7003289` (CT9b), `38b9e5d` (CT9c), đã push.
+  - **Phép ghép, ở mức kế hoạch** (`LoopEconomics.pairHolds`, màn Đề xuất và What-if dùng chung):
+    - một đôi = chuyến thêm đi (kế hoạch "về ngay") + một chuyến thêm về sau đó (kế hoạch "đưa xe tới trước") của cùng cặp;
+    - chuyến về khởi hành sau khi xe tới + 1 giờ chuẩn bị; một tài xế lái ≤ 8 giờ mỗi ngày khởi hành;
+    - chờ thêm = giờ đi của chuyến về − lần về ngay sớm nhất (`LoopEconomics.earliestReturn`, CM-30), tối đa 7 ngày (CM-31);
+    - tiền chờ = (lương chờ × số người của kíp + phí xe nằm bến) × giờ ÷ 24 (CM-8);
+    - lãi tăng thêm = lãi vòng giữ − phần dương của lãi hai vòng riêng. Ghép khi > 0, đôi tăng nhiều nhất trước (CM-32);
+    - lợi ích tối đa "2 × chi phí một chiều" của QĐ-25 tự có trong phép so: thứ vòng giữ tiết kiệm được chính là hai lượt đi kèm.
+  - **Màn Đề xuất:**
+    - một vòng giữ là MỘT thẻ, lượt đi kèm loại `HOLD` chính là chuyến thêm về; thẻ được xét theo lãi cả vòng;
+    - một xe + một tài xế cho cả khối, chọn bằng `selectLoop` (bận phủ cả khối, nên xe và kíp được giữ suốt lúc chờ);
+    - không xếp được, hay cổng trượt, thì hai chuyến thêm quay về hai thẻ riêng, xếp lại theo lãi riêng;
+    - "Chuyến thêm còn thiếu" vẫn đếm chuyến thêm, nên số thẻ có thể nhỏ hơn số đó.
+  - **What-if** ghép đúng như màn Đề xuất. Hai chuyến thêm của một vòng giữ vẫn là hai phần tử của độ phủ (W1); tiền là của cả vòng.
+  - **Tham số (CM-8):** hai cột mới `cost_parameters.waiting_wage_per_day`, `bus_parking_per_day`, mặc định 333.000 / 330.000, phải > 0. Dòng cấu hình có từ trước đọc ra mặc định cho tới khi Admin bấm Lưu.
+  - **Job đêm:**
+    - vòng giữ được lưu thành vòng dự báo hai lượt, cả hai là chuyến thêm; cột mới `trips.forecast_loop_hold` = true ở cả hai lượt;
+    - vòng giữ được giữ / rút theo CẢ HAI khung của nó;
+    - Admin từ chối một vòng giữ thì cả hai khung không được đề xuất lại; kế hoạch của job không ghép khung đã bị từ chối.
+  - **Hàng chờ duyệt / màn Duyệt:** nhãn "giữ xe · chuyến thêm đi / về", một dòng nhắc; duyệt và từ chối cả vòng như CM-27.
+  - **Trang Kế hoạch cặp tuyến:**
+    - chuyến thêm về được tính vào khung và ngày của nó;
+    - mục "xe được giữ ở bến xa" ghi mỗi ngày xe chờ, cho cả vòng giữ của màn Đề xuất (kèm phép so tiền) lẫn vòng giữ đã lưu.
+  - **QĐ-26, P6:** không thêm luật khoá. Một test khoá rằng máy không chèn được chuyến nào vào khoảng chờ (luật vị trí hai phía của CT5b); đối chứng là khi chưa có chuyến về thì chính xe và tài xế đó được chọn.
+  - **Mô phỏng cho luận văn:** `docs/development/route_pairs_research/ct9_hold_return_simulation.py`, kết quả ở `ct9_hold_return_results.md`.
+- **Cách hiểu khi cài ở CT9, chủ dự án chưa duyệt từng điểm:**
+  - **Thêm cột `trips.forecast_loop_hold`.** CM-26 chỉ có một cột. Không có cột thứ hai này, job không biết lượt thứ hai của một vòng là chuyến thêm về (phục vụ một khung đang cần tăng cường) hay lượt đi kèm chở khách còn tràn. Khi đó job không giữ / rút đúng theo hai khung, và không chặn được cả hai khung khi Admin từ chối.
+  - **Kế hoạch của job không ghép khung Admin đã từ chối** (trang Đề xuất thì vẫn ghép), để chuyến thêm còn lại của đôi vẫn được xét như một thẻ riêng.
+  - **"Chuyến thêm k/n" đếm theo thứ tự xét thật**, vì một vòng giữ có thể được xét trước một chuyến thêm khác của cùng khung.
+  - **Chỉ ghép với thẻ về.** Không giữ xe chờ khách tràn ở khung không có thẻ.
+  - **Tiền chờ chỉ có ở vòng giữ.** Vòng giữ "không phải chờ thêm" (chuyến về đi đúng lúc về ngay sớm nhất) có tiền chờ 0.
+  - **Vòng giữ đã lưu không mang tiền dự kiến**, nên trang Kế hoạch chỉ ghi phép so tiền cho vòng giữ của màn Đề xuất.
+- **Ví dụ trên bản sao DB thật** (`busmanagement_ct9`, 2026-11-25):
+  - lần khởi động đầu, job rút #51610 (đi Đà Lạt 18:00 28/11, về rỗng 06:00 29/11) và #51614 (lên gần như rỗng 18:00 28/11, về 12:00 29/11);
+  - job tạo vòng giữ #51616: xe 11A-111.11 chờ ở Đà Lạt thêm 6 giờ, về bằng chuyến thêm 12:00 29/11, lãi cả vòng 6.174.074đ;
+  - job tạo thêm vòng giữ #51618 ở cặp Cần Thơ (không phải chờ thêm, lãi 33.877đ);
+  - chạy lại: tạo 0, giữ 3, rút 0.
 
 ### QĐ-26. Kíp lái và giờ lái (chốt 2026-11-13 và 2026-11-16)
 
@@ -361,7 +398,7 @@
 | CM-5 | **ĐÃ CHỐT 2026-11-17: cách B (cứng cho máy, mềm cho người), áp cả cho tài xế (ghi ở QĐ-23).** Vị trí áp cứng hay mềm? Có áp cho tài xế không? | Áp **cứng** cho AI (tự phân công, Đề xuất, tự tạo chuyến). Luồng thủ công thì **mềm**: xếp xe cùng bến lên đầu và ghi chú, giống cách làm với loại xe. **Áp cả cho tài xế**, cùng quy tắc | CT5 |
 | CM-6 | **ĐÃ CHỐT 2026-11-19: đảo bến, đúng một tuyến khớp, không đổi schema (`RouteService.reverseRoutesOf`).** Liên kết cặp tuyến | Suy ra bằng cách đảo bến đầu/cuối (`Route.getDepartureStation()`/`getDestinationStation()`), phải có đúng một tuyến khớp. Không đổi schema của `Route` | CT6 |
 | CM-7 | **ĐÃ CHỐT 2026-11-22: W1 — tiền tính cả vòng theo kế hoạch, năng lực giữ nguyên (ghi ở QĐ-22, "cách cài lãi cả vòng ở CT7").** What-if có tính lãi cả vòng không? | Có, để chỉ có một định nghĩa chi phí | CT7 |
-| CM-8 | Giá trị tiền chờ | Chưa có số. Lúc bàn đã dùng tạm: lương chờ 333.000đ/người/ngày, xe nằm bến 330.000đ/ngày | CT9 |
+| CM-8 | **ĐÃ CHỐT 2026-11-25: hai tham số mới của Admin — lương chờ 333.000đ/người/ngày, phí xe nằm bến 330.000đ/ngày (mặc định), tính theo giờ.** Giá trị tiền chờ | Lương chờ = 10 triệu/tháng ÷ 30, cùng nguồn "10 triệu/tháng" của mức 50.000đ/giờ đang dùng. Phí nằm bến là số tạm đã dùng khi bàn, chưa có nguồn; Admin sửa ở form Tham số chi phí. Vòng dự báo không có phụ xe nên chỉ tính một người. Với hai số này, một ngày chờ ≈ 663.000đ | CT9 |
 | CM-9 | **ĐÃ CHỐT 2026-11-22: S1 — trang mới `/admin/analytics/pair-plan` (ghi ở QĐ-22).** Màn M2 đặt ở đâu? | Trang mới "Kế hoạch cặp tuyến" trong nhóm phân tích. Tránh nhầm với "Bảng điều hành" (`/admin/dispatch`), vốn là màn chuyển trạng thái chuyến | CT7 |
 | CM-10 | **ĐÃ CHỐT 2026-11-25: T2 — 01:00 + một lần chạy bù khi app khởi động + nút "Chạy ngay"; chưa có chuỗi dự báo hay lịch sử cũ hơn 7 ngày thì không tự tạo; công tắc `dispatch.nightly.enabled` (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8a, CT8b.** Job đêm chạy lúc mấy giờ? Làm gì khi dự báo thiếu dữ liệu? | **T2.** App chạy trên laptop, ban đêm thường tắt: chỉ hẹn giờ (T1) thì job gần như không chạy; chỉ có nút (T3) thì không còn là "tự tạo" như QĐ-24. Chọn 01:00 vì đã sang ngày mới mà còn trước chuyến 06:00. Mọi bước chạy lại đều an toàn. Có công tắc, vì không có nó thì chỉ việc khởi động app để kiểm tra cũng ghi vào DB thật | CT8 |
 | CM-11 | **ĐÃ CHỐT 2026-11-16 (đã ghi: lỗi #34 và 7 mục có hướng xử lý).** 8 phát hiện phụ ghi vào sổ nào? | `docs/todo/current_bugs_found.md`, sau phép thử ba ngả | CT0 |
@@ -382,6 +419,10 @@
 | CM-26 | **ĐÃ CHỐT 2026-11-25: K1 — một cột `trips.forecast_loop_id` (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8b.** Mở ở vòng thảo luận CT8. `Trip` không có cách nào biết chuyến do job tạo, cũng không nối được hai lượt của một vòng. Đánh dấu và nối thế nào? | **K1:** thêm một cột cho phép null. Cột có giá trị = chuyến do job đêm tạo; cùng giá trị = cùng một vòng (chuyến thêm trỏ vào chính nó, lượt đi kèm trỏ vào chuyến thêm); chuyến cũ để trống, như cách CT7d thêm cột. Chuyến gốc của mỗi lượt là chuyến chính của khung nó, không bao giờ là một chuyến tăng cường. Không chọn K0 (suy từ "chuyến thêm + phút 00": mong manh, và không biết lượt nào đi với lượt nào), K2 (hai cột, nguồn tạo + lượt cặp: nhiều hơn mức cần) | CT8b |
 | CM-27 | **ĐÃ CHỐT 2026-11-25: duyệt / từ chối cả vòng một lần (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8b.** Mở ở vòng thảo luận CT8. Admin duyệt chuyến thêm Đà Lạt → Miền Đông 06:00 30/11 nhưng từ chối lượt đưa xe lên 18:00 29/11 thì xe không có mặt ở Đà Lạt để chạy, đúng kiểu xe .15. Làm gì? | Duyệt một lượt là duyệt cả vòng, trong một giao dịch, lượt nào cũng qua cổng kiểm tra; từ chối một lượt là hủy cả vòng. Xe và tài xế đã gán sẵn từ kế hoạch, nên màn Duyệt dùng chế độ "✅ Xác nhận" một nút; đường duyệt tay (đổi xe) không nhận lượt của vòng | CT8b |
 | CM-28 | **ĐÃ CHỐT 2026-11-25: rút khi dự báo giảm, hoặc khi còn dưới 72 giờ mà chưa duyệt (ghi ở QĐ-24, "cách cài ở CT8"). Đã làm ở CT8b.** Mở ở vòng thảo luận CT8. QĐ-24 mục 5 đã chốt "dự báo giảm thì rút". Còn khi nào nữa, và rút thế nào? | (a) Dự báo giảm: máy tạm coi các vòng chờ duyệt của chính nó là chưa có rồi dự báo lại. Khung vẫn cần thì giữ vòng cũ (không tạo thêm, không đổi xe), khung hết cần thì rút; vòng đã duyệt thì giữ. (b) Quá hạn duyệt: còn dưới 72 giờ mà chưa duyệt thì rút, vì không kịp bán vé; cùng mốc 72 giờ của job 10 giây. Ví dụ vòng 06:00 ngày 30/11: lúc 01:00 ngày 27/11 còn 77 giờ thì giữ, lúc 01:00 ngày 28/11 còn 53 giờ thì rút. Rút xong, xe và tài xế được trả lại | CT8b |
+| CM-29 | **ĐÃ CHỐT 2026-11-25: G1 — vòng giữ xe lập lúc lên kế hoạch.** Mở ở vòng thảo luận CT9. Làm luật giữ–về (QĐ-25) thế nào? | **G1:** ghép một thẻ đi (chuyến thêm rời bến nhà) với một thẻ về sau đó của cùng cặp thành MỘT vòng: một xe, một tài xế, xe và kíp chờ ở bến xa giữa hai lượt; quyết bằng tiền (CM-32). Dùng lại `selectLoop`, vòng dự báo và luật duyệt cả vòng. "Xét lại mỗi ngày" của QĐ-25 = job đêm dựng lại kế hoạch cho vòng còn chờ duyệt (CM-28); vòng đã duyệt là chuyến thật, giữ nguyên. Không chọn: G0 (chỉ mô phỏng cho luận văn — app vẫn cho xe về rỗng), G2 (quyết khi xe tới bến xa — cần trạng thái "xe đang giữ", khoá kíp không biết tới bao giờ, job tự tạo lượt về; ngược CT7c và CM-27). Ví dụ trên DB thật: hai vòng #51610 (đi Đà Lạt 18:00 28/11, về rỗng 06:00) và #51614 (lên rỗng 18:00 28/11, về 12:00 29/11) → một vòng giữ xe 6 giờ, lãi ≈ 2,21 → 6,22 triệu | CT9 |
+| CM-30 | **ĐÃ CHỐT 2026-11-25: W-b — chỉ tính phần chờ thêm so với lần "về ngay" sớm nhất.** Mở ở vòng thảo luận CT9. Tiền chờ tính từ lúc nào? | W-a (mọi giờ xe nằm ở bến xa) và W-b cho cùng quyết định giữ hay về, vì phần chung bị trừ ở cả hai bên; W-b giữ nguyên số của mọi thẻ không ghép (CT7, CT8, What-if, test). Lần "về ngay" sớm nhất = khung chiều ngược đầu tiên sau khi xe tới + 1 giờ chuẩn bị mà một tài xế lái được (≤ 8 giờ mỗi ngày) | CT9 |
+| CM-31 | **ĐÃ CHỐT 2026-11-25: 7 ngày cho 3 cặp ngắn; 35 ngày của QĐ-25 để dành cho cặp dài.** Mở ở vòng thảo luận CT9. Nhìn trước bao xa? | Chỉ đáng chờ khi tiền chờ < 2 × chi phí một chiều: Đà Lạt 4,2 tr ÷ 0,663 ≈ 6,3 ngày, Cần Thơ ≈ 3,8, Vũng Tàu ≈ 2,1. Ví dụ Tết: lên 27 Tết, khách về mùng 5 → chờ ~8 ngày ≈ 5,3 tr > 4,2 tr → về. Thẻ cũng chỉ có trong 7 ngày của dự báo | CT9 |
+| CM-32 | **ĐÃ CHỐT 2026-11-25: ghép đôi tăng lãi nhiều nhất trước; ghép không được thì quay về hai vòng riêng.** Mở ở vòng thảo luận CT9. Ghép thẻ thế nào? | Điều kiện: cùng cặp; thẻ về khởi hành sau khi xe tới + 1 giờ; mỗi ngày ≤ 8 giờ lái; chờ ≤ 7 ngày. Lãi tăng thêm = lãi vòng giữ − lãi các vòng riêng có lãi. Không ghép khi lượt đưa xe tới đang chở nhiều khách (phép tính tự loại); không giữ xe chờ khách tràn ở khung không có thẻ. Không theo "xe tới trước về trước" (chỉ có nghĩa khi quyết lúc xe tới, G2). Không chọn được một xe + một tài xế cho cả vòng giữ → hai vòng riêng như trước | CT9 |
 
 ---
 
@@ -469,3 +510,16 @@
   - Sau khi tự test, chủ dự án bảo *"commit và push đi"*. Commit `fb6bc9b` (CT8c), `b34aba3` (CT8b), `ad75bc6` (CT8a), đã push.
   - Khi chủ dự án khởi động lại app, lần chạy bù đầu tiên của job đã ghi vào DB thật. Trước đó đã có bản sao lưu `ProjectBackup\db\busmanagement_2026-11-25_truoc-CT8.sql`.
   - Tài liệu của CT8 làm theo hai đợt. Đợt nhỏ (file này, `route_pairs_progress.md`, roadmap, `test_case.md`, hướng dẫn `verify`, hai sổ lỗi) làm trước CT9, theo lời chủ dự án *"làm đợt tài liệu nhỏ đó đi"*. Phần còn lại để sau.
+- **2026-11-25 (CT9, vòng thảo luận):** chủ dự án nghe vòng thảo luận đầu CT9 (phiên `8ab0b0c8`) và trả lời *"tôi đồng ý tất cả. bạn hãy thực hiện đi"*.
+  - **Đóng:** CM-8 (lương chờ 333.000đ/người/ngày, phí nằm bến 330.000đ/ngày, tính theo giờ).
+  - **Mở và đóng ngay:** CM-29 (G1), CM-30 (W-b), CM-31 (7 ngày), CM-32 (ghép đôi tăng lãi nhiều nhất trước).
+  - **Sửa QĐ-25 cho 3 cặp ngắn:** nhìn trước 7 ngày thay vì 35 (CM-31); bỏ luật "gọi xe về khi bến nhà thiếu xe cho chuyến thường lệ" và "xe tới trước về trước" — với G1 job đêm làm lịch thường lệ trước, vòng giữ chỉ dùng xe còn rảnh, và mỗi xe giữ đã biết lượt về của nó. Giữ: "chỉ thiếu xe cho chuyến tăng cường thì bỏ chuyến đó", "tính theo số ghế thật".
+  - **QĐ-26, P6 (kíp lái ở lại cùng xe):** không thêm luật khoá. Luật vị trí hai phía (CT5b) đã không cho máy chèn chuyến nào vào khoảng chờ; người chọn tay vẫn được (CM-5 cách B). Khoá bằng test.
+  - **Để ngoài CT9:** chuyến của job 10 giây (không có lượt về) vẫn để xe ở bến xa như trước.
+  - **Từ chối một vòng giữ:** cả hai khung không được đề xuất lại.
+  - **Mô phỏng cho luận văn:** một script Python chỉ đọc DB, xuất bảng vào phụ lục.
+  - **Chia việc:** CT9a (tiền chờ, ghép thẻ, màn Đề xuất, What-if) → CT9b (job đêm, Hàng chờ duyệt, trang Kế hoạch cặp tuyến) → CT9c (mô phỏng).
+- **2026-11-25 (CT9, cài đặt):** làm đúng các quyết định vừa ghi (CM-8, CM-29…CM-32), theo lời chủ dự án *"tôi đồng ý tất cả. bạn hãy thực hiện đi, đảm bảo mọi thứ đều logic, tối ưu và phù hợp với project. đồng thời cũng test lại sau khi xong"*.
+  - Ghi "cách cài ở CT9" và các "cách hiểu khi cài" vào QĐ-25. Điểm cần chủ dự án biết nhất: thêm cột `trips.forecast_loop_hold`, vì không có nó job không giữ / rút / chặn đúng hai khung của một vòng giữ.
+  - **Đính chính một điều nói ở vòng thảo luận:** test đầu tiên của QĐ-26/P6 lại "đỏ" — nhưng do dữ liệu test (tuyến không mang danh sách bến thì luật vị trí không xét), không phải do luật. Nạp tuyến kèm bến như app thì luật vị trí hai phía chặn đúng, như đã nói.
+  - `mvnw test` 334/334 (+16). Thử làm hỏng 12 chỗ (`sab_ct9.py`), mỗi lần gỡ một luật: chỗ nào cũng đúng test của luật đó đỏ, khôi phục khớp từng byte. Lần đầu ca S5 (bỏ bước quay về hai thẻ riêng) không đỏ: test của nó không có xe, nên không có bến nhà, không có đôi nào để ghép — đã sửa test (xe ở bến nhà, không tài xế), S5 đỏ. Bản sao và DB thật (chỉ đọc): xem `route_pairs_progress.md`, CT9. Commit `33b61fe` (CT9a), `7003289` (CT9b), `38b9e5d` (CT9c) sau khi chủ dự án tự test, đã push.

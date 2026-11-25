@@ -1499,6 +1499,21 @@
 - **Tự động hoá:** `TripServiceScannerSlotTest.aStillHotSlot_getsItsNextExtraFromTheMainTrip_notAChainedOne`
 
 ---
+### TC_AI_022 — Vòng giữ xe: máy không giao xe hay kíp đang chờ ở bến xa cho chuyến khác (CT9, QĐ-26, P6)
+
+- **Mã TC:** TC_AI_022
+- **Tên Kịch Bản:** Error/Edge — kíp lái ở lại cùng xe mà không cần luật khoá mới
+- **Điều kiện tiên quyết:** Một vòng giữ đã lưu: chuyến thêm đi 18:00 hôm nay (xe A, tài xế X) và chuyến thêm về 12:00 hôm sau (cùng xe, cùng tài xế), cả hai chờ duyệt
+- **Các bước thực hiện:**
+  1. Cho bộ chọn của máy (đi DB như job 10 giây) chọn xe và tài xế cho một chuyến bến xa → bến nhà lúc 06:00 hôm sau, tức trong khoảng chờ
+  2. Đối chứng: làm lại bước 1 khi chưa có chuyến về
+- **Kết quả mong đợi:**
+  - Bước 1: không chọn xe A, không chọn tài xế X. Chuyến chèn vào phải kết thúc ở bến xa, nơi lượt kế tiếp của họ (12:00) bắt đầu — luật vị trí hai phía (CT5b)
+  - Bước 2: chọn chính xe A và tài xế X — tức điều chặn ở bước 1 là luật vị trí, không phải cửa sổ bận
+  - Admin chọn tay vẫn được (CM-5 cách B, "mềm cho người")
+- **Tự động hoá:** `RecommendationHoldTest.theHeldBusAndCrew_cannotBeGivenAnotherTripWhileTheyWait`
+
+---
 //////////////////////////////////////
 ### NHÓM 4.3: THUẬT TOÁN TỰ ĐỘNG PHÂN CÔNG TÀI NGUYÊN (autoAssignResources)
 
@@ -2024,6 +2039,25 @@
   - Bước 2: lỗi *"Chuyến #… thuộc vòng dự báo #… (cùng một xe và một tài xế cho cả vòng): hãy bấm Xác nhận để kích hoạt cả vòng, hoặc Từ chối để hủy cả vòng."*; cả hai lượt vẫn chờ duyệt
 - **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct8`: bị từ chối đúng câu
 - **Tự động hoá:** `ForecastLoopServiceTest.confirmingOneLeg_activatesTheWholeLoop_andTheManualApprovalPathRefusesALoopLeg`
+
+
+---
+
+### TC_APR_021 — Vòng giữ xe: nhãn trên Hàng chờ duyệt, xác nhận / từ chối cả vòng (CT9, CM-29, CM-27)
+
+- **Mã TC:** TC_APR_021
+- **Tên Kịch Bản:** Happy path — Admin duyệt một vòng giữ xe do job đêm tạo
+- **Điều kiện tiên quyết:** Hàng chờ duyệt có một vòng giữ xe (hai chuyến thêm, cùng xe, cùng tài xế)
+- **Các bước thực hiện:**
+  1. `GET /admin/trips/pending`, xem hai lượt; mở `/admin/trips/approve/{id}` của một lượt
+  2. Bấm "✅ Xác nhận" ở chuyến thêm về (`POST /admin/trips/confirm`)
+  3. Với một vòng giữ khác: bấm "Từ chối cả vòng"
+- **Kết quả mong đợi:**
+  - Bước 1: nhãn "🤖 Vòng dự báo #… · giữ xe · chuyến thêm đi" / "· giữ xe · chuyến thêm về", dòng nhắc *"Vòng giữ xe: xe và kíp lái chờ ở bến xa giữa chuyến thêm đi và chuyến thêm về."*; phụ đề màn Duyệt *"Lượt của một vòng giữ xe do job đêm tạo từ dự báo (vòng #…) — …"*
+  - Bước 2: cả hai lượt `ACTIVE`, thông báo *"… Cả vòng dự báo cũng được kích hoạt: #…, #…."*
+  - Bước 3: cả hai lượt `CANCELLED`; job đêm không đề xuất lại hai khung đó (TC_RC_024)
+- **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct9`: xác nhận #51617 → #51616 và #51617 `ACTIVE`; từ chối #51618 → #51618 và #51619 `CANCELLED`
+- **Tự động hoá:** `ForecastLoopServiceTest.aHeldCard_becomesOneLoopOfTwoMarkedExtras_keptOnARerun_andConfirmedAsAWhole`
 
 ---
 
@@ -2962,6 +2996,102 @@ Toàn bộ module chỉ đọc. Trang là `GET /admin/analytics/recommendation`.
   - bản sao: lần khởi động đầu mất 23 giây; "Chạy ngay" sau khi xác nhận / từ chối như TC_RC_016, TC_RC_018;
   - DB thật với cờ tắt (`verify` chỉ đọc): 21 trang 200, DB giống hệt trước và sau
 
+
+---
+
+### TC_RC_021 — Vòng giữ xe: chuyến thêm đi và chuyến thêm về sau đó thành một thẻ, một xe, một tài xế (CT9, CM-29…CM-32)
+
+- **Mã TC:** TC_RC_021
+- **Tên Kịch Bản:** Happy path — hai thẻ ngược chiều riêng thì lỗ (lượt đi kèm gần như rỗng), ghép thì có lãi
+- **Điều kiện tiên quyết:** Một cặp có khung đi nóng (ví dụ 18:00) và khung về nóng hôm sau (12:00); một xe, một tài xế ở bến nhà
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/recommendation`
+- **Kết quả mong đợi:**
+  - Một thẻ "Giữ xe ở bến xa": chuyến thêm đi 18:00, *"Chờ ở <bến xa> thêm 6 giờ (từ 06:00 …), tiền chờ 165,750đ"*, rồi chạy chuyến thêm về 12:00 hôm sau; cùng biển số và tài xế ở hai lượt; ô khách KV của chuyến về là khách tràn của khung đó như một chuyến thêm
+  - Chi phí cả vòng = 2 lượt + tiền chờ; ô lãi ghi thêm *"hai vòng riêng: …đ"* (lãi theo kế hoạch của hai vòng riêng)
+  - Tóm tắt: "Chuyến thêm còn thiếu" vẫn đếm chuyến thêm; *"… N vòng giữ xe gánh hai chuyến thêm mỗi vòng"*; số trên tiêu đề "Thẻ Đề Xuất" là số thẻ
+  - Đôi nào không tăng lãi, chờ quá 7 ngày, hay một tài xế phải lái > 8 giờ trong ngày thì không ghép
+- **Đã chạy:** 2026-11-25, DB thật (chỉ đọc): 15 thẻ, 3 vòng giữ; ví dụ Miền Đông → Đà Lạt 06:00 28/11 + Đà Lạt → Miền Đông 18:00 29/11, chờ thêm 12 giờ (331,500đ), lãi 1,931,689đ so với 47,447đ của hai vòng riêng
+- **Tự động hoá:** `RecommendationHoldTest.anOutboundAndALaterInboundExtra_becomeOneHeldLoop_onOneBusAndOneDriver`; phép tính tay ở `LoopEconomicsTest` (`waitCost_…`, `earliestReturn_…`, `aProfitableHold_…`, `noHold_…`, `theLargestGainIsPairedFirst_…`)
+
+---
+
+### TC_RC_022 — Không xếp được vòng giữ thì quay về hai thẻ riêng (CT9, CM-32)
+
+- **Mã TC:** TC_RC_022
+- **Tên Kịch Bản:** Error/Edge — không có xe (hay tài xế) chạy được cả vòng giữ
+- **Điều kiện tiên quyết:** Như TC_RC_021 nhưng không có xe nào
+- **Các bước thực hiện:**
+  1. Mở trang Đề xuất
+- **Kết quả mong đợi:**
+  - Không thẻ nào là vòng giữ; mỗi chuyến thêm một thẻ "Thiếu tài nguyên", như trước CT9
+  - Không mất chuyến thêm nào: "Chuyến thêm còn thiếu" = số thẻ
+- **Tự động hoá:** `RecommendationHoldTest.whenNoBusCanRunTheHeldLoop_theTwoExtrasFallBackToTwoSeparateCards`
+
+---
+
+### TC_RC_023 — Job đêm lưu vòng giữ, giữ nó khi chạy lại, và thay vòng thường cũ (CT9, CM-29)
+
+- **Mã TC:** TC_RC_023
+- **Tên Kịch Bản:** Happy path / Regression — vòng giữ là vòng dự báo hai lượt
+- **Điều kiện tiên quyết:** Có thẻ giữ xe còn ≥ 72 giờ; có thể đang có vòng thường (CT8b) chờ duyệt ở đúng các khung đó
+- **Các bước thực hiện:**
+  1. Bấm "Chạy ngay" (hay khởi động app)
+  2. Bấm "Chạy ngay" lần nữa
+- **Kết quả mong đợi:**
+  - Bước 1: khung "Job đêm" ghi *"🤖 Tạo vòng #… · xe … · lãi cả vòng …đ (giữ xe ở <bến xa> thêm N giờ, về bằng chuyến thêm …)"*; hai lượt `PENDING_APPROVAL`, cả hai là chuyến thêm, `forecast_loop_hold` = true, chuyến gốc của mỗi lượt là chuyến chính của khung nó. Vòng thường cũ mà kế hoạch nay muốn thay bằng vòng giữ thì bị rút (xoá mềm)
+  - Bước 2: "tạo 0, giữ N, rút 0" — giữ theo cả hai khung của vòng
+- **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct9`: rút #51610 và #51614; tạo #51616 (xe 11A-111.11 chờ ở Đà Lạt thêm 6 giờ, lãi 6.174.074đ) và #51618 (Cần Thơ); chạy lại: tạo 0, giữ 3, rút 0
+- **Tự động hoá:** `ForecastLoopServiceTest.aHeldCard_becomesOneLoopOfTwoMarkedExtras_keptOnARerun_andConfirmedAsAWhole`, `…pendingSingleLoops_areReplacedByHeldLoops_whenThePlanNowPairsThem`
+
+---
+
+### TC_RC_024 — Admin từ chối một vòng giữ: không khung nào trong hai khung được đề xuất lại (CT9)
+
+- **Mã TC:** TC_RC_024
+- **Tên Kịch Bản:** Error/Edge — người đã quyết "không" cho cả hai chuyến thêm
+- **Điều kiện tiên quyết:** Đã từ chối một vòng giữ (TC_APR_021 bước 3); dự báo của hai khung vẫn cần tăng cường; đủ xe cho hai thẻ riêng
+- **Các bước thực hiện:**
+  1. Chạy job
+- **Kết quả mong đợi:**
+  - Không vòng nào mới ở hai khung đó; kế hoạch của job không ghép hai khung đó, nên chúng hiện như hai thẻ riêng và cả hai bị bỏ qua (*"Không đề xuất lại 2 khung …"*)
+  - Các vòng khác vẫn được giữ
+- **Đã chạy:** 2026-11-25 trên bản sao: sau khi từ chối #51618, "Chạy ngay" ghi "tạo 0, giữ 1, rút 0": không vòng nào được tạo lại ở hai khung đó
+- **Tự động hoá:** `ForecastLoopServiceTest.aRejectedHeldLoop_keepsBothOfItsSlotsFromBeingProposedAgain`
+
+---
+
+### TC_RC_025 — Trang Kế hoạch cặp tuyến: chuyến thêm về của vòng giữ và xe đang được giữ (CT9)
+
+- **Mã TC:** TC_RC_025
+- **Tên Kịch Bản:** Happy path — nhìn là thấy xe nào đang chờ ở bến xa, chờ tới bao giờ, vì sao
+- **Điều kiện tiên quyết:** Màn Đề xuất có thẻ giữ xe; hay đã có một vòng giữ được lưu
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/pair-plan?date=` các ngày của vòng giữ, kể cả ngày ở giữa mà xe không chạy lượt nào
+- **Kết quả mong đợi:**
+  - Chuyến thêm về ★ được tính vào khung và ngày của nó; không có km "lượt đi kèm" cho vòng giữ
+  - Mục *"Xe được giữ ở bến xa (vòng giữ xe)"*: *"🅿 <biển số> (tài xế …) chờ ở <bến xa> từ … tới … để chạy chuyến thêm … về bến nhà — chờ thêm N giờ … (tiền chờ …); lãi cả vòng giữ …, hai vòng riêng …"*; vòng đã lưu ghi *"(vòng dự báo #…, chờ duyệt)"*, không có phép so tiền
+- **Đã chạy:** 2026-11-25 trên bản sao: ngày 28/11 có ba dòng của màn Đề xuất và *"🅿 29A-001.08 (vòng dự báo #51618, chờ duyệt) chờ ở Bến xe Cần Thơ từ 21:30 28/11 tới 06:00 29/11 …"*
+- **Tự động hoá:** `PairPlanServiceTest.aHeldLoop_showsBothExtras_andTheBusBeingHeld`, `…aSavedHeldLoop_isListed_onTheDayTheBusDoesNotMove`
+
+---
+
+### TC_RC_026 — Tham số tiền chờ: form, mặc định, chặn 0 (CT9, CM-8)
+
+- **Mã TC:** TC_RC_026
+- **Tên Kịch Bản:** Happy path + Error/Edge
+- **Điều kiện tiên quyết:** Dòng tham số chi phí lưu từ trước CT9 (chưa có hai cột tiền chờ)
+- **Các bước thực hiện:**
+  1. Mở `/admin/cost-parameters`
+  2. Lưu lương chờ 400000, phí nằm bến 200000
+  3. Lưu lương chờ 0
+- **Kết quả mong đợi:**
+  - Bước 1: hai ô mới "Lương Chờ (đồng / người / ngày)" = 333000, "Phí Xe Nằm Bến (đồng / xe / ngày)" = 330000 — đọc ra mặc định, chưa ghi gì xuống DB
+  - Bước 2: *"Đã lưu tham số chi phí!"*; màn Đề xuất *"Đang áp dụng: … lương chờ 400,000đ/người/ngày, phí xe nằm bến 200,000đ/ngày"*
+  - Bước 3: *"Lỗi: Lương chờ mỗi người mỗi ngày phải lớn hơn 0!"*, không lưu
+- **Đã chạy:** 2026-11-25 trên bản sao `busmanagement_ct9`: đúng cả ba bước
+- **Tự động hoá:** `CostParameterServiceTest.aRowSavedBeforeCt9_readsTheWaitingDefaults_withoutWriting`, `…save_rejectsAWaitingRateThatIsNotPositive`
+
 ---
 
 <a name="module-11"></a>
@@ -3037,6 +3167,21 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 
 ---
 
+---
+
+### TC_WI_007 — What-if ghép vòng giữ xe đúng như màn Đề xuất (CT9)
+
+- **Mã TC:** TC_WI_007
+- **Tên Kịch Bản:** Regression — hai màn cùng một kế hoạch
+- **Điều kiện tiên quyết:** Như TC_RC_021, đội xe phủ hết
+- **Các bước thực hiện:**
+  1. Mở `/admin/analytics/what-if` (không tham số) và `/admin/analytics/recommendation`
+- **Kết quả mong đợi:**
+  - "Chuyến thêm cần" của What-if = "Chuyến thêm còn thiếu" của màn Đề xuất (đếm chuyến thêm, không đếm thẻ)
+  - Doanh thu, chi phí của What-if = tổng của các thẻ, kể cả tiền chờ của vòng giữ
+  - "Nếu chỉ chạy chuyến có lãi" đếm theo chuyến thêm: một vòng giữ có lãi góp hai chuyến
+- **Tự động hoá:** `RecommendationHoldTest.whatIf_pairsTheSameHolds_andCountsTheSameMoney_asTheCards`
+
 ## PHỤ LỤC: MA TRẬN CHUYỂN TRẠNG THÁI FSM
 
 | Từ → Đến | ACTIVE | PENDING | DEPARTED | COMPLETED | CANCELLED |
@@ -3084,11 +3229,11 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 | Module 1 — Bus Management | 14 | 6 | 8 |
 | Module 2 — Station Management | 6 | 3 | 3 |
 | Module 3 — Trip FSM & CRUD | 35 | 10 | 25 |
-| Module 4 — AI Scheduler | 21 | 6 | 15 |
-| Module 5 — Admin Approval | 17 | 9 | 8 |
+| Module 4 — AI Scheduler | 22 | 6 | 16 |
+| Module 5 — Admin Approval | 18 | 10 | 8 |
 | Module 6 — Security & Config | 6 | 2 | 4 |
 | Module 7 — Incident Management | 20 | 12 | 8 |
-| **TỔNG** | **119** | **48** | **71** |
+| **TỔNG** | **121** | **49** | **72** |
 
 > **⚠️ Bảng này đã lệch so với thực tế (phát hiện 2026-07-17, chưa đối soát):** đếm trực tiếp
 > số heading `### TC_*` trong file cho ra **108** case, không phải 94. Cụ thể: `TC_SEC` thực có
@@ -3097,7 +3242,7 @@ Toàn bộ module chỉ đọc: ghi đè chi phí chỉ sống trong phiên mô 
 > dòng TỔNG (tổng số học của các dòng trong bảng) là mới; các dòng cũ được giữ nguyên thay vì
 > đoán lại phần Happy/Error của chúng. Cần một lượt đối soát riêng. *(2026-09-21: Module 7 +2 —
 > `TC_INC_019`/`TC_INC_020`, phạm vi mời của dropdown chuyến — dòng Module 7 và TỔNG cộng thêm 2
-> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)* *(2026-11-23, CT7c + CT7d (CM-24, CM-25): Module 1 +1 — `TC_BUS_014` (Happy Path); Module 3 +2 — `TC_TRIP_049` (Happy Path), `TC_TRIP_050` (Error/Edge); Module 10 +2 — `TC_RC_012` (Happy Path), `TC_RC_013` (Error/Edge) — cộng theo cùng cách. `TC_RC_008` sửa tại chỗ: lượt về là cùng xe, cùng tài xế.)* *(2026-11-25, CT8 (QĐ-24): Module 3 +3 — `TC_TRIP_051`, `TC_TRIP_053` (Happy Path), `TC_TRIP_052` (Error/Edge); Module 4 +1 — `TC_AI_021` (Error/Edge); Module 5 +3 — `TC_APR_018`, `TC_APR_019` (Happy Path), `TC_APR_020` (Error/Edge); Module 10 +7 — `TC_RC_014`, `TC_RC_020` (Happy Path), `TC_RC_015`…`TC_RC_019` (Error/Edge/Regression) — cộng theo cùng cách. `TC_AI_007`–`TC_AI_009` viết lại tại chỗ theo khung (CT8c); nhóm 4.1 thêm một ghi chú.)*
+> theo đúng cách bảng này vẫn đang được duy trì; phần lệch cũ chưa đối soát vẫn nguyên.)* *(2026-09-23: Module 5 +1 — `TC_APR_014`, Group C(a) — cộng theo cùng cách. Group C(c) — cảnh báo khi sửa km của tuyến có chuyến `DEPARTED` — chưa có TC thủ công vì Quản lý Tuyến chưa có module (xem "Khoảng trống đã biết" ngay dưới); nó được khoá bằng `RouteServiceDistanceWarningTest` (4 test).)* *(2026-09-24: Module 5 +1 — `TC_APR_015`, lỗi #27 (nút Từ chối ở MANUAL MODE) — cộng theo cùng cách, tính vào Error/Edge Case.)* *(2026-09-24: Module 5 +1 — `TC_APR_016`, mục #26 (số ghế theo xe khi duyệt thủ công) — tính vào Happy Path. `TC_AI_010`/`TC_AI_011` được cập nhật tại chỗ, không đổi số lượng.)* *(2026-11-17: Module 1 +2 — `TC_BUS_012` (bến nhà bắt buộc, Error/Edge) và `TC_BUS_013` (đổi bến nhà, Happy Path), CT5a của đợt cặp tuyến — cộng theo cùng cách. Bến nhà của **tài xế** chưa có case thủ công vì Quản lý Tài xế chưa có module (xem "Khoảng trống đã biết"); nó được khoá bằng `DriverServiceHomeStationTest` (4 test) và đã chạy tay trên bản sao ngày 2026-11-17.)* *(2026-11-17, CT5b: Module 4 +2 — `TC_AI_019` (Happy Path), `TC_AI_020` (Error/Edge); Module 5 +1 — `TC_APR_017` (Happy Path) — cộng theo cùng cách. Màn Đề xuất tăng cường (Module 10) không thêm case: phép kiểm 25 thẻ / 0 vi phạm vị trí ghi ở `route_pairs_progress.md`, CT5b.)* *(2026-11-17, lỗi #35/#36: Module 3 +1 — `TC_TRIP_044` (Error/Edge) — cộng theo cùng cách. Phần hiệu năng của #35 đo bằng `performance_schema`, không thành test case.)* *(2026-11-19, CT6 lịch thường lệ: Module 3 +4 — `TC_TRIP_045` (Happy Path), `TC_TRIP_046`, `TC_TRIP_047`, `TC_TRIP_048` (Error/Edge) — cộng theo cùng cách. Lịch thường lệ đặt ở Module 3 vì nó tạo chuyến qua đúng lối của form Tạo.)* *(2026-11-22, CT7 lãi cả vòng và trang Kế hoạch cặp tuyến: Module 8 +1 — `TC_FC_010`; Module 10 +4 — `TC_RC_008` (Happy Path), `TC_RC_009`, `TC_RC_010` (Error/Edge), `TC_RC_011` (Happy Path); Module 11 +1 — `TC_WI_006` (Regression). Bảng trên chỉ có Module 1–7 như trước, nên các dòng của nó không đổi. `TC_RC_001`, `TC_RC_002` sửa tại chỗ theo cách 2a và lãi cả vòng.)* *(2026-11-23, CT7c + CT7d (CM-24, CM-25): Module 1 +1 — `TC_BUS_014` (Happy Path); Module 3 +2 — `TC_TRIP_049` (Happy Path), `TC_TRIP_050` (Error/Edge); Module 10 +2 — `TC_RC_012` (Happy Path), `TC_RC_013` (Error/Edge) — cộng theo cùng cách. `TC_RC_008` sửa tại chỗ: lượt về là cùng xe, cùng tài xế.)* *(2026-11-25, CT8 (QĐ-24): Module 3 +3 — `TC_TRIP_051`, `TC_TRIP_053` (Happy Path), `TC_TRIP_052` (Error/Edge); Module 4 +1 — `TC_AI_021` (Error/Edge); Module 5 +3 — `TC_APR_018`, `TC_APR_019` (Happy Path), `TC_APR_020` (Error/Edge); Module 10 +7 — `TC_RC_014`, `TC_RC_020` (Happy Path), `TC_RC_015`…`TC_RC_019` (Error/Edge/Regression) — cộng theo cùng cách. `TC_AI_007`–`TC_AI_009` viết lại tại chỗ theo khung (CT8c); nhóm 4.1 thêm một ghi chú.)* *(2026-11-25, CT9 (QĐ-25, QĐ-26): Module 4 +1 — `TC_AI_022` (Error/Edge); Module 5 +1 — `TC_APR_021` (Happy Path); Module 10 +6 — `TC_RC_021`, `TC_RC_023`, `TC_RC_025`, `TC_RC_026` (Happy Path), `TC_RC_022`, `TC_RC_024` (Error/Edge); Module 11 +1 — `TC_WI_007` (Regression) — cộng theo cùng cách.)*
 
 > **Khoảng trống đã biết:** Phase 1 (Quản lý Tài xế, Quản lý Tuyến đường, Bảng Điều hành)
 > chưa có module test case riêng — các chức năng đó hiện chỉ được chạm tới gián tiếp qua

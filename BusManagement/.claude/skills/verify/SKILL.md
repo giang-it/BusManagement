@@ -106,8 +106,11 @@ Otherwise add `-Ddispatch.nightly.enabled=false`, or the clone drifts away from 
 real DB before your first request. On 2026-11-25 the first boot on the clone
 `busmanagement_ct8` closed 89 trips.
 
-Three checks before believing a result from the clone: (1) row counts + an MD5 over
-`trips` match the real DB right after the restore; (2) `information_schema.processlist`
+Three checks before believing a result from the clone: (1) row counts + a checksum over
+`trips` match the real DB right after the restore — use `CHECKSUM TABLE` (or `SUM(CRC32(...))` over the
+columns), **not** `MD5(GROUP_CONCAT(...))`: `group_concat_max_len` defaults to 1,024 characters, so such
+an MD5 silently covers only the first rows (found 2026-11-25; the earlier `snap.sh` had this flaw). A
+change that adds a column changes `CHECKSUM TABLE` of that table — compare a CRC over the old columns; (2) `information_schema.processlist`
 shows the new JVM's pool on `busmanagement_test` and **none** on `busmanagement`;
 (3) the real DB's snapshot is identical at the end. Do not pass the `demo` profile
 here either — the datasource override is a JVM arg, and a typo in it would wipe the
